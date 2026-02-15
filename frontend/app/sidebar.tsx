@@ -14,6 +14,7 @@ export default function Sidebar() {
     { href: '/schedule', icon: '📅', label: 'Schedule' },
     { href: '/locations', icon: '📍', label: 'Locations' },
     { href: '/equipment', icon: '🎬', label: 'Equipment' },
+    { href: '/collaboration', icon: '🤝', label: 'Collab', badge: 'NEW' },
     { href: '/progress', icon: '📊', label: 'Progress' },
     { href: '/dood', icon: '📈', label: 'DOOD Report' },
     { href: '/budget', icon: '💰', label: 'Budget' },

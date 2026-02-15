@@ -565,12 +565,81 @@ export function Phase29Dashboard({ stats, recentActivities, collaborators }: Pha
   );
 }
 
+// ============ Team Workload Component ============
+
+interface TeamMember {
+  name: string;
+  role: string;
+  tasks: number;
+  capacity: number;
+}
+
+interface TeamWorkloadProps {
+  members: TeamMember[];
+}
+
+export function TeamWorkload({ members }: TeamWorkloadProps) {
+  return (
+    <div className="space-y-4">
+      {members.map((member, idx) => (
+        <div key={idx} className="space-y-1">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="font-medium text-white">{member.name}</div>
+              <div className="text-xs text-gray-400">{member.role}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-white">{member.tasks} tasks</div>
+              <div className={`text-xs ${member.capacity > 80 ? 'text-red-400' : 'text-green-400'}`}>
+                {member.capacity}% capacity
+              </div>
+            </div>
+          </div>
+          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div 
+              className={`h-full rounded-full ${member.capacity > 80 ? 'bg-red-500' : member.capacity > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
+              style={{ width: `${Math.min(member.capacity, 100)}%` }}
+            ></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============ Collaboration Stats Component ============
+
+interface CollaborationStatsProps {
+  title: string;
+  value: string;
+  change: string;
+  icon: string;
+  trend: 'up' | 'down';
+}
+
+export function CollaborationStats({ title, value, change, icon, trend }: CollaborationStatsProps) {
+  return (
+    <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+      <div className="flex items-start justify-between mb-2">
+        <div className="text-2xl">{icon}</div>
+        <div className={`text-xs px-2 py-1 rounded-full ${trend === 'up' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+          {change}
+        </div>
+      </div>
+      <div className="text-2xl font-bold text-white mb-1">{value}</div>
+      <div className="text-sm text-gray-400">{title}</div>
+    </div>
+  );
+}
+
 export default {
   CollaboratorAvatar,
   CollaboratorList,
   ActivityFeed,
   RealtimeStatus,
   ProjectTimeline,
+  TeamWorkload,
+  CollaborationStats,
   BudgetTracker,
   SceneBoard,
   ExportModal,

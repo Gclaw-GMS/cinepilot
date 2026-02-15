@@ -1746,6 +1746,110 @@ def export_calendar(data: dict):
         "generated_at": datetime.now().isoformat()
     }
 
+@app.post("/api/export/json")
+def export_json(data: dict):
+    """Export project data as JSON"""
+    project_id = data.get("project_id", 1)
+    export_type = data.get("type", "project")
+    
+    result = {
+        "project_id": project_id,
+        "exported_at": datetime.now().isoformat(),
+        "type": export_type
+    }
+    
+    if export_type == "project":
+        projects = load_json("projects.json", [])
+        project = next((p for p in projects if p.get("id") == project_id), projects[0] if projects else {})
+        result["project"] = project
+        result["schedule"] = load_json("schedule.json", {})
+        result["scenes"] = load_json("scenes.json", [])
+        
+    elif export_type == "locations":
+        locations = load_json("locations.json", [])
+        result["locations"] = locations
+        
+    elif export_type == "schedule":
+        result["schedule"] = load_json("schedule.json", {})
+        
+    elif export_type == "budget":
+        result["budget"] = load_json("budget.json", {})
+        
+    elif export_type == "crew":
+        result["crew"] = load_json("crew.json", [])
+    
+    json_content = json.dumps(result, indent=2)
+    
+    return {
+        "project_id": project_id,
+        "content": json_content,
+        "filename": f"cinepilot_{export_type}_{datetime.now().strftime('%Y%m%d')}.json",
+        "generated_at": datetime.now().isoformat()
+    }
+
+@app.post("/api/export/batch")
+def export_batch(data: dict):
+    """Export multiple data types as ZIP"""
+    project_id = data.get("project_id", 1)
+    export_types = data.get("types", ["schedule", "budget"])
+    
+    import base64
+    import io
+    import zipfile
+    
+    # Collect all exports
+    files = {}
+    
+    if "schedule" in export_types:
+        schedule = load_json("schedule.json", {})
+        files["schedule.json"] = json.dumps(schedule, indent=2)
+    
+    if "budget" in export_types:
+        budget = load_json("budget.json", {})
+        files["budget.json"] = json.dumps(budget, indent=2)
+    
+    if "crew" in export_types:
+        crew = load_json("crew.json", [])
+        files["crew.json"] = json.dumps(crew, indent=2)
+    
+    if "equipment" in export_types:
+        equipment = load_json("equipment.json", [])
+        files["equipment.json"] = json.dumps(equipment, indent=2)
+    
+    if "locations" in export_types:
+        locations = load_json("locations.json", [])
+        files["locations.json"] = json.dumps(locations, indent=2)
+    
+    if "callsheet" in export_types:
+        # Generate simple text callsheet
+        callsheet = "CINEPILOT CALL SHEET\n" + "=" * 40 + "\n\nDate: " + datetime.now().strftime("%Y-%m-%d")
+        files["callsheet.txt"] = callsheet
+    
+    # Create ZIP in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for filename, content in files.items():
+            zipf.writestr(filename, content)
+        
+        # Add manifest
+        manifest = {
+            "project_id": project_id,
+            "exported_at": datetime.now().isoformat(),
+            "files": list(files.keys())
+        }
+        zipf.writestr("manifest.json", json.dumps(manifest, indent=2))
+    
+    zip_buffer.seek(0)
+    zip_base64 = base64.b64encode(zip_buffer.read()).decode('utf-8')
+    
+    return {
+        "project_id": project_id,
+        "zip_base64": zip_base64,
+        "files_included": list(files.keys()),
+        "filename": f"cinepilot_batch_{datetime.now().strftime('%Y%m%d')}.zip",
+        "generated_at": datetime.now().isoformat()
+    }
+
 # ==================== AI SHOT LIST GENERATION ====================
 
 SHOT_TYPES = {

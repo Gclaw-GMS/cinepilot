@@ -17,6 +17,7 @@ export default function ScriptsPage() {
   const [scriptText, setScriptText] = useState<string>('')
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tagFilter, setTagFilter] = useState<string>('')
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -276,9 +277,18 @@ export default function ScriptsPage() {
 
           {/* Tags */}
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-400 mb-2">Tags</h3>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-medium text-gray-400">Tags</h3>
+              <input
+                type="text"
+                placeholder="Filter tags..."
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value.toLowerCase())}
+                className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded w-32 focus:border-cinepilot-accent focus:outline-none"
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
-              {analysis.tags.map((tag) => (
+              {analysis.tags.filter(t => !tagFilter || t.toLowerCase().includes(tagFilter)).map((tag) => (
                 <span key={tag} className="px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full text-sm">
                   {tag}
                 </span>

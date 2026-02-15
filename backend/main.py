@@ -3147,4 +3147,352 @@ def analyze_vfx_requirements(request: dict):
         ] if len(vfx_scenes) > 0 else ["Minimal VFX required - good for budget"]
     }
 
-print("✅ Phase 25 AI Features loaded")
+# ============ PHASE 26: ENHANCED FEATURES ============
+
+@app.post("/api/ai/scene-suggestions")
+def get_scene_suggestions(request: dict):
+    """Get AI-powered scene suggestions based on context"""
+    project_id = request.get("project_id")
+    context = request.get("context", "")
+    
+    # Get existing scenes
+    scenes = load_json("scenes.json", [])
+    project_scenes = [s for s in scenes if s.get("project_id") == project_id]
+    
+    suggestions = []
+    
+    # Analyze existing scenes for gaps
+    locations = set(s.get("location") for s in project_scenes if s.get("location"))
+    times = set(s.get("time_of_day") for s in project_scenes if s.get("time_of_day"))
+    
+    if len(project_scenes) < 5:
+        suggestions.append({
+            "type": "expansion",
+            "suggestion": "Add more establishing shots",
+            "reason": "Only a few scenes defined"
+        })
+    
+    if "DAY" not in times:
+        suggestions.append({
+            "type": "time_addition",
+            "suggestion": "Add daytime scenes",
+            "reason": "No day scenes found"
+        })
+    
+    if "NIGHT" not in times:
+        suggestions.append({
+            "type": "time_addition", 
+            "suggestion": "Add night sequences",
+            "reason": "Adds dramatic variety"
+        })
+    
+    if len(locations) < 3:
+        suggestions.append({
+            "type": "location_expansion",
+            "suggestion": "Introduce new locations",
+            "reason": "Limited location variety"
+        })
+    
+    # Generate suggested new scenes based on common Tamil film patterns
+    suggestions.extend([
+        {
+            "type": "introduction",
+            "suggestion": "Opening scene - Establish setting",
+            "scene_type": "establishing",
+            "location_suggestion": "City/Town overview",
+            "time_suggestion": "DAY"
+        },
+        {
+            "type": "conflict",
+            "suggestion": "Conflict introduction scene",
+            "scene_type": "dialogue",
+            "location_suggestion": "Home/Office",
+            "time_suggestion": "DAY"
+        },
+        {
+            "type": "climax",
+            "suggestion": "Climactic sequence",
+            "scene_type": "action",
+            "location_suggestion": "Open location",
+            "time_suggestion": "EVENING"
+        }
+    ])
+    
+    return {
+        "project_id": project_id,
+        "suggestions": suggestions,
+        "analysis": {
+            "current_scene_count": len(project_scenes),
+            "location_count": len(locations),
+            "time_variety": len(times)
+        }
+    }
+
+@app.post("/api/ai/location-recommendations")
+def get_location_recommendations(request: dict):
+    """AI-powered location recommendations based on script content"""
+    script_content = request.get("script_content", "")
+    requirements = request.get("requirements", {})
+    
+    recommendations = []
+    
+    # Analyze script for location keywords
+    location_types = {
+        "residential": ["home", "house", "apartment", "room", "bedroom", "kitchen"],
+        "commercial": ["shop", "office", "restaurant", "hotel", "market"],
+        "outdoor": ["park", "street", "beach", "forest", "field", "road"],
+        "industrial": ["factory", "warehouse", "construction"],
+        "religious": ["temple", "church", "mosque", "church"],
+        "entertainment": ["theater", "cinema", "club", "party"]
+    }
+    
+    content_lower = script_content.lower()
+    
+    for loc_type, keywords in location_types.items():
+        matches = sum(1 for kw in keywords if kw in content_lower)
+        if matches > 0:
+            recommendations.append({
+                "type": loc_type,
+                "priority": matches,
+                "suggested_locations": [
+                    f"Typical {loc_type} setting in Tamil Nadu",
+                    "Consider both studio and practical locations"
+                ],
+                "estimated_cost": {
+                    "studio": 50000 if loc_type == "residential" else 100000,
+                    "practical": 30000 if loc_type == "residential" else 50000
+                }
+            })
+    
+    # Add general recommendations
+    recommendations.extend([
+        {
+            "type": "shooting_efficiency",
+            "priority": 5,
+            "suggested_locations": ["Group scenes by location for efficiency"],
+            "estimated_cost": {"savings": "20-30%"}
+        },
+        {
+            "type": "weather_consideration", 
+            "priority": 4,
+            "suggested_locations": ["Plan outdoor shoots for optimal weather months"],
+            "estimated_cost": {"contingency": "10%"}
+        }
+    ])
+    
+    return {
+        "recommendations": sorted(recommendations, key=lambda x: x["priority"], reverse=True),
+        "total_suggested": len(recommendations),
+        "budget_impact": "Moderate - depends on location choices"
+    }
+
+@app.post("/api/ai/cost-estimate")
+def get_ai_cost_estimate(request: dict):
+    """AI-powered detailed cost estimation"""
+    project_id = request.get("project_id")
+    scenes = request.get("scenes", [])
+    
+    # Base costs (in INR)
+    base_costs = {
+        "camera_dept": 150000,      # Per day
+        "light_dept": 100000,       # Per day
+        "sound_dept": 50000,        # Per day
+        "art_dept": 80000,          # Per day
+        "makeup": 30000,            # Per day
+        "transport": 50000,         # Per day
+        "catering": 40000,          # Per day
+        "location": 100000,         # Per day (average)
+    }
+    
+    # Calculate based on scene complexity
+    total_shoot_days = max(1, len(scenes) // 3)  # Rough estimate: 3 scenes per day
+    
+    # Scene type multipliers
+    action_scenes = sum(1 for s in scenes if any(k in str(s).lower() for k in ["action", "fight", "chase"]))
+    night_scenes = sum(1 for s in scenes if "night" in str(s).lower())
+    vfx_scenes = sum(1 for s in scenes if "vfx" in str(s).lower())
+    
+    # Adjust for complexity
+    day_multiplier = 1.0
+    if action_scenes > 3: day_multiplier += 0.3
+    if night_scenes > 2: day_multiplier += 0.2
+    if vfx_scenes > 0: day_multiplier += 0.5
+    
+    adjusted_days = int(total_shoot_days * day_multiplier)
+    
+    breakdown = {}
+    total = 0
+    for dept, base in base_costs.items():
+        cost = base * adjusted_days
+        breakdown[dept] = cost
+        total += cost
+    
+    # Add contingency
+    contingency = total * 0.1
+    
+    return {
+        "project_id": project_id,
+        "estimate": {
+            "total_scenes": len(scenes),
+            "estimated_shoot_days": adjusted_days,
+            "breakdown": breakdown,
+            "subtotal": total,
+            "contingency": contingency,
+            "grand_total": total + contingency
+        },
+        "complexity_factors": {
+            "action_scenes": action_scenes,
+            "night_scenes": night_scenes,
+            "vfx_scenes": vfx_scenes,
+            "day_multiplier": day_multiplier
+        },
+        "recommendations": [
+            "Group scenes by location to reduce setup time",
+            "Consider night shoots in succession for cost efficiency",
+            "Pre-book VFX-intensive scenes with post-production"
+        ]
+    }
+
+@app.post("/api/scenes/batch")
+def batch_update_scenes(request: dict):
+    """Batch create or update scenes"""
+    project_id = request.get("project_id")
+    scenes_data = request.get("scenes", [])
+    
+    scenes = load_json("scenes.json", [])
+    
+    for scene_data in scenes_data:
+        scene_data["project_id"] = project_id
+        if "id" in scene_data:
+            # Update existing
+            for i, s in enumerate(scenes):
+                if s.get("id") == scene_data["id"]:
+                    scenes[i].update(scene_data)
+                    break
+        else:
+            # Create new
+            scene_data["id"] = len(scenes) + 1
+            scenes.append(scene_data)
+    
+    save_json("scenes.json", scenes)
+    
+    return {
+        "success": True,
+        "scenes_updated": len(scenes_data),
+        "total_scenes": len(scenes)
+    }
+
+@app.get("/api/calendar/{project_id}")
+def get_production_calendar(project_id: int):
+    """Get production calendar with milestones"""
+    schedule = load_json("schedule.json", {"days": []})
+    project_schedule = [d for d in schedule.get("days", []) if d.get("project_id") == project_id]
+    
+    # Generate calendar events
+    events = []
+    for day in project_schedule:
+        events.append({
+            "date": day.get("date"),
+            "type": "shoot",
+            "scenes": day.get("scenes", []),
+            "location": day.get("location"),
+            "call_time": day.get("call_time"),
+            "wrap_time": day.get("wrap_time")
+        })
+    
+    return {
+        "project_id": project_id,
+        "events": events,
+        "total_shoot_days": len(events)
+    }
+
+@app.post("/api/crew/availability")
+def check_crew_availability(request: dict):
+    """Check crew availability for given dates"""
+    crew_ids = request.get("crew_ids", [])
+    dates = request.get("dates", [])
+    
+    crew = load_json("crew.json", [])
+    schedule = load_json("schedule.json", {"days": []})
+    
+    availability = []
+    for crew_id in crew_ids:
+        crew_member = next((c for c in crew if c.get("id") == crew_id), None)
+        if not crew_member:
+            continue
+            
+        crew_schedules = []
+        for date in dates:
+            # Check if crew is booked on this date
+            booked = any(
+                d.get("date") == date and crew_id in d.get("crew_ids", [])
+                for d in schedule.get("days", [])
+            )
+            crew_schedules.append({
+                "date": date,
+                "available": not booked,
+                "status": "booked" if booked else "available"
+            })
+        
+        availability.append({
+            "crew_id": crew_id,
+            "name": crew_member.get("name"),
+            "role": crew_member.get("role"),
+            "schedule": crew_schedules
+        })
+    
+    return {
+        "dates_checked": len(dates),
+        "crew_checked": len(crew_ids),
+        "availability": availability
+    }
+
+@app.put("/api/notifications/preferences")
+def update_notification_preferences(request: dict):
+    """Update user notification preferences"""
+    user_id = request.get("user_id")
+    preferences = {
+        "whatsapp_enabled": request.get("whatsapp_enabled", True),
+        "email_enabled": request.get("email_enabled", True),
+        "sms_enabled": request.get("sms_enabled", False),
+        "notify_on": request.get("notify_on", ["schedule_change", "budget_alert", "scene_update"])
+    }
+    
+    # Save preferences
+    prefs_file = DATA_DIR / "notification_preferences.json"
+    all_prefs = {}
+    if prefs_file.exists():
+        all_prefs = json.load(prefs_file)
+    
+    all_prefs[str(user_id)] = preferences
+    save_json("notification_preferences.json", all_prefs)
+    
+    return {"success": True, "preferences": preferences}
+
+@app.get("/api/collaboration/{project_id}/users")
+def get_collaborators(project_id: int):
+    """Get active collaborators on a project"""
+    # Mock implementation - in real app would check database
+    return [
+        {"id": 1, "name": "Director", "role": "director", "online": True},
+        {"id": 2, "name": "Producer", "role": "producer", "online": False},
+        {"id": 3, "name": "Writer", "role": "writer", "online": True}
+    ]
+
+@app.get("/api/scripts/{project_id}/versions")
+def get_script_versions(project_id: int):
+    """Get script version history"""
+    versions = load_json("script_versions.json", [])
+    project_versions = [v for v in versions if v.get("project_id") == project_id]
+    
+    if not project_versions:
+        # Return mock data
+        return [
+            {"id": 1, "version": "1.0", "uploaded_at": "2026-01-15", "uploaded_by": "Writer", "notes": "Initial draft"},
+            {"id": 2, "version": "1.1", "uploaded_at": "2026-01-20", "uploaded_by": "Director", "notes": "Revised scenes 5-10"},
+            {"id": 3, "version": "2.0", "uploaded_at": "2026-02-01", "uploaded_by": "Writer", "notes": "Final draft"}
+        ]
+    
+    return project_versions
+
+print("✅ Phase 26 Features loaded")

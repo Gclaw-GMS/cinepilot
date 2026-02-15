@@ -12,6 +12,7 @@ export default function Sidebar() {
     { href: '/scripts', icon: '📄', label: 'Scripts', badge: 2 },
     { href: '/shot-list', icon: '🎥', label: 'Shot List' },
     { href: '/schedule', icon: '📅', label: 'Schedule' },
+    { href: '/timeline', icon: '📆', label: 'Timeline', badge: 'NEW' },
     { href: '/locations', icon: '📍', label: 'Locations' },
     { href: '/equipment', icon: '🎬', label: 'Equipment' },
     { href: '/collaboration', icon: '🤝', label: 'Collab', badge: 'NEW' },

@@ -4,7 +4,8 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface StoryboardFrame {
-  id: number
+  id?: number
+  scene_id: number
   scene_number: number
   shot_number: number
   description: string
@@ -66,7 +67,7 @@ export const StoryboardViewer: React.FC<StoryboardViewerProps> = ({
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.05 }}
-                  onClick={() => setSelectedFrame(frame.id)}
+                  onClick={() => frame.id !== undefined && setSelectedFrame(frame.id)}
                   className={`cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
                     selectedFrame === frame.id ? 'border-indigo-500 ring-2 ring-indigo-500/30' : 'border-gray-700 hover:border-gray-600'
                   }`}
@@ -99,7 +100,7 @@ export const StoryboardViewer: React.FC<StoryboardViewerProps> = ({
               {frames.map((frame) => (
                 <div
                   key={frame.id}
-                  onClick={() => setSelectedFrame(frame.id)}
+                  onClick={() => frame.id !== undefined && setSelectedFrame(frame.id)}
                   className={`flex-shrink-0 w-32 cursor-pointer rounded-lg overflow-hidden border-2 ${
                     selectedFrame === frame.id ? 'border-indigo-500' : 'border-gray-700'
                   }`}
@@ -128,9 +129,9 @@ export const StoryboardViewer: React.FC<StoryboardViewerProps> = ({
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Shot {selected.shot_number}</h3>
-              {editable && (
+              {editable && selected.id !== undefined && (
                 <button
-                  onClick={() => onFrameDelete?.(selected.id)}
+                  onClick={() => selected.id !== undefined && onFrameDelete?.(selected.id as number)}
                   className="text-red-400 hover:text-red-300"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

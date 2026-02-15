@@ -3600,3 +3600,274 @@ def get_script_versions(project_id: int):
     return project_versions
 
 print("✅ Phase 26 Features loaded")
+
+# ============== PHASE 28: TASKS, NOTES, ACTIVITY ==============
+
+# Task Models
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    assignee: Optional[str] = None
+    status: str = "pending"
+    priority: str = "medium"
+    due_date: Optional[str] = None
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    assignee: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[str] = None
+
+# Note Models
+class NoteCreate(BaseModel):
+    content: str
+    author: str
+    category: str = "general"
+
+# Budget Category Models
+class BudgetCategoryCreate(BaseModel):
+    name: str
+    allocated: float
+    spent: float = 0
+    color: str = "#4F46E5"
+
+# Activity Model
+class ActivityCreate(BaseModel):
+    type: str
+    action: str
+    details: str
+    user: str
+
+def log_activity(project_id: int, activity_type: str, action: str, details: str, user: str = "System"):
+    """Log an activity to the activity feed"""
+    activities = load_json("activities.json", [])
+    activities.append({
+        "id": len(activities) + 1,
+        "project_id": project_id,
+        "type": activity_type,
+        "action": action,
+        "details": details,
+        "user": user,
+        "created_at": datetime.now().isoformat()
+    })
+    # Keep only last 100 activities
+    activities = activities[-100:]
+    save_json("activities.json", activities)
+
+# Tasks Endpoints
+@app.get("/api/projects/{project_id}/tasks")
+def get_tasks(project_id: int):
+    """Get all tasks for a project"""
+    tasks = load_json("tasks.json", [])
+    return [t for t in tasks if t.get("project_id") == project_id]
+
+@app.post("/api/projects/{project_id}/tasks")
+def create_task(project_id: int, task: TaskCreate):
+    """Create a new task"""
+    tasks = load_json("tasks.json", [])
+    task_id = len(tasks) + 1
+    new_task = {
+        "id": task_id,
+        "project_id": project_id,
+        "title": task.title,
+        "description": task.description,
+        "assignee": task.assignee,
+        "status": task.status,
+        "priority": task.priority,
+        "due_date": task.due_date,
+        "created_at": datetime.now().isoformat()
+    }
+    tasks.append(new_task)
+    save_json("tasks.json", tasks)
+    
+    log_activity(project_id, "task", "Created", f"Task: {task.title}", task.author if hasattr(task, 'author') else "User")
+    
+    return new_task
+
+@app.put("/api/projects/{project_id}/tasks/{task_id}")
+def update_task(project_id: int, task_id: int, task: TaskUpdate):
+    """Update a task"""
+    tasks = load_json("tasks.json", [])
+    for t in tasks:
+        if t.get("id") == task_id and t.get("project_id") == project_id:
+            if task.title is not None:
+                t["title"] = task.title
+            if task.description is not None:
+                t["description"] = task.description
+            if task.assignee is not None:
+                t["assignee"] = task.assignee
+            if task.status is not None:
+                t["status"] = task.status
+                if task.status == "completed":
+                    t["completed_at"] = datetime.now().isoformat()
+            if task.priority is not None:
+                t["priority"] = task.priority
+            if task.due_date is not None:
+                t["due_date"] = task.due_date
+            break
+    save_json("tasks.json", tasks)
+    
+    log_activity(project_id, "task", "Updated", f"Task #{task_id}")
+    
+    return {"success": True}
+
+@app.delete("/api/projects/{project_id}/tasks/{task_id}")
+def delete_task(project_id: int, task_id: int):
+    """Delete a task"""
+    tasks = load_json("tasks.json", [])
+    tasks = [t for t in tasks if not (t.get("id") == task_id and t.get("project_id") == project_id)]
+    save_json("tasks.json", tasks)
+    
+    log_activity(project_id, "task", "Deleted", f"Task #{task_id}")
+    
+    return {"success": True}
+
+@app.post("/api/projects/{project_id}/tasks/batch")
+def batch_update_tasks(project_id: int, request: dict):
+    """Batch update tasks (complete or delete)"""
+    task_ids = request.get("task_ids", [])
+    action = request.get("action", "complete")
+    
+    tasks = load_json("tasks.json", [])
+    for t in tasks:
+        if t.get("id") in task_ids and t.get("project_id") == project_id:
+            if action == "complete":
+                t["status"] = "completed"
+                t["completed_at"] = datetime.now().isoformat()
+            elif action == "delete":
+                tasks.remove(t)
+    
+    save_json("tasks.json", tasks)
+    
+    log_activity(project_id, "task", "Batch Updated", f"{len(task_ids)} tasks {action}ed")
+    
+    return {"success": True, "updated": len(task_ids)}
+
+# Notes Endpoints
+@app.get("/api/projects/{project_id}/notes")
+def get_notes(project_id: int):
+    """Get all notes for a project"""
+    notes = load_json("notes.json", [])
+    return [n for n in notes if n.get("project_id") == project_id]
+
+@app.post("/api/projects/{project_id}/notes")
+def create_note(project_id: int, note: NoteCreate):
+    """Create a new note"""
+    notes = load_json("notes.json", [])
+    note_id = len(notes) + 1
+    new_note = {
+        "id": note_id,
+        "project_id": project_id,
+        "content": note.content,
+        "author": note.author,
+        "category": note.category,
+        "created_at": datetime.now().isoformat()
+    }
+    notes.append(new_note)
+    save_json("notes.json", notes)
+    
+    log_activity(project_id, "note", "Added", f"Note in {note.category}", note.author)
+    
+    return new_note
+
+@app.delete("/api/projects/{project_id}/notes/{note_id}")
+def delete_note(project_id: int, note_id: int):
+    """Delete a note"""
+    notes = load_json("notes.json", [])
+    notes = [n for n in notes if not (n.get("id") == note_id and n.get("project_id") == project_id)]
+    save_json("notes.json", notes)
+    
+    log_activity(project_id, "note", "Deleted", f"Note #{note_id}")
+    
+    return {"success": True}
+
+# Budget Categories Endpoints
+@app.get("/api/projects/{project_id}/budget/categories")
+def get_budget_categories(project_id: int):
+    """Get budget categories for a project"""
+    categories = load_json("budget_categories.json", [])
+    return [c for c in categories if c.get("project_id") == project_id]
+
+@app.post("/api/projects/{project_id}/budget/categories")
+def create_budget_category(project_id: int, category: BudgetCategoryCreate):
+    """Create a budget category"""
+    categories = load_json("budget_categories.json", [])
+    cat_id = len(categories) + 1
+    new_category = {
+        "id": cat_id,
+        "project_id": project_id,
+        "name": category.name,
+        "allocated": category.allocated,
+        "spent": category.spent,
+        "color": category.color
+    }
+    categories.append(new_category)
+    save_json("budget_categories.json", categories)
+    
+    log_activity(project_id, "budget", "Created Category", f"Budget category: {category.name}")
+    
+    return new_category
+
+@app.put("/api/projects/{project_id}/budget/categories/{category_id}")
+def update_budget_category(project_id: int, category_id: int, category: BudgetCategoryCreate):
+    """Update a budget category"""
+    categories = load_json("budget_categories.json", [])
+    for c in categories:
+        if c.get("id") == category_id and c.get("project_id") == project_id:
+            c["name"] = category.name
+            c["allocated"] = category.allocated
+            c["spent"] = category.spent
+            c["color"] = category.color
+            break
+    save_json("budget_categories.json", categories)
+    
+    log_activity(project_id, "budget", "Updated Category", f"Budget category #{category_id}")
+    
+    return {"success": True}
+
+# Activity Endpoints
+@app.get("/api/projects/{project_id}/activity")
+def get_project_activity(project_id: int, limit: int = 20):
+    """Get activity feed for a project"""
+    activities = load_json("activities.json", [])
+    project_activities = [a for a in activities if a.get("project_id") == project_id]
+    # Sort by most recent first
+    project_activities.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return project_activities[:limit]
+
+# Export Endpoint
+@app.get("/api/projects/{project_id}/export")
+def export_project_data(project_id: int, format: str = "json"):
+    """Export project data"""
+    projects = load_json("projects.json", [])
+    project = next((p for p in projects if p.get("id") == project_id), None)
+    
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    scenes = load_json("scenes.json", [])
+    project_scenes = [s for s in scenes if s.get("project_id") == project_id]
+    
+    crew = load_json("crew.json", [])
+    project_crew = [c for c in crew if c.get("project_id") == project_id]
+    
+    tasks = load_json("tasks.json", [])
+    project_tasks = [t for t in tasks if t.get("project_id") == project_id]
+    
+    notes = load_json("notes.json", [])
+    project_notes = [n for n in notes if n.get("project_id") == project_id]
+    
+    data = {
+        "project": project,
+        "scenes": project_scenes,
+        "crew": project_crew,
+        "tasks": project_tasks,
+        "notes": project_notes,
+        "exported_at": datetime.now().isoformat()
+    }
+    
+    return data
+
+print("✅ Phase 28 Features loaded: Tasks, Notes, Activity Timeline, Budget Categories")

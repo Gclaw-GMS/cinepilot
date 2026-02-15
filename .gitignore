@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+# Build
+.next/
+# Environment
+.env
+# OS
+.DS_Store

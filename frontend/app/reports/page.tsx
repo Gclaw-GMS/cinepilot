@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from 'react'
-import Sidebar from '../sidebar'
 import ProductionReport from '../components/production-report'
 import CharacterArcViewer from '../components/character-arc-viewer'
 import ShotListGenerator from '../components/shot-list-generator'
@@ -10,8 +9,7 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'reports' | 'arc' | 'shots'>('reports')
 
   return (
-    <div className="flex min-h-screen bg-gray-900">
-      <Sidebar />
+    <div className="p-8">
       <main className="flex-1 p-8">
         <div className="max-w-6xl mx-auto">
           <header className="mb-8">

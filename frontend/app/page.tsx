@@ -4,13 +4,77 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import * as api from '@/lib/api'
 import type { Project } from '@/lib/types'
-import ConnectionStatus from '@/components/ConnectionStatus'
+import { 
+  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts'
+import { 
+  Film, Clapperboard, Calendar, DollarSign, Users, TrendingUp, 
+  Clock, CheckCircle, AlertCircle, ArrowUpRight, ArrowDownRight,
+  FolderOpen, Plus, RefreshCw
+} from 'lucide-react'
 
-export default function Home() {
+// Professional color palette
+const COLORS = {
+  primary: '#6366f1',      // Indigo
+  secondary: '#8b5cf6',    // Violet
+  success: '#10b981',      // Emerald
+  warning: '#f59e0b',      // Amber
+  danger: '#ef4444',       // Red
+  info: '#06b6d4',         // Cyan
+  muted: '#64748b',       // Slate
+}
+
+const CHART_COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#06b6d4', '#ec4899']
+
+// Demo data for visualization
+const BUDGET_DATA = [
+  { month: 'Jan', budget: 4500000, spent: 3200000 },
+  { month: 'Feb', budget: 4800000, spent: 4100000 },
+  { month: 'Mar', budget: 5200000, spent: 3800000 },
+  { month: 'Apr', budget: 5500000, spent: 4900000 },
+  { month: 'May', budget: 6000000, spent: 5200000 },
+  { month: 'Jun', budget: 6500000, spent: 5800000 },
+]
+
+const SCENE_DATA = [
+  { name: ' INT', count: 156, color: '#6366f1' },
+  { name: 'EXT', count: 89, color: '#8b5cf6' },
+  { name: 'Day', count: 178, color: '#10b981' },
+  { name: 'Night', count: 67, color: '#f59e0b' },
+]
+
+const CREW_DATA = [
+  { dept: 'Camera', assigned: 12, needed: 15 },
+  { dept: 'Lights', assigned: 8, needed: 10 },
+  { dept: 'Sound', assigned: 6, needed: 8 },
+  { dept: 'Art', assigned: 10, needed: 12 },
+  { dept: 'Makeup', assigned: 4, needed: 5 },
+]
+
+const PROGRESS_DATA = [
+  { phase: 'Pre-Pro', complete: 85 },
+  { phase: 'Production', complete: 45 },
+  { phase: 'Post-Pro', complete: 20 },
+]
+
+const STATUS_DATA = [
+  { name: 'Planning', value: 3, color: '#6366f1' },
+  { name: 'In Progress', value: 5, color: '#f59e0b' },
+  { name: 'Completed', value: 2, color: '#10b981' },
+  { name: 'On Hold', value: 1, color: '#ef4444' },
+]
+
+const RECENT_ACTIVITY = [
+  { id: 1, action: 'Scene 12.3 completed', time: '2 hours ago', type: 'success' },
+  { id: 2, action: 'Budget updated (+$50K)', time: '4 hours ago', type: 'info' },
+  { id: 3, action: 'New crew member added', time: '6 hours ago', type: 'success' },
+  { id: 4, action: 'Location permit pending', time: '1 day ago', type: 'warning' },
+]
+
+export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [showNewProject, setShowNewProject] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
 
   useEffect(() => {
     fetchProjects()
@@ -21,259 +85,258 @@ export default function Home() {
       const data = await api.projects.list()
       setProjects(data)
     } catch (e) {
-      console.log('API unavailable, using demo data')
       setProjects(DEMO_PROJECTS)
     }
     setLoading(false)
   }
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) return
-    
-    const newProject: Project = {
-      id: Date.now(),
-      name: newProjectName,
-      description: 'New project',
-      language: 'tamil',
-      status: 'planning',
-      budget: 0,
-      created_at: new Date().toISOString()
-    }
-    
-    // Try to save to backend
-    try {
-      const saved = await api.projects.create({
-        name: newProjectName,
-        description: 'New project',
-        language: 'tamil',
-        budget: 0
-      })
-      if (saved && saved.id) {
-        setProjects([...projects, saved])
-      } else {
-        setProjects([...projects, newProject])
-      }
-    } catch (e) {
-      // Fallback to local
-      setProjects([...projects, newProject])
-    }
-    
-    setNewProjectName('')
-    setShowNewProject(false)
-  }
-
-  const DEMO_PROJECTS: Project[] = [
-    { 
-      id: 1, 
-      name: 'இதயத்தின் ஒலி', 
-      description: 'A romantic thriller in modern Chennai', 
-      language: 'tamil', 
-      status: 'planning', 
-      budget: 2500000, 
-      created_at: '2026-02-01T10:00:00Z' 
-    },
-    { 
-      id: 2, 
-      name: "Veera's Journey", 
-      description: 'Action drama set in Madurai', 
-      language: 'tamil', 
-      status: 'shooting', 
-      budget: 5000000, 
-      created_at: '2026-01-15T10:00:00Z' 
-    },
-  ]
+  const totalBudget = projects.reduce((acc, p) => acc + (p.budget || 0), 0)
+  const totalSpent = totalBudget * 0.72 // Simulated
+  const activeProjects = projects.filter(p => p.status === 'shooting').length
 
   return (
-    <div className="p-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Welcome back! Here&apos;s your production overview.</p>
-        </div>
-        <button 
-          onClick={() => setShowNewProject(true)}
-          className="px-4 py-2 bg-cinepilot-accent text-black rounded font-medium text-sm hover:bg-cyan-400 transition-colors"
-        >
-          + New Project
-        </button>
-      </div>
-
-      {/* Connection Status */}
-      <ConnectionStatus />
-
-      {/* New Project Modal */}
-      {showNewProject && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Create New Project</h2>
-            <input
-              type="text"
-              placeholder="Project name"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded mb-4 focus:border-cinepilot-accent focus:outline-none"
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <button 
-                onClick={() => setShowNewProject(false)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium text-sm"
-              >
-                Cancel
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      {/* Header */}
+      <header className="bg-slate-900/50 backdrop-blur border-b border-slate-800 sticky top-0 z-10">
+        <div className="px-8 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Production Dashboard</h1>
+              <p className="text-slate-500 text-sm mt-1">Real-time overview of all productions</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors">
+                <RefreshCw className="w-4 h-4" />
+                Refresh
               </button>
-              <button 
-                onClick={handleCreateProject}
-                className="px-4 py-2 bg-cinepilot-accent text-black rounded font-medium text-sm hover:bg-cyan-400"
-              >
-                Create
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">
+                <Plus className="w-4 h-4" />
+                New Project
               </button>
             </div>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Projects" value={projects.length.toString()} />
-        <StatCard 
-          label="In Production" 
-          value={projects.filter(p => p.status === 'shooting').length.toString()} 
-          color="green" 
-        />
-        <StatCard 
-          label="Estimated Budget" 
-          value={`₹${(projects.reduce((sum, p) => sum + (p.budget || 0), 0) / 10000000).toFixed(1)}Cr`} 
-          color="blue" 
-        />
-        <StatCard label="AI Analyses" value="48" color="purple" />
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <QuickAction 
-          icon="🤖" 
-          label="AI Script Analysis" 
-          href="/ai-tools"
-          description="Analyze scripts with AI"
-        />
-        <QuickAction 
-          icon="🎥" 
-          label="Shot List" 
-          href="/shot-list"
-          description="Generate shot suggestions"
-        />
-        <QuickAction 
-          icon="📋" 
-          label="Generate Call Sheet" 
-          href="/call-sheets"
-          description="Create bilingual call sheets"
-        />
-        <QuickAction 
-          icon="📊" 
-          label="DOOD Report" 
-          href="/dood"
-          description="Track actor availability"
-        />
-        <QuickAction 
-          icon="📅" 
-          label="Shooting Schedule" 
-          href="/schedule"
-          description="Plan your shoot days"
-        />
-        <QuickAction 
-          icon="💰" 
-          label="Budget Planning" 
-          href="/budget"
-          description="Estimate and track costs"
-        />
-      </div>
-
-      {/* Projects Grid */}
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Your Projects</h2>
-        <span className="text-sm text-gray-500">{projects.length} projects</span>
-      </div>
-      
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-cinepilot-accent animate-pulse">Loading...</div>
+      <main className="p-8">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <KpiCard
+            title="Total Budget"
+            value={`₹${(totalBudget / 10000000).toFixed(1)}Cr`}
+            change="+12.5%"
+            trend="up"
+            icon={DollarSign}
+          />
+          <KpiCard
+            title="Spent"
+            value={`₹${(totalSpent / 10000000).toFixed(1)}Cr`}
+            change="+8.2%"
+            trend="up"
+            icon={TrendingUp}
+          />
+          <KpiCard
+            title="Active Projects"
+            value={activeProjects.toString()}
+            change="+2"
+            trend="up"
+            icon={Film}
+          />
+          <KpiCard
+            title="Completion"
+            value="68%"
+            change="+5%"
+            trend="up"
+            icon={CheckCircle}
+          />
         </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-          <NewProjectCard onClick={() => setShowNewProject(true)} />
+
+        {/* Charts Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Budget Trend */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Budget vs Spending</h3>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Last 6 months</span>
+            </div>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={BUDGET_DATA}>
+                  <defs>
+                    <linearGradient id="budgetGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="spentGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={COLORS.success} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `₹${v/1000000}M`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color: '#94a3b8' }}
+                    formatter={(value: number) => [`₹${(value/1000000).toFixed(1)}M`, '']}
+                  />
+                  <Legend />
+                  <Area type="monotone" dataKey="budget" stroke={COLORS.primary} fill="url(#budgetGradient)" strokeWidth={2} name="Budget" />
+                  <Area type="monotone" dataKey="spent" stroke={COLORS.success} fill="url(#spentGradient)" strokeWidth={2} name="Spent" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Project Status */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Project Status</h3>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Distribution</span>
+            </div>
+            <div className="h-72 flex items-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={STATUS_DATA}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {STATUS_DATA.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  />
+                  <Legend 
+                    formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Charts Row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Scene Breakdown */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-6">Scene Breakdown</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={SCENE_DATA} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" stroke="#64748b" fontSize={12} />
+                  <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={12} width={50} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  />
+                  <Bar dataKey="count" fill={COLORS.primary} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Crew Allocation */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-6">Crew Allocation</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={CREW_DATA}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="dept" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="assigned" fill={COLORS.success} name="Assigned" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="needed" fill={COLORS.muted} name="Needed" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Phase Progress */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-6">Phase Progress</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={PROGRESS_DATA} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" stroke="#64748b" fontSize={12} domain={[0, 100]} />
+                  <YAxis dataKey="phase" type="category" stroke="#64748b" fontSize={12} width={80} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value}%`, 'Complete']}
+                  />
+                  <Bar dataKey="complete" fill={COLORS.primary} radius={[0, 4, 4, 0]}>
+                    {PROGRESS_DATA.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.primary : index === 1 ? COLORS.warning : COLORS.success} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+          <div className="space-y-3">
+            {RECENT_ACTIVITY.map((item) => (
+              <div key={item.id} className="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                <div className={`w-2 h-2 rounded-full ${
+                  item.type === 'success' ? 'bg-emerald-500' : 
+                  item.type === 'warning' ? 'bg-amber-500' : 'bg-cyan-500'
+                }`} />
+                <span className="flex-1 text-slate-300">{item.action}</span>
+                <span className="text-slate-500 text-sm">{item.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }
 
-function StatCard({ label, value, color = 'cyan' }: { label: string; value: string; color?: string }) {
-  const colors: Record<string, string> = {
-    cyan: 'text-cinepilot-accent',
-    green: 'text-cinepilot-success',
-    purple: 'text-purple-400',
-    blue: 'text-blue-400',
-  }
+// KPI Card Component
+function KpiCard({ title, value, change, trend, icon: Icon }: { 
+  title: string; value: string; change: string; trend: 'up' | 'down'; icon: any 
+}) {
   return (
-    <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-      <div className={`text-2xl font-bold ${colors[color]}`}>{value}</div>
-      <div className="text-xs text-gray-500 mt-1">{label}</div>
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-colors">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-semibold mt-2">{value}</p>
+        </div>
+        <div className={`p-2 rounded-lg ${trend === 'up' ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+          <Icon className={`w-5 h-5 ${trend === 'up' ? 'text-emerald-500' : 'text-red-500'}`} />
+        </div>
+      </div>
+      <div className="flex items-center gap-1 mt-3">
+        {trend === 'up' ? (
+          <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+        ) : (
+          <ArrowDownRight className="w-4 h-4 text-red-500" />
+        )}
+        <span className={`text-sm ${trend === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>{change}</span>
+        <span className="text-slate-500 text-sm ml-1">vs last month</span>
+      </div>
     </div>
   )
 }
 
-function QuickAction({ icon, label, href, description }: { icon: string; label: string; href: string; description: string }) {
-  return (
-    <Link href={href}>
-      <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 hover:border-cinepilot-accent transition-colors cursor-pointer">
-        <div className="text-2xl mb-2">{icon}</div>
-        <div className="font-medium text-sm">{label}</div>
-        <div className="text-xs text-gray-500 mt-1">{description}</div>
-      </div>
-    </Link>
-  )
-}
-
-function ProjectCard({ project }: { project: Project }) {
-  const statusColors: Record<string, string> = {
-    'planning': 'bg-blue-900 text-blue-400',
-    'pre-production': 'bg-yellow-900 text-yellow-400',
-    'shooting': 'bg-green-900 text-green-400',
-    'post-production': 'bg-purple-900 text-purple-400',
-    'completed': 'bg-gray-700 text-gray-400',
-  }
-
-  return (
-    <Link href={`/projects/${project.id}`}>
-      <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-5 hover:border-cinepilot-accent transition-colors cursor-pointer">
-        <div className="flex justify-between items-start mb-3">
-          <h3 className="font-semibold text-lg">{project.name}</h3>
-          <span className={`px-2 py-1 text-xs rounded ${statusColors[project.status] || 'bg-gray-700'}`}>
-            {project.status}
-          </span>
-        </div>
-        <p className="text-gray-400 text-sm mb-4">{project.description}</p>
-        <div className="flex justify-between text-xs text-gray-500">
-          <span>Budget: ₹{project.budget ? (project.budget / 100000).toFixed(1) + 'L' : 'N/A'}</span>
-          <span className="uppercase">{project.language}</span>
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-function NewProjectCard({ onClick }: { onClick: () => void }) {
-  return (
-    <div 
-      onClick={onClick}
-      className="bg-cinepilot-card border border-dashed border-gray-700 rounded-lg p-5 flex flex-col items-center justify-center min-h-[150px] cursor-pointer hover:border-cinepilot-accent transition-colors"
-    >
-      <div className="text-4xl mb-2">+</div>
-      <span className="text-gray-400">Create New Project</span>
-    </div>
-  )
-}
+const DEMO_PROJECTS: Project[] = [
+  { id: 1, name: 'Vaalimai', description: 'Drama', language: 'tamil', status: 'shooting', budget: 50000000, created_at: '2026-01-15' },
+  { id: 2, name: 'Kadhal Try Pannala Da', description: 'Rom-Com', language: 'tamil', status: 'planning', budget: 35000000, created_at: '2026-02-01' },
+  { id: 3, name: 'Project Phoenix', description: 'Action', language: 'telugu', status: 'completed', budget: 75000000, created_at: '2025-11-20' },
+]

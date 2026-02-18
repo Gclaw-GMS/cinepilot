@@ -1,13 +1,11 @@
 "use client"
 
 import { useState } from 'react'
-import Sidebar from '../sidebar'
 import ExportPanel from '../components/export-panel'
 
 export default function ExportsPage() {
   return (
-    <div className="flex min-h-screen bg-gray-900">
-      <Sidebar />
+    <div className="p-8">
       <main className="flex-1 p-8">
         <div className="max-w-4xl mx-auto">
           <header className="mb-8">

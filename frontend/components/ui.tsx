@@ -29,11 +29,12 @@ export function LoadingScreen({ message = 'Loading...' }: { message?: string }) 
 interface CardProps {
   children: ReactNode
   className?: string
+  hover?: boolean
 }
 
-export function Card({ children, className = '' }: CardProps) {
+export function Card({ children, className = '', hover = false }: CardProps) {
   return (
-    <div className={`bg-cinepilot-card border border-cinepilot-border rounded-lg ${className}`}>
+    <div className={`bg-cinepilot-card border border-cinepilot-border rounded-lg ${hover ? 'hover:border-indigo-500/50 hover:shadow-lg transition-all' : ''} ${className}`}>
       {children}
     </div>
   )
@@ -85,19 +86,35 @@ export function Input({ placeholder, value, onChange, type = 'text', className =
 
 interface BadgeProps {
   children: ReactNode
-  variant?: 'success' | 'warning' | 'danger' | 'info'
+  variant?: string
+  className?: string
 }
 
-export function Badge({ children, variant = 'info' }: BadgeProps) {
-  const variants = {
+export function Badge({ children, variant = 'info', className = '' }: BadgeProps) {
+  const variantMap: Record<string, string> = {
     success: 'bg-green-900 text-green-400',
     warning: 'bg-yellow-900 text-yellow-400',
     danger: 'bg-red-900 text-red-400',
-    info: 'bg-blue-900 text-blue-400'
+    info: 'bg-blue-900 text-blue-400',
+    emerald: 'bg-emerald-900 text-emerald-400',
+    indigo: 'bg-indigo-900 text-indigo-400',
+    violet: 'bg-violet-900 text-violet-400',
+    amber: 'bg-amber-900 text-amber-400',
+    rose: 'bg-rose-900 text-rose-400',
+    cyan: 'bg-cyan-900 text-cyan-400',
+    slate: 'bg-slate-700 text-slate-300',
+    active: 'bg-emerald-900 text-emerald-400',
+    busy: 'bg-amber-900 text-amber-400',
+    offline: 'bg-slate-700 text-slate-300',
+    available: 'bg-emerald-900 text-emerald-400',
+    'in-use': 'bg-amber-900 text-amber-400',
+    maintenance: 'bg-rose-900 text-rose-400'
   }
   
+  const variantClass = variantMap[variant] || variantMap[variant.toLowerCase()] || 'bg-slate-700 text-slate-300'
+  
   return (
-    <span className={`px-2 py-1 text-xs rounded ${variants[variant]}`}>
+    <span className={`px-2 py-1 text-xs rounded ${variantClass} ${className}`}>
       {children}
     </span>
   )
@@ -247,6 +264,69 @@ export function EmptyState({ icon = '📭', title, description, action }: EmptyS
           {action.label}
         </button>
       )}
+    </div>
+  )
+}
+
+// StatCard component
+interface StatCardProps {
+  title: string
+  value: string | number
+  color?: 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'cyan'
+  icon?: ReactNode
+  trend?: { value: number; positive: boolean }
+}
+
+const colorClasses = {
+  indigo: 'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30',
+  emerald: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
+  amber: 'from-amber-500/20 to-amber-600/10 border-amber-500/30',
+  rose: 'from-rose-500/20 to-rose-600/10 border-rose-500/30',
+  violet: 'from-violet-500/20 to-violet-600/10 border-violet-500/30',
+  cyan: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30',
+}
+
+const iconColorClasses = {
+  indigo: 'text-indigo-400',
+  emerald: 'text-emerald-400',
+  amber: 'text-amber-400',
+  rose: 'text-rose-400',
+  violet: 'text-violet-400',
+  cyan: 'text-cyan-400',
+}
+
+export function StatCard({ title, value, color = 'indigo', icon, trend }: StatCardProps) {
+  return (
+    <div className={`bg-gradient-to-br ${colorClasses[color]} border rounded-lg p-4`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-slate-400 text-sm">{title}</span>
+        {icon && <span className={iconColorClasses[color]}>{icon}</span>}
+      </div>
+      <div className="text-2xl font-bold">{value}</div>
+      {trend && (
+        <div className={`text-xs mt-1 ${trend.positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+          {trend.positive ? '↑' : '↓'} {Math.abs(trend.value)}%
+        </div>
+      )}
+    </div>
+  )
+}
+
+// PageHeader component
+interface PageHeaderProps {
+  title: string
+  subtitle?: string
+  action?: ReactNode
+}
+
+export function PageHeader({ title, subtitle, action }: PageHeaderProps) {
+  return (
+    <div className="flex items-center justify-between mb-8">
+      <div>
+        <h1 className="text-2xl font-bold">{title}</h1>
+        {subtitle && <p className="text-slate-400 mt-1">{subtitle}</p>}
+      </div>
+      {action && <div>{action}</div>}
     </div>
   )
 }

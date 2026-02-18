@@ -1,119 +1,149 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { CollaboratorAvatar, CollaboratorList, ActivityFeed, TeamWorkload, ProjectTimeline, CollaborationStats } from '@/lib/enhanced-components-phase29'
+import { useState } from 'react'
+import { Card, StatCard, Button, Badge, PageHeader } from '@/components/ui'
+import { 
+  Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
+  Film, Star, Clock, CheckCircle, MoreHorizontal
+} from 'lucide-react'
 
-// Demo data
-const DEMO_COLLABORATORS = [
-  { id: '1', name: 'Sarah Chen', role: 'Director', isOnline: true },
-  { id: '2', name: 'Mike Johnson', role: 'Producer', isOnline: true },
-  { id: '3', name: 'Emily Davis', role: 'Cinematographer', isOnline: false },
-  { id: '4', name: 'James Wilson', role: '1st AD', isOnline: true },
-  { id: '5', name: 'Lisa Park', role: 'Production Designer', isOnline: false },
-  { id: '6', name: 'Tom Brown', role: 'Sound Mixer', isOnline: true },
+interface TeamMember {
+  id: number
+  name: string
+  role: string
+  email: string
+  phone: string
+  status: 'active' | 'busy' | 'offline'
+  avatar?: string
+  skills: string[]
+}
+
+const DEMO_MEMBERS: TeamMember[] = [
+  { id: 1, name: 'Rajesh Kumar', role: 'Director', email: 'rajesh@film.com', phone: '+91 98765 43210', status: 'active', skills: ['Narrative', 'Casting'] },
+  { id: 2, name: 'Priya Sharma', role: 'Producer', email: 'priya@film.com', phone: '+91 98765 43211', status: 'busy', skills: ['Budgeting', 'Scheduling'] },
+  { id: 3, name: 'Arun Vijay', role: 'Cinematographer', email: 'arun@film.com', phone: '+91 98765 43212', status: 'active', skills: ['Camera', 'Lighting'] },
+  { id: 4, name: 'Meera Kumari', role: 'Production Designer', email: 'meera@film.com', phone: '+91 98765 43213', status: 'active', skills: ['Art Direction', 'Set Design'] },
+  { id: 5, name: 'Vikram Seth', role: 'Sound Engineer', email: 'vikram@film.com', phone: '+91 98765 43214', status: 'offline', skills: ['Audio', 'Mixing'] },
 ]
 
-const DEMO_ACTIVITIES = [
-  { id: '1', user: 'Sarah Chen', action: 'updated', target: 'Scene 12 - The Meeting', timestamp: '2026-02-15T20:30:00Z', type: 'update' as const },
-  { id: '2', user: 'Mike Johnson', action: 'commented on', target: 'Budget Overview', timestamp: '2026-02-15T20:15:00Z', type: 'comment' as const },
-  { id: '3', user: 'Emily Davis', action: 'uploaded', target: 'Shot List v2.pdf', timestamp: '2026-02-15T19:45:00Z', type: 'create' as const },
-  { id: '4', user: 'James Wilson', action: 'created', target: 'Call Sheet - Day 5', timestamp: '2026-02-15T18:30:00Z', type: 'create' as const },
-  { id: '5', user: 'Lisa Park', action: 'updated', target: 'Location: Warehouse', timestamp: '2026-02-15T17:00:00Z', type: 'update' as const },
-]
-
-const DEMO_WORKLOAD = [
-  { name: 'Sarah Chen', role: 'Director', tasks: 12, capacity: 80 },
-  { name: 'Mike Johnson', role: 'Producer', tasks: 8, capacity: 60 },
-  { name: 'Emily Davis', role: 'Cinematographer', tasks: 15, capacity: 95 },
-  { name: 'James Wilson', role: '1st AD', tasks: 20, capacity: 100 },
-]
-
-const DEMO_TIMELINE: Array<{id: string; title: string; status: 'completed' | 'in-progress' | 'pending'; date: string; description?: string}> = [
-  { id: '1', title: 'Pre-Production', status: 'completed', date: 'Jan 15 - Feb 1', description: '100% complete' },
-  { id: '2', title: 'Principal Photography', status: 'in-progress', date: 'Feb 2 - Mar 15', description: '45% complete' },
-  { id: '3', title: 'Post-Production', status: 'pending', date: 'Mar 16 - Apr 30', description: 'Not started' },
-]
+const STATUS_COLORS = {
+  active: 'emerald',
+  busy: 'amber',
+  offline: 'slate',
+}
 
 export default function CollaborationPage() {
-  const [activeTab, setActiveTab] = useState('overview')
-  
+  const [members] = useState<TeamMember[]>(DEMO_MEMBERS)
+  const [search, setSearch] = useState('')
+
+  const filtered = members.filter(m => 
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+    m.role.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const activeCount = members.filter(m => m.status === 'active').length
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">🤝 Collaboration Hub</h1>
-        <p className="text-gray-400">Real-time team collaboration and project tracking</p>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
+      <PageHeader 
+        title="Team Collaboration" 
+        subtitle="Manage your production team and communications"
+        action={
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Invite Member
+          </Button>
+        }
+      />
 
-      {/* Stats Overview */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <CollaborationStats 
-          title="Active Members"
-          value="24"
-          change="+3 this week"
-          icon="👥"
-          trend="up"
+        <StatCard 
+          title="Team Members" 
+          value={members.length} 
+          color="indigo"
+          icon={<Users className="w-5 h-5" />}
         />
-        <CollaborationStats 
-          title="Tasks Completed"
-          value="156"
-          change="+28 this week"
-          icon="✅"
-          trend="up"
+        <StatCard 
+          title="Active Now" 
+          value={activeCount} 
+          color="emerald"
+          icon={<CheckCircle className="w-5 h-5" />}
         />
-        <CollaborationStats 
-          title="Pending Reviews"
-          value="12"
-          change="-5 this week"
-          icon="👀"
-          trend="down"
+        <StatCard 
+          title="Pending Tasks" 
+          value={12} 
+          color="amber"
+          icon={<Clock className="w-5 h-5" />}
         />
-        <CollaborationStats 
-          title="Comments Today"
-          value="47"
-          change="+12 this week"
-          icon="💬"
-          trend="up"
+        <StatCard 
+          title="Messages" 
+          value={47} 
+          color="violet"
+          icon={<MessageSquare className="w-5 h-5" />}
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Team Section */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Active Collaborators */}
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h2 className="text-xl font-semibold mb-4">🎯 Active Team</h2>
-            <CollaboratorList collaborators={DEMO_COLLABORATORS} />
-            <div className="mt-4 text-sm text-gray-400">
-              {DEMO_COLLABORATORS.filter(c => c.isOnline).length} online now
+      {/* Search */}
+      <Card className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search team members..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 bg-slate-800 border-slate-700 rounded-lg"
+          />
+        </div>
+      </Card>
+
+      {/* Team Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((member) => (
+          <Card key={member.id} hover className="group">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xl font-semibold">
+                {member.name.split(' ').map(n => n[0]).join('')}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold">{member.name}</h3>
+                    <p className="text-slate-400 text-sm">{member.role}</p>
+                  </div>
+                  <Badge variant={STATUS_COLORS[member.status]}>
+                    {member.status}
+                  </Badge>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Project Timeline */}
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h2 className="text-xl font-semibold mb-4">📅 Project Timeline</h2>
-            <ProjectTimeline events={DEMO_TIMELINE} />
-          </div>
-
-          {/* Team Workload */}
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h2 className="text-xl font-semibold mb-4">📊 Team Workload</h2>
-            <TeamWorkload members={DEMO_WORKLOAD} />
-          </div>
-        </div>
-
-        {/* Activity Feed */}
-        <div className="space-y-6">
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h2 className="text-xl font-semibold mb-4">📝 Recent Activity</h2>
-            <ActivityFeed 
-              activities={DEMO_ACTIVITIES}
-              onLoadMore={() => console.log('Load more')}
-              hasMore={true}
-            />
-          </div>
-        </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-800">
+              <div className="flex flex-wrap gap-2 mb-4">
+                {member.skills.map(skill => (
+                  <span key={skill} className="px-2 py-0.5 bg-slate-800 rounded text-xs text-slate-400">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors">
+                  <Mail className="w-4 h-4" />
+                  Email
+                </button>
+                <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors">
+                  <Phone className="w-4 h-4" />
+                  Call
+                </button>
+                <button className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
+                  <MessageSquare className="w-4 h-4 text-slate-400" />
+                </button>
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
     </div>
   )

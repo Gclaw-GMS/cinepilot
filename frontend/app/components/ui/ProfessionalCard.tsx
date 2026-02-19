@@ -36,7 +36,7 @@ interface StatCardProps {
   trend?: 'up' | 'down' | 'neutral'
   trendValue?: string
   icon?: ReactNode
-  color?: 'indigo' | 'violet' | 'emerald' | 'amber' | 'rose' | 'cyan'
+  color?: 'indigo' | 'violet' | 'emerald' | 'amber' | 'rose' | 'cyan' | 'blue' | 'slate'
 }
 
 export function StatCard({ title, value, subtitle, trend, trendValue, icon, color = 'indigo' }: StatCardProps) {
@@ -47,6 +47,8 @@ export function StatCard({ title, value, subtitle, trend, trendValue, icon, colo
     amber: 'from-amber-500/20 to-amber-600/5 border-amber-500/30',
     rose: 'from-rose-500/20 to-rose-600/5 border-rose-500/30',
     cyan: 'from-cyan-500/20 to-cyan-600/5 border-cyan-500/30',
+    blue: 'from-blue-500/20 to-blue-600/5 border-blue-500/30',
+    slate: 'from-slate-500/20 to-slate-600/5 border-slate-500/30',
   }
   
   const iconColors = {
@@ -56,6 +58,8 @@ export function StatCard({ title, value, subtitle, trend, trendValue, icon, colo
     amber: 'bg-amber-500/20 text-amber-400',
     rose: 'bg-rose-500/20 text-rose-400',
     cyan: 'bg-cyan-500/20 text-cyan-400',
+    blue: 'bg-blue-500/20 text-blue-400',
+    slate: 'bg-slate-500/20 text-slate-400',
   }
   
   const trendColors = {

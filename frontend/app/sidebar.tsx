@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, FileText, Clapperboard, Calendar, MapPin, Users, DollarSign, Settings, BarChart3, Video, Bell, FolderOpen, Download, Sparkles, ChevronRight } from 'lucide-react'
+import { Home, FileText, Clapperboard, Calendar, Cloud, Radar, MapPin, Users, DollarSign, Settings, BarChart3, Video, Bell, FolderOpen, Download, Sparkles, ChevronRight } from 'lucide-react'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -11,8 +11,8 @@ export default function Sidebar() {
     { href: '/', icon: Home, label: 'Dashboard' },
     { href: '/scripts', icon: FileText, label: 'Scripts' },
     { href: '/shot-list', icon: Video, label: 'Shot List' },
-    { href: '/schedule', icon: Calendar, label: 'Schedule' },
-    { href: '/timeline', icon: Calendar, label: 'Timeline', badge: 'NEW' },
+    { href: '/schedule', icon: Calendar, Cloud, Radar, label: 'Schedule' },
+    { href: '/timeline', icon: Calendar, Cloud, Radar, label: 'Timeline', badge: 'NEW' },
     { href: '/locations', icon: MapPin, label: 'Locations' },
     { href: '/equipment', icon: Clapperboard, label: 'Equipment' },
     { href: '/collaboration', icon: Users, label: 'Collaboration', badge: 'NEW' },
@@ -25,6 +25,7 @@ export default function Sidebar() {
     { href: '/exports', icon: Download, label: 'Exports', badge: 'NEW' },
     { href: '/ai-tools', icon: Sparkles, label: 'AI Tools', badge: 'NEW' },
     { href: '/notifications', icon: Bell, label: 'Notifications', badge: 5 },
+    { href: '/weather', icon: Cloud, Radar, label: 'Weather' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ]
 

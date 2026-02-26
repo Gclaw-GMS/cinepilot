@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import Sidebar from './sidebar'
+import ChatWidget from './components/ChatWidget'
 
 export const metadata: Metadata = {
   title: 'CinePilot - AI-Powered Pre-Production',
@@ -21,6 +22,7 @@ export default function RootLayout({
             {children}
           </main>
         </div>
+        <ChatWidget />
       </body>
     </html>
   )

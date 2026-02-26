@@ -81,6 +81,7 @@ model Script {
   fileSize  Int?     @map("file_size")
   mimeType  String?  @map("mime_type")
   content   String?
+  language  String?  @default("tamil")
   version   Int      @default(1)
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")

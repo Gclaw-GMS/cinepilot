@@ -11,6 +11,7 @@ import {
   MapPin,
   DollarSign,
   Shield,
+  Languages,
   Users,
   Clapperboard,
   Settings,
@@ -18,6 +19,8 @@ import {
   Cloud,
   Bell,
   ChevronRight,
+  Eye,
+  Sparkles,
 } from 'lucide-react'
 
 type NavItem = {
@@ -49,6 +52,9 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/locations', icon: MapPin, label: 'Location Scout' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: Shield, label: 'Censor Board' },
+      { href: '/continuity', icon: Eye, label: 'Continuity' },
+      { href: '/vfx', icon: Sparkles, label: 'VFX Breakdown' },
+      { href: '/dubbing', icon: Languages, label: 'Dubbing' },
     ],
   },
   {

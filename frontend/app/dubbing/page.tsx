@@ -1,0 +1,296 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe } from 'lucide-react'
+
+type ScriptOption = {
+  id: string
+  title: string
+}
+
+type DubbedScript = {
+  id: string
+  title: string
+  language: string
+  createdAt: string
+}
+
+type TranslatedScene = {
+  sceneNumber: string
+  translatedDialogue: string
+  notes?: string
+}
+
+const TARGET_LANGUAGES = [
+  { value: 'telugu', label: 'Telugu' },
+  { value: 'hindi', label: 'Hindi' },
+  { value: 'malayalam', label: 'Malayalam' },
+  { value: 'kannada', label: 'Kannada' },
+  { value: 'english', label: 'English' },
+]
+
+export default function DubbingPage() {
+  const [scripts, setScripts] = useState<ScriptOption[]>([])
+  const [selectedScriptId, setSelectedScriptId] = useState('')
+  const [targetLanguage, setTargetLanguage] = useState('')
+  const [dubbedVersions, setDubbedVersions] = useState<DubbedScript[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState('')
+  const [preview, setPreview] = useState<TranslatedScene[]>([])
+  const [loadingScripts, setLoadingScripts] = useState(true)
+
+  useEffect(() => {
+    async function loadScripts() {
+      try {
+        const res = await fetch('/api/scripts')
+        if (!res.ok) throw new Error('Failed to load scripts')
+        const data = await res.json()
+        const list = (data.scripts || data || []).map(
+          (s: { id: string; title: string }) => ({ id: s.id, title: s.title }),
+        )
+        setScripts(list)
+      } catch {
+        setError('Failed to load scripts')
+      } finally {
+        setLoadingScripts(false)
+      }
+    }
+    loadScripts()
+  }, [])
+
+  const loadDubbedVersions = useCallback(async (scriptId: string) => {
+    if (!scriptId) return
+    try {
+      const res = await fetch(`/api/dubbing?scriptId=${scriptId}`)
+      if (!res.ok) throw new Error('Failed to load dubbed versions')
+      const data = await res.json()
+      setDubbedVersions(data.scripts || [])
+    } catch {
+      setDubbedVersions([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedScriptId) {
+      loadDubbedVersions(selectedScriptId)
+      setPreview([])
+    }
+  }, [selectedScriptId, loadDubbedVersions])
+
+  async function handleGenerate() {
+    if (!selectedScriptId || !targetLanguage) return
+    setGenerating(true)
+    setError('')
+    setPreview([])
+
+    try {
+      const res = await fetch('/api/dubbing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptId: selectedScriptId, targetLanguage }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Generation failed')
+      }
+
+      await loadDubbedVersions(selectedScriptId)
+
+      const newScript = dubbedVersions.find(
+        (d) => d.language === targetLanguage,
+      )
+      if (newScript) {
+        try {
+          const contentRes = await fetch(`/api/scripts/${newScript.id}`)
+          if (contentRes.ok) {
+            const contentData = await contentRes.json()
+            const parsed = JSON.parse(contentData.content || '{}')
+            setPreview(parsed.translatedScenes || [])
+          }
+        } catch {
+          // preview not critical
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Generation failed')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const languageBadgeColor: Record<string, string> = {
+    telugu: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+    hindi: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+    malayalam: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
+    kannada: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    english: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 p-6">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+            <Languages className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Dubbing Script Generator</h1>
+            <p className="text-sm text-slate-400">
+              Translate scripts with cultural adaptation and lip-sync matching
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Script Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-slate-500" />
+                Source Script
+              </label>
+              <select
+                value={selectedScriptId}
+                onChange={(e) => setSelectedScriptId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+                disabled={loadingScripts}
+              >
+                <option value="">
+                  {loadingScripts ? 'Loading scripts...' : 'Select a script'}
+                </option>
+                {scripts.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Language Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-slate-500" />
+                Target Language
+              </label>
+              <select
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+              >
+                <option value="">Select target language</option>
+                {TARGET_LANGUAGES.map((lang) => (
+                  <option key={lang.value} value={lang.value}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={!selectedScriptId || !targetLanguage || generating}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            {generating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <ArrowRight className="w-4 h-4" />
+                Generate Dubbed Script
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Existing Dubbed Versions */}
+        {dubbedVersions.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Languages className="w-5 h-5 text-indigo-400" />
+              Dubbed Versions
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {dubbedVersions.map((dub) => (
+                <div
+                  key={dub.id}
+                  className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 flex items-start justify-between"
+                >
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium text-white truncate max-w-[200px]">
+                      {dub.title}
+                    </p>
+                    <span
+                      className={`inline-block text-xs px-2 py-0.5 rounded-full border ${
+                        languageBadgeColor[dub.language] ||
+                        'bg-slate-600/15 text-slate-400 border-slate-500/30'
+                      }`}
+                    >
+                      {dub.language}
+                    </span>
+                    <p className="text-xs text-slate-500">
+                      {new Date(dub.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <FileText className="w-4 h-4 text-slate-500 mt-1 flex-shrink-0" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Side-by-Side Preview */}
+        {preview.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <ArrowRight className="w-5 h-5 text-indigo-400" />
+              Translation Preview
+            </h2>
+            <div className="space-y-3">
+              {preview.map((scene, idx) => (
+                <div
+                  key={idx}
+                  className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 space-y-2"
+                >
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="bg-indigo-500/15 text-indigo-400 px-2 py-0.5 rounded">
+                      Scene {scene.sceneNumber}
+                    </span>
+                    {scene.notes && (
+                      <span className="text-slate-500 italic">
+                        {scene.notes}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed">
+                    {scene.translatedDialogue}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!selectedScriptId && !loadingScripts && scripts.length === 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+            <FileText className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+            <p className="text-slate-400">No scripts found. Upload a script first.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

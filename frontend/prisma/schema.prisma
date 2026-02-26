@@ -27,6 +27,7 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   projects     Project[]
+  settings     UserSetting[]
 
   @@map("users")
 }
@@ -67,6 +68,7 @@ model Project {
   censorAnalyses    CensorAnalysis[]
   storyboardStyles  StoryboardStyle[]
   props             Prop[]
+  notifications     Notification[]
 
   @@map("projects")
 }
@@ -885,4 +887,42 @@ model AiAnalysis {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("ai_analyses")
+}
+
+// =============================================================================
+// Notifications
+// =============================================================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  channel     String   @default("app")
+  recipient   String?
+  title       String
+  body        String
+  status      String   @default("unread")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("notifications")
+}
+
+// =============================================================================
+// User Settings
+// =============================================================================
+
+model UserSetting {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("user_settings")
 }

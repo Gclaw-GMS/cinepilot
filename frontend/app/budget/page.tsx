@@ -1,226 +1,375 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
-interface Expense {
-  id: number
+interface BudgetItemData {
+  id: string
   category: string
-  item: string
-  estimated: number
-  actual: number
-  date: string
-  notes?: string
+  subcategory: string | null
+  description: string | null
+  quantity: string | null
+  unit: string | null
+  rate: string | null
+  rateLow: string | null
+  rateHigh: string | null
+  total: string | null
+  actualCost: string | null
+  source: string
+  notes: string | null
 }
 
-const DEMO_EXPENSES: Expense[] = [
-  { id: 1, category: 'Pre-production', item: 'Script Writing', estimated: 150000, actual: 125000, date: '2026-01-15' },
-  { id: 2, category: 'Pre-production', item: 'Location Scouting', estimated: 75000, actual: 80000, date: '2026-01-20' },
-  { id: 3, category: 'Production', item: 'Camera Equipment', estimated: 500000, actual: 480000, date: '2026-02-01' },
-  { id: 4, category: 'Production', item: 'Lighting Gear', estimated: 250000, actual: 260000, date: '2026-02-01' },
-  { id: 5, category: 'Production', item: 'Crew Wages', estimated: 1000000, actual: 850000, date: '2026-02-10' },
-  { id: 6, category: 'Post-production', item: 'Editing', estimated: 300000, actual: 0, date: '' },
-  { id: 7, category: 'Post-production', item: 'VFX', estimated: 400000, actual: 0, date: '' },
-  { id: 8, category: 'Contingency', item: 'Emergency Fund', estimated: 250000, actual: 50000, date: '2026-02-05' },
+interface ExpenseData {
+  id: string
+  category: string
+  description: string
+  amount: string
+  date: string
+  vendor: string | null
+  status: string
+  notes: string | null
+}
+
+interface ForecastData {
+  planned: number
+  actual: number
+  eacTotal: number
+  variance: number
+  percentSpent: number
+  categories: { category: string; planned: number; actual: number; forecast: number; status: string }[]
+}
+
+type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast'
+
+const REGIONS = ['Tamil Nadu', 'Chennai', 'Madurai', 'Ooty']
+const SCALES = [
+  { key: 'micro', label: 'Micro (<50L)' },
+  { key: 'indie', label: 'Indie (50L-2Cr)' },
+  { key: 'mid', label: 'Mid (2-10Cr)' },
+  { key: 'big', label: 'Big (10Cr+)' },
 ]
 
-const CATEGORIES = ['Pre-production', 'Production', 'Post-production', 'Contingency']
-
 export default function BudgetPage() {
-  const [expenses, setExpenses] = useState(DEMO_EXPENSES)
-  const [showAdd, setShowAdd] = useState(false)
-  const [newExpense, setNewExpense] = useState({ category: 'Production', item: '', estimated: 0, actual: 0 })
+  const [items, setItems] = useState<BudgetItemData[]>([])
+  const [expenses, setExpenses] = useState<ExpenseData[]>([])
+  const [forecast, setForecast] = useState<ForecastData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
+  const [error, setError] = useState<string | null>(null)
 
-  const totalEstimated = expenses.reduce((a, e) => a + e.estimated, 0)
-  const totalActual = expenses.reduce((a, e) => a + e.actual, 0)
-  const totalRemaining = totalEstimated - totalActual
+  const [region, setRegion] = useState('Tamil Nadu')
+  const [scale, setScale] = useState('mid')
 
-  const byCategory = CATEGORIES.map(cat => ({
-    name: cat,
-    estimated: expenses.filter(e => e.category === cat).reduce((a, e) => a + e.estimated, 0),
-    actual: expenses.filter(e => e.category === cat).reduce((a, e) => a + e.actual, 0),
-  }))
+  const [showAddExpense, setShowAddExpense] = useState(false)
+  const [newExpense, setNewExpense] = useState({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
 
-  const addExpense = () => {
-    if (!newExpense.item) return
-    setExpenses([...expenses, { ...newExpense, id: Date.now(), date: new Date().toISOString().split('T')[0] }])
-    setNewExpense({ category: 'Production', item: '', estimated: 0, actual: 0 })
-    setShowAdd(false)
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/budget')
+      const data = await res.json()
+      setItems(data.items || [])
+      setExpenses(data.expenses || [])
+      setForecast(data.forecast || null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  const handleGenerate = async () => {
+    setGenerating(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate', region, targetScale: scale }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      await fetchData()
+      setActiveTab('breakdown')
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGenerating(false)
+    }
   }
 
-  const progressPercent = totalEstimated > 0 ? (totalActual / totalEstimated) * 100 : 0
+  const handleAddExpense = async () => {
+    if (!newExpense.description || !newExpense.amount) return
+    try {
+      await fetch('/api/budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'addExpense', ...newExpense, amount: parseFloat(newExpense.amount) }),
+      })
+      setShowAddExpense(false)
+      setNewExpense({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
+      await fetchData()
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const formatINR = (n: number) => {
+    if (n >= 10000000) return `${(n / 10000000).toFixed(2)} Cr`
+    if (n >= 100000) return `${(n / 100000).toFixed(1)} L`
+    return `₹${n.toLocaleString('en-IN')}`
+  }
+
+  const totalPlanned = items.reduce((s, i) => s + Number(i.total || 0), 0)
+  const totalActual = expenses.reduce((s, e) => s + Number(e.amount), 0)
+  const variance = totalPlanned - totalActual
+
+  const categoryGroups = items.reduce<Record<string, BudgetItemData[]>>((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = []
+    acc[item.category].push(item)
+    return acc
+  }, {})
+
+  const tabs: { key: ActiveTab; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'breakdown', label: `Breakdown (${items.length})` },
+    { key: 'expenses', label: `Expenses (${expenses.length})` },
+    { key: 'forecast', label: 'Forecast' },
+  ]
+
+  if (loading) {
+    return <div className="p-6 flex items-center justify-center min-h-[60vh]"><div className="text-gray-400 animate-pulse">Loading budget...</div></div>
+  }
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">💰 Budget</h1>
-          <p className="text-gray-500 mt-1">Track and manage production expenses</p>
+          <h1 className="text-2xl font-bold">Budget Engine</h1>
+          <p className="text-gray-500 text-sm mt-0.5">AI-powered production budgeting</p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded font-medium"
-        >
-          + Add Expense
-        </button>
+        <div className="flex items-center gap-3">
+          <select value={region} onChange={e => setRegion(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+            {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select value={scale} onChange={e => setScale(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+            {SCALES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded font-medium text-sm">
+            {generating ? 'Generating...' : 'Generate Budget'}
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500">Dismiss</button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Total Budget</div>
-          <div className="text-2xl font-bold text-white">₹{totalEstimated.toLocaleString()}</div>
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+          <div className="text-xs text-gray-500 mb-1">Planned Budget</div>
+          <div className="text-2xl font-bold text-cinepilot-accent">{formatINR(totalPlanned)}</div>
         </div>
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Spent</div>
-          <div className="text-2xl font-bold text-red-400">₹{totalActual.toLocaleString()}</div>
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+          <div className="text-xs text-gray-500 mb-1">Actual Spend</div>
+          <div className="text-2xl font-bold text-gray-300">{formatINR(totalActual)}</div>
         </div>
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Remaining</div>
-          <div className="text-2xl font-bold text-green-400">₹{totalRemaining.toLocaleString()}</div>
-        </div>
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Utilization</div>
-          <div className="text-2xl font-bold text-amber-400">{progressPercent.toFixed(1)}%</div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="bg-slate-800 p-4 rounded mb-6">
-        <div className="flex justify-between text-sm mb-2">
-          <span>Budget Utilization</span>
-          <span>₹{totalActual.toLocaleString()} / ₹{totalEstimated.toLocaleString()}</span>
-        </div>
-        <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all"
-            style={{ width: `${Math.min(progressPercent, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-6">
-        {/* Category Breakdown */}
-        <div className="col-span-1">
-          <h3 className="font-bold mb-3">By Category</h3>
-          <div className="space-y-3">
-            {byCategory.map(cat => (
-              <div key={cat.name} className="bg-slate-800 p-3 rounded">
-                <div className="flex justify-between mb-1">
-                  <span className="font-medium">{cat.name}</span>
-                  <span className="text-cyan-400">₹{cat.actual.toLocaleString()}</span>
-                </div>
-                <div className="text-xs text-gray-400">Est: ₹{cat.estimated.toLocaleString()}</div>
-                <div className="h-1.5 bg-slate-700 rounded-full mt-2 overflow-hidden">
-                  <div 
-                    className="h-full bg-cyan-500"
-                    style={{ width: `${cat.estimated > 0 ? (cat.actual / cat.estimated) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+          <div className="text-xs text-gray-500 mb-1">Variance</div>
+          <div className={`text-2xl font-bold ${variance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {variance >= 0 ? '+' : ''}{formatINR(Math.abs(variance))}
           </div>
         </div>
-
-        {/* Expense List */}
-        <div className="col-span-2">
-          <h3 className="font-bold mb-3">All Expenses</h3>
-          <div className="bg-slate-800 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-900 text-gray-400">
-                <tr>
-                  <th className="text-left p-3">Item</th>
-                  <th className="text-left p-3">Category</th>
-                  <th className="text-right p-3">Estimated</th>
-                  <th className="text-right p-3">Actual</th>
-                  <th className="text-right p-3">Variance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map(expense => {
-                  const variance = expense.estimated - expense.actual
-                  return (
-                    <tr key={expense.id} className="border-t border-slate-700 hover:bg-slate-750">
-                      <td className="p-3">
-                        <div className="font-medium">{expense.item}</div>
-                        <div className="text-xs text-gray-500">{expense.date}</div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          expense.category === 'Production' ? 'bg-blue-600/30 text-blue-300' :
-                          expense.category === 'Pre-production' ? 'bg-purple-600/30 text-purple-300' :
-                          expense.category === 'Post-production' ? 'bg-amber-600/30 text-amber-300' :
-                          'bg-red-600/30 text-red-300'
-                        }`}>
-                          {expense.category}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">₹{expense.estimated.toLocaleString()}</td>
-                      <td className="p-3 text-right">₹{expense.actual.toLocaleString()}</td>
-                      <td className={`p-3 text-right ${variance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {variance >= 0 ? '↓' : '↑'} ₹{Math.abs(variance).toLocaleString()}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+          <div className="text-xs text-gray-500 mb-1">Forecast (EAC)</div>
+          <div className="text-2xl font-bold text-yellow-400">{forecast ? formatINR(forecast.eacTotal) : '—'}</div>
         </div>
       </div>
 
-      {/* Add Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Add Expense</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Category</label>
-                <select
-                  value={newExpense.category}
-                  onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2"
-                >
-                  {CATEGORIES.map(cat => <option key={cat}>{cat}</option>)}
-                </select>
+      {/* Tab Navigation */}
+      <div className="flex gap-1 mb-6 border-b border-gray-800 pb-px">
+        {tabs.map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+              activeTab === tab.key ? 'bg-cinepilot-card text-cinepilot-accent border border-b-0 border-cinepilot-border' : 'text-gray-500 hover:text-gray-300'
+            }`}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {items.length === 0 ? (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
+              <div className="text-gray-500 mb-3">No budget generated yet</div>
+              <p className="text-gray-600 text-sm mb-4">Upload a script first, then click "Generate Budget" to create an AI-powered budget from your script breakdown.</p>
+              <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium">
+                Generate Budget from Script
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(categoryGroups).map(([cat, catItems]) => {
+                const catTotal = catItems.reduce((s, i) => s + Number(i.total || 0), 0)
+                const pct = totalPlanned > 0 ? (catTotal / totalPlanned) * 100 : 0
+                return (
+                  <div key={cat} className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium text-gray-300">{cat}</h3>
+                      <span className="text-sm text-cinepilot-accent">{formatINR(catTotal)}</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-800 rounded-full">
+                      <div className="h-full bg-cinepilot-accent rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">{pct.toFixed(1)}% of total</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Breakdown Tab */}
+      {activeTab === 'breakdown' && (
+        <div className="space-y-4">
+          {Object.entries(categoryGroups).map(([cat, catItems]) => (
+            <div key={cat} className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden">
+              <div className="px-4 py-3 bg-gray-800/50 font-medium text-sm text-gray-300 flex justify-between">
+                <span>{cat}</span>
+                <span className="text-cinepilot-accent">{formatINR(catItems.reduce((s, i) => s + Number(i.total || 0), 0))}</span>
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Item</label>
-                <input
-                  type="text"
-                  value={newExpense.item}
-                  onChange={(e) => setNewExpense({ ...newExpense, item: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2"
-                  placeholder="Expense description"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Estimated (₹)</label>
-                  <input
-                    type="number"
-                    value={newExpense.estimated || ''}
-                    onChange={(e) => setNewExpense({ ...newExpense, estimated: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Actual (₹)</label>
-                  <input
-                    type="number"
-                    value={newExpense.actual || ''}
-                    onChange={(e) => setNewExpense({ ...newExpense, actual: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2"
-                  />
-                </div>
+              <div className="divide-y divide-gray-800">
+                {catItems.map(item => (
+                  <div key={item.id} className="px-4 py-3 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-300">{item.description}</div>
+                      {item.subcategory && <span className="text-xs text-gray-600">{item.subcategory}</span>}
+                    </div>
+                    <div className="text-xs text-gray-500 w-20 text-right">{item.quantity} {item.unit || ''}</div>
+                    <div className="text-xs text-gray-500 w-24 text-right">
+                      {item.rateLow && item.rateHigh ? `${formatINR(Number(item.rateLow))} - ${formatINR(Number(item.rateHigh))}` : '—'}
+                    </div>
+                    <div className="text-sm font-medium text-gray-300 w-24 text-right">{formatINR(Number(item.total || 0))}</div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.source === 'ai' ? 'bg-purple-900/30 text-purple-400' : 'bg-gray-800 text-gray-500'}`}>
+                      {item.source}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => setShowAdd(false)} className="flex-1 bg-slate-700 py-2 rounded">Cancel</button>
-              <button onClick={addExpense} className="flex-1 bg-cyan-500 py-2 rounded text-black font-medium">Add</button>
-            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Expenses Tab */}
+      {activeTab === 'expenses' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="font-medium text-gray-300">Expense Tracking</h2>
+            <button onClick={() => setShowAddExpense(!showAddExpense)} className="px-3 py-1.5 bg-cinepilot-accent text-black rounded text-sm font-medium">
+              + Add Expense
+            </button>
           </div>
+
+          {showAddExpense && (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 grid grid-cols-5 gap-3">
+              <select value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+                {Object.keys(categoryGroups).map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="Other">Other</option>
+              </select>
+              <input type="text" placeholder="Description" value={newExpense.description}
+                onChange={e => setNewExpense({ ...newExpense, description: e.target.value })}
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
+              <input type="number" placeholder="Amount (₹)" value={newExpense.amount}
+                onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })}
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
+              <input type="date" value={newExpense.date}
+                onChange={e => setNewExpense({ ...newExpense, date: e.target.value })}
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
+              <button onClick={handleAddExpense} className="px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium">Save</button>
+            </div>
+          )}
+
+          {expenses.length === 0 ? (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
+              No expenses recorded yet.
+            </div>
+          ) : (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden divide-y divide-gray-800">
+              {expenses.map(exp => (
+                <div key={exp.id} className="px-4 py-3 flex items-center gap-4">
+                  <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-400 rounded">{exp.category}</span>
+                  <div className="flex-1 text-sm text-gray-300">{exp.description}</div>
+                  {exp.vendor && <span className="text-xs text-gray-500">{exp.vendor}</span>}
+                  <span className="text-xs text-gray-500">{exp.date ? new Date(exp.date).toLocaleDateString('en-IN') : '—'}</span>
+                  <span className="text-sm font-medium text-gray-300">{formatINR(Number(exp.amount))}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded ${
+                    exp.status === 'approved' ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
+                  }`}>{exp.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Forecast Tab */}
+      {activeTab === 'forecast' && (
+        <div className="space-y-4">
+          {!forecast || forecast.planned === 0 ? (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
+              Generate a budget first to see forecasting data.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">% Spent</div>
+                  <div className="text-3xl font-bold text-cinepilot-accent">{forecast.percentSpent}%</div>
+                  <div className="w-full h-2 bg-gray-800 rounded-full mt-2">
+                    <div className={`h-full rounded-full ${forecast.percentSpent > 100 ? 'bg-red-500' : 'bg-cinepilot-accent'}`}
+                      style={{ width: `${Math.min(100, forecast.percentSpent)}%` }} />
+                  </div>
+                </div>
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">EAC (Forecast)</div>
+                  <div className="text-3xl font-bold text-yellow-400">{formatINR(forecast.eacTotal)}</div>
+                </div>
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Variance</div>
+                  <div className={`text-3xl font-bold ${forecast.variance >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {forecast.variance >= 0 ? '+' : ''}{formatINR(Math.abs(forecast.variance))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 bg-gray-800/50 font-medium text-sm text-gray-300">Category Forecasts</div>
+                <div className="divide-y divide-gray-800">
+                  {forecast.categories.map(cat => (
+                    <div key={cat.category} className="px-4 py-3 flex items-center gap-4">
+                      <div className="flex-1 text-sm text-gray-300">{cat.category}</div>
+                      <div className="text-xs text-gray-500 w-24 text-right">Planned: {formatINR(cat.planned)}</div>
+                      <div className="text-xs text-gray-500 w-24 text-right">Actual: {formatINR(cat.actual)}</div>
+                      <div className="text-sm font-medium w-24 text-right text-gray-300">EAC: {formatINR(cat.forecast)}</div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded ${
+                        cat.status === 'over' ? 'bg-red-900/30 text-red-400' :
+                        cat.status === 'warning' ? 'bg-yellow-900/30 text-yellow-400' :
+                        'bg-green-900/30 text-green-400'
+                      }`}>{cat.status === 'on_track' ? 'On Track' : cat.status === 'warning' ? 'Warning' : 'Over Budget'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

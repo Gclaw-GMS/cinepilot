@@ -406,22 +406,61 @@ DataAssembler, ConstraintNormalizer (LLM), TravelMatrixBuilder, WeatherCacheServ
 
 ---
 
-### 11. Budget (`/budget`)
+### 11. AI Budget Engine (`/budget`) -- MAJOR FEATURE
 
 | Aspect | Detail |
 |--------|--------|
 | **Current State** | Summary cards, category breakdown, expense table, add expense modal. |
-| **Gaps** | No persistence (local state). No editing/deletion. No charts. No approvals. |
+| **Gaps** | No persistence (local state). No editing/deletion. No charts. No approvals. No script-driven estimation. No forecasting. No invoice verification. |
+| **Target** | Full production budgeting engine: generates initial budget estimate from script breakdown data, tracks burn rate, forecasts cost-at-completion (EAC), detects anomalies vs regional benchmarks, suggests reallocations with minimal creative impact, verifies invoices against contracted rates. HYBRID: deterministic cost model (days, rates, rentals, travel) + AI for mapping breakdown → cost drivers, estimating missing values, explaining tradeoffs. See **N17** in Part 3 for the complete deep specification. |
 
 **AI Enhancements (P0)**
 
 | Enhancement | Implementation |
 |-------------|---------------|
-| Predictive Budget Forecasting | AIML API projects spend at completion from PostgreSQL `budget_items` burn rate. Cache in Redis. |
-| Cost Anomaly Detection | AIML API flags expenses above PostgreSQL category benchmarks. |
-| Regional Cost Benchmarks | AIML API compares against industry data. Benchmarks cached in Redis (long TTL). |
-| Budget Reallocation Suggestions | AIML API suggests cuts with least impact when a category is over-budget. |
-| Invoice Verification | Upload invoices to file storage. AIML API (vision model) cross-checks against PostgreSQL contracted rates. |
+| Generate Budget from Script | POST `/api/budget/generate`. Deterministic Stage 1: assemble CostDriverSummary from Script Parsing (scenes, INT/EXT, day/night), Shot Hub (shot count, night EXT %, equipment hints), Schedule (shoot days, travel, unit moves), cast data. Stage 2: baseline cost skeleton using formulas + regional defaults per scale (micro/indie/mid/big). Stage 3: AIML API (GPT-4o) refines quantities, adds missing line items, produces cost ranges (low/high) + risk notes + questions for producer. Benchmarks from `benchmarks` table clamp absurd rates. Persist as `budget_version` with `budget_items` (source=ai). |
+| Predictive Forecasting (EAC) | Deterministic: burn rate per category = actual_spend / time, CPI index = actual_to_plan_ratio. Three methods: simple projection, category-wise trend, risk-weighted with multipliers for high-risk categories (VFX, travel, overtime). AIML API interprets variance causes + summarizes in plain language. Cached in Redis `budget_forecast:{version_id}` TTL 30-120 min. |
+| Cost Anomaly Detection | Deterministic rules: expense > 1.5x category median → flag, repeated vendor split invoices → flag, category mismatch → flag, missing invoice for high amount → flag. Benchmarks from PostgreSQL `benchmarks` table (regional medians, p75). AIML API classifies anomaly type + proposes investigation steps. Cached in Redis `anomalies:{version_id}` TTL 30-120 min. |
+| Budget Reallocation Suggestions | AIML API proposes 5-10 cuts with minimal creative impact. Inputs: overages, script/shot hub cues (where quality matters), director style preferences, user priorities ("protect hero elevation shots", "reduce travel"). Each suggestion includes savings range, impact risk, affected scenes/shots, and actionable "Apply" buttons. Deterministic "impact map" ranks category importance by genre (camera/lighting high for action, music high for romance). |
+| Invoice Verification (Vision) | Upload invoice (PDF/JPG/PNG) to storage. AIML API (vision model) extracts vendor, date, line items, quantities, taxes, total. Cross-check against `contracts_rates` + `budget_items` planned rates. Flag: over contract rate, duplicate invoice numbers, missing PO/approval, unexpected category. Persist to `invoices` table. |
+| Approvals Workflow | Budget version states: draft → submitted → approved → locked. Expense approvals above threshold require sign-off. Redis pub/sub notifies UI of status changes. |
+| Version History | Multiple budget versions per project (Initial Estimate, Rev 1, etc.). Compare versions side-by-side. |
+
+**Pipeline: Generate Budget from Script**
+
+```
+Script Breakdown Data + Shot Hub + Schedule → CostDriverSummary (Deterministic)
+  → Baseline Cost Skeleton (Formulas + Regional Defaults)
+  → AI Refinement (GPT-4o: quantities, ranges, risks)
+  → Benchmark Calibration (Regional p75 clamp)
+  → Present to User (totals, categories, ranges, risk notes)
+  → User Overrides → Persist Budget Version
+```
+
+**Data Model (PostgreSQL)**
+
+| Table | Key Columns |
+|-------|------------|
+| `budget_versions` | id, project_id, name, status (draft/submitted/approved/locked), created_by |
+| `budget_categories` | id, project_id, name (Cast/Crew/Locations/Travel/Equipment/Art/Costume/VFX/Post/Music/Catering/Contingency), sort_order |
+| `budget_items` | id, budget_version_id, category_id, name, quantity, unit (days/lumpsum/items/km/nights/hours), unit_rate, planned_cost, cost_range_low, cost_range_high, assumptions_json, source (manual/ai/import), linked_entities_json |
+| `expenses` | id, budget_version_id, category_id, vendor, description, amount, date, payment_status (unpaid/paid/reimbursable), invoice_id, tags_json, created_by |
+| `approvals` | id, budget_version_id, step (producer/line_producer/finance), status (pending/approved/rejected), comment |
+| `contracts_rates` | id, project_id, party_type (actor/vendor/crew/rental_house), party_name, rate_type (daily/weekly/lumpsum), rate_amount, terms_json |
+| `invoices` | id, project_id, storage_key, vendor, total_amount, parsed_json (line items), verification_status (pending/verified/flagged), flags_json |
+| `benchmarks` | id, region (Tamil Nadu/Chennai/Madurai), category_name, median_unit_rate, p75_unit_rate, source_ref |
+
+**Redis Keys:**
+- `budget_forecast:{budget_version_id}` -- forecast JSON, TTL 30-120 min
+- `benchmarks:{region}:{category}` -- rate benchmarks, TTL 7-30 days
+- `anomalies:{budget_version_id}` -- anomaly list, TTL 30-120 min
+
+**Cross-Module Feeds:**
+- FROM Script Parsing: scenes (INT/EXT, day/night, length), characters, props, VFX notes, safety notes
+- FROM Shot Hub: shot count, night EXT %, lighting intensity, equipment suggestions
+- FROM Schedule: shoot days, travel between locations, night days, unit moves, cast call days
+- TO Schedule: cost constraints (expensive days, overtime budgets)
+- TO Shot Hub: equipment budget limits
 
 ---
 
@@ -462,21 +501,55 @@ DataAssembler, ConstraintNormalizer (LLM), TravelMatrixBuilder, WeatherCacheServ
 
 ---
 
-### 14. Reports (`/reports`)
+### 14. Censor Board (`/censor-board`, replaces `/reports`) -- MAJOR FEATURE
 
 | Aspect | Detail |
 |--------|--------|
-| **Current State** | Three-tab wrapper for report components. |
-| **Gaps** | Thin wrapper. No direct reporting. |
+| **Current State** | Three-tab wrapper for report components. Thin wrapper with no real functionality. |
+| **Gaps** | No CBFC analysis. No content detection. No certificate prediction. No cut suggestions. No export. |
+| **Target** | Dedicated "Censor Board" module: AI detects sensitive content per scene (violence, profanity, drugs, sexual content, hate, child harm), maps to official CBFC guidelines (Section 5B + Cinematograph Act), predicts likely certificate (U / UA 7+ / UA 13+ / UA 16+ / A / S) with confidence, and suggests practical edits/cuts to reach a target rating. HYBRID: deterministic keyword pre-pass + severity scoring + LLM grounded classification + explainable rules mapping. See **N19** in Part 3 for the complete deep specification. |
+
+**Important Caveat:** This engine provides a *probabilistic, advisory* estimate, not a guarantee of CBFC outcome. Final certification depends on CBFC committees and context/impact of the complete film.
 
 **AI Enhancements (P1)**
 
 | Enhancement | Implementation |
 |-------------|---------------|
-| Natural Language Reports | AIML API (GPT-4o) generates prose reports from PostgreSQL data. Cached in Redis. |
-| Executive Summary | AIML API generates one-page summary. Exportable as PDF. |
-| Comparative Analysis | Server Action compares PostgreSQL actuals vs plan. AIML API highlights deviations. |
-| Custom Report Builder | User describes report in natural language. AIML API generates SQL query, fetches from PostgreSQL, formats results. |
+| Content Detection (Per-Scene) | Two-layer approach: (1) Deterministic keyword + pattern pre-pass using Tamil/Tanglish profanity/violence/drug lexicons → candidate flags with rough severity. (2) AIML API (GPT-4o) confirms/denies flags, assigns severity 0-5, extracts evidence (line ranges + short snippets), adds context (glorified vs condemned, comic vs serious). Stored in `censor_scene_flags` table. Categories: violence, sex/nudity, profanity, drugs/alcohol/tobacco, horror, hate/communal, child harm, public order, defamation. |
+| Certificate Prediction | Deterministic scoring: weighted sum of category severities + aggravators (glorified violence, detailed sexual violence, incitement) - mitigators (condemnation context, educational framing). Score mapped to certificate band. AIML API (GPT-4o) calibration pass: predicted certificate + confidence + top drivers + high-risk scenes + uncertainties. Stored in `censor_analyses` table. Cached in Redis `censor:{script_hash}:{prompt_version}:{model}` TTL 24h. |
+| Target Rating Optimizer | User selects target certificate (e.g., "want UA 13+ but predicted UA 16+"). System identifies dominant blockers, generates ranked edit options per blocker: mute/cut/rewrite/reframe/contextualize/disclaimer. AIML API produces suggestions with expected severity reduction, certificate impact, effort, creative risk. "What-if" simulation recomputes score after applying expected deltas. Stored in `censor_suggestions` table. |
+| Content Map Visualization | Timeline/scene list with colored markers by category (violence = red, profanity = orange, drugs = purple, etc.). Click scene → detail panel with flags, evidence snippets, CBFC principle mapping, cut suggestions (minimal cut / tone-down / rewrite). |
+| Cut List Export | Producer-facing table: Scene, Issue, Severity, Current Risk, Suggested Edit, Expected Rating Impact, Effort. Exportable as PDF (CBFC prep sheet). Also: executive summary PDF + JSON export. |
+| CBFC Rules Knowledge Base | Versioned JSON derived from official CBFC guidelines (Section 5B, Certification Rules 2024). Each rule has: rule_id, description, source_url, triggers (categories + severity thresholds), recommended mitigation patterns. Admin-editable. Displayed as "Rules sources used" links in UI for transparency. |
+
+**CBFC Sources (embedded in system):**
+- [CBFC Guidelines](https://cbfcindia.gov.in/cbfcAdmin/guidelines.php) -- Section 5B principles
+- [CBFC Certification](https://cbfcindia.gov.in/cbfcAdmin/certification.php) -- certificate types
+- [CBFC Act & Rules](https://cbfcindia.gov.in/cbfcAdmin/act-and-rules.php) -- governing framework
+- [Certificate Types (UA 7+/13+/16+)](https://en.wikipedia.org/wiki/Central_Board_of_Film_Certification) -- overview
+- [Certification Rules 2024](https://www.pib.gov.in/PressReleaseIframePage.aspx?PRID=2014950) -- age-based subcategories
+
+**Data Model (PostgreSQL)**
+
+| Table | Key Columns |
+|-------|------------|
+| `censor_analyses` | id, project_id, script_version_id, model_used, predicted_certificate (U/UA7/UA13/UA16/A/S/REFUSE_POSSIBLE), confidence (0-1), summary_json |
+| `censor_scene_flags` | id, analysis_id, scene_id, category, severity (0-5), evidence_json (line ranges + snippets), context notes |
+| `censor_suggestions` | id, analysis_id, scene_id, target_certificate, suggestion_type (cut/mute/blur/rewrite/reframe/disclaimer/contextualize), suggestion_text, expected_impact_json, effort (low/med/high) |
+
+**Redis Keys:**
+- `censor:{script_hash}:{prompt_version}:{model}` -- full analysis, TTL 24h
+- `censor_target:{script_hash}:{target}:{prompt_version}` -- target optimizer results, TTL 24h
+
+**Pipeline:**
+```
+Script Scenes + Text → Keyword Pre-Pass (Deterministic, Tamil/Tanglish lexicons)
+  → LLM Scene Flagging (GPT-4o, grounded, evidence-based)
+  → Rules Mapping (CBFC Knowledge Base)
+  → Certificate Prediction (Deterministic scoring + LLM calibration)
+  → Target Optimizer (Cut suggestions + what-if simulation)
+  → Report (Executive summary + content map + cut list + PDF)
+```
 
 ---
 
@@ -606,21 +679,52 @@ DataAssembler, ConstraintNormalizer (LLM), TravelMatrixBuilder, WeatherCacheServ
 
 ---
 
-### 22. Storyboard (Component only, no dedicated page)
+### 22. Storyboard Page (`/storyboard`) -- MAJOR FEATURE
 
 | Aspect | Detail |
 |--------|--------|
-| **Current State** | Grid/timeline viewer for frames. Placeholder images. |
-| **Gaps** | No image generation. No drag-and-drop. No dedicated route. |
+| **Current State** | Grid/timeline viewer for frames. Placeholder images. Component only, no dedicated route. |
+| **Gaps** | No image generation. No drag-and-drop. No dedicated route. No shot linkage. No style consistency. No director notes. No export. |
+| **Target** | Dedicated `/storyboard` page: all shots from Shot Hub auto-listed, director selects a shot and auto-generates storyboard frames in **drawing style** (clean line art / sketch -- NOT photoreal). Director adds art-direction notes. System generates consistent panels per scene with character/location/palette locks. Supports batch generation, versioning, approval flow, and PDF/ZIP export. See **N18** in Part 3 for the complete deep specification. |
 
-**AI Enhancements (P1)**
+**Key Requirement:** Output must look like "storyboard drawings" -- clean line art, sketch, monochrome with optional flat color accents. NOT photoreal, NOT cinematic stills.
+
+**AI Enhancements (P0)**
 
 | Enhancement | Implementation |
 |-------------|---------------|
-| AI Frame Generation | AIML API (Stable Diffusion XL or DALL-E 3) generates frames from scene descriptions. Images stored in file storage, references in PostgreSQL. |
-| Scene-to-Storyboard Pipeline | AIML API reads scene + shot list from PostgreSQL, generates frame per shot. |
-| Style Transfer | AIML API applies visual style via prompt engineering. |
-| Animatic Generation | AIML API estimates timing. Server Action stitches frames into video. |
+| Drawing-Style Frame Generation | AIML API (SDXL + storyboard/lineart LoRA, or DALL-E 3 with explicit "storyboard sketch" prompt). Strong negative prompts against photorealism. 4 style presets: Clean Line Art, Pencil Sketch, Marker + Line, Blueprint/Tech Sketch. Color modes: B/W or limited palette (2-3 colors). Generate at 1024x576 (16:9) or 1024x768 (4:3). |
+| Shot-Grounded Prompt Building | Deterministic 4-layer prompt: (1) global storyboard style prefix, (2) shot composition from shot_size/angle/movement, (3) scene content from location + time + characters, (4) director notes (colors, props, mood, composition). Negative prompt blocks photorealism. Every prompt grounded in Shot Hub fields -- no invented content. |
+| Director Art-Direction Notes | Per-shot editable notes: environment (colors, props, architecture), character (costume, posture, expressions), lighting/mood, composition ("keep subject left", "negative space"). Notes merged into prompt safely; conflicts with shot hub flagged with override option. |
+| Style Consistency (Locks) | Character lock: reference asset anchors character look across panels. Location lock: "location establishing board" as anchor. Palette lock: consistent colors across project. Enforced via reference image conditioning (style reference / image prompt at low strength). |
+| Batch Generation | Select scene → generate key shots (importance >= 4 or starred). Background worker queue with Redis progress + pub/sub for UI updates. Storyboard job tracks status (queued/running/done/failed). |
+| Versioning & Approval | Each generation creates new version (v1, v2, v3...). Director compares versions and approves/rejects. Seed stored for reproducibility. |
+| Key Shot Importance Scoring | Deterministic: shot_size + action_tags (establishing, reveal, action beat, emotional peak). Optional AI: LLM labels importance 1-5 per shot. Batch gen defaults to importance >= 4 + first establishing shot per scene. |
+| Export | Scene PDF (2-6 panels per page, shot # + size + angle + notes under each panel). Full project PDF (grouped by scenes). ZIP (raw images). Server-side PDF generation. |
+
+**Pipeline Architecture**
+
+```
+Shot Hub (shots table) → Select Shot → Build StoryboardSpec (Deterministic)
+  → Consistency Anchoring (Locks) → Prompt Builder (4 layers + negative)
+  → Image Generation (Drawing Model) → Post-Processing (optional lineart enhance)
+  → Persist (Storage + DB) → Approval → Export
+```
+
+**Data Model (PostgreSQL)**
+
+| Table | Key Columns |
+|-------|------------|
+| `storyboard_styles` | id, project_id, style_name (clean_line/pencil_sketch/marker_line/blueprint), prompt_prefix, negative_prompt, palette_json, line_weight_hint |
+| `storyboard_assets` | id, project_id, shot_id, scene_id, version_index, status (draft/approved/rejected), style_id, prompt_final, prompt_user_notes, seed, model_used, storage_key_image, width, height |
+| `storyboard_locks` | project_id, lock_type (character/location/palette/global), key (character_id or location_id), reference_asset_id, style_id, notes |
+| `storyboard_jobs` | id, project_id, scene_id, shot_ids_json, status (queued/running/done/failed), progress (0-100) |
+
+**Storage:** `storyboard/{project_id}/{scene_id}/{shot_id}/v{n}.png`
+
+**Redis Keys:**
+- `storyboard_job:{job_id}` -- job status + progress + current_shot
+- `storyboard_cache:{shot_hash}:{style}:{notes_hash}` -- storage key (optional dedup)
 
 ---
 
@@ -727,13 +831,9 @@ Features that don't exist yet but would make CinePilot the definitive South Indi
 | **AI** | AIML API (GPT-4o) analyzes emotional arc from PostgreSQL scene data. Cue points cached in Redis. |
 | **Integration** | Visual overlay on timeline showing music cue points. |
 
-### N5. CBFC Certification Predictor (P1)
+### N5. CBFC Censor Board (P1) -- SUPERSEDED
 
-| Aspect | Detail |
-|--------|--------|
-| **What** | AI predicts U/U-A/A rating. Flags problematic scenes/dialogues. |
-| **AI** | AIML API (GPT-4o or Claude 3.5) content analysis against CBFC guidelines. |
-| **Data** | Predictions stored in PostgreSQL `ai_analyses` table. |
+*Replaced by the full Censor Board module (Section 14) + deep spec N19. See those for the complete CBFC pipeline.*
 
 ### N6. Dubbing Script Generator (P1)
 
@@ -1544,14 +1644,553 @@ All prompts enforce:
 | Phase 3 (Analysis add-ons) | Quality score. Safety/cultural notes. Script version comparison diff. Script library UI with version history. |
 | Phase 4 (Long-context checks) | Character consistency (on-demand). Plot hole detection (synopsis-first, on-demand). |
 
+### N17. AI Budget Engine -- Full Specification (P0)
+
+CinePilot's production budgeting intelligence. Generates a budget estimate directly from script breakdown data, tracks real spend against plan, forecasts cost-at-completion, flags anomalies, and suggests reallocations that protect creative quality while cutting costs.
+
+#### High-Level Strategy
+
+**HYBRID system:**
+- **Deterministic cost model** (baseline "physics": shoot days × rates, rental windows, travel distances, cast call days)
+- **AI/LLM** for: mapping script breakdown → cost drivers, estimating missing values with uncertainty ranges, explaining tradeoffs, suggesting alternatives
+- **Benchmarks cache** (regional, category) to detect anomalies and clamp absurd AI estimates
+
+#### Pipeline: Generate Budget from Script
+
+**Endpoint: POST `/api/budget/generate`**
+
+```json
+{
+  "project_id": "uuid",
+  "region": "Tamil Nadu | Chennai | Madurai | Ooty",
+  "target_scale": "micro | indie | mid | big",
+  "budget_cap": 15000000,
+  "overrides": {
+    "hero_fee": 5000000,
+    "music_director_fee": 800000,
+    "dp_daily_rate": 25000
+  },
+  "preferences": {
+    "quality_priority": "high | med | low",
+    "speed_priority": "high | med | low",
+    "realism_mode": true
+  }
+}
+```
+
+**Stage 1: Assemble CostDriverSummary (Deterministic)**
+
+| Driver | Source |
+|--------|--------|
+| shoot_days_estimate | Schedule (if exists), else estimate from scenes + shot counts |
+| location_count, unit_moves, avg_travel_per_day | Schedule + Location Scouter |
+| cast_count, lead_call_days, supporting_call_days | Script Parsing characters + scene_characters |
+| night_ext_days | Scenes with EXT + NIGHT/SUNSET |
+| stunt_days | Script Parsing safety notes |
+| vfx_days_proxy | Script Parsing vfx_notes severity |
+| art_complexity_proxy | Props variety + locations variety |
+| post_complexity_proxy | VFX severity + music requirements |
+| night_ext_pct, equipment_hints | Shot Hub shot data |
+
+Output: `CostDriverSummary` JSON stored for traceability.
+
+**Stage 2: Baseline Cost Skeleton (Deterministic)**
+
+Create planned budget using formulas + regional defaults per scale:
+
+| Category | Estimation Logic |
+|----------|-----------------|
+| Cast (leads) | User override OR regional scale default |
+| Cast (supporting, juniors) | count × call_days × regional_day_rate |
+| Crew | department_count × shoot_days × regional_rates |
+| Equipment | camera_pkg_daily × shoot_days + grip + lighting (night EXT days get generator line item) |
+| Locations & permits | location_count × avg_permit_cost + dressing |
+| Travel & stay | unit_moves × vehicle_cost + fuel + hotel_nights × rate |
+| Catering | crew_size × shoot_days × per_head_rate |
+| Post-production | edit_days + DI + sound_mix + VFX (by severity) |
+| Music | composer_fee + studio_days + musicians |
+| Contingency | 5-15% depending on risk assessment |
+
+Produces initial `budget_items` with `assumptions_json`.
+
+**Stage 3: AI Cost Refinement (LLM)**
+
+| Step | Detail |
+|------|--------|
+| Model | AIML API GPT-4o |
+| Input | CostDriverSummary, baseline skeleton, user overrides, genre/tone, director style |
+| Task | Adjust quantities, add missing production-critical line items, produce cost ranges (low/high), provide risk notes + questions for producer |
+| Validation | Only allowed categories. Numeric types correct. No hallucinated entities referencing scenes/locations not in breakdown. |
+| Output | Refined `budget_items[]` with source=ai, `risks[]`, `questions_for_user[]` |
+
+**Stage 4: Benchmark Calibration**
+
+| Step | Detail |
+|------|--------|
+| Fetch | Regional benchmarks from `benchmarks` table (seeded with Tamil Nadu industry data). Cached in Redis TTL 7-30 days. |
+| Apply | Clamp absurd rates to within reasonable range. Flag items outside p75. |
+| India specifics | Chennai vs Madurai vs Ooty have different crew rates, equipment availability, travel costs. Festival season premium surcharges (Pongal, Deepavali). Monsoon risk buffer for outdoor-heavy shoots. |
+
+#### Predictive Forecasting (EAC)
+
+| Method | Detail |
+|--------|--------|
+| Simple projection | EAC = total_budget × (actual_spend / planned_spend_to_date) |
+| Category-wise | Forecast each category separately using trend + remaining work units |
+| Risk-weighted | Apply multipliers for high-risk categories (VFX: 1.2x, travel: 1.3x if monsoon, overtime: 1.5x if behind schedule) |
+| LLM assist | AIML API interprets causes of variance, summarizes in plain language: "VFX costs trending 18% above plan due to 3 additional CGI scenes added in revision 2" |
+
+**Output payload:**
+```json
+{
+  "forecast": {
+    "eac_total": 14200000,
+    "variance": 1800000,
+    "confidence": "med",
+    "category_forecasts": [
+      { "category": "VFX", "planned": 800000, "actual": 520000, "forecast": 1050000, "status": "over" }
+    ]
+  },
+  "drivers": ["VFX scope increased", "3 additional night EXT days"],
+  "recommended_actions": ["Negotiate bulk VFX rate", "Cluster remaining night shoots"]
+}
+```
+
+Cache: Redis `budget_forecast:{budget_version_id}` TTL 30-120 min.
+
+#### Cost Anomaly Detection
+
+| Rule | Detail |
+|------|--------|
+| Threshold flag | Expense > 1.5x category median → flag |
+| Split invoice detection | Repeated vendor invoices just under approval threshold → flag |
+| Category mismatch | Expense categorized differently from vendor's usual category → flag |
+| Missing invoice | High-amount expense with no attached invoice → flag |
+| Contract breach | Expense rate exceeds contracted rate for that vendor → flag |
+| LLM assist | AIML API classifies anomaly type, proposes investigation steps |
+
+Cache: Redis `anomalies:{budget_version_id}` TTL 30-120 min.
+
+#### Budget Reallocation Suggestions
+
+| Step | Detail |
+|------|--------|
+| Input | Current overages, script/shot hub cues (where quality matters), director style preferences, user priorities |
+| Deterministic impact map | Categories ranked by creative impact per genre: camera/lighting high for action, music high for romance, art high for period films |
+| LLM suggestions | AIML API generates 5-10 ranked reallocations, each with: title, savings range (low/high), impact risk (low/med/high), tradeoff description, actionable steps |
+
+**Example suggestions:**
+- "Reduce unit moves by clustering Madurai scenes" (saves 1.2-2.5L, low impact)
+- "Swap crane days to drone days for 60% cost with 80% visual impact"
+- "Convert night EXT to dusk/magic hour where script allows" (saves generator + overtime)
+- "Replace expensive set build with real location + dressing"
+
+Each suggestion has "Apply" action that can push schedule hints or modify budget items.
+
+#### Invoice Verification (Vision)
+
+| Step | Detail |
+|------|--------|
+| Upload | Invoice PDF/JPG/PNG → file storage |
+| Extract | AIML API (vision model) OCR: vendor name, invoice date, line items, quantities, taxes, total amount |
+| Cross-check | Against `contracts_rates` (contracted rates), `budget_items` (planned rates) |
+| Flags | Over contract rate, duplicate invoice numbers, missing PO/approval, unexpected line item category |
+| Output | `verification_status` (verified/flagged) + extracted data + check results + recommended action |
+| Persist | `invoices` table with parsed_json + flags_json. Link to `expenses`. |
+
+#### Approvals Workflow
+
+| State | Detail |
+|-------|--------|
+| draft | Budget being built/edited |
+| submitted | Sent for approval |
+| approved | Producer/finance signed off |
+| locked | No further edits (production underway) |
+| Expense approvals | Above configurable threshold → require sign-off. Redis pub/sub notifies UI. |
+
+#### UI: Producer-Grade Budget Page
+
+| Element | Detail |
+|---------|--------|
+| **Summary cards** | Planned budget total (with range), actual spend, forecast EAC (with variance), over/under budget + confidence |
+| **Charts** | Category donut (planned vs actual), burn rate line chart, forecast range band |
+| **Category table** | Category, planned, actual, variance, forecast, anomaly count |
+| **Expense table** | Full CRUD (add/edit/delete), invoice attachments, approval status chip, vendor, date, category |
+| **AI panels** | "Generate Budget from Script" (with region/scale/override inputs), "Forecast & Risks" (EAC + drivers), "Anomalies" (flagged items), "Reallocation Suggestions" (ranked list with Apply buttons) |
+| **Version selector** | Switch between budget versions, compare side-by-side |
+| **Export** | PDF budget report, XLSX detailed breakdown, CSV for accounting |
+
+#### Tamil Film Industry Specifics
+
+| Aspect | Detail |
+|--------|--------|
+| Regional rate tiers | Chennai (metro premium), Madurai (mid-tier), rural/Ooty (logistics premium). Auto-applied based on region selection. |
+| Festival surcharges | Pongal (Jan), Deepavali (Oct-Nov), summer holidays → crew/vendor rate surcharges flagged. |
+| Union minimums | TFPC/FEFSI minimum rates for technicians. Auto-checked against budget items. |
+| Catering norms | South Indian film set catering: per-head rates differ from Bollywood norms. Regional defaults seeded. |
+| Music industry | Tamil film music: composer fees, playback singer rates, studio costs specific to Chennai music industry. |
+| Generator/power | Night EXT shoots in rural Tamil Nadu: generator rental + diesel costs auto-calculated. |
+
+#### Model Selection
+
+| Task | Model | Rationale |
+|------|-------|-----------|
+| Budget refinement | GPT-4o | Fast, structured output |
+| Reallocation suggestions | GPT-4o | Needs script context + creative reasoning |
+| Anomaly explanation | GPT-4o | Quick classification |
+| Forecast narrative | GPT-4o | Summarize variance causes |
+| Invoice verification | Vision model (AIML API) | OCR + structured extraction |
+
+Caching mandatory: content-hash for script-driven generation, Redis for forecasts/anomalies.
+
+#### P0 Build Plan
+
+| Phase | Deliverables |
+|-------|-------------|
+| Phase 1 (Persistence + CRUD) | PostgreSQL tables (budget_versions, budget_categories, budget_items, expenses, contracts_rates, invoices, benchmarks, approvals). Full CRUD UI. Export CSV. |
+| Phase 2 (Generate from Script) | CostDriverSummary builder from Script Parsing + Shot Hub + Schedule data. Baseline cost skeleton generator. LLM refinement + ranges + risks. Benchmarks cache + regional calibration. |
+| Phase 3 (Forecasting + Intelligence) | Burn rate + EAC forecast engine. Anomaly detection rules + LLM classification. Reallocation suggestions with "Apply" buttons. Charts (donut, burn rate, forecast band). |
+| Phase 4 (Invoice + Approvals) | Invoice upload + vision parsing. Contract rate cross-checks + flags. Approval workflow (draft → submitted → approved → locked). |
+
+### N18. Storyboard Page -- Full Specification (P0)
+
+CinePilot's visual pre-visualization engine. Generates production storyboard drawings (NOT photos) from Shot Hub data, with director art-direction notes, style consistency locks, batch generation, and PDF export.
+
+#### Key Requirement
+
+Output must be **storyboard drawings**: clean line art, sketch, monochrome with optional flat color accents. Never photoreal, never cinematic stills. This is a production tool, not an art generator.
+
+#### Page Layout (`/storyboard`)
+
+| Element | Detail |
+|---------|--------|
+| **Left Sidebar** | Scene + Shot Navigator. Scene list (search, filter by INT/EXT, day/night, location). Expand scene to show shots: shot #, short description, status badge (Not generated / Draft / Approved), "Key shot" star toggle. |
+| **Main Canvas** | Storyboard Panel Grid. Scene view: 3-6 panels per row (thumbnail grid). Shot view: big panel + metadata + notes + versions. Each panel shows: frame thumbnail, shot # + size + angle chips, version selector (v1/v2/v3), approve toggle. |
+| **Right Inspector** | Shot metadata (read-only from Shot Hub). Director Notes (editable): environment notes, character notes, lighting/mood notes, composition notes. Style preset dropdown (Clean Line Art / Pencil Sketch / Marker + Line / Blueprint). Color mode (B/W / Limited palette). Consistency toggles (Lock character / Lock location / Lock palette). Generate buttons: Generate (1), Generate 4 variations, Generate next panel (sequence), Batch generate scene (key shots). Regenerate with notes. Upscale (keeps style). |
+| **Top Bar** | Project selector. Export (PDF scene, PDF full, ZIP images). Batch progress indicator. "Storyboard Bible" (style sheet) link. |
+
+#### Pipeline Stages -- Detail
+
+**Stage 0: Select Shot**
+
+UI loads shot from Shot Hub + existing storyboard assets. If none exist, show "Generate" CTA.
+
+**Stage 1: Build StoryboardSpec (Deterministic)**
+
+| Field | Source |
+|-------|--------|
+| shot_text, camera (shot_size, angle, movement) | Shot Hub `shots` table |
+| time (int_ext, time_of_day) | Shot Hub / Scene |
+| location text | Shot Hub / Scene / Location Scouter |
+| characters (name, costume, emotion) | Shot Hub characters_json + director notes |
+| director_notes | User input: environment, mood, composition, lighting |
+| style | Project storyboard_styles + user selection |
+| locks | storyboard_locks references |
+
+Output: `StoryboardSpec` JSON used to build prompts consistently.
+
+**Stage 2: Consistency Anchoring (Locks)**
+
+| Lock Type | Implementation |
+|-----------|---------------|
+| Character lock | Fetch reference_asset_id from `storyboard_locks`. Provide reference image as style reference / image prompt at low strength to maintain consistent character look across panels. |
+| Location lock | "Location establishing board" as anchor. Apply to subsequent shots via reference conditioning. |
+| Palette lock | Enforce consistent color palette across project. Colors from `storyboard_styles.palette_json`. |
+| Future (P1) | Lightweight LoRA per project style + characters for stronger consistency. |
+
+**Stage 3: Prompt Builder (Deterministic + Safe Merge)**
+
+4-layer prompt construction:
+
+| Layer | Content |
+|-------|---------|
+| Layer 1: Global style | "Storyboard panel, clean line art drawing, production storyboard sketch, minimal shading, clear readable shapes, strong silhouette, simple background shapes, cinematic composition, no photorealism." |
+| Layer 2: Shot composition | Derived from shot_size/angle/movement: "wide establishing shot, low angle perspective, road leading lines, subject placement left" |
+| Layer 3: Scene content | Location + time-of-day cues. Characters (count + general pose). Props if present in Shot Hub. |
+| Layer 4: Director notes | User notes merged as constraints (colors, objects, mood, composition). If conflicts with Shot Hub → show warning, allow override. |
+| Negative prompt | "photorealistic, photo, film still, ultra realistic, detailed skin, pores, cinematic bokeh, text, captions, watermark, logo, 3d render, glossy, anime" |
+
+**Style Preset Prompts:**
+
+| Preset | Prompt Prefix |
+|--------|--------------|
+| Clean Line Art | "Storyboard panel, clean line art drawing, production storyboard sketch, minimal shading, clear readable shapes, strong silhouette, thin linework, limited color accents, no photorealism." |
+| Pencil Sketch | "Storyboard panel, pencil sketch drawing, rough graphite lines, light hatching, paper texture subtle, readable blocking, simple forms, no photorealism." |
+| Marker + Line | "Storyboard panel, ink line drawing with marker fill, bold outlines, flat color blocks, simple shading, readable composition, no photorealism." |
+| Blueprint | "Storyboard panel, blueprint-style technical sketch, clean lines, minimal fill, composition focused, readable geometry, no photorealism." |
+
+**Stage 4: Image Generation (Drawing Models)**
+
+| Item | Detail |
+|------|--------|
+| Primary | SDXL + storyboard/lineart LoRA via AIML API (if provider supports). Controllable, consistent style. |
+| Alternative | DALL-E 3 with explicit "storyboard sketch" prompt. High quality composition, less direct control. |
+| Size | 1024x576 (16:9) or 1024x768 (4:3 storyboard panel) |
+| Variations | 1-4 per generation |
+| Seed | Stored for reproducibility |
+| Guidance | Moderate (avoid over-rendering) |
+| Background | Keep simple for readability |
+
+**Stage 5: Post-Processing (Optional)**
+
+| Step | Detail |
+|------|--------|
+| Style drift check | If output looks too photo-like → re-run with stronger negative prompt / lineart style, or run "sketchify" pass |
+| Panel border + shot number | Added ONLY in PDF export (not baked into image) |
+
+**Stage 6: Persistence**
+
+| Step | Detail |
+|------|--------|
+| Upload | Image to file storage: `storyboard/{project_id}/{scene_id}/{shot_id}/v{n}.png` |
+| DB | Insert `storyboard_assets` row: prompt_final, prompt_user_notes, model_used, version_index, seed |
+| Approve | User clicks approve → status=approved |
+| Auto-lock | If locks enabled and none exist yet → create `storyboard_locks` referencing this asset as anchor |
+
+**Stage 7: Batch Generation**
+
+| Step | Detail |
+|------|--------|
+| Selection | Key shots starred by director OR top N by importance score (importance >= 4 + first establishing per scene) |
+| Job | Create `storyboard_jobs` row with shot_ids_json. Status: queued → running → done/failed. |
+| Worker | Process sequentially: build spec → prompt → generate → persist. Update Redis `storyboard_job:{job_id}` status + pub/sub for UI progress. |
+
+#### Key Shot Importance Scoring
+
+| Method | Detail |
+|--------|--------|
+| Deterministic | shot_size (WS/establishing = high) + action_tags (reveal, climax, hero entry = high) |
+| AI (optional) | LLM labels importance 1-5 per shot for each scene |
+| Batch default | importance >= 4 + first establishing shot per scene |
+
+#### Quality Controls
+
+| Control | Detail |
+|---------|--------|
+| Style drift detection | If panel looks photoreal → auto re-run with stronger lineart style |
+| Character consistency | Use character lock references. Optionally store "character sheet" panels (front view, side view, key expressions) as anchors for future shots. |
+| Location consistency | Save "location establishing board" as anchor. Apply to subsequent shots via reference conditioning. |
+| Versioning | Each generation increments version_index. Director compares v1-v4 and approves best. |
+
+#### API Endpoints
+
+| Endpoint | Detail |
+|----------|--------|
+| GET `/api/storyboard?project_id=&scene_id=` | Returns scene shots + storyboard assets |
+| POST `/api/storyboard/generate` | Generate for single shot. Input: project_id, shot_id, style_preset, color_mode, director_notes, variations, lock flags. Returns job_id or synchronous assets. |
+| POST `/api/storyboard/batch-generate` | Generate for scene_id or shot_ids selection. Returns job_id. |
+| POST `/api/storyboard/approve` | Set asset status=approved |
+| GET `/api/storyboard/job/{job_id}` | Job status + progress |
+
+#### Export
+
+| Format | Detail |
+|--------|--------|
+| Scene PDF | Scene header + shot list + storyboard panels. 2-6 panels per page. Shot #, size, angle, notes under each panel. |
+| Full Project PDF | Grouped by scenes. |
+| ZIP | Raw images. |
+| Implementation | Server-side PDF generation. Thumbnails generated on upload or on demand. |
+
+#### P0 Build Plan
+
+| Week | Deliverables |
+|------|-------------|
+| Week 1 | Create `/storyboard` page UI (scene/shot navigator + grid). DB tables (storyboard_styles, storyboard_assets, storyboard_jobs). Hook into Shot Hub to list shots by scene. Single-shot generate endpoint (no locks yet). Store images in storage + display in UI. |
+| Week 2 | Director notes + style presets. Variations + versioning. Approval flow. Batch generation worker + Redis progress + pub/sub. PDF export (scene-level). |
+| Week 3 | Locks (character/location/palette) via reference conditioning. Key shot importance scoring. Full project export + ZIP. Polish: style drift detection, caching, regen UX. |
+
+### N19. Censor Board (CBFC Certificate Prediction + Cut Suggestions) -- Full Specification (P1)
+
+CinePilot's CBFC advisory engine. Given a parsed script (Tamil/Tanglish supported), detects sensitive content per scene, maps to official CBFC guidelines, predicts likely certificate with confidence, and suggests practical edits to reach a target rating.
+
+**Important:** This engine provides a *probabilistic, advisory* estimate, not a guarantee of CBFC outcome. Final certification depends on CBFC committees and context/impact of the complete film.
+
+#### Engine Architecture (Hybrid: Deterministic + LLM)
+
+Why hybrid: repeatability + explainability + evidence per scene (line ranges) + no hallucinations about rules.
+
+```
+Script Scenes + Text → Stage 1: Content Detection (keyword pre-pass + LLM)
+  → Stage 2: Rules Mapping (CBFC Knowledge Base)
+  → Stage 3: Certificate Prediction (deterministic score + LLM calibration)
+  → Stage 4: Target Rating Optimizer (cut suggestions + what-if)
+  → Report Generation (summary + content map + cut list + PDF)
+```
+
+#### Stage 0: Inputs (From Script Parser)
+
+| Input | Detail |
+|-------|--------|
+| Per scene | scene_id, scene_number, heading_raw, scene_text with line ranges (or block references), language_profile (Tamil/Tanglish/mixed), characters present, location_text |
+| Optional | Shot Hub info (adds visual intensity estimation) |
+
+#### Stage 1: Content Detection (Per-Scene, Accuracy + Traceability)
+
+**Layer 1: Deterministic Keyword + Pattern Pre-Pass (fast)**
+
+| Lexicon | Detail |
+|---------|--------|
+| Tamil/Tanglish profanity | Curated wordlist with severity levels. Covers Tamil slang, Tanglish variants, euphemisms. |
+| Violence terms | stab/blood/kill + Tamil equivalents. Weapon mentions. Fight action verbs. |
+| Sexual content / nudity | Explicit and suggestive terms, body references, romantic intensity cues. |
+| Drug/alcohol/tobacco | Substance names, consumption verbs, glamorization cues. |
+| Hate / communal | Slurs, identity-group references in conflict context (handle carefully). |
+
+Output: candidate flags with rough severity per scene.
+
+**Layer 2: LLM Classification (Grounded)**
+
+| Item | Detail |
+|------|--------|
+| Model | AIML API GPT-4o (fast) or Claude 3.5 (long scenes) |
+| Input | Scene text with line numbers + candidate flags from pre-pass |
+| Task | Confirm/deny flags. Assign severity 0-5. Extract evidence (line ranges + short snippets). Add context: glorified/condemned/comic/serious. |
+| Output | Strict JSON: `{ scene_id, flags: [{ category, severity, context, evidence: [{ line_start, line_end, snippet }] }] }` |
+| Guardrails | Evidence snippets must be short (avoid leaking full script). Only use provided lines. Do not invent content. |
+
+**Layer 3: Normalization**
+- Merge duplicates, map to canonical categories, store in `censor_scene_flags`.
+
+**Severity Rubric (tunable):**
+- 0: none
+- 1: mild reference
+- 2: moderate
+- 3: strong but brief
+- 4: strong and sustained / graphic detail implied
+- 5: extreme / explicit / repeated / potentially disallowed under guidelines
+
+#### Stage 2: Rules Mapping (CBFC Guidelines → Internal Rule KB)
+
+**CBFC Rule Knowledge Base (RKB):**
+- Versioned JSON file in repo (admin-editable)
+- Each rule: rule_id, description, linked_source_url(s), triggers (categories + severity thresholds + context), recommended mitigation patterns
+
+**Rule families derived from CBFC guidelines (Section 5B):**
+
+| Rule Family | CBFC Principle |
+|-------------|---------------|
+| Violence | Not glorified/justified; no incitement of offence; impact judged as whole |
+| Sexual content | Avoid sexual violence depiction; reduce to minimum; no explicit details |
+| Sexual perversion | Avoid depiction; reduce to minimum |
+| Profanity | Language not denigrating groups; reduce offensive language |
+| Drugs/alcohol/tobacco | Not glamorized; show consequences if depicted |
+| Communal / hate | No contemptuous visuals/words toward racial/religious groups |
+| Contempt of court | No depictions undermining dignity of court |
+| National symbols | Only per law |
+| Child safety | Minors not depicted as victims/perpetrators with graphic detail |
+| Overall impact | Film judged as whole; period + contemporary standards; should not deprave morality |
+
+#### Stage 3: Certificate Prediction (Explainable Scoring + LLM Calibration)
+
+**Step 1: Deterministic Scoring Model**
+
+| Factor | Detail |
+|--------|--------|
+| Weighted sum | Category severities × category weights (sex_nudity: high, sexual violence: very high, hate/communal: very high, profanity: medium, violence: medium-high, drugs: medium) |
+| Aggravators | Glorified violence (+), detailed sexual violence (+), incitement/how-to crime (+) |
+| Mitigators | Condemnation context (-), educational framing (-), non-graphic depiction (-) |
+
+**Step 2: Score → Certificate Band**
+
+| Score Range | Certificate |
+|-------------|-------------|
+| Very low | U |
+| Low-moderate | UA 7+ |
+| Moderate | UA 13+ |
+| Higher | UA 16+ |
+| Very high | A |
+| Specialized educational | S (rule-based) |
+| Extreme guideline conflicts | REFUSE_POSSIBLE advisory flag (rare) |
+
+**Step 3: LLM Calibration Pass**
+
+| Item | Detail |
+|------|--------|
+| Model | AIML API GPT-4o |
+| Input | Aggregated flags + contexts + deterministic score + short RKB summary |
+| Output | Strict JSON: `{ predicted_certificate, confidence, top_drivers, high_risk_scenes: [{ scene_number, reason }], uncertainties }` |
+| Persist | `censor_analyses` table |
+
+#### Stage 4: Target Rating Optimizer (Cut Suggestions Engine)
+
+**Step 1: Identify Dominant Blockers**
+- Single extreme scene pushing rating up
+- Repeated medium issues across many scenes
+
+**Step 2: Generate Edit Options Per Blocker**
+
+| Category | Mitigation Templates |
+|----------|---------------------|
+| Profanity | Mute/replace strongest words, reduce frequency |
+| Violence | Shorten violent beat, remove how-to crime depiction, reduce gore detail |
+| Sexual content | Remove explicit description, cut nudity references, shift to implied staging |
+| Drugs/alcohol/tobacco | Remove glamor, show consequences / contextual condemnation |
+| Hate/communal | Remove slurs, reframe conflict away from identity group |
+| Child harm | Reduce to minimum, remove detail, avoid minors as victims/perpetrators in visuals |
+
+**Step 3: LLM Recommendation Generation**
+
+| Item | Detail |
+|------|--------|
+| Model | AIML API GPT-4o |
+| Input | Evidence lines, category + severity, target certificate, mitigation templates |
+| Output | Strict JSON: `{ target, recommendations: [{ rank, scene_number, issue, suggested_change, why, expected_severity_delta, effort, creative_risk, expected_certificate_impact }] }` |
+
+**Step 4: What-If Simulation**
+- Recompute deterministic score after applying expected deltas
+- Return probability of reaching target (advisory)
+- Persist to `censor_suggestions`
+
+#### UI: Censor Board Page (`/censor-board`)
+
+| Element | Detail |
+|---------|--------|
+| **Header** | Project selector, script version selector, target certificate dropdown (Predict / U / UA 7+ / UA 13+ / UA 16+ / A / S), "Re-run analysis" button, export (PDF + JSON) |
+| **Summary cards** | Predicted certificate + confidence, key drivers, high-risk scene count, delta to target |
+| **Content Map** | Timeline/scene list with colored markers by category (violence=red, profanity=orange, drugs=purple, sex=pink, hate=dark red, horror=gray). Click scene → detail panel. |
+| **Scene detail panel** | Scene header (INT/EXT, day/night, location). Flag chips with severity + evidence snippets + line ranges. "Reasoning vs CBFC principles" summary. Cut suggestions: Option A (minimal cut), Option B (tone-down), Option C (rewrite). "Apply as notes" button. |
+| **Cut List tab** | Producer-facing table: Scene, Issue, Severity, Current Risk, Suggested Edit, Expected Rating Impact, Effort. Exportable as PDF (CBFC prep sheet). |
+| **What-If tab** | Sliders: reduce profanity, reduce violence intensity, remove nudity toggle, remove drug glamor toggle. AI simulates certificate impact + summarizes tradeoffs. |
+| **Sources panel** | "Rules sources used" links to official CBFC guidelines for transparency. |
+
+#### Prompts (Strict JSON)
+
+| Prompt | Role | Key Rules |
+|--------|------|-----------|
+| Scene Flagging | CBFC content classifier | Use only provided text. Evidence line ranges required. Severity 0-5. Context (glorified/condemned/comic/serious). |
+| Certificate Calibration | CBFC outcome advisor | No certainty claims -- provide confidence. Top drivers + high-risk scenes + uncertainties. |
+| Target Optimizer | Producer-side edit advisor | Minimal changes to reach target. Estimate severity reduction + certificate shift. Effort + creative risk. |
+
+#### Model Selection
+
+| Task | Model |
+|------|-------|
+| Per-scene flagging | GPT-4o (fast per scene) |
+| Certificate calibration | GPT-4o |
+| Cut suggestions | GPT-4o |
+| Long-context holistic narrative (optional) | Claude 3.5 |
+
+Caching: per-scene flags cached by scene_hash. Only recompute if scene text or prompt_version changes.
+
+#### Build Plan (P1)
+
+| Step | Deliverables |
+|------|-------------|
+| Step 1 | DB tables (censor_analyses, censor_scene_flags, censor_suggestions). Build `/censor-board` page with scene list + flags. |
+| Step 2 | Scene flagging engine: keyword pre-pass lexicons (Tamil/Tanglish) + LLM confirmation pass. Persist + content map UI. |
+| Step 3 | Certificate prediction: deterministic scoring + mapping + LLM calibration. Summary cards. |
+| Step 4 | Target optimizer: cut suggestions + what-if simulation + "apply as notes." Cut list export. |
+| Step 5 | Export: executive summary PDF + cut list PDF + JSON. |
+| Step 6 | Polish: admin-editable Rule KB, tune weights using real outcomes (feedback loop), transparency UX with source links. |
+
 ---
 
 ## Implementation Priority Matrix
 
 | Priority | Features | Rationale |
 |----------|----------|-----------|
-| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script Parsing & AI Breakdown**, **Script-Aware Location Scouter**, **AI Scheduling Engine**, **Shot Hub**, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Script Parsing is the foundational pipeline; Location Scouter, Scheduling Engine, and Shot Hub are the signature differentiators. |
-| **P1 - Next Quarter** | Authentication, Budget forecasting, Crew management, Notifications, Weather API, Continuity tracker, Dubbing scripts, CBFC predictor, Storyboard AI, VFX breakdown, Music placement, Dialogue coach, UI theme standardization, File storage | These differentiate CinePilot from generic tools and serve South Indian cinema specifically. |
+| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script Parsing & AI Breakdown**, **Script-Aware Location Scouter**, **AI Scheduling Engine**, **Shot Hub**, **AI Budget Engine**, **Storyboard Page**, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Script Parsing is the foundational pipeline; Location Scouter, Scheduling Engine, Shot Hub, Budget Engine, and Storyboard are the signature differentiators. |
+| **P1 - Next Quarter** | Authentication, Crew management, Notifications, Weather API, Continuity tracker, Dubbing scripts, **Censor Board (CBFC)**, VFX breakdown, Music placement, Dialogue coach, UI theme standardization, File storage | These differentiate CinePilot from generic tools and serve South Indian cinema specifically. |
 | **P2 - Future** | Smart exports, Settings persistence, Production accounting, Crowd management, Release planner, Poster generation, Voice briefings, Preference learning | Premium features for larger productions. |
 
 ---

@@ -3,9 +3,21 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.r2.cloudflarestorage.com',
+      },
+    ],
   },
-  env: {
-    API_URL: process.env.API_URL || 'http://localhost:8000',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
   },
 }
 

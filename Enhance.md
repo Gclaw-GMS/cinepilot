@@ -129,22 +129,55 @@ Python backend has been removed. The new architecture is:
 
 ---
 
-### 4. Schedule (`/schedule`)
+### 4. AI Scheduling Engine (`/schedule`) -- MAJOR FEATURE
 
 | Aspect | Detail |
 |--------|--------|
-| **Current State** | Calendar view (5-day grid) and List view. Day detail panel. Unassigned scenes panel. Stats row. |
-| **Gaps** | Entirely hardcoded demo data. Only 5 days. No drag-and-drop. No save. |
+| **Current State** | Calendar view (5-day grid) and List view. Day detail panel. Unassigned scenes panel. Stats row. All hardcoded demo data. |
+| **Gaps** | Entirely hardcoded. Only 5 days. No drag-and-drop. No save. No real optimization. No weather/travel/cost awareness. |
+| **Target** | Full constraint-aware scheduling engine. HYBRID approach: deterministic solver for correctness + AIML API for structuring messy constraints, proposing fixes when infeasible, and summarizing rationale. Prevents "LLM schedule that sounds good but breaks reality." See **N14** in Part 3 for the complete deep specification. |
 
 **AI Enhancements (P0)**
 
 | Enhancement | Implementation |
 |-------------|---------------|
-| Constraint-Based Optimization | AIML API (GPT-4o) receives scenes, locations, cast availability from PostgreSQL. Returns optimized schedule. Persist result to PostgreSQL `shooting_days` + `day_scenes`. |
-| Weather-Aware Scheduling | Fetch real weather via API (OpenWeatherMap). AIML API cross-references with outdoor scenes. Cache weather in Redis (TTL 6 hours). |
-| Cast Conflict Resolution | Query PostgreSQL for cast bookings. AIML API proposes alternatives. Broadcast changes via Redis pub/sub. |
-| Travel & Logistics | AIML API calculates travel time between PostgreSQL locations. Flags impossible same-day moves. |
-| Cost-Optimized Scheduling | AIML API factors equipment rental costs, crew overtime, permit windows from PostgreSQL budget/crew tables. |
+| Constraint-Based Optimization | HYBRID: AIML API (GPT-4o) normalizes messy constraints into strict JSON. TypeScript constraint solver (or OR-Tools via serverless) assigns scenes to days respecting cast availability, permits, day limits. Persists to PostgreSQL `shooting_days` + `day_scenes`. Redis pub/sub streams progress to UI. |
+| Weather-Aware Scheduling | OpenWeatherMap API fetches forecast per (location, date). Cached in Redis (TTL 6h, key: `weather:{location_id}:{date}`). EXT scenes penalized/forbidden on rainy days depending on mode (weather_safe / balanced / fast). "Backup Rain Plan" auto-generates indoor-only fallback schedule. |
+| Cast Conflict Resolution | Hard constraint: PostgreSQL `cast_availability` table enforces availability windows. When infeasible, AIML API (ConflictResolver role) proposes minimal scene swaps/date moves. Changes broadcast via Redis pub/sub `schedule_updates:{project_id}`. Tamil film industry union turnaround rules (12h minimum) enforced as hard constraints. |
+| Travel & Logistics Feasibility | Travel matrix built via OSRM between all candidate locations. Cached in Redis (TTL 7-30 days). Day-to-day travel penalized in objective function. "Impossible same-day moves" flagged when multi-location day travel exceeds threshold. India-reality: accounts for actual road conditions, not straight-line distance. |
+| Cost-Optimized Scheduling | Objective factors: cast daily rates, crew overtime (Tamil industry union rules), equipment rental windows, permit costs per location/time, travel cost per km. `cost_min` mode prioritizes lowest total cost. Highlights "cost spike" days in UI. |
+| Schedule Versioning | Multiple schedule versions per project. Modes: fast / balanced / cost_min / travel_min / weather_safe. Lock specific scenes, days, or assignments. Compare versions side-by-side. |
+| LLM Schedule Narrator | AIML API (GPT-4o, ScheduleNarrator role) generates human-readable summary: "why this schedule", major constraints, tradeoffs, risks + backup suggestions. Strictly grounded in computed metrics -- never hallucinated logistics claims. |
+
+**Pipeline Architecture**
+
+```
+Optimize Click → Job Setup → Data Assembly → Travel Matrix (OSRM)
+  → Weather Fetch (OpenWeatherMap) → Constraint Normalization (LLM)
+  → Feasibility Pre-Check → Solver (CP-SAT/Greedy) → Repair Loop (LLM + Solver)
+  → Post-Solve Validation → Persist (PostgreSQL) → Broadcast (Redis Pub/Sub)
+```
+
+**Core Engine Modules:**
+DataAssembler, ConstraintNormalizer (LLM), TravelMatrixBuilder, WeatherCacheService, FeasibilityChecker, Optimizer (solver), ConflictResolver (LLM + solver repair), Persister, Broadcaster (Redis pub/sub)
+
+**Data Model Additions (PostgreSQL)**
+
+| Table | Key Columns |
+|-------|------------|
+| `scenes` (extended) | estimated_duration_min, required_cast (jsonb), required_equipment (jsonb), location_tags (jsonb), continuity_group_id, constraints (jsonb) |
+| `cast_availability` | cast_id, date, available_from, available_to, status (available/booked/hold), booking_notes |
+| `crew_constraints` | project_id, max_day_minutes, turnaround_minutes, overtime_rules (jsonb), break_rules (jsonb) |
+| `equipment_rentals` | equipment_id, date_from, date_to, daily_cost, constraints_json |
+| `shooting_days` | id, project_id, schedule_version_id, date, location_id, call_time, wrap_time, total_planned_minutes, objective_scores_json, risk_flags_json |
+| `day_scenes` | shooting_day_id, scene_id, order_in_day, assigned_location_id, planned_start, planned_end, flags_json |
+| `schedule_versions` | id, project_id, mode, locked_items_json, status (draft/final), summary_text, created_at |
+
+**Redis Keys:**
+- `weather:{location_id}:{date}` -- weather JSON, TTL 6h
+- `travel:{from_id}:{to_id}` -- routing result, TTL 7-30 days
+- `schedule_job:{job_id}` -- job status/progress, TTL 24h
+- `schedule_updates:{project_id}` -- pub/sub channel for live UI updates
 
 ---
 
@@ -779,18 +812,242 @@ Default weights: 0.30, 0.25, 0.20, 0.15, 0.10. Prompt-based reweighting: "quiet"
 - Manual feedback marking
 - Later: PostGIS + osm2pgsql, self-hosted OSRM/Nominatim, imagery-based classifiers, shot suitability presets
 
+### N14. AI Scheduling Engine -- Full Specification (P0)
+
+CinePilot's constraint-aware, India-reality scheduling engine. Replaces demo data with a real optimization pipeline that respects Tamil film industry realities: union rules, monsoon seasons, festival calendars, permit windows, and logistics constraints that generic tools ignore.
+
+#### Critical Design Principle
+
+**HYBRID approach** -- deterministic optimization handles correctness and feasibility; AI/LLM structures messy constraints, proposes alternatives when infeasible, and summarizes rationale. This prevents "LLM schedule that sounds good but breaks reality."
+
+#### Pipeline Flow
+
+```
+User clicks "Optimize" → Job Setup (PostgreSQL + Redis)
+  → Stage 1: Data Assembly (scenes, cast, locations, equipment, costs)
+  → Stage 2: Travel Matrix (OSRM, cached in Redis)
+  → Stage 3: Weather Fetch (OpenWeatherMap, cached in Redis)
+  → Stage 4: Constraint Normalization (AIML API GPT-4o → strict JSON)
+  → Stage 5: Feasibility Pre-Check (hard fail detection)
+  → Stage 6: Solver (constraint programming / greedy + local search)
+  → Stage 7: Repair Loop (LLM ConflictResolver + solver re-run)
+  → Stage 8: Post-Solve Validation (quality gate)
+  → Stage 9: Persist (PostgreSQL shooting_days + day_scenes)
+  → Stage 10: Broadcast (Redis pub/sub → UI)
+```
+
+#### API Contracts
+
+**POST `/api/schedule/optimize`**
+
+```json
+{
+  "project_id": "uuid",
+  "date_range": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" },
+  "mode": "balanced | fast | cost_min | travel_min | weather_safe",
+  "base_location_id": "uuid (production office/hotel)",
+  "locks": {
+    "locked_days": ["YYYY-MM-DD"],
+    "locked_scenes": ["scene_id"],
+    "locked_assignments": [
+      { "scene_id": "...", "date": "YYYY-MM-DD", "location_id": "..." }
+    ]
+  },
+  "preferences": {
+    "max_day_minutes": 600,
+    "weather_risk_tolerance": "low | med | high",
+    "minimize_overtime_weight": 0.6,
+    "minimize_travel_weight": 0.7,
+    "cluster_by_location_weight": 0.8,
+    "continuity_weight": 0.5
+  }
+}
+```
+Response: `{ "job_id": "...", "status": "queued" }`
+
+**GET `/api/schedule/job/{job_id}`**
+Response: `{ "status": "running|done|failed", "progress": 0-100, "stage": "...", "preview": {...} }`
+
+**GET `/api/schedule/version/{schedule_version_id}`**
+Response: full schedule payload for UI rendering
+
+#### Pipeline Stages -- Detail
+
+**Stage 1: Data Assembly (Deterministic)**
+
+| Step | Detail |
+|------|--------|
+| Fetch | Scenes (unassigned + all), scene_location_candidates, locations (with permits), cast + cast_availability, crew_constraints, equipment_rentals, existing schedule (if re-optimizing), locks |
+| Normalize | Every scene must have: estimated_duration_min, cast list, INT/EXT, at least 1 location candidate. Every location must have lat/lon. |
+| Work units | P0: each scene is atomic. Later: allow splitting long scenes into sub-units. |
+
+**Stage 2: Travel Matrix (Deterministic, OSRM)**
+
+| Step | Detail |
+|------|--------|
+| Location set | All locations appearing as candidates + base_location_id |
+| Compute | For each pair (A,B): check Redis `travel:{A}:{B}`. Miss → call OSRM. Cache result (TTL 7-30 days). |
+| Output | `travel_time[A][B]` with duration_min and distance_km |
+| India reality | Uses actual road graph via OSRM (not straight-line). Accounts for one-ways, restricted roads, bridge crossings. Self-host OSRM with India OSM extract for reliability. |
+
+**Stage 3: Weather Fetch (OpenWeatherMap, cached)**
+
+| Step | Detail |
+|------|--------|
+| Scope | Fetch for each (location, date) pair in candidate sets within date_range. P0 optimization: top N locations by candidate frequency only. |
+| Normalize | Per day: precipitation_probability, precipitation_mm, wind_speed, temp_min/max |
+| Cache | Redis key `weather:{location_id}:{date}`, TTL 6 hours |
+| India specifics | Account for monsoon season (Jun-Sep in Tamil Nadu): auto-elevate weather risk for EXT scenes during monsoon months. Festival calendar awareness (Pongal, Deepavali, summer holidays) flagged as crowd/permit risk. |
+
+**Stage 4: Constraint Normalization (LLM-Assisted)**
+
+| Item | Detail |
+|------|--------|
+| Input to AIML API | Project constraints text, crew constraints (max hours, turnaround -- Tamil film union: 12h minimum turnaround), cast availability conflicts summary, permit window rules, weather policy per mode, lock list, soft preference weights |
+| Output | Strict JSON with `hard_constraints` and `soft_constraints`. Schema-validated by backend -- reject any invalid/unknown fields. |
+| Tamil industry rules | Tamil Film Producers Council (TFPC) regulations: shooting hour limits, mandatory breaks, child actor restrictions, night shoot permits. Auto-included as hard constraints. |
+
+**Stage 5: Feasibility Pre-Check (Deterministic)**
+
+| Check | Action on Fail |
+|-------|---------------|
+| Scene requires cast unavailable on ALL days | Hard fail → report to UI |
+| EXT scene needs low rain but all days rainy | Warn → suggest backup indoor scenes or date extension |
+| Permit windows exclude all dates for a location | Hard fail → suggest alternative locations from candidates |
+| Locked scenes conflict with locked days or cast | Hard conflict → send to ConflictResolver |
+| Total scene duration exceeds total available shoot minutes | Warn → suggest extending date range |
+
+**Stage 6: Optimization Solve (Deterministic Solver)**
+
+| Item | Detail |
+|------|--------|
+| Recommended | TypeScript constraint solver (e.g., `csp-solver` or custom backtracking + local search). For complex projects: OR-Tools CP-SAT via serverless Python function. |
+| Decision variables | `assign_scene_day[s][d]` ∈ {0,1}, `assign_scene_location[s][l]` ∈ {0,1} (restricted to candidate set) |
+| Hard constraints | (1) Each scene assigned exactly once. (2) Scene location from its candidates. (3) Cast availability enforced. (4) Day duration ≤ max + allowed overtime. (5) Permit windows enforced. (6) Weather thresholds for EXT (mode-dependent). (7) Locks respected. |
+| Objective (minimize) | Travel time between consecutive days' locations, location changes, overtime cost, equipment rental spread, weather risk for EXT. |
+| Objective (maximize) | Continuity group coherence, location clustering (same-location scenes on same day). |
+| Weights | Mode-dependent: `cost_min` emphasizes cost, `travel_min` emphasizes logistics, `weather_safe` maximizes indoor/dry-day coverage, `balanced` uses default weights. |
+
+**Stage 7: Repair Loop (LLM + Solver Iteration)**
+
+| Scenario | Action |
+|----------|--------|
+| Solver returns infeasible | Extract conflict set. Send to AIML API ConflictResolver. LLM returns ranked actions: swap scenes, move dates, use alternative location, relax weather threshold, split high-duration day. Backend applies best fix (rule-based acceptance) and reruns solver. |
+| Solver feasible but low quality | Run local search: swap days of two scenes, move a scene to cluster location, reduce travel peaks. Optionally ask LLM for improvement suggestions but only apply if constraints remain satisfied. |
+| Max 3 repair iterations | Prevent infinite loops. After 3 attempts, return best-found schedule with warnings. |
+
+**Stage 8: Post-Solve Validation (Quality Gate)**
+
+| Validation | Detail |
+|-----------|--------|
+| Cast overlap | No cast member assigned to two locations on same day |
+| Day duration | Within limit or overtime computed and flagged |
+| Weather | EXT scenes on rainy days flagged per mode |
+| Travel sanity | Day-to-day travel > threshold → "logistics risk" flag |
+| Permits | All assignments within permit windows |
+| Output | `violations[]` (must fix) + `warnings[]` (can proceed). If violations exist → repair loop or mark "draft: needs attention" |
+
+**Stage 9: Persist (PostgreSQL)**
+
+Write to `schedule_versions` (status=draft/final), `shooting_days` (one per date), `day_scenes` (scene assignments + order). Also persist:
+- `objective_scores_json`: total cost estimate, total travel minutes, overtime minutes, weather risk score
+- `risk_flags_json`: impossible move risk, weather backup needed, tight cast day
+- `summary_text`: LLM-generated grounded explanation
+
+**Stage 10: Broadcast (Redis Pub/Sub)**
+
+Publish `final_schedule_ready` to `schedule_updates:{project_id}` with `schedule_version_id`. UI loads full schedule via GET endpoint. During pipeline, publish incremental events: `job_started`, `stage_progress`, `partial_schedule`, `conflicts_found`.
+
+#### AI/LLM Roles (AIML API GPT-4o) -- Strict Boundaries
+
+| Role | What It Does | What It Does NOT Do |
+|------|-------------|-------------------|
+| **ConstraintNormalizer** | Converts human rules + mode to strict constraints JSON. Output schema-validated. | Does not assign scenes. Does not decide schedule. |
+| **ConflictResolver** | When solver returns infeasible, proposes minimal change set (ranked actions with reasons). Backend applies only allowed action types. | Does not override solver. Does not bypass hard constraints. |
+| **ScheduleNarrator** | Produces human-readable summary: why this schedule, major constraints, tradeoffs, risks + backups. References computed metrics only. | Does not hallucinate logistics claims or road conditions. |
+
+#### Output Payload (Frontend Contract)
+
+```json
+{
+  "schedule_version_id": "uuid",
+  "mode": "balanced",
+  "objective": {
+    "total_cost_estimate": 1850000,
+    "total_travel_minutes": 980,
+    "overtime_minutes": 120,
+    "weather_risk_score": 0.22
+  },
+  "days": [
+    {
+      "date": "2026-04-15",
+      "location_id": "uuid",
+      "location_name": "Vaigai River Bank, Madurai",
+      "travel_from_prev_day_min": 35,
+      "weather_summary": { "rain_prob": 0.15, "rain_mm": 0.2, "wind": 12 },
+      "day_minutes": 560,
+      "overtime_minutes": 0,
+      "warnings": ["tight_cast_day"],
+      "scenes": [
+        {
+          "scene_id": "uuid",
+          "scene_number": "12A",
+          "order": 1,
+          "duration_min": 45,
+          "location_name": "Vaigai River Bank",
+          "cast": ["Vikram", "Trisha"],
+          "flags": {}
+        }
+      ]
+    }
+  ],
+  "unassigned_scenes": [],
+  "violations": [],
+  "summary_text": "Schedule optimized for balanced cost and travel...",
+  "backup_suggestions": ["Scenes 12A, 15B can move indoors if rain on Apr 15"]
+}
+```
+
+#### UI Integration
+
+| Element | Detail |
+|---------|--------|
+| Job progress | Visual pipeline: Data → Travel → Weather → Constraints → Solve → Validate → Save. Updates in real-time via Redis pub/sub. |
+| Per day | Location, total minutes + overtime bar, weather chip (for outdoor scenes), travel from previous day, warning chips |
+| Per scene | Cast required, location candidate selected, flags (weather risk, cast risk, travel risk) |
+| User actions | Lock scene/day/assignment, regenerate with new weights/mode, generate backup rain plan, compare schedule versions, export schedule (PDF/CSV) |
+| Mode selector | Dropdown: Fast (speed), Balanced (default), Cost Minimum, Travel Minimum, Weather Safe |
+
+#### India-Specific Scheduling Intelligence
+
+| Aspect | Detail |
+|--------|--------|
+| Tamil Film Union Rules | TFPC regulations auto-included: max 12h shoot days, 12h turnaround, mandatory meal breaks, child actor hour limits, night shoot restrictions |
+| Monsoon Awareness | Jun-Sep in Tamil Nadu: auto-elevate weather risk for all EXT scenes, suggest indoor contingencies, flag outdoor locations as high-risk |
+| Festival Calendar | Pongal (Jan), Tamil New Year (Apr), Deepavali (Oct-Nov), summer holidays: flag as crowd risk for public locations, permit difficulty spikes |
+| Permit Reality | Government location permits (temples, heritage sites, public roads) often take 2-4 weeks. Auto-flag if permit window is tight. Thalaiver birthday, political events → public gatherings that disrupt outdoor shoots |
+| Regional Logistics | Chennai vs Madurai vs Ooty → different road quality, travel reliability. Ghats/hill station shoots need buffer time. Weekend vs weekday traffic patterns in Chennai |
+
+#### P0 Build Plan
+
+| Week | Deliverables |
+|------|-------------|
+| Week 1 | DB tables (scenes extended, cast_availability, crew_constraints, equipment_rentals, shooting_days, day_scenes, schedule_versions) + seed data. `/api/schedule/optimize` job system + Redis pub/sub. Travel matrix (OSRM) + cache. Weather fetch + cache. Feasibility checks + warnings UI. |
+| Week 2 | TypeScript constraint solver (greedy + local search for P0, CP-SAT via serverless later). Locks support. Persist to shooting_days + day_scenes. LLM ConstraintNormalizer + ScheduleNarrator integration. |
+| Week 3 | Repair loop (infeasible → ConflictResolver → rerun). Cost optimization objective. "Backup rain schedule" generation. Schedule versioning + comparison. Polish UI: mode selector, progress visualization, export. |
+
 ---
 
 ## Implementation Priority Matrix
 
 | Priority | Features | Rationale |
 |----------|----------|-----------|
-| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script-Aware Location Scouter**, Script AI analysis, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Location Scouter is the signature differentiator. |
-| **P1 - Next Quarter** | Authentication, Schedule optimization, Budget forecasting, Crew management, Notifications, Weather API, Continuity tracker, Dubbing scripts, CBFC predictor, Storyboard AI, VFX breakdown, Music placement, Dialogue coach, UI theme standardization, File storage | These differentiate CinePilot from generic tools and serve South Indian cinema specifically. |
+| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script-Aware Location Scouter**, **AI Scheduling Engine**, Script AI analysis, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Location Scouter and Scheduling Engine are the signature differentiators. |
+| **P1 - Next Quarter** | Authentication, Budget forecasting, Crew management, Notifications, Weather API, Continuity tracker, Dubbing scripts, CBFC predictor, Storyboard AI, VFX breakdown, Music placement, Dialogue coach, UI theme standardization, File storage | These differentiate CinePilot from generic tools and serve South Indian cinema specifically. |
 | **P2 - Future** | Smart exports, Settings persistence, Production accounting, Crowd management, Release planner, Poster generation, Voice briefings, Preference learning | Premium features for larger productions. |
 
 ---
 
 *CinePilot Enhancement Blueprint -- Updated 2026-02-26*
-*Architecture: Next.js 14 + PostgreSQL (PostGIS) + Redis + AIML API*
+*Architecture: Next.js 14 + PostgreSQL (PostGIS) + Redis + AIML API + OSRM*
 *South Indian Cinema's First AI-Powered Pre-Production Suite*

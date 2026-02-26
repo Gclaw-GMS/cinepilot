@@ -1,272 +1,261 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Bell,
+  Mail,
+  MessageSquare,
+  Check,
+  Send,
+  X,
+} from 'lucide-react';
 
-interface Notification {
-  id: number
-  type: 'whatsapp' | 'email'
-  to: string
-  message: string
-  status: 'sent' | 'pending' | 'failed'
-  sentAt: string
+type Notification = {
+  id: string;
+  channel: string;
+  recipient: string | null;
+  title: string;
+  body: string;
+  status: string;
+  createdAt: string;
+};
+
+const CHANNEL_ICONS: Record<string, React.ReactNode> = {
+  app: <Bell className="h-5 w-5" />,
+  email: <Mail className="h-5 w-5" />,
+  whatsapp: <MessageSquare className="h-5 w-5" />,
+};
+
+function ChannelIcon({ channel }: { channel: string }) {
+  return (
+    <span className="text-slate-400">
+      {CHANNEL_ICONS[channel] ?? <Bell className="h-5 w-5" />}
+    </span>
+  );
 }
 
-const DEMO_NOTIFICATIONS: Notification[] = [
-  { id: 1, type: 'whatsapp', to: '+91 98765 43210', message: 'Call time updated to 06:00 for tomorrow shooting', status: 'sent', sentAt: '2026-02-14 10:30' },
-  { id: 2, type: 'whatsapp', to: '+91 98765 43211', message: 'Location changed to Chennai Studio', status: 'sent', sentAt: '2026-02-14 09:15' },
-  { id: 3, type: 'email', to: 'crew@film.com', message: 'Shooting Schedule Week 1', status: 'sent', sentAt: '2026-02-13 18:00' },
-  { id: 4, type: 'whatsapp', to: '+91 98765 43212', message: 'Your call time is 08:00 for Day 1', status: 'pending', sentAt: '' },
-]
-
-const TEMPLATES = [
-  { id: 'call_time', name: 'Call Time Update', message: 'Hi {{name}}, your call time for {{date}} is {{call_time}}. Location: {{location}}.' },
-  { id: 'location', name: 'Location Change', message: 'Important: Location has been changed to {{new_location}}. Please report there.' },
-  { id: 'schedule', name: 'Schedule Release', message: 'Week {{week}} schedule is out! Check the call sheet for details.' },
-  { id: 'reminder', name: 'Shooting Reminder', message: 'Reminder: Shooting starts tomorrow at {{call_time}}. See you there!' },
-]
-
-const RECIPIENTS = [
-  { name: 'Rajesh Kumar', phone: '+91 98765 43210', role: 'Director' },
-  { name: 'Anand Chakravarthy', phone: '+91 98765 43211', role: 'Cinematographer' },
-  { name: 'Vijay Sethupathi', phone: '+91 98765 43212', role: 'Lead Actor' },
-  { name: 'Nithya Menen', phone: '+91 98765 43213', role: 'Lead Actress' },
-  { name: 'All Crew', phone: 'crew@film.com', role: 'All' },
-]
-
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(DEMO_NOTIFICATIONS)
-  const [activeTab, setActiveTab] = useState<'send' | 'history' | 'templates'>('send')
-  const [type, setType] = useState<'whatsapp' | 'email'>('whatsapp')
-  const [recipient, setRecipient] = useState('')
-  const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'all' | 'unread' | 'sent'>('all');
+  const [form, setForm] = useState({
+    channel: 'app',
+    recipient: '',
+    title: '',
+    body: '',
+  });
 
-  const sentCount = notifications.filter(n => n.status === 'sent').length
-  const pendingCount = notifications.filter(n => n.status === 'pending').length
-
-  const sendNotification = async () => {
-    if (!recipient || !message) return
-    setSending(true)
-    
-    await new Promise(r => setTimeout(r, 1000))
-    
-    const newNotif: Notification = {
-      id: Date.now(),
-      type,
-      to: recipient,
-      message,
-      status: 'sent',
-      sentAt: new Date().toLocaleString()
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications');
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setNotifications(data);
+    } catch (err) {
+      console.error(err);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
     }
-    setNotifications([newNotif, ...notifications])
-    setRecipient('')
-    setMessage('')
-    setSending(false)
-  }
+  }, []);
 
-  const applyTemplate = (templateId: string) => {
-    const template = TEMPLATES.find(t => t.id === templateId)
-    if (template) setMessage(template.message)
-  }
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'read' ? 'unread' : 'read';
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: nextStatus }),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      await fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const sendNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.title.trim() || !form.body.trim()) return;
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: form.channel,
+          recipient: form.recipient.trim() || undefined,
+          title: form.title.trim(),
+          body: form.body.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      setForm({ channel: form.channel, recipient: '', title: '', body: '' });
+      await fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const filtered =
+    tab === 'unread'
+      ? notifications.filter((n) => n.status === 'unread')
+      : tab === 'sent'
+        ? notifications.filter((n) => n.channel === 'email' || n.channel === 'whatsapp')
+        : notifications;
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">📱 Notifications</h1>
-          <p className="text-gray-500 mt-1">Send updates to crew via WhatsApp & Email</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <Bell className="h-6 w-6" />
+          Notifications
+        </h1>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Total Sent</div>
-          <div className="text-2xl font-bold text-white">{notifications.length}</div>
-        </div>
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">WhatsApp</div>
-          <div className="text-2xl font-bold text-green-400">{notifications.filter(n => n.type === 'whatsapp').length}</div>
-        </div>
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Email</div>
-          <div className="text-2xl font-bold text-blue-400">{notifications.filter(n => n.type === 'email').length}</div>
-        </div>
-        <div className="bg-slate-800 p-4 rounded">
-          <div className="text-sm text-gray-400">Pending</div>
-          <div className="text-2xl font-bold text-amber-400">{pendingCount}</div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6">
-        {(['send', 'history', 'templates'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded ${
-              activeTab === tab ? 'bg-cyan-500 text-black' : 'bg-slate-800'
-            }`}
-          >
-            {tab === 'send' && '📤 Send'}
-            {tab === 'history' && '📋 History'}
-            {tab === 'templates' && '📝 Templates'}
-          </button>
-        ))}
-      </div>
-
-      {/* Send Tab */}
-      {activeTab === 'send' && (
-        <div className="grid grid-cols-2 gap-6">
-          <div className="bg-slate-800 rounded-lg p-6">
-            <h3 className="font-bold mb-4">New Notification</h3>
-            
-            {/* Type */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setType('whatsapp')}
-                className={`flex-1 py-3 rounded flex items-center justify-center gap-2 ${
-                  type === 'whatsapp' ? 'bg-green-600' : 'bg-slate-700'
-                }`}
-              >
-                💬 WhatsApp
-              </button>
-              <button
-                onClick={() => setType('email')}
-                className={`flex-1 py-3 rounded flex items-center justify-center gap-2 ${
-                  type === 'email' ? 'bg-blue-600' : 'bg-slate-700'
-                }`}
-              >
-                📧 Email
-              </button>
-            </div>
-
-            {/* Recipient */}
-            <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Recipient</label>
+        <form
+          onSubmit={sendNotification}
+          className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 space-y-3"
+        >
+          <h2 className="text-sm font-medium text-slate-300">Send Notification</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Channel</label>
               <select
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2"
+                value={form.channel}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, channel: e.target.value }))
+                }
+                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
               >
-                <option value="">Select recipient...</option>
-                {RECIPIENTS.map(r => (
-                  <option key={r.phone} value={r.phone}>{r.name} ({r.role})</option>
-                ))}
+                <option value="app">App</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Email</option>
               </select>
             </div>
-
-            {/* Template */}
-            <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Template (optional)</label>
-              <select
-                value={selectedTemplate}
-                onChange={(e) => { applyTemplate(e.target.value); setSelectedTemplate(e.target.value) }}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2"
-              >
-                <option value="">Select template...</option>
-                {TEMPLATES.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Message */}
-            <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Message</label>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type your message..."
-                className="w-full h-32 bg-slate-900 border border-slate-700 rounded p-2"
-              />
-            </div>
-
-            <button
-              onClick={sendNotification}
-              disabled={sending || !recipient || !message}
-              className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 rounded font-medium"
-            >
-              {sending ? '⏳ Sending...' : `📤 Send via ${type === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
-            </button>
-          </div>
-
-          {/* Preview */}
-          <div className="bg-slate-800 rounded-lg p-6">
-            <h3 className="font-bold mb-4">Preview</h3>
-            {recipient && message ? (
-              <div className={`rounded-lg p-4 ${type === 'whatsapp' ? 'bg-green-900/30' : 'bg-blue-900/30'}`}>
-                <div className="text-xs text-gray-400 mb-2">To: {recipient}</div>
-                <div className="whitespace-pre-wrap">{message}</div>
-              </div>
-            ) : (
-              <div className="text-gray-500 text-center py-8">
-                Add recipient and message to preview
+            {(form.channel === 'email' || form.channel === 'whatsapp') && (
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">
+                  Recipient
+                </label>
+                <input
+                  type="text"
+                  value={form.recipient}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, recipient: e.target.value }))
+                  }
+                  placeholder={
+                    form.channel === 'email' ? 'email@example.com' : '+91...'
+                  }
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                />
               </div>
             )}
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Title</label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Notification title"
+              required
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Body</label>
+            <textarea
+              value={form.body}
+              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              placeholder="Notification body"
+              required
+              rows={3}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm font-medium"
+          >
+            <Send className="h-4 w-4" />
+            Send
+          </button>
+        </form>
 
-      {/* History Tab */}
-      {activeTab === 'history' && (
-        <div className="bg-slate-800 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900 text-gray-400">
-              <tr>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">To</th>
-                <th className="text-left p-3">Message</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Sent At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {notifications.map(notif => (
-                <tr key={notif.id} className="border-t border-slate-700">
-                  <td className="p-3">
-                    <span className={notif.type === 'whatsapp' ? 'text-green-400' : 'text-blue-400'}>
-                      {notif.type === 'whatsapp' ? '💬' : '📧'}
-                    </span>
-                  </td>
-                  <td className="p-3">{notif.to}</td>
-                  <td className="p-3 max-w-xs truncate">{notif.message}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      notif.status === 'sent' ? 'bg-green-600/30 text-green-300' :
-                      notif.status === 'pending' ? 'bg-amber-600/30 text-amber-300' :
-                      'bg-red-600/30 text-red-300'
-                    }`}>
-                      {notif.status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-gray-400">{notif.sentAt || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Templates Tab */}
-      {activeTab === 'templates' && (
-        <div className="grid grid-cols-2 gap-4">
-          {TEMPLATES.map(template => (
-            <div key={template.id} className="bg-slate-800 p-4 rounded-lg">
-              <div className="font-bold mb-2">{template.name}</div>
-              <div className="text-sm text-gray-400">{template.message}</div>
-              <button
-                onClick={() => { setMessage(template.message); setActiveTab('send') }}
-                className="mt-3 text-cyan-400 text-sm hover:underline"
-              >
-                Use this template →
-              </button>
-            </div>
+        <div className="flex gap-2 border-b border-slate-800 pb-2">
+          {(['all', 'unread', 'sent'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3 py-1.5 rounded text-sm capitalize ${
+                tab === t
+                  ? 'bg-slate-700 text-slate-100'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t}
+            </button>
           ))}
         </div>
-      )}
+
+        {loading ? (
+          <p className="text-slate-500 text-sm">Loading...</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-slate-500 text-sm">No notifications</p>
+        ) : (
+          <ul className="space-y-3">
+            {filtered.map((n) => (
+              <li
+                key={n.id}
+                onClick={() => toggleStatus(n.id, n.status)}
+                className="flex gap-3 p-4 rounded-lg border border-slate-800 bg-slate-900/50 cursor-pointer hover:bg-slate-800/50 transition-colors"
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  <ChannelIcon channel={n.channel} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{n.title}</span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded ${
+                        n.status === 'read'
+                          ? 'bg-slate-700 text-slate-400'
+                          : 'bg-slate-600 text-slate-200'
+                      }`}
+                    >
+                      {n.status === 'read' ? (
+                        <span className="flex items-center gap-1">
+                          <Check className="h-3 w-3 inline" />
+                          Read
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <X className="h-3 w-3 inline" />
+                          Unread
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-sm mt-1 line-clamp-2">
+                    {n.body}
+                  </p>
+                  {n.recipient && (
+                    <p className="text-slate-500 text-xs mt-1">
+                      To: {n.recipient}
+                    </p>
+                  )}
+                  <p className="text-slate-600 text-xs mt-1">
+                    {new Date(n.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
-  )
+  );
 }

@@ -1,189 +1,271 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Settings,
+  Globe,
+  Brain,
+  Palette,
+  Bell,
+  Database,
+  Save,
+  Check,
+} from 'lucide-react';
+import { MODELS } from '@/lib/ai/config';
+import type { ModelKey } from '@/lib/ai/config';
+
+type SettingsState = Record<string, unknown>;
+
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+        checked ? 'bg-slate-600 border-slate-500' : 'bg-slate-800 border-slate-700'
+      }`}
+    >
+      <span
+        className={`pointer-events-none absolute top-0.5 left-0.5 inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform ${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+  );
+}
+
+const LANGUAGES = [
+  { value: 'tamil', label: 'Tamil' },
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+];
+
+const THEMES = [
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+  { value: 'system', label: 'System' },
+];
+
+const AI_MODELS = Object.keys(MODELS) as ModelKey[];
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    language: 'tamil',
-    aiModel: 'gpt-4',
-    theme: 'dark',
-    notifications: true,
-    autoBackup: true,
-    tamilOcr: true,
-    bilingualOutput: true,
-    whatsappUpdates: false,
-  })
+  const [settings, setSettings] = useState<SettingsState>({});
+  const [local, setLocal] = useState<SettingsState>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const [saved, setSaved] = useState(false)
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setSettings(data);
+      setLocal(data);
+    } catch (err) {
+      console.error(err);
+      setSettings({});
+      setLocal({});
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const set = (key: string, value: unknown) => {
+    setLocal((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const get = (key: string): unknown => {
+    return local[key] ?? settings[key];
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk', settings: local }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      setSettings(local);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex items-center justify-center">
+        <p className="text-slate-500">Loading...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 max-w-2xl">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-gray-500 text-sm mt-1">Configure your CinePilot preferences</p>
-        </div>
-        <button 
-          onClick={handleSave}
-          className="px-4 py-2 bg-cinepilot-accent text-black rounded font-medium text-sm"
-        >
-          {saved ? '✓ Saved!' : 'Save Changes'}
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#0d0d0d] text-slate-100 p-6">
+      <div className="max-w-xl mx-auto space-y-6">
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <Settings className="h-6 w-6" />
+          Settings
+        </h1>
 
-      <div className="space-y-6">
-        {/* Language */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">🌐 Default Language</h2>
-          <select 
-            value={settings.language}
-            onChange={(e) => setSettings({...settings, language: e.target.value})}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 focus:border-cinepilot-accent focus:outline-none"
+        <div className="space-y-6">
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Globe className="h-4 w-4" />
+              Language
+            </h2>
+            <select
+              value={(get('language') as string) ?? 'tamil'}
+              onChange={(e) => set('language', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+            >
+              {LANGUAGES.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Brain className="h-4 w-4" />
+              Tamil Cinema Features
+            </h2>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-400">
+                Enable Tamil-specific parsing and suggestions
+              </span>
+              <Toggle
+                checked={(get('tamilCinemaEnabled') as boolean) ?? true}
+                onChange={(v) => set('tamilCinemaEnabled', v)}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Brain className="h-4 w-4" />
+              AI Model
+            </h2>
+            <select
+              value={(get('aiModel') as string) ?? 'gpt4o'}
+              onChange={(e) => set('aiModel', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+            >
+              {AI_MODELS.map((key) => (
+                <option key={key} value={key}>
+                  {key}: {MODELS[key as ModelKey].slug}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-2">
+              {MODELS[(get('aiModel') as ModelKey) ?? 'gpt4o']?.description ??
+                ''}
+            </p>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Palette className="h-4 w-4" />
+              Theme
+            </h2>
+            <select
+              value={(get('theme') as string) ?? 'dark'}
+              onChange={(e) => set('theme', e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+            >
+              {THEMES.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Bell className="h-4 w-4" />
+              Notifications
+            </h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">Push notifications</span>
+                <Toggle
+                  checked={(get('notificationsPush') as boolean) ?? true}
+                  onChange={(v) => set('notificationsPush', v)}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">Email alerts</span>
+                <Toggle
+                  checked={(get('notificationsEmail') as boolean) ?? false}
+                  onChange={(v) => set('notificationsEmail', v)}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Database className="h-4 w-4" />
+              Data
+            </h2>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-400">Analytics (anonymous)</span>
+              <Toggle
+                checked={(get('analyticsEnabled') as boolean) ?? false}
+                onChange={(v) => set('analyticsEnabled', v)}
+              />
+            </div>
+          </section>
+        </div>
+
+        <div className="flex items-center gap-3 pt-4">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded text-sm font-medium"
           >
-            <option value="tamil">Tamil (தமிழ்)</option>
-            <option value="english">English</option>
-            <option value="both">Both (Bilingual)</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-2">Default language for new projects and outputs</p>
-        </div>
-
-        {/* Tamil Features */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">🇮🇳 Tamil Cinema Features</h2>
-          
-          <div className="flex justify-between items-center py-2">
-            <div>
-              <div className="font-medium">Tamil OCR</div>
-              <div className="text-sm text-gray-400">Recognize Tamil text in scripts</div>
-            </div>
-            <Toggle 
-              enabled={settings.tamilOcr} 
-              onChange={() => setSettings({...settings, tamilOcr: !settings.tamilOcr})} 
-            />
-          </div>
-          
-          <div className="flex justify-between items-center py-2 border-t border-gray-800 mt-2">
-            <div>
-              <div className="font-medium">Bilingual Outputs</div>
-              <div className="text-sm text-gray-400">Generate outputs in both Tamil and English</div>
-            </div>
-            <Toggle 
-              enabled={settings.bilingualOutput} 
-              onChange={() => setSettings({...settings, bilingualOutput: !settings.bilingualOutput})} 
-            />
-          </div>
-        </div>
-
-        {/* AI Model */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">🤖 AI Model</h2>
-          <select 
-            value={settings.aiModel}
-            onChange={(e) => setSettings({...settings, aiModel: e.target.value})}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 focus:border-cinepilot-accent focus:outline-none"
-          >
-            <option value="gpt-4">GPT-4 (Best Quality)</option>
-            <option value="gpt-3.5">GPT-3.5 (Faster)</option>
-            <option value="claude">Claude (Creative)</option>
-            <option value="local">Local LLaMA (Privacy)</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-2">AI model used for script analysis and generation</p>
-        </div>
-
-        {/* Theme */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">🎨 Theme</h2>
-          <div className="flex gap-3">
-            {['dark', 'light', 'system'].map(theme => (
-              <button
-                key={theme}
-                onClick={() => setSettings({...settings, theme})}
-                className={`flex-1 py-2 rounded capitalize transition-colors ${
-                  settings.theme === theme 
-                    ? 'bg-cinepilot-accent text-black' 
-                    : 'bg-gray-800 hover:bg-gray-700'
-                }`}
-              >
-                {theme}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Notifications */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">🔔 Notifications</h2>
-          
-          <div className="flex justify-between items-center py-2">
-            <div>
-              <div className="font-medium">Push Notifications</div>
-              <div className="text-sm text-gray-400">Get updates in the app</div>
-            </div>
-            <Toggle 
-              enabled={settings.notifications} 
-              onChange={() => setSettings({...settings, notifications: !settings.notifications})} 
-            />
-          </div>
-          
-          <div className="flex justify-between items-center py-2 border-t border-gray-800 mt-2">
-            <div>
-              <div className="font-medium">WhatsApp Updates</div>
-              <div className="text-sm text-gray-400">Receive call sheets on WhatsApp</div>
-            </div>
-            <Toggle 
-              enabled={settings.whatsappUpdates} 
-              onChange={() => setSettings({...settings, whatsappUpdates: !settings.whatsappUpdates})} 
-            />
-          </div>
-        </div>
-
-        {/* Data */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">💾 Data & Storage</h2>
-          
-          <div className="flex justify-between items-center py-2">
-            <div>
-              <div className="font-medium">Auto Backup</div>
-              <div className="text-sm text-gray-400">Backup project data daily</div>
-            </div>
-            <Toggle 
-              enabled={settings.autoBackup} 
-              onChange={() => setSettings({...settings, autoBackup: !settings.autoBackup})} 
-            />
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-800">
-            <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm text-gray-400">
-              📥 Export All Data
-            </button>
-          </div>
-        </div>
-
-        {/* About */}
-        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-          <h2 className="font-semibold mb-3">ℹ️ About</h2>
-          <div className="text-sm text-gray-400">
-            <p>CinePilot v1.0.0</p>
-            <p className="mt-1">AI-Powered Pre-Production for Tamil Cinema</p>
-          </div>
+            {saved ? (
+              <>
+                <Check className="h-4 w-4" />
+                Saved
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save'}
+              </>
+            )}
+          </button>
+          {saved && (
+            <span className="text-sm text-green-500 flex items-center gap-1">
+              <Check className="h-4 w-4" />
+              Settings saved
+            </span>
+          )}
         </div>
       </div>
     </div>
-  )
-}
-
-function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
-  return (
-    <button 
-      onClick={onChange}
-      className={`w-12 h-6 rounded-full transition-colors ${enabled ? 'bg-green-500' : 'bg-gray-700'}`}
-    >
-      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
-    </button>
-  )
+  );
 }

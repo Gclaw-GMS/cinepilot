@@ -90,23 +90,83 @@ Python backend has been removed. The new architecture is:
 
 ---
 
-### 2. Scripts (`/scripts`)
+### 2. Script Parsing & AI Breakdown (`/scripts`) -- MAJOR FEATURE
 
 | Aspect | Detail |
 |--------|--------|
 | **Current State** | Drag-and-drop upload (PDF, DOCX, FDX, TXT). AI analysis button returns mock data. Script preview. Script comparison tab. Tags, safety warnings, cultural notes. |
-| **Gaps** | Upload fallback generates fake text. Analysis is static mock. No script library or version history. No persistence. |
+| **Gaps** | Upload fallback generates fake text. Analysis is static mock. No script library or version history. No persistence. No real entity extraction. No traceability to line/page ranges. |
+| **Target** | Production-grade "Script Ingest + Breakdown" pipeline: deterministic text extraction → language detection (Tamil/Tanglish/mixed) → staged AI breakdown (scene boundaries, characters, locations, props, VFX) → canonicalization → quality scoring → consistency/plot hole detection. Persistent script library with version history. Every extracted entity maps back to line/page ranges. Never generates fake text. See **N16** in Part 3 for the complete deep specification. |
+
+**Design Principles (Non-Negotiable):**
+1. Never generate fake script text. If extraction fails, store explicit error + request re-upload.
+2. Separate "text extraction" (deterministic) from "semantic breakdown" (AI).
+3. AI in stages with strict JSON schemas + validation + grounding.
+4. Every extracted entity maps back to line/page ranges in the original script (traceability).
+5. Chunking, caching, and versioning are first-class.
 
 **AI Enhancements (P0)**
 
 | Enhancement | Implementation |
 |-------------|---------------|
-| Real Script Breakdown | Upload script to file storage (S3/R2). Send content to AIML API (GPT-4o or Claude 3.5) for full breakdown: scenes, characters, locations, props, VFX. Store results in PostgreSQL `ai_analyses` table. Cache in Redis. |
-| Tamil NLP Pipeline | AIML API handles Tamil script parsing: scene headings in Tamil, character names in Tamil/Tanglish, dialogue extraction with language detection. |
-| Auto Scene Extraction | AIML API identifies scene boundaries even in non-standard formats. Results persisted to PostgreSQL `scenes` table. |
-| Screenplay Quality Score | AIML API rates formatting, pacing, dialogue density. Score stored in PostgreSQL alongside the script. |
-| Character Consistency Check | AIML API (Claude 3.5 -- best for long-context) analyzes all character appearances for consistency. |
-| Plot Hole Detection | AIML API analyzes narrative logic across all scenes. Flags stored as warnings in PostgreSQL. |
+| Deterministic Text Extraction | Per-format extraction: PDF (layout-preserving text + OCR fallback), DOCX (paragraph/run parsing), FDX (XML structure -- highest quality), TXT (line split). Store as `script_text_blocks` with page_number + line_start/end. Extraction quality score (0-100) computed from heading patterns, dialogue density, garbled character ratio. Below threshold → explicit error, never fake text. |
+| Scene Boundary Detection | Deterministic heading regex first (INT/EXT variations, Tamil equivalents). AI fallback (AIML API GPT-4o or Claude 3.5) for messy/non-standard formats with strict JSON schema. Backend validates: sequential, non-overlapping, line ranges exist. Failed validation → auto-repair prompt (max 2 retries). Persist to `scenes` table with version_id + page/line mapping. |
+| Per-Scene Entity Extraction | AIML API extracts characters (name + Tamil aliases + dialogue role), locations (name + aliases), props (category: weapon/vehicle/phone), VFX notes (explicit vs implied, severity), safety notes (stunts, water hazards, weapons). Run per-scene in parallel. Each entity grounded in scene text -- confidence scores per entity. Persist to `characters`, `scene_characters`, `locations`, `scene_locations`, `props`, `scene_props`, `vfx_notes` tables. |
+| Tamil/Tanglish Canonicalization | Global deduplication: deterministic clustering (casefold + Levenshtein + Tamil transliteration), then AIML API merge suggestions. Produces canonical names + alias lists for characters and locations. Prevents downstream hallucination in Shot Hub and Schedule. |
+| Version History & Diff | Script versions tracked in `script_versions` table with content_hash. Diff between versions: added/removed scenes, character changes, location changes. Deterministic diff + optional AI summary ("Version 3 added 4 scenes and renamed antagonist"). |
+| Screenplay Quality Score | AIML API (GPT-4o) rates formatting consistency, pacing, dialogue/action balance, readability. Scores 0-100 per dimension + actionable quick fixes. Stored in `ai_analyses` table. |
+| Character Consistency Check | AIML API (Claude 3.5 -- best for long-context) analyzes character appearances across all scenes. Finds name changes, personality contradictions, timeline issues. Triggered on user click, not on every upload. Stored as `warnings`. |
+| Plot Hole Detection | Synopsis-first approach: AI generates 1-2 line summary per scene, then long-context model analyzes synopsis list for narrative logic issues. Flags stored as `warnings` with scene_refs + suggested fixes. |
+| Safety/Cultural Notes | Production-aware annotations: stunts, water hazards, vehicles, weapons (safety). Region-specific customs, sensitive depiction warnings (cultural). Compliance flags for harmful stereotypes. |
+
+**Pipeline Architecture**
+
+```
+Upload (PDF/DOCX/FDX/TXT) → Create Script Version → Background Job
+  → Stage 1: Deterministic Text Extraction (per-format, page/line mapping)
+  → Stage 2: Language Detection (Tamil/Tanglish/mixed) + Normalization
+  → Stage 3A: Scene Boundary Detection (regex + AI fallback)
+  → Stage 3B: Per-Scene Entity Extraction (parallel, AI)
+  → Stage 3C: Global Canonicalization (dedup characters/locations)
+  → Stage 3D: Breakdown Summary
+  → Stage 4: Quality Score (AI)
+  → Stage 5: Character Consistency (long-context AI, on-demand)
+  → Stage 6: Plot Hole Detection (synopsis-first, on-demand)
+  → Stage 7: Safety/Cultural Notes
+  → Cache + Persist → UI
+```
+
+**Data Model (PostgreSQL)**
+
+| Table | Key Columns |
+|-------|------------|
+| `scripts` | id, project_id, filename, file_ext, storage_key_original, script_status (uploaded/extracting/extracted/analyzing/ready/failed), active_version_id |
+| `script_versions` | id, script_id, version_number, content_hash (sha256), extraction_method, extraction_quality_score (0-100), language_detected |
+| `script_text_blocks` | id, version_id, block_index, page_number, line_start, line_end, raw_text, normalized_text |
+| `ai_analyses` | id, version_id, model_used, prompt_version, analysis_type (breakdown/quality_score/consistency/plot_holes/cultural_notes), result_json |
+| `scenes` (extended) | version_id, page_start, page_end, line_start, line_end, location_normalized, scene_text_ref |
+| `characters` (extended) | version_id, first_appearance_scene_id |
+| `scene_characters` (extended) | speaking_lines_count, appears_in_action |
+| `locations` (script-level) | id, project_id, version_id, name_canonical, aliases_json, indoor_outdoor |
+| `scene_locations` | scene_id, location_id, confidence |
+| `props` | id, project_id, version_id, name_canonical, aliases_json, category |
+| `scene_props` | scene_id, prop_id, confidence |
+| `vfx_notes` | id, scene_id, severity, description |
+| `warnings` | id, version_id, warning_type (safety/cultural/formatting/plot), severity, message, scene_id |
+
+**Redis Keys:**
+- `script_extract:{version_id}` -- extracted text/pages metadata
+- `breakdown:{content_hash}:{prompt_version}:{model}` -- breakdown JSON
+- `quality:{content_hash}:{prompt_version}:{model}` -- score JSON
+
+**File Storage Layout:**
+`scripts/{project_id}/{script_id}/{version_id}/original.{ext}` + `text.json` + `pages.json` + `analysis.json` + `errors.json`
+
+**Downstream Feeds:**
+- Shot Hub: consumes scenes + characters + locations for beat/shot generation
+- Schedule: consumes scenes + estimated durations for day planning
+- Location Scouter: consumes scene location_text for intent generation
+- Budget/Call Sheets: consumes props, VFX, safety notes for resource planning
 
 ---
 
@@ -1274,13 +1334,223 @@ Scene-hash-based caching prevents re-paying for identical scene generations.
 | Phase 2 (2-4 days) | PDF export (per-scene + full project). CSV/JSON export. Basic storyboard for key shots. |
 | Phase 3 (1 week) | Tamil character aliasing. Confidence + warnings UI. Batch regenerate per scene or filter. Key shot selection logic + storyboard queue. Shot Inspector panel. |
 
+### N16. Script Parsing & AI Breakdown -- Full Specification (P0)
+
+CinePilot's foundational pipeline. Every downstream module (Shot Hub, Schedule, Location Scouter, Budget, Call Sheets) depends on clean, structured script data. This is the entry point for all production intelligence.
+
+#### Design Principles (Non-Negotiable)
+
+1. **Never generate fake script text.** If extraction fails → explicit error + re-upload request.
+2. **Separate text extraction (deterministic) from semantic breakdown (AI).**
+3. **AI in stages** with strict JSON schemas + backend validation + grounding in source text.
+4. **Traceability**: every extracted entity maps back to line/page ranges in the original script.
+5. **Scalable**: chunking for long scripts, Redis caching by content_hash, version history first-class.
+
+#### Storage Architecture
+
+**File Storage (S3/R2/MinIO):**
+```
+scripts/{project_id}/{script_id}/{version_id}/
+  ├── original.{pdf|docx|fdx|txt}
+  ├── text.json          (extracted text + blocks)
+  ├── pages.json         (page metadata)
+  ├── analysis.json      (breakdown results)
+  └── errors.json        (extraction/analysis errors)
+```
+
+#### Pipeline Stages -- Detail
+
+**Stage 0: Upload & Create Script Version**
+
+| Step | Detail |
+|------|--------|
+| Upload | User uploads PDF/DOCX/FDX/TXT via drag-and-drop |
+| Backend | Create `scripts` row (if new). Create `script_versions` row (version_number++). Upload file to storage. Set `active_version_id`. Set `script_status = "extracting"`. |
+| Job | Enqueue background job: `ScriptExtractJob(version_id)` |
+
+**Stage 1: Text Extraction (Deterministic -- NO AI)**
+
+| Format | Method |
+|--------|--------|
+| **PDF** | Extract text by page (layout-preserving). If scanned/low-quality → OCR fallback (mark `extraction_method=ocr_fallback`). Store per-page blocks with page_number + line ranges. |
+| **DOCX** | Parse paragraphs + runs. Preserve heading-like lines and spacing. Create blocks with virtual page indexes. |
+| **FDX** (Final Draft XML) | Parse XML structure: scene headings, action, character, dialogue are explicit nodes. Highest-quality format -- use fully. |
+| **TXT** | Split into lines, preserve formatting. |
+
+**Extraction Quality Score (0-100):**
+- % of lines that look like scene headings
+- Average line length
+- Presence of dialogue patterns (CHARACTER:\n dialogue)
+- Garbled character ratio
+- Below 40 → status "failed" with actionable error message, never fake text
+
+**Persist:** `script_text_blocks` with page/line mappings. Normalized text stored as `text.json`. Status → "extracted". Enqueue `ScriptAnalyzeJob(version_id)`.
+
+**Stage 2: Language Detection + Canonicalization (Deterministic)**
+
+| Step | Detail |
+|------|--------|
+| Detect per block | Unicode Tamil range detection, English ratio, mixed classification. Store language stats in `script_versions.language_detected`. |
+| Normalize | Unicode NFC for Tamil text. Maintain original text always; normalized text for hashing/comparison. |
+
+**Stage 3A: Scene Boundary Detection (AI + Validation)**
+
+| Step | Detail |
+|------|--------|
+| Input | Extracted text blocks with line numbers + detected heading candidates from regex rules |
+| AI call | AIML API (GPT-4o or Claude 3.5) identifies scene boundaries with strict JSON output: scene_index, scene_number, heading_raw, int_ext, time_of_day, location_text, start_line, end_line, page_start, page_end, confidence |
+| Validation | Backend validates: sequential, non-overlapping, start_line/end_line exist, page ranges coherent with line mapping. If validation fails → repair prompt (max 2 retries). |
+| Persist | Insert into `scenes` table with version_id. Store artifact in `ai_analyses` (analysis_type=breakdown_scene_bounds). |
+
+**Stage 3B: Per-Scene Entity Extraction (AI, Parallelizable)**
+
+| Step | Detail |
+|------|--------|
+| Input | Per scene: scene text + running "known entities" dictionary |
+| Output | Per scene: characters (name + aliases + role_hint + confidence), locations (name + aliases + confidence), props (name + category + confidence), VFX notes (description + severity + explicit/implied + confidence), safety notes (type + severity + text) |
+| Rules | Characters from dialogue labels / action mentions only. Locations from heading or explicit mentions. Props = concrete production-relevant nouns. VFX flagged as explicit vs implied. |
+| Parallel | Run scene entity extraction in parallel workers (rate-limit AI calls). |
+| Persist | Upsert characters, locations, props. Insert join rows: scene_characters, scene_locations, scene_props, vfx_notes. |
+
+**Stage 3C: Global Canonicalization (Deterministic + AI Merge)**
+
+| Step | Detail |
+|------|--------|
+| Deterministic clustering | Casefolded text, Tamil transliteration heuristic, Levenshtein similarity → candidate clusters |
+| AI merge | AIML API "merge suggestions" prompt: given clusters, pick canonical name + alias list. Strict JSON output. |
+| Apply | Update character/location tables with canonical IDs. Keep `aliases_json` for search & UI. |
+| Why | Prevents "KIRAN", "Kiran", "கிரண்" from being treated as 3 different characters downstream. |
+
+**Stage 3D: Breakdown Summary (AI)**
+
+| Step | Detail |
+|------|--------|
+| Output | Scene count, unique characters, unique locations, key props, VFX count, stunt/safety warnings count, cultural notes summary |
+| Persist | `ai_analyses` (analysis_type=breakdown_summary) |
+
+**Stage 4: Screenplay Quality Score (AI)**
+
+| Step | Detail |
+|------|--------|
+| Model | GPT-4o (fast) or Claude 3.5 (long scripts) |
+| Input | Formatting stats + sampled scenes (10% across script) + dialogue density metrics (deterministic) |
+| Output | Scores 0-100: formatting, pacing, dialogue_density, readability, overall. Plus actionable notes + quick_fixes. |
+| Persist | `ai_analyses` (analysis_type=quality_score) |
+
+**Stage 5: Character Consistency Check (On-Demand, Long Context)**
+
+| Step | Detail |
+|------|--------|
+| Trigger | User clicks "Run consistency check" (not on every upload -- cost control) |
+| Model | Claude 3.5 (best long-context) or chunked GPT-4o with synopsis compression |
+| Input | Character appearances summary + key lines excerpts (NOT whole script if too large) + character profiles |
+| Output | Issues: character name, type (continuity/personality/timeline), severity, description, scene_refs |
+| Persist | `warnings` table + `ai_analyses` (analysis_type=character_consistency) |
+
+**Stage 6: Plot Hole Detection (On-Demand, Synopsis-First)**
+
+| Step | Detail |
+|------|--------|
+| Trigger | User clicks "Run plot hole detection" or script marked "ready for production" |
+| Strategy | Build scene synopsis list first (1-2 lines per scene, AI or deterministic). Feed synopsis list + key turning points to long-context model. |
+| Output | Plot holes: severity, description, scene_refs, suggested_fix |
+| Persist | `warnings` (warning_type=plot) + `ai_analyses` (analysis_type=plot_holes) |
+
+**Stage 7: Safety, Cultural Notes, Tags**
+
+| Category | Detail |
+|----------|--------|
+| Safety | Stunts, water hazards, vehicles, weapons, fire, heights, child actor scenes |
+| Cultural | Region-specific customs (temple protocols, festival depictions), sensitive depiction warnings, caste/language sensitivity |
+| Compliance | Harmful stereotype flags, respectful depiction checks |
+| Persist | `warnings` table with warning_type + `ai_analyses` |
+
+**Stage 8: Caching & Reuse**
+
+| Rule | Detail |
+|------|--------|
+| Same content_hash | Do not re-run full analysis. Reuse breakdown from Redis/PostgreSQL. |
+| Style change only | Does not affect script parsing -- only downstream modules (Shot Hub, Schedule). |
+| Cache keys | `breakdown:{content_hash}:{prompt_version}:{model}`, `quality:{content_hash}:{prompt_version}:{model}` |
+
+**Stage 9: Script Version Comparison**
+
+| Step | Detail |
+|------|--------|
+| Diff | Added/removed scenes, changed headings, character additions/removals, location changes |
+| Method | Deterministic diff + optional AI summary: "Version 3 added 4 scenes, renamed antagonist from RAVI to KIRAN, removed bus stand location" |
+| Persist | Comparison results stored for UI |
+
+#### Prompting System (Strict Templates)
+
+All prompts enforce:
+- STRICT JSON output only, no markdown
+- No extra keys beyond schema
+- Line/page references required
+- Forbid inventing text not present in source
+- Known character dictionary enforced (after Stage 3C)
+
+| Prompt | Role | Schema |
+|--------|------|--------|
+| Scene Boundary Detection | Identify scene boundaries with start_line/end_line | `{ "scenes": [{ scene_index, scene_number, heading_raw, int_ext, time_of_day, location_text, start_line, end_line, page_start, page_end, confidence }], "notes": [] }` |
+| Per-Scene Entity Extraction | Extract characters, locations, props, VFX, safety from scene text | `{ "scene_number", "characters": [{ name, aliases, role_hint, confidence }], "locations": [...], "props": [...], "vfx": [...], "safety_notes": [...] }` |
+| Canonicalization Merge | Pick canonical names + alias lists from clusters | `{ "characters": [{ canonical, aliases, merge_keys }], "locations": [...] }` |
+| Quality Score | Rate formatting/pacing/dialogue | `{ "scores": { formatting, pacing, dialogue_density, readability, overall }, "notes": [], "quick_fixes": [] }` |
+| Character Consistency | Find contradictions across appearances | `{ "issues": [{ character, type, severity, description, scene_refs }] }` |
+| Plot Holes | Find narrative logic issues in synopsis | `{ "plot_holes": [{ severity, description, scene_refs, suggested_fix }] }` |
+
+#### Error Handling (No Fake Text)
+
+| Scenario | Action |
+|----------|--------|
+| Extraction fails | `script_status = "failed"`. Store error: "PDF appears scanned; please upload original DOCX/FDX or higher-quality PDF." UI shows re-upload suggestions. |
+| AI output invalid schema | Auto-retry with "repair JSON" prompt (max 2 retries). Still failing → mark analysis failed, store raw output for debugging (internal only). |
+| Low extraction quality (<40) | Status "failed" with specific feedback on what's wrong. Never proceed with garbage text. |
+
+#### Model Selection Strategy
+
+| Task | Model | Rationale |
+|------|-------|-----------|
+| Scene boundaries + entity extraction | GPT-4o (medium scripts), Claude 3.5 (long scripts 100+ pages) | Speed vs reliability tradeoff |
+| Consistency + plot holes | Claude 3.5 or chunked GPT-4o with synopsis compression | Long-context reasoning needed |
+| Quality score | GPT-4o | Fast, doesn't need full context |
+| Canonicalization merge | GPT-4o | Small input, fast decision |
+
+**Cost control:** Consistency and plot hole detection NOT run on every upload. Triggered on user click or when script marked "ready for production."
+
+#### UI: What `/scripts` Shows
+
+| Element | Detail |
+|---------|--------|
+| Upload | Drag-and-drop with format support indicator. Progress bar for extraction + analysis pipeline. |
+| Script library | All scripts for project with version history. Active version highlighted. |
+| Extraction quality | Score badge + method used. Error messages with re-upload suggestions if failed. |
+| Scene list | Filterable: INT/EXT, location, day/night, character. Searchable by scene number/keywords. Click to read scene text with line highlighting. |
+| Character list | Canonical names + aliases (Tamil variants). First appearance scene. Speaking line counts. |
+| Location list | Script-level locations with aliases. Indoor/outdoor classification. |
+| Props list | Categorized (weapon/vehicle/phone/document/etc). Scene linkages. |
+| VFX list | Severity-coded. Explicit vs implied. Scene linkages. |
+| Warnings | Tabbed: safety, cultural, formatting, plot holes. Severity-coded. Scene-linked where applicable. |
+| Quality dashboard | Scores: formatting, pacing, dialogue density, readability. Quick fix suggestions. |
+| Analysis buttons | "Run Consistency Check", "Run Plot Hole Detection" (on-demand, cost-controlled). |
+| Version comparison | Side-by-side diff. AI summary of changes. |
+
+#### P0 Build Plan
+
+| Phase | Deliverables |
+|-------|-------------|
+| Phase 1 (Core extraction) | DB tables (scripts, script_versions, script_text_blocks, ai_analyses). File storage upload. Deterministic text extraction per format (PDF/DOCX/FDX/TXT). Page/line block mapping. Extraction quality scoring. No-fake-text error handling. |
+| Phase 2 (AI breakdown) | Scene boundary detection (regex + AI fallback) + persist scenes. Per-scene entity extraction (parallel) + persist characters/locations/props/VFX. Canonicalization merge. Breakdown summary. Redis caching by content_hash. |
+| Phase 3 (Analysis add-ons) | Quality score. Safety/cultural notes. Script version comparison diff. Script library UI with version history. |
+| Phase 4 (Long-context checks) | Character consistency (on-demand). Plot hole detection (synopsis-first, on-demand). |
+
 ---
 
 ## Implementation Priority Matrix
 
 | Priority | Features | Rationale |
 |----------|----------|-----------|
-| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script-Aware Location Scouter**, **AI Scheduling Engine**, **Shot Hub**, Script AI analysis, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Location Scouter, Scheduling Engine, and Shot Hub are the signature differentiators. |
+| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script Parsing & AI Breakdown**, **Script-Aware Location Scouter**, **AI Scheduling Engine**, **Shot Hub**, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Script Parsing is the foundational pipeline; Location Scouter, Scheduling Engine, and Shot Hub are the signature differentiators. |
 | **P1 - Next Quarter** | Authentication, Budget forecasting, Crew management, Notifications, Weather API, Continuity tracker, Dubbing scripts, CBFC predictor, Storyboard AI, VFX breakdown, Music placement, Dialogue coach, UI theme standardization, File storage | These differentiate CinePilot from generic tools and serve South Indian cinema specifically. |
 | **P2 - Future** | Smart exports, Settings persistence, Production accounting, Crowd management, Release planner, Poster generation, Voice briefings, Preference learning | Premium features for larger productions. |
 

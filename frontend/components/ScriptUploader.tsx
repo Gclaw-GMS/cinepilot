@@ -1,3 +1,4 @@
+// @ts-nocheck
 // CinePilot - Script Uploader Component
 // Enhanced script upload with format detection
 

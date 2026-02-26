@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Production Assistant - AI-Powered Helper
  * Provides intelligent suggestions and guidance

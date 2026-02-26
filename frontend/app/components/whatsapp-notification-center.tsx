@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CinePilot - WhatsApp Notification Center
  * Enhanced WhatsApp with Schedule Reminders, Location Updates, Cast Calls

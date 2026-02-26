@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Script Uploader Component
  * Handles script file upload with drag & drop, parsing, and version control

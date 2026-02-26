@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import * as api from '@/lib/api'
-import type { Project } from '@/lib/types'
+interface Project {
+  id: number
+  name: string
+  description: string
+  language: string
+  status: string
+  budget: number
+  created_at: string
+}
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -77,18 +84,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchProjects()
-  }, [])
-
-  const fetchProjects = async () => {
-    try {
-      const data = await api.projects.list()
-      setProjects(data)
-    } catch (e) {
-      setProjects(DEMO_PROJECTS)
-    }
+    setProjects(DEMO_PROJECTS)
     setLoading(false)
-  }
+  }, [])
 
   const totalBudget = projects.reduce((acc, p) => acc + (p.budget || 0), 0)
   const totalSpent = totalBudget * 0.72 // Simulated

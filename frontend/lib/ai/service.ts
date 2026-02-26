@@ -31,7 +31,7 @@ export interface ChatCompletionOptions {
 }
 
 export interface ImageGenerationOptions {
-  size?: '1024x1024' | '1024x576' | '1024x768' | '512x512';
+  size?: '1024x1024' | '1024x576' | '1024x768' | '512x512' | '1792x1024';
   quality?: 'standard' | 'hd';
   n?: number;
   style?: 'natural' | 'vivid';

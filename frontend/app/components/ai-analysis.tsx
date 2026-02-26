@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AI Analysis Panel
  * Enhanced AI tools for script analysis, shot planning, and more

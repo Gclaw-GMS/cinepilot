@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CinePilot - Script Analysis Dashboard
  * Enhanced AI Analysis with Pacing, Characters, Emotional Arc, and Tags

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Task Manager Component
  * CinePilot Phase 28

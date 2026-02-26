@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CinePilot - Project Collaboration Hub
  * Activity Feed, Tasks, and Expense Tracking

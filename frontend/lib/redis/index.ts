@@ -5,8 +5,14 @@ const globalForRedis = globalThis as unknown as {
 };
 
 function createRedisClient(): Redis {
-  const url = process.env.REDIS_URL || 'redis://localhost:6379';
-  return new Redis(url, {
+  const host = process.env.REDIS_HOST || '127.0.0.1';
+  const port = parseInt(process.env.REDIS_PORT || '6379', 10);
+  const password = process.env.REDIS_PASSWORD || undefined;
+
+  return new Redis({
+    host,
+    port,
+    password,
     maxRetriesPerRequest: 3,
     retryStrategy(times) {
       if (times > 5) return null;

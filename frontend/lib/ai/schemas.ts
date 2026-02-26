@@ -184,7 +184,7 @@ export const ShotGenerationSchema = z.object({
         lighting: z.number(),
         duration: z.number(),
       }),
-      ai_reason_missing: z.record(z.string()).optional(),
+      ai_reason_missing: z.record(z.string(), z.string()).optional(),
     })
   ),
 });
@@ -254,7 +254,7 @@ export const ConstraintNormalizerSchema = z.object({
     weather_preferences: z.array(z.unknown()).optional(),
     cost_optimizations: z.array(z.unknown()).optional(),
     travel_minimization: z.boolean().optional(),
-    penalties: z.record(z.unknown()).optional(),
+    penalties: z.record(z.string(), z.unknown()).optional(),
   }),
 });
 export type ConstraintNormalizerResult = z.infer<typeof ConstraintNormalizerSchema>;

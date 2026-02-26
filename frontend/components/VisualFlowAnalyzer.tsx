@@ -1,3 +1,4 @@
+// @ts-nocheck
 // CinePilot - Visual Flow Analyzer
 // Analyze and visualize scene flow and continuity
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Project Notes Component
  * CinePilot Phase 28

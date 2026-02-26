@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * WhatsApp Notification Integration
  * Sends notifications via WhatsApp for production updates

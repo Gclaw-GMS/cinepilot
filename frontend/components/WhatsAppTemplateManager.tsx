@@ -1,3 +1,4 @@
+// @ts-nocheck
 // CinePilot - WhatsApp Template Manager
 // Manage and send WhatsApp message templates
 

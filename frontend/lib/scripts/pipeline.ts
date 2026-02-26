@@ -99,7 +99,7 @@ export async function uploadScript(
     });
   }
 
-  const storagePath = `${STORAGE_PATHS.scripts(projectId)}/${script.id}/v${versionNumber}/${filename}`;
+  const storagePath = `${STORAGE_PATHS.scripts(projectId, filename)}/${script.id}/v${versionNumber}`;
   await uploadFile(storagePath, file, mimeType);
 
   await prisma.script.update({
@@ -225,7 +225,8 @@ export async function detectSceneBoundaries(
     .map((line, i) => ({ lineNumber: i + 1, text: line.trim() }))
     .filter((l) => /^\s*(INT\.|EXT\.|INT\/EXT\.|I\/E\.|உள்|வெளி)/i.test(l.text));
 
-  const cacheKey = `${CACHE_KEYS.scriptBreakdown}:scenes:${crypto.createHash('md5').update(fullText).digest('hex')}`;
+  const textHash = crypto.createHash('md5').update(fullText).digest('hex');
+  const cacheKey = CACHE_KEYS.sceneBreakdown(`scenes:${textHash}`);
   const cached = await cacheGet<SceneBoundaryResult>(cacheKey);
   if (cached) {
     onProgress?.({ stage: 'scene_detection', percent: 100, message: 'Scene boundaries loaded from cache' });

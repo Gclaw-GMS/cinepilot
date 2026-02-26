@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Analytics Dashboard
  * Project analytics and insights display

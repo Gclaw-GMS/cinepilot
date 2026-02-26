@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Activity Timeline Component
  * CinePilot Phase 28

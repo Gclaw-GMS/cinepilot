@@ -1,259 +1,468 @@
 'use client'
 
-import { useState } from 'react'
-import * as api from '@/lib/api'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
-// Demo scenes for shot suggestions
-const DEMO_SCENES = [
-  { id: 1, scene_number: 1, heading: 'EXT. CHENNAI STREET - DAY', description: 'Rain pours on the busy street. People rush with umbrellas.' },
-  { id: 2, scene_number: 2, heading: 'INT. APARTMENT - NIGHT', description: 'Priya sits alone, looking at old photographs.' },
-  { id: 3, scene_number: 3, heading: 'EXT. MADURAI TEMPLE - DAY', description: 'Devotees gather for the evening aarti.' },
-]
+interface ShotData {
+  id: string
+  shotIndex: number
+  beatIndex: number
+  shotText: string
+  characters: string[]
+  shotSize: string | null
+  cameraAngle: string | null
+  cameraMovement: string | null
+  focalLengthMm: number | null
+  lensType: string | null
+  keyStyle: string | null
+  colorTemp: string | null
+  durationEstSec: number | null
+  confidenceCamera: number | null
+  confidenceLens: number | null
+  confidenceLight: number | null
+  confidenceDuration: number | null
+  isLocked: boolean
+  userEdited: boolean
+  scene: {
+    id: string
+    sceneNumber: string
+    headingRaw: string | null
+    intExt: string | null
+    timeOfDay: string | null
+    location: string | null
+  }
+}
 
-export default function ShotListPage() {
-  const [selectedScene, setSelectedScene] = useState<number | null>(null)
-  const [shotList, setShotList] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [sceneDescription, setSceneDescription] = useState('')
+interface SceneInfo {
+  id: string
+  sceneNumber: string
+  headingRaw: string | null
+  intExt: string | null
+  timeOfDay: string | null
+  location: string | null
+  _count: { shots: number }
+}
 
-  const generateShotList = async () => {
-    if (!sceneDescription.trim()) return
-    
-    setLoading(true)
+const STYLE_PRESETS = [
+  { key: 'maniRatnam', label: 'Mani Ratnam', desc: 'Elegant, motivated movement, longer takes, warm palette' },
+  { key: 'vetrimaaran', label: 'Vetrimaaran', desc: 'Grounded realism, handheld, documentary feel' },
+  { key: 'lokeshKanagaraj', label: 'Lokesh Kanagaraj', desc: 'Stylized, kinetic camera, fast action grammar' },
+  { key: 'custom', label: 'Custom', desc: 'Define your own style' },
+] as const
+
+const SHOT_SIZES = ['ECU', 'CU', 'MCU', 'MS', 'MWS', 'WS', 'VWS', 'EWS']
+const ANGLES = ['high', 'low', 'eye', 'dutch', 'bird', 'worm']
+const MOVEMENTS = ['static', 'pan', 'tilt', 'dolly', 'track', 'crane', 'handheld', 'steadicam', 'drone']
+const LENSES = [16, 24, 35, 50, 85, 100, 135, 200]
+
+export default function ShotHubPage() {
+  const [shots, setShots] = useState<ShotData[]>([])
+  const [scenes, setScenes] = useState<SceneInfo[]>([])
+  const [stats, setStats] = useState({ totalShots: 0, totalDuration: 0, missingFields: 0 })
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [genProgress, setGenProgress] = useState('')
+
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
+  const [directorStyle, setDirectorStyle] = useState<string>('maniRatnam')
+  const [sceneFilter, setSceneFilter] = useState('')
+
+  const [scriptId, setScriptId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchScriptId = useCallback(async () => {
     try {
-      // Call the API
-      const result: any = await api.ai.generateShotList?.(sceneDescription) || { shots: [] }
-      setShotList(result.shots || [])
+      const res = await fetch('/api/scripts')
+      const data = await res.json()
+      if (data.scripts?.[0]?.id) {
+        setScriptId(data.scripts[0].id)
+        return data.scripts[0].id
+      }
     } catch (e) {
-      // Mock response for demo
-      setShotList([
-        { shot_type: 'Wide Shot', description: 'Establish the location and atmosphere', camera: 'Wide', lens: '24mm' },
-        { shot_type: 'Medium Shot', description: 'Character introduction and context', camera: 'Medium', lens: '50mm' },
-        { shot_type: 'Close-up', description: 'Emotional beat - key reaction', camera: 'CU', lens: '85mm' },
-        { shot_type: 'Over the Shoulder', description: 'Conversation coverage', camera: 'OTS', lens: '50mm' },
-        { shot_type: 'Two Shot', description: 'Characters together', camera: 'Wide', lens: '35mm' },
-      ])
+      console.error(e)
     }
-    setLoading(false)
-  }
+    return null
+  }, [])
 
-  const shotTypes = [
-    { type: 'Wide Shot (WS)', icon: '🌐', color: 'blue' },
-    { type: 'Medium Shot (MS)', icon: '👤', color: 'green' },
-    { type: 'Close-up (CU)', icon: '👁️', color: 'purple' },
-    { type: 'Extreme Close-up (ECU)', icon: '🔍', color: 'pink' },
-    { type: 'Over the Shoulder (OTS)', icon: '🔄', color: 'yellow' },
-    { type: 'Point of View (POV)', icon: '👀', color: 'cyan' },
-    { type: 'Two Shot', icon: '👥', color: 'orange' },
-    { type: 'Insert', icon: '✂️', color: 'red' },
-  ]
-
-  const addShotType = (shotType: string, lens: string = '50mm') => {
-    const newShot = {
-      shot_type: shotType,
-      description: '',
-      camera: shotType.includes('Wide') ? 'Wide' : shotType.includes('CU') ? 'CU' : 'Medium',
-      lens
+  const fetchShots = useCallback(async (sId: string) => {
+    try {
+      const res = await fetch(`/api/shots?scriptId=${sId}`)
+      const data = await res.json()
+      setShots(data.shots || [])
+      setScenes(data.scenes || [])
+      setStats(data.stats || { totalShots: 0, totalDuration: 0, missingFields: 0 })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
     }
-    setShotList([...shotList, newShot])
+  }, [])
+
+  useEffect(() => {
+    (async () => {
+      const id = await fetchScriptId()
+      if (id) await fetchShots(id)
+      else setLoading(false)
+    })()
+  }, [fetchScriptId, fetchShots])
+
+  const handleGenerateAll = async () => {
+    if (!scriptId) return
+    setGenerating(true)
+    setError(null)
+    setGenProgress('Generating shots for all scenes...')
+
+    try {
+      const res = await fetch('/api/shots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generateScript', scriptId, directorStyle }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setGenProgress(`Generated ${data.totalShots} shots!`)
+      await fetchShots(scriptId)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGenerating(false)
+    }
   }
 
-  const removeShot = (index: number) => {
-    setShotList(shotList.filter((_, i) => i !== index))
+  const handleGenerateScene = async (sceneId: string) => {
+    setGenerating(true)
+    setError(null)
+    setGenProgress(`Generating shots for scene...`)
+
+    try {
+      const res = await fetch('/api/shots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generateScene', sceneId, directorStyle }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setGenProgress(`Generated ${data.shotCount} shots`)
+      if (scriptId) await fetchShots(scriptId)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setGenerating(false)
+    }
   }
 
-  const updateShot = (index: number, field: string, value: string) => {
-    const updated = [...shotList]
-    updated[index] = { ...updated[index], [field]: value }
-    setShotList(updated)
+  const handleFillNull = async (shotId: string) => {
+    try {
+      const res = await fetch('/api/shots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fillNull', shotId, directorStyle }),
+      })
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
+      if (scriptId) await fetchShots(scriptId)
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const handleUpdateShot = async (shotId: string, field: string, value: string | number | boolean) => {
+    try {
+      await fetch('/api/shots', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shotId, [field]: value }),
+      })
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const filteredScenes = scenes.filter(s => {
+    if (!sceneFilter) return true
+    return s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
+      (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
+      (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
+  })
+
+  const activeSceneShots = selectedSceneId
+    ? shots.filter(s => s.scene.id === selectedSceneId)
+    : shots
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60)
+    const s = Math.round(sec % 60)
+    return m > 0 ? `${m}m ${s}s` : `${s}s`
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="text-gray-400 animate-pulse">Loading Shot Hub...</div>
+      </div>
+    )
   }
 
   return (
     <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg">←</Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">🎬 Shot List Generator</h1>
-          <p className="text-gray-500 text-sm mt-1">AI-powered shot suggestions for your scenes</p>
+      {/* Top Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg text-gray-400">&#8592;</Link>
+          <div>
+            <h1 className="text-2xl font-bold">Shot Hub</h1>
+            <p className="text-gray-500 text-sm mt-0.5">AI-powered shot breakdown engine</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={directorStyle}
+            onChange={e => setDirectorStyle(e.target.value)}
+            className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm"
+          >
+            {STYLE_PRESETS.map(s => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleGenerateAll}
+            disabled={generating || !scriptId}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded font-medium text-sm"
+          >
+            {generating ? genProgress : 'Generate All Shots'}
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Input Section */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Scene Description Input */}
-          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Describe Your Scene</h2>
-            <textarea
-              value={sceneDescription}
-              onChange={(e) => setSceneDescription(e.target.value)}
-              placeholder="Describe what happens in the scene. E.g., 'A romantic conversation between two leads on a beach at sunset...'"
-              rows={4}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:border-cinepilot-accent focus:outline-none resize-none"
-            />
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={generateShotList}
-                disabled={loading || !sceneDescription.trim()}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded font-medium flex items-center gap-2"
-              >
-                {loading ? '⏳ Generating...' : '🤖 AI Generate Shots'}
-              </button>
-              <button
-                onClick={() => setShotList([])}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          {/* Shot List */}
-          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Shot List ({shotList.length} shots)</h2>
-              <div className="text-sm text-gray-500">
-                {shotList.reduce((sum, s) => sum + (s.lens?.includes('24') ? 12 : s.lens?.includes('85') ? 6 : 8), 0)} min estimated
-              </div>
-            </div>
-
-            {shotList.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <div className="text-4xl mb-4">🎥</div>
-                <p>No shots yet</p>
-                <p className="text-sm mt-2">Describe a scene or add shot types manually</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {shotList.map((shot, index) => (
-                  <div key={index} className="flex gap-4 p-4 bg-gray-800/50 rounded-lg items-start">
-                    <div className="w-8 h-8 bg-cinepilot-accent text-black rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 grid grid-cols-4 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-500">Shot Type</label>
-                        <select
-                          value={shot.shot_type}
-                          onChange={(e) => updateShot(index, 'shot_type', e.target.value)}
-                          className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
-                        >
-                          {shotTypes.map(st => (
-                            <option key={st.type} value={st.type}>{st.type}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500">Camera</label>
-                        <select
-                          value={shot.camera}
-                          onChange={(e) => updateShot(index, 'camera', e.target.value)}
-                          className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
-                        >
-                          <option value="Wide">Wide</option>
-                          <option value="Medium">Medium</option>
-                          <option value="CU">CU</option>
-                          <option value="OTS">OTS</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500">Lens</label>
-                        <select
-                          value={shot.lens}
-                          onChange={(e) => updateShot(index, 'lens', e.target.value)}
-                          className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
-                        >
-                          <option value="24mm">24mm</option>
-                          <option value="35mm">35mm</option>
-                          <option value="50mm">50mm</option>
-                          <option value="85mm">85mm</option>
-                          <option value="135mm">135mm</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500">Description</label>
-                        <input
-                          type="text"
-                          value={shot.description}
-                          onChange={(e) => updateShot(index, 'description', e.target.value)}
-                          placeholder="Shot description..."
-                          className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeShot(index)}
-                      className="text-gray-500 hover:text-red-400 flex-shrink-0"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {shotList.length > 0 && (
-              <div className="mt-6 flex gap-4">
-                <button className="px-4 py-2 bg-cinepilot-accent text-black rounded font-medium hover:bg-cyan-400">
-                  💾 Save Shot List
-                </button>
-                <button className="px-4 py-2 bg-gray-700 rounded font-medium hover:bg-gray-600">
-                  📤 Export PDF
-                </button>
-              </div>
-            )}
-          </div>
+      {error && (
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500">Dismiss</button>
         </div>
+      )}
 
-        {/* Shot Types Reference */}
-        <div className="space-y-6">
-          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Add Shot Type</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {shotTypes.map((shot) => (
+      {/* Stats Row */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-cinepilot-accent">{stats.totalShots}</div>
+          <div className="text-xs text-gray-500">Total Shots</div>
+        </div>
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-cinepilot-accent">{formatDuration(stats.totalDuration)}</div>
+          <div className="text-xs text-gray-500">Est. Runtime</div>
+        </div>
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-yellow-400">{stats.missingFields}</div>
+          <div className="text-xs text-gray-500">Missing Fields</div>
+        </div>
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-gray-400">{scenes.length}</div>
+          <div className="text-xs text-gray-500">Scenes</div>
+        </div>
+      </div>
+
+      {!scriptId ? (
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
+          <div className="text-gray-500 mb-2">No script found</div>
+          <Link href="/scripts" className="text-cinepilot-accent hover:underline text-sm">Upload a script first</Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-4 gap-6">
+          {/* Left Panel: Scene List */}
+          <div className="col-span-1 space-y-3">
+            <input
+              type="text"
+              placeholder="Filter scenes..."
+              value={sceneFilter}
+              onChange={e => setSceneFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-cinepilot-accent"
+            />
+            <button
+              onClick={() => setSelectedSceneId(null)}
+              className={`w-full text-left px-3 py-2 rounded text-sm ${
+                !selectedSceneId ? 'bg-cinepilot-accent/20 text-cinepilot-accent border border-cinepilot-accent/30' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              All Scenes ({shots.length} shots)
+            </button>
+            <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+              {filteredScenes.map(scene => (
                 <button
-                  key={shot.type}
-                  onClick={() => addShotType(shot.type)}
-                  className="p-2 text-left bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 hover:border-cinepilot-accent transition-colors"
+                  key={scene.id}
+                  onClick={() => setSelectedSceneId(scene.id)}
+                  className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                    selectedSceneId === scene.id
+                      ? 'bg-cinepilot-accent/20 text-cinepilot-accent border border-cinepilot-accent/30'
+                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700'
+                  }`}
                 >
-                  <span className="text-lg">{shot.icon}</span>
-                  <span className="block text-xs mt-1">{shot.type.split(' (')[0]}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-xs">{scene.sceneNumber}</span>
+                    <span className="text-xs text-gray-600">
+                      {scene._count.shots > 0 ? `${scene._count.shots} shots` : ''}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 truncate mt-0.5">
+                    {scene.headingRaw || scene.location || 'Untitled'}
+                  </div>
+                  {scene._count.shots === 0 && (
+                    <button
+                      onClick={e => { e.stopPropagation(); handleGenerateScene(scene.id) }}
+                      disabled={generating}
+                      className="mt-1 text-xs px-2 py-0.5 bg-purple-600/30 text-purple-400 rounded hover:bg-purple-600/50"
+                    >
+                      Generate
+                    </button>
+                  )}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Quick Templates */}
-          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Scene Templates</h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setSceneDescription('Two characters having an intense romantic conversation in a coffee shop. Emotional dialogue with some humor.')}
-                className="w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm"
-              >
-                ☕ Coffee Shop Conversation
-              </button>
-              <button
-                onClick={() => setSceneDescription('Action sequence with a car chase through busy city streets. Stunts and explosions.')}
-                className="w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm"
-              >
-                🚗 Car Chase Action
-              </button>
-              <button
-                onClick={() => setSceneDescription('Emotional family drama scene at a funeral. Characters crying and consoling each other.')}
-                className="w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm"
-              >
-                😢 Funeral Drama
-              </button>
-              <button
-                onClick={() => setSceneDescription('Song and dance sequence in a traditional Tamil wedding. Colorful costumes, large crowd.')}
-                className="w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded border border-gray-700 text-sm"
-              >
-                💃 Tamil Wedding Song
-              </button>
-            </div>
+          {/* Main Panel: Shot Table */}
+          <div className="col-span-3">
+            {activeSceneShots.length === 0 ? (
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
+                <div className="text-gray-500 mb-2">
+                  {selectedSceneId ? 'No shots generated for this scene' : 'No shots generated yet'}
+                </div>
+                <p className="text-gray-600 text-sm">Click "Generate All Shots" or generate per scene</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activeSceneShots.map(shot => (
+                  <ShotRow
+                    key={shot.id}
+                    shot={shot}
+                    onUpdate={handleUpdateShot}
+                    onFillNull={handleFillNull}
+                  />
+                ))}
+              </div>
+            )}
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ShotRow({
+  shot,
+  onUpdate,
+  onFillNull,
+}: {
+  shot: ShotData
+  onUpdate: (id: string, field: string, value: string | number | boolean) => void
+  onFillNull: (id: string) => void
+}) {
+  const hasMissing = !shot.shotSize || !shot.focalLengthMm || !shot.keyStyle || !shot.durationEstSec
+  const avgConfidence = (
+    (shot.confidenceCamera || 0) +
+    (shot.confidenceLens || 0) +
+    (shot.confidenceLight || 0) +
+    (shot.confidenceDuration || 0)
+  ) / 4
+
+  const confidenceColor =
+    avgConfidence >= 0.7 ? 'text-green-400' :
+    avgConfidence >= 0.4 ? 'text-yellow-400' :
+    'text-red-400'
+
+  return (
+    <div className={`bg-cinepilot-card border rounded-lg p-3 ${shot.isLocked ? 'border-blue-700/50' : 'border-cinepilot-border'}`}>
+      <div className="flex items-start gap-3">
+        {/* Shot Number */}
+        <div className="w-10 h-10 bg-gray-800 rounded-lg flex flex-col items-center justify-center shrink-0">
+          <span className="text-xs font-bold text-cinepilot-accent">{shot.shotIndex}</span>
+          <span className="text-[10px] text-gray-600">B{shot.beatIndex}</span>
+        </div>
+
+        {/* Shot Description */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {shot.scene && (
+              <span className="text-[10px] font-mono bg-gray-800 px-1.5 py-0.5 rounded text-gray-500">
+                {shot.scene.sceneNumber}
+              </span>
+            )}
+            {shot.characters.length > 0 && (
+              <div className="flex gap-1">
+                {shot.characters.slice(0, 3).map((c, i) => (
+                  <span key={i} className="text-[10px] px-1.5 py-0.5 bg-emerald-900/30 text-emerald-400 rounded">{c}</span>
+                ))}
+                {shot.characters.length > 3 && (
+                  <span className="text-[10px] text-gray-600">+{shot.characters.length - 3}</span>
+                )}
+              </div>
+            )}
+            <span className={`text-[10px] ${confidenceColor}`}>{Math.round(avgConfidence * 100)}%</span>
+          </div>
+          <p className="text-sm text-gray-300 leading-tight">{shot.shotText}</p>
+        </div>
+
+        {/* Controls Grid */}
+        <div className="flex gap-2 items-center shrink-0">
+          <select
+            value={shot.shotSize || ''}
+            onChange={e => onUpdate(shot.id, 'shotSize', e.target.value)}
+            className={`w-16 text-xs py-1 px-1 rounded border ${
+              shot.shotSize ? 'bg-gray-800 border-gray-700' : 'bg-yellow-900/20 border-yellow-700/50'
+            }`}
+          >
+            <option value="">Size</option>
+            {SHOT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          <select
+            value={shot.cameraAngle || ''}
+            onChange={e => onUpdate(shot.id, 'cameraAngle', e.target.value)}
+            className="w-16 text-xs py-1 px-1 bg-gray-800 border border-gray-700 rounded"
+          >
+            <option value="">Angle</option>
+            {ANGLES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+
+          <select
+            value={shot.cameraMovement || ''}
+            onChange={e => onUpdate(shot.id, 'cameraMovement', e.target.value)}
+            className="w-20 text-xs py-1 px-1 bg-gray-800 border border-gray-700 rounded"
+          >
+            <option value="">Movement</option>
+            {MOVEMENTS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+
+          <select
+            value={shot.focalLengthMm ?? ''}
+            onChange={e => onUpdate(shot.id, 'focalLengthMm', parseInt(e.target.value))}
+            className={`w-16 text-xs py-1 px-1 rounded border ${
+              shot.focalLengthMm ? 'bg-gray-800 border-gray-700' : 'bg-yellow-900/20 border-yellow-700/50'
+            }`}
+          >
+            <option value="">Lens</option>
+            {LENSES.map(l => <option key={l} value={l}>{l}mm</option>)}
+          </select>
+
+          <div className="text-xs text-gray-500 w-10 text-right">
+            {shot.durationEstSec ? `${Math.round(shot.durationEstSec)}s` : '—'}
+          </div>
+
+          {hasMissing && (
+            <button
+              onClick={() => onFillNull(shot.id)}
+              className="text-[10px] px-2 py-1 bg-purple-600/30 text-purple-400 rounded hover:bg-purple-600/50"
+              title="AI fill missing fields"
+            >
+              Fill
+            </button>
+          )}
+
+          <button
+            onClick={() => onUpdate(shot.id, 'isLocked', !shot.isLocked)}
+            className={`text-sm ${shot.isLocked ? 'text-blue-400' : 'text-gray-600 hover:text-gray-400'}`}
+            title={shot.isLocked ? 'Unlock' : 'Lock'}
+          >
+            {shot.isLocked ? '\u{1F512}' : '\u{1F513}'}
+          </button>
         </div>
       </div>
     </div>

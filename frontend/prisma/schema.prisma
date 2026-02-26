@@ -1,0 +1,886 @@
+// =============================================================================
+// CinePilot — Prisma Schema
+// Base tables (14) + Feature tables (N13-N19: ~48 additional)
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// =============================================================================
+// BASE TABLES
+// =============================================================================
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String?
+  role         String    @default("producer")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  projects     Project[]
+
+  @@map("users")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  language    String   @default("tamil")
+  status      String   @default("planning")
+  budget      Decimal? @db.Decimal(12, 2)
+  genre       String?
+  directorStyle String? @map("director_style")
+  defaultLenses String[] @default([]) @map("default_lenses")
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user              User               @relation(fields: [userId], references: [id])
+  scripts           Script[]
+  characters        Character[]
+  locations         Location[]
+  shootingDays      ShootingDay[]
+  budgetItems       BudgetItem[]
+  crew              Crew[]
+  callSheets        CallSheet[]
+  invoices          Invoice[]
+  aiAnalyses        AiAnalysis[]
+  regions           Region[]
+  scheduleVersions  ScheduleVersion[]
+  budgetVersions    BudgetVersion[]
+  budgetCategories  BudgetCategory[]
+  expenses          Expense[]
+  benchmarks        Benchmark[]
+  contractsRates    ContractRate[]
+  censorAnalyses    CensorAnalysis[]
+  storyboardStyles  StoryboardStyle[]
+
+  @@map("projects")
+}
+
+model Script {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  title     String
+  filePath  String?  @map("file_path")
+  fileSize  Int?     @map("file_size")
+  mimeType  String?  @map("mime_type")
+  content   String?
+  version   Int      @default(1)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes         Scene[]
+  scriptVersions ScriptVersion[]
+  textBlocks     ScriptTextBlock[]
+
+  @@map("scripts")
+}
+
+// =============================================================================
+// N16 — Script Parsing & AI Breakdown
+// =============================================================================
+
+model ScriptVersion {
+  id              String   @id @default(cuid())
+  scriptId        String   @map("script_id")
+  versionNumber   Int      @map("version_number")
+  changeNote      String?  @map("change_note")
+  extractionScore Int?     @map("extraction_score")
+  rawTextHash     String?  @map("raw_text_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@unique([scriptId, versionNumber])
+  @@map("script_versions")
+}
+
+model ScriptTextBlock {
+  id          String @id @default(cuid())
+  scriptId    String @map("script_id")
+  pageNumber  Int    @map("page_number")
+  lineStart   Int    @map("line_start")
+  lineEnd     Int    @map("line_end")
+  blockType   String @map("block_type")
+  rawText     String @map("raw_text")
+  confidence  Float  @default(0)
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@index([scriptId, pageNumber])
+  @@map("script_text_blocks")
+}
+
+model Scene {
+  id              String   @id @default(cuid())
+  scriptId        String   @map("script_id")
+  sceneNumber     String   @map("scene_number")
+  sceneIndex      Int      @map("scene_index")
+  headingRaw      String?  @map("heading_raw")
+  location        String?
+  locationTamil   String?  @map("location_tamil")
+  timeOfDay       String?  @map("time_of_day")
+  intExt          String?  @map("int_ext")
+  description     String?
+  descriptionTamil String? @map("description_tamil")
+  startLine       Int?     @map("start_line")
+  endLine         Int?     @map("end_line")
+  pageStart       Int?     @map("page_start")
+  pageEnd         Int?     @map("page_end")
+  confidence      Float    @default(0)
+  estimatedDuration Int?   @map("estimated_duration")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  script          Script           @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  sceneElements   SceneElement[]
+  sceneCharacters SceneCharacter[]
+  sceneLocations  SceneLocation[]
+  sceneProps      SceneProp[]
+  vfxNotes        VfxNote[]
+  warnings        Warning[]
+  shots           Shot[]
+  dayScenes       DayScene[]
+  locationIntents LocationIntent[]
+  censorSceneFlags CensorSceneFlag[]
+
+  @@index([scriptId])
+  @@map("scenes")
+}
+
+model SceneElement {
+  id           String   @id @default(cuid())
+  sceneId      String   @map("scene_id")
+  elementType  String   @map("element_type")
+  name         String
+  nameTamil    String?  @map("name_tamil")
+  description  String?
+  isSpeaking   Boolean  @default(false) @map("is_speaking")
+  isBackground Boolean  @default(false) @map("is_background")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
+  @@map("scene_elements")
+}
+
+model Character {
+  id          String  @id @default(cuid())
+  projectId   String  @map("project_id")
+  name        String
+  nameTamil   String? @map("name_tamil")
+  aliases     String[] @default([])
+  description String?
+  actorName   String? @map("actor_name")
+  isMain      Boolean @default(false) @map("is_main")
+  roleHint    String? @map("role_hint")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneCharacters SceneCharacter[]
+
+  @@map("characters")
+}
+
+model SceneCharacter {
+  id          String @id @default(cuid())
+  sceneId     String @map("scene_id")
+  characterId String @map("character_id")
+  isSpeaking  Boolean @default(false) @map("is_speaking")
+  confidence  Float   @default(0)
+
+  scene     Scene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([sceneId, characterId])
+  @@map("scene_characters")
+}
+
+model SceneLocation {
+  id         String @id @default(cuid())
+  sceneId    String @map("scene_id")
+  name       String
+  details    String?
+  confidence Float  @default(0)
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@map("scene_locations")
+}
+
+model Prop {
+  id          String @id @default(cuid())
+  projectId   String @map("project_id")
+  name        String
+  category    String?
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sceneProps SceneProp[]
+
+  @@map("props")
+}
+
+model SceneProp {
+  id           String @id @default(cuid())
+  sceneId      String @map("scene_id")
+  propId       String @map("prop_id")
+  quantityHint String? @map("quantity_hint")
+  confidence   Float   @default(0)
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  prop  Prop  @relation(fields: [propId], references: [id], onDelete: Cascade)
+
+  @@unique([sceneId, propId])
+  @@map("scene_props")
+}
+
+model VfxNote {
+  id          String @id @default(cuid())
+  sceneId     String @map("scene_id")
+  description String
+  vfxType     String @map("vfx_type")
+  confidence  Float  @default(0)
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@map("vfx_notes")
+}
+
+model Warning {
+  id          String @id @default(cuid())
+  sceneId     String @map("scene_id")
+  warningType String @map("warning_type")
+  description String
+  severity    String @default("low")
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@map("warnings")
+}
+
+// =============================================================================
+// N15 — Shot Hub
+// =============================================================================
+
+model Shot {
+  id                String  @id @default(cuid())
+  sceneId           String  @map("scene_id")
+  shotIndex         Int     @map("shot_index")
+  beatIndex         Int     @map("beat_index")
+  shotText          String  @map("shot_text")
+  characters        String[] @default([])
+  shotSize          String?  @map("shot_size")
+  cameraAngle       String?  @map("camera_angle")
+  cameraMovement    String?  @map("camera_movement")
+  focalLengthMm     Int?     @map("focal_length_mm")
+  lensType          String?  @map("lens_type")
+  keyStyle          String?  @map("key_style")
+  colorTemp         String?  @map("color_temp")
+  durationEstSec    Float?   @map("duration_est_sec")
+  confidenceCamera  Float?   @map("confidence_camera")
+  confidenceLens    Float?   @map("confidence_lens")
+  confidenceLight   Float?   @map("confidence_lighting")
+  confidenceDuration Float?  @map("confidence_duration")
+  importance        Int?     @default(3)
+  isLocked          Boolean  @default(false) @map("is_locked")
+  userEdited        Boolean  @default(false) @map("user_edited")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  scene            Scene             @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  shotSuggestions  ShotSuggestion[]
+  storyboardFrames StoryboardFrame[]
+
+  @@index([sceneId, shotIndex])
+  @@map("shots")
+}
+
+model ShotSuggestion {
+  id          String @id @default(cuid())
+  shotId      String @map("shot_id")
+  fieldName   String @map("field_name")
+  suggestion  Json
+  confidence  Float  @default(0)
+  isAccepted  Boolean? @map("is_accepted")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  shot Shot @relation(fields: [shotId], references: [id], onDelete: Cascade)
+
+  @@map("shot_suggestions")
+}
+
+model StoryboardFrame {
+  id          String   @id @default(cuid())
+  shotId      String   @map("shot_id")
+  imageUrl    String?  @map("image_url")
+  prompt      String?
+  style       String   @default("cleanLineArt")
+  seed        Int?
+  variation   Int      @default(1)
+  status      String   @default("pending")
+  directorNotes String? @map("director_notes")
+  isApproved  Boolean  @default(false) @map("is_approved")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  shot Shot @relation(fields: [shotId], references: [id], onDelete: Cascade)
+
+  @@map("storyboard_frames")
+}
+
+// =============================================================================
+// N13 — Script-Aware Location Scouter
+// =============================================================================
+
+model Location {
+  id         String   @id @default(cuid())
+  projectId  String   @map("project_id")
+  name       String
+  nameTamil  String?  @map("name_tamil")
+  address    String?
+  latitude   Decimal? @db.Decimal(10, 8)
+  longitude  Decimal? @db.Decimal(11, 8)
+  placeType  String?  @map("place_type")
+  notes      String?
+  imageUrls  String[] @default([]) @map("image_urls")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shootingDays ShootingDay[]
+
+  @@map("locations")
+}
+
+model Region {
+  id          String @id @default(cuid())
+  projectId   String @map("project_id")
+  name        String
+  centerLat   Decimal @map("center_lat") @db.Decimal(10, 8)
+  centerLng   Decimal @map("center_lng") @db.Decimal(11, 8)
+  radiusKm    Float   @map("radius_km")
+
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  locationIntents  LocationIntent[]
+
+  @@map("regions")
+}
+
+model LocationIntent {
+  id            String   @id @default(cuid())
+  sceneId       String   @map("scene_id")
+  regionId      String?  @map("region_id")
+  keywords      String[] @default([])
+  terrainType   String?  @map("terrain_type")
+  requiredFeatures String[] @default([]) @map("required_features")
+  avoidFeatures String[] @default([]) @map("avoid_features")
+  timeOfDay     String?  @map("time_of_day")
+  isLocked      Boolean  @default(false) @map("is_locked")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  scene      Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  region     Region?    @relation(fields: [regionId], references: [id])
+  candidates Candidate[]
+
+  @@map("location_intents")
+}
+
+model Candidate {
+  id             String  @id @default(cuid())
+  intentId       String  @map("intent_id")
+  name           String?
+  latitude       Decimal @db.Decimal(10, 8)
+  longitude      Decimal @db.Decimal(11, 8)
+  osmId          String? @map("osm_id")
+  placeType      String? @map("place_type")
+  scoreTotal     Float   @map("score_total")
+  scoreWater     Float?  @map("score_water")
+  scoreGreen     Float?  @map("score_green")
+  scoreAccess    Float?  @map("score_access")
+  scoreLocality  Float?  @map("score_locality")
+  scoreFlat      Float?  @map("score_flat")
+  riskFlags      String[] @default([]) @map("risk_flags")
+  explanation    String?
+  travelTimeMin  Float?  @map("travel_time_min")
+  distanceKm     Float?  @map("distance_km")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  intent       LocationIntent       @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  enrichments  CandidateEnrichment[]
+  feedback     ScoutFeedback[]
+
+  @@index([intentId, scoreTotal(sort: Desc)])
+  @@map("candidates")
+}
+
+model CandidateEnrichment {
+  id           String  @id @default(cuid())
+  candidateId  String  @map("candidate_id")
+  enrichType   String  @map("enrich_type")
+  data         Json
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_enrichments")
+}
+
+model ScoutFeedback {
+  id          String @id @default(cuid())
+  candidateId String @map("candidate_id")
+  userId      String @map("user_id")
+  rating      Int
+  notes       String?
+  photos      String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("scout_feedback")
+}
+
+model VerifiedLocation {
+  id          String  @id @default(cuid())
+  projectId   String  @map("project_id")
+  name        String
+  latitude    Decimal @db.Decimal(10, 8)
+  longitude   Decimal @db.Decimal(11, 8)
+  address     String?
+  photos      String[] @default([])
+  notes       String?
+  verifiedBy  String? @map("verified_by")
+  verifiedAt  DateTime? @map("verified_at")
+
+  @@map("verified_locations")
+}
+
+model ScoutPlan {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  name      String
+  data      Json
+  exportUrl String?  @map("export_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("scout_plans")
+}
+
+// =============================================================================
+// N14 — AI Scheduling Engine
+// =============================================================================
+
+model ShootingDay {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  dayNumber      Int      @map("day_number")
+  scheduledDate  DateTime? @map("scheduled_date") @db.Date
+  callTime       String?  @map("call_time")
+  locationId     String?  @map("location_id")
+  estimatedHours Decimal? @map("estimated_hours") @db.Decimal(5, 2)
+  weatherData    Json?    @map("weather_data")
+  notes          String?
+  status         String   @default("scheduled")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  location   Location?  @relation(fields: [locationId], references: [id])
+  dayScenes  DayScene[]
+  callSheets CallSheet[]
+
+  @@map("shooting_days")
+}
+
+model DayScene {
+  id              String @id @default(cuid())
+  shootingDayId   String @map("shooting_day_id")
+  sceneId         String @map("scene_id")
+  orderNumber     Int?   @map("order_number")
+  estimatedMinutes Int?  @map("estimated_minutes")
+  actualMinutes    Int?  @map("actual_minutes")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  shootingDay ShootingDay @relation(fields: [shootingDayId], references: [id], onDelete: Cascade)
+  scene       Scene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([shootingDayId])
+  @@map("day_scenes")
+}
+
+model CastAvailability {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  characterId String   @map("character_id")
+  dateStart   DateTime @map("date_start") @db.Date
+  dateEnd     DateTime @map("date_end") @db.Date
+  status      String   @default("available")
+  notes       String?
+
+  @@map("cast_availability")
+}
+
+model CrewConstraint {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  crewId      String   @map("crew_id")
+  dateStart   DateTime @map("date_start") @db.Date
+  dateEnd     DateTime @map("date_end") @db.Date
+  status      String   @default("unavailable")
+  notes       String?
+
+  @@map("crew_constraints")
+}
+
+model EquipmentRental {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  category    String
+  dateStart   DateTime @map("date_start") @db.Date
+  dateEnd     DateTime @map("date_end") @db.Date
+  dailyRate   Decimal  @map("daily_rate") @db.Decimal(10, 2)
+  vendor      String?
+  notes       String?
+
+  @@map("equipment_rentals")
+}
+
+model ScheduleVersion {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  versionNum  Int      @map("version_num")
+  label       String?
+  summaryText String?  @map("summary_text")
+  data        Json
+  score       Float?
+  isActive    Boolean  @default(false) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, versionNum])
+  @@map("schedule_versions")
+}
+
+// =============================================================================
+// N17 — AI Budget Engine
+// =============================================================================
+
+model BudgetItem {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  category    String
+  subcategory String?
+  description String?
+  quantity    Decimal? @db.Decimal(10, 2)
+  unit        String?
+  rate        Decimal? @db.Decimal(10, 2)
+  rateLow     Decimal? @map("rate_low") @db.Decimal(10, 2)
+  rateHigh    Decimal? @map("rate_high") @db.Decimal(10, 2)
+  taxRate     Decimal? @map("tax_rate") @db.Decimal(5, 2)
+  total       Decimal? @db.Decimal(12, 2)
+  actualCost  Decimal? @map("actual_cost") @db.Decimal(12, 2)
+  source      String   @default("manual")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("budget_items")
+}
+
+model BudgetVersion {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  versionNum Int     @map("version_num")
+  label     String?
+  snapshot  Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, versionNum])
+  @@map("budget_versions")
+}
+
+model BudgetCategory {
+  id         String @id @default(cuid())
+  projectId  String @map("project_id")
+  name       String
+  parentId   String? @map("parent_id")
+  sortOrder  Int    @default(0) @map("sort_order")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("budget_categories")
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  category    String
+  description String
+  amount      Decimal  @db.Decimal(12, 2)
+  date        DateTime @db.Date
+  vendor      String?
+  receiptUrl  String?  @map("receipt_url")
+  status      String   @default("pending")
+  approvedBy  String?  @map("approved_by")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  approval Approval[]
+
+  @@index([projectId, date])
+  @@map("expenses")
+}
+
+model Approval {
+  id          String   @id @default(cuid())
+  expenseId   String   @map("expense_id")
+  approverRole String  @map("approver_role")
+  status      String   @default("pending")
+  notes       String?
+  decidedAt   DateTime? @map("decided_at")
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@map("approvals")
+}
+
+model ContractRate {
+  id          String  @id @default(cuid())
+  projectId   String  @map("project_id")
+  vendorName  String  @map("vendor_name")
+  category    String
+  itemDesc    String  @map("item_desc")
+  contractedRate Decimal @map("contracted_rate") @db.Decimal(10, 2)
+  unit        String?
+  validFrom   DateTime? @map("valid_from") @db.Date
+  validTo     DateTime? @map("valid_to") @db.Date
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("contracts_rates")
+}
+
+model Benchmark {
+  id         String  @id @default(cuid())
+  projectId  String  @map("project_id")
+  category   String
+  region     String
+  avgRate    Decimal @map("avg_rate") @db.Decimal(10, 2)
+  minRate    Decimal? @map("min_rate") @db.Decimal(10, 2)
+  maxRate    Decimal? @map("max_rate") @db.Decimal(10, 2)
+  source     String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("benchmarks")
+}
+
+// =============================================================================
+// Invoices (extended for N17)
+// =============================================================================
+
+model Invoice {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  invoiceNumber  String   @map("invoice_number")
+  recipientName  String?  @map("recipient_name")
+  vendorName     String?  @map("vendor_name")
+  description    String?
+  amount         Decimal  @db.Decimal(12, 2)
+  status         String   @default("pending")
+  dueDate        DateTime? @map("due_date") @db.Date
+  paidDate       DateTime? @map("paid_date") @db.Date
+  fileUrl        String?  @map("file_url")
+  ocrData        Json?    @map("ocr_data")
+  verificationResult Json? @map("verification_result")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+// =============================================================================
+// N18 — Storyboard Page
+// =============================================================================
+
+model StoryboardStyle {
+  id          String @id @default(cuid())
+  projectId   String @map("project_id")
+  name        String
+  presetKey   String @map("preset_key")
+  customPositive String? @map("custom_positive")
+  customNegative String? @map("custom_negative")
+  isDefault   Boolean @default(false) @map("is_default")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("storyboard_styles")
+}
+
+model StoryboardAsset {
+  id          String   @id @default(cuid())
+  frameId     String   @map("frame_id")
+  assetType   String   @map("asset_type")
+  url         String
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("storyboard_assets")
+}
+
+model StoryboardLock {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  lockType    String   @map("lock_type")
+  lockValue   Json     @map("lock_value")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("storyboard_locks")
+}
+
+model StoryboardJob {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  jobType     String   @map("job_type")
+  status      String   @default("queued")
+  progress    Int      @default(0)
+  totalFrames Int      @default(0) @map("total_frames")
+  completedFrames Int  @default(0) @map("completed_frames")
+  errorMsg    String?  @map("error_msg")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("storyboard_jobs")
+}
+
+// =============================================================================
+// N19 — Censor Board
+// =============================================================================
+
+model CensorAnalysis {
+  id                   String   @id @default(cuid())
+  projectId            String   @map("project_id")
+  scriptVersionId      String?  @map("script_version_id")
+  predictedCertificate String?  @map("predicted_certificate")
+  confidence           String?
+  deterministicScore   Float?   @map("deterministic_score")
+  topDrivers           String[] @default([]) @map("top_drivers")
+  highRiskScenes       Json?    @map("high_risk_scenes")
+  uncertainties        String[] @default([])
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneFlags CensorSceneFlag[]
+  suggestions CensorSuggestion[]
+
+  @@map("censor_analyses")
+}
+
+model CensorSceneFlag {
+  id          String @id @default(cuid())
+  analysisId  String @map("analysis_id")
+  sceneId     String @map("scene_id")
+  category    String
+  severity    Int    @default(0)
+  context     String?
+  evidence    Json?
+
+  analysis CensorAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  scene    Scene          @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@map("censor_scene_flags")
+}
+
+model CensorSuggestion {
+  id                     String @id @default(cuid())
+  analysisId             String @map("analysis_id")
+  sceneNumber            String @map("scene_number")
+  rank                   Int
+  issue                  String
+  suggestedChange        String @map("suggested_change")
+  why                    String?
+  expectedSeverityDelta  Int?   @map("expected_severity_delta")
+  effort                 String?
+  creativeRisk           String? @map("creative_risk")
+  expectedCertImpact     String? @map("expected_cert_impact")
+
+  analysis CensorAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@map("censor_suggestions")
+}
+
+// =============================================================================
+// Remaining Base Tables
+// =============================================================================
+
+model Crew {
+  id         String   @id @default(cuid())
+  projectId  String   @map("project_id")
+  name       String
+  role       String
+  department String?
+  phone      String?
+  email      String?
+  dailyRate  Decimal? @map("daily_rate") @db.Decimal(10, 2)
+  startDate  DateTime? @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("crew")
+}
+
+model CallSheet {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  shootingDayId String?  @map("shooting_day_id")
+  title         String?
+  date          DateTime @db.Date
+  content       Json?
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shootingDay ShootingDay? @relation(fields: [shootingDayId], references: [id])
+
+  @@map("call_sheets")
+}
+
+model AiAnalysis {
+  id           String   @id @default(cuid())
+  projectId    String   @map("project_id")
+  analysisType String   @map("analysis_type")
+  inputData    Json?    @map("input_data")
+  result       Json?
+  modelUsed    String?  @map("model_used")
+  tokenCount   Int?     @map("token_count")
+  latencyMs    Int?     @map("latency_ms")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("ai_analyses")
+}

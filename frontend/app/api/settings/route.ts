@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 
 const DEFAULT_USER_ID = 'default-user';
@@ -60,8 +61,8 @@ export async function POST(req: NextRequest) {
           where: {
             userId_key: { userId: DEFAULT_USER_ID, key: k },
           },
-          create: { userId: DEFAULT_USER_ID, key: k, value: v as object },
-          update: { value: v as object },
+          create: { userId: DEFAULT_USER_ID, key: k, value: v as Prisma.InputJsonValue },
+          update: { value: v as Prisma.InputJsonValue },
         });
       }
 
@@ -81,9 +82,9 @@ export async function POST(req: NextRequest) {
       create: {
         userId: DEFAULT_USER_ID,
         key: key.trim(),
-        value: value ?? null,
+        value: (value ?? null) as Prisma.InputJsonValue,
       },
-      update: { value: value ?? null },
+      update: { value: (value ?? null) as Prisma.InputJsonValue },
     });
 
     return NextResponse.json({ success: true });

@@ -6,6 +6,7 @@ import {
 } from '@/lib/scripts/pipeline';
 
 const DEFAULT_PROJECT_ID = 'default-project';
+const DEFAULT_USER_ID = 'default-user';
 
 async function ensureDefaultProject() {
   let project = await prisma.project.findFirst({
@@ -13,11 +14,25 @@ async function ensureDefaultProject() {
   });
 
   if (!project) {
+    let user = await prisma.user.findFirst({ where: { id: DEFAULT_USER_ID } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: DEFAULT_USER_ID,
+          email: 'admin@cinepilot.local',
+          passwordHash: 'placeholder',
+          name: 'CinePilot Admin',
+          role: 'producer',
+        },
+      });
+    }
+
     project = await prisma.project.create({
       data: {
         id: DEFAULT_PROJECT_ID,
         name: 'Default Project',
         description: 'Auto-created default project',
+        userId: user.id,
       },
     });
   }

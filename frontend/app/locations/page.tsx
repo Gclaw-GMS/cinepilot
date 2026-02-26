@@ -1,289 +1,274 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import * as api from '@/lib/api'
-import Link from 'next/link'
+import { useState, useEffect, useCallback } from 'react'
 
-interface Location {
-  id: number
-  project_id: number
-  name: string
-  tamil: string | null
-  type: string
-  address: string
-  notes?: string
-  permit_status: string
+interface SceneWithIntent {
+  id: string
+  sceneNumber: string
+  headingRaw: string | null
+  intExt: string | null
+  timeOfDay: string | null
+  location: string | null
+  locationIntents: {
+    id: string
+    keywords: string[]
+    terrainType: string | null
+    _count: { candidates: number }
+  }[]
 }
 
-const DEMO_LOCATIONS: Location[] = [
-  { id: 1, project_id: 1, name: 'Chennai Street', tamil: 'சென்னை வீதி', type: 'outdoor', address: 'Anna Nagar, Chennai', permit_status: 'approved' },
-  { id: 2, project_id: 1, name: 'Priya Apartment', tamil: 'பிரியாவின் அபார்ட்மென்ட்', type: 'indoor', address: 'T Nagar, Chennai', permit_status: 'approved' },
-  { id: 3, project_id: 2, name: 'Meenakshi Temple', tamil: 'மீனாட்சி கோவில்', type: 'religious', address: 'Madurai', permit_status: 'pending' },
-  { id: 4, project_id: 2, name: 'Madurai Market', tamil: 'மதுரை சந்தை', type: 'outdoor', address: 'Velan Market, Madurai', permit_status: 'approved' },
-]
-
-const LOCATION_TYPES = [
-  { value: 'indoor', label: 'Indoor', icon: '🏠' },
-  { value: 'outdoor', label: 'Outdoor', icon: '🌳' },
-  { value: 'religious', label: 'Religious', icon: '🛕' },
-  { value: 'commercial', label: 'Commercial', icon: '🏢' },
-  { value: 'residential', label: 'Residential', icon: '🏘️' },
-]
+interface CandidateData {
+  id: string
+  name: string | null
+  latitude: string
+  longitude: string
+  placeType: string | null
+  scoreTotal: number
+  scoreAccess: number | null
+  scoreLocality: number | null
+  riskFlags: string[]
+  explanation: string | null
+}
 
 export default function LocationsPage() {
-  const [locations, setLocations] = useState<Location[]>([])
+  const [scenes, setScenes] = useState<SceneWithIntent[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
-  const [selectedProject, setSelectedProject] = useState(1)
-  const [newLocation, setNewLocation] = useState({
-    name: '',
-    tamil: '',
-    type: 'outdoor',
-    address: '',
-    notes: ''
-  })
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<CandidateData[]>([])
+  const [scouting, setScouting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchLocations()
+  const fetchScenes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/locations')
+      const data = await res.json()
+      setScenes(data.scenes || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const fetchLocations = async () => {
+  useEffect(() => { fetchScenes() }, [fetchScenes])
+
+  const handleSelectScene = async (sceneId: string) => {
+    setSelectedSceneId(sceneId)
+    setCandidates([])
     try {
-      const data = await api.locations.list()
-      setLocations(data || [])
+      const res = await fetch(`/api/locations?sceneId=${sceneId}`)
+      const data = await res.json()
+      setCandidates(data.intent?.candidates || [])
     } catch (e) {
-      setLocations(DEMO_LOCATIONS)
+      console.error(e)
     }
-    setLoading(false)
   }
 
-  const handleAddLocation = async () => {
-    if (!newLocation.name.trim()) return
-
-    const location: Partial<Location> = {
-      project_id: selectedProject,
-      name: newLocation.name,
-      tamil: newLocation.tamil || undefined,
-      type: newLocation.type,
-      address: newLocation.address,
-      notes: newLocation.notes || undefined
-    }
-
+  const handleScout = async () => {
+    if (!selectedSceneId) return
+    setScouting(true)
+    setError(null)
     try {
-      const saved = await api.locations.create(location as any)
-      if (saved) {
-        setLocations([...locations, saved])
-      }
-    } catch (e) {
-      // Demo fallback
-      setLocations([...locations, { ...location, id: Date.now(), permit_status: 'pending' } as Location])
-    }
-
-    setNewLocation({ name: '', tamil: '', type: 'outdoor', address: '', notes: '' })
-    setShowAdd(false)
-  }
-
-  const getPermitColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'bg-green-500/20 text-green-400'
-      case 'pending': return 'bg-yellow-500/20 text-yellow-400'
-      case 'denied': return 'bg-red-500/20 text-red-400'
-      default: return 'bg-gray-500/20 text-gray-400'
+      const res = await fetch('/api/locations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'scout', sceneId: selectedSceneId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setCandidates(data.candidates || [])
+      await fetchScenes()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setScouting(false)
     }
   }
 
-  const getTypeIcon = (type: string) => {
-    const t = LOCATION_TYPES.find(t => t.value === type)
-    return t?.icon || '📍'
-  }
+  const selectedScene = scenes.find(s => s.id === selectedSceneId)
+  const extScenes = scenes.filter(s => s.intExt === 'EXT')
+  const intScenes = scenes.filter(s => s.intExt !== 'EXT')
 
-  const filteredLocations = locations.filter(l => l.project_id === selectedProject)
+  if (loading) {
+    return <div className="p-6 flex items-center justify-center min-h-[60vh]"><div className="text-gray-400 animate-pulse">Loading locations...</div></div>
+  }
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg">←</Link>
-          <div>
-            <h1 className="text-2xl font-bold">📍 Locations</h1>
-            <p className="text-gray-500 mt-1">Manage shooting locations and permits</p>
-          </div>
-        </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded font-medium"
-        >
-          + Add Location
-        </button>
-      </div>
-
-      {/* Project Filter */}
-      <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 mb-6">
-        <label className="text-sm text-gray-400 block mb-2">Filter by Project</label>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setSelectedProject(1)}
-            className={`px-4 py-2 rounded font-medium ${
-              selectedProject === 1 
-                ? 'bg-cinepilot-accent text-black' 
-                : 'bg-gray-800 hover:bg-gray-700'
-            }`}
-          >
-            🎬 இதயத்தின் ஒலி
-          </button>
-          <button
-            onClick={() => setSelectedProject(2)}
-            className={`px-4 py-2 rounded font-medium ${
-              selectedProject === 2 
-                ? 'bg-cinepilot-accent text-black' 
-                : 'bg-gray-800 hover:bg-gray-700'
-            }`}
-          >
-            🎬 Veera's Journey
-          </button>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Location Scouter</h1>
+          <p className="text-gray-500 text-sm mt-0.5">AI-powered script-aware location discovery</p>
         </div>
       </div>
 
-      {/* Locations Grid */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading locations...</div>
-      ) : filteredLocations.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-4xl mb-4">📍</div>
-          <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>
-          <p className="text-gray-400 mb-4">Add your first shooting location</p>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="px-4 py-2 bg-cinepilot-accent text-black rounded font-medium"
-          >
-            + Add Location
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredLocations.map((location) => (
-            <div
-              key={location.id}
-              className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-5 hover:border-cinepilot-accent/50 transition-colors"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{getTypeIcon(location.type)}</span>
-                  <div>
-                    <h3 className="font-semibold">{location.name}</h3>
-                    {location.tamil && (
-                      <p className="text-sm text-purple-400">{location.tamil}</p>
-                    )}
-                  </div>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded ${getPermitColor(location.permit_status)}`}>
-                  {location.permit_status}
-                </span>
-              </div>
-              
-              <div className="text-sm text-gray-400 mb-2">
-                📍 {location.address || 'Address not specified'}
-              </div>
-              
-              <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs px-2 py-1 bg-gray-800 rounded">
-                  {LOCATION_TYPES.find(t => t.value === location.type)?.label || location.type}
-                </span>
-              </div>
-              
-              {location.notes && (
-                <p className="text-sm text-gray-500 mt-3 pt-3 border-t border-gray-800">
-                  {location.notes}
-                </p>
-              )}
-            </div>
-          ))}
+      {error && (
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500">Dismiss</button>
         </div>
       )}
 
-      {/* Add Location Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Add New Location</h2>
-            
-            <div className="space-y-4">
+      {scenes.length === 0 ? (
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center text-gray-500">
+          No scenes found. Upload and parse a script first.
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-6">
+          {/* Scene List Panel */}
+          <div className="col-span-1 space-y-4">
+            {extScenes.length > 0 && (
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Location Name</label>
-                <input
-                  type="text"
-                  value={newLocation.name}
-                  onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                  placeholder="e.g., Chennai Beach"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:border-cinepilot-accent focus:outline-none"
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">Tamil Name (Optional)</label>
-                <input
-                  type="text"
-                  value={newLocation.tamil}
-                  onChange={(e) => setNewLocation({ ...newLocation, tamil: e.target.value })}
-                  placeholder="e.g., சென்னை கடல்"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:border-cinepilot-accent focus:outline-none"
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">Type</label>
-                <select
-                  value={newLocation.type}
-                  onChange={(e) => setNewLocation({ ...newLocation, type: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:border-cinepilot-accent focus:outline-none"
-                >
-                  {LOCATION_TYPES.map(t => (
-                    <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                <h3 className="text-xs font-medium text-amber-400 mb-2 uppercase">Exterior Scenes</h3>
+                <div className="space-y-1">
+                  {extScenes.map(scene => (
+                    <SceneButton key={scene.id} scene={scene} selected={selectedSceneId === scene.id} onClick={handleSelectScene} />
                   ))}
-                </select>
+                </div>
               </div>
-              
+            )}
+            {intScenes.length > 0 && (
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Address</label>
-                <input
-                  type="text"
-                  value={newLocation.address}
-                  onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
-                  placeholder="Full address"
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:border-cinepilot-accent focus:outline-none"
-                />
+                <h3 className="text-xs font-medium text-blue-400 mb-2 uppercase">Interior Scenes</h3>
+                <div className="space-y-1">
+                  {intScenes.map(scene => (
+                    <SceneButton key={scene.id} scene={scene} selected={selectedSceneId === scene.id} onClick={handleSelectScene} />
+                  ))}
+                </div>
               </div>
-              
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">Notes</label>
-                <textarea
-                  value={newLocation.notes}
-                  onChange={(e) => setNewLocation({ ...newLocation, notes: e.target.value })}
-                  placeholder="Any additional notes..."
-                  rows={2}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded focus:border-cinepilot-accent focus:outline-none resize-none"
-                />
+            )}
+          </div>
+
+          {/* Main Panel */}
+          <div className="col-span-2 space-y-4">
+            {!selectedSceneId ? (
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center text-gray-500">
+                Select a scene to scout locations
               </div>
-            </div>
-            
-            <div className="flex gap-2 justify-end mt-6">
-              <button
-                onClick={() => setShowAdd(false)}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddLocation}
-                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded font-medium"
-              >
-                Add Location
-              </button>
-            </div>
+            ) : (
+              <>
+                {/* Scene Header */}
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-mono bg-gray-800 px-2 py-0.5 rounded">{selectedScene?.sceneNumber}</span>
+                      {selectedScene?.intExt && (
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          selectedScene.intExt === 'EXT' ? 'bg-amber-900/40 text-amber-400' : 'bg-blue-900/40 text-blue-400'
+                        }`}>{selectedScene.intExt}</span>
+                      )}
+                      {selectedScene?.timeOfDay && (
+                        <span className="text-xs px-2 py-0.5 bg-gray-800 rounded text-gray-400">{selectedScene.timeOfDay}</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-300">{selectedScene?.headingRaw || selectedScene?.location || 'Unknown'}</div>
+                    {selectedScene?.locationIntents?.[0]?.keywords && (
+                      <div className="flex gap-1 mt-2">
+                        {selectedScene.locationIntents[0].keywords.map((k, i) => (
+                          <span key={i} className="text-[10px] px-2 py-0.5 bg-cinepilot-accent/20 text-cinepilot-accent rounded">{k}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={handleScout} disabled={scouting}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded font-medium text-sm">
+                    {scouting ? 'Scouting...' : 'Scout Locations'}
+                  </button>
+                </div>
+
+                {/* Candidates */}
+                {candidates.length === 0 ? (
+                  <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
+                    {scouting ? 'Searching for locations...' : 'Click "Scout Locations" to find candidates'}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {candidates.map((c, idx) => (
+                      <div key={c.id || idx} className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-bold text-cinepilot-accent">#{idx + 1}</span>
+                              <span className="font-medium text-gray-200">{c.name || 'Unnamed Location'}</span>
+                              {c.placeType && (
+                                <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-500 rounded">{c.placeType}</span>
+                              )}
+                            </div>
+                            {c.explanation && (
+                              <p className="text-xs text-gray-400 mt-1">{c.explanation}</p>
+                            )}
+                            {c.riskFlags.length > 0 && (
+                              <div className="flex gap-1 mt-2">
+                                {c.riskFlags.map((f, i) => (
+                                  <span key={i} className="text-[10px] px-2 py-0.5 bg-red-900/30 text-red-400 rounded">{f}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-center">
+                              <div className="text-xl font-bold text-cinepilot-accent">{c.scoreTotal}</div>
+                              <div className="text-[10px] text-gray-600">Score</div>
+                            </div>
+                            <a
+                              href={`https://www.google.com/maps?q=${c.latitude},${c.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs px-2 py-1 bg-gray-800 text-gray-400 rounded hover:bg-gray-700"
+                            >
+                              Map
+                            </a>
+                          </div>
+                        </div>
+                        <div className="flex gap-4 mt-2 text-[10px] text-gray-600">
+                          {c.scoreAccess !== null && <span>Access: {c.scoreAccess}</span>}
+                          {c.scoreLocality !== null && <span>Locality: {c.scoreLocality}</span>}
+                          <span>{Number(c.latitude).toFixed(4)}, {Number(c.longitude).toFixed(4)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function SceneButton({
+  scene,
+  selected,
+  onClick,
+}: {
+  scene: SceneWithIntent
+  selected: boolean
+  onClick: (id: string) => void
+}) {
+  const candidateCount = scene.locationIntents?.[0]?._count?.candidates || 0
+
+  return (
+    <button
+      onClick={() => onClick(scene.id)}
+      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+        selected
+          ? 'bg-cinepilot-accent/20 text-cinepilot-accent border border-cinepilot-accent/30'
+          : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700'
+      }`}
+    >
+      <div className="flex justify-between items-center">
+        <span className="font-mono text-xs">{scene.sceneNumber}</span>
+        {candidateCount > 0 && (
+          <span className="text-[10px] bg-green-900/30 text-green-400 px-1.5 py-0.5 rounded">
+            {candidateCount} spots
+          </span>
+        )}
+      </div>
+      <div className="text-xs text-gray-500 truncate mt-0.5">
+        {scene.location || scene.headingRaw || 'Untitled'}
+      </div>
+    </button>
   )
 }

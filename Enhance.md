@@ -110,22 +110,60 @@ Python backend has been removed. The new architecture is:
 
 ---
 
-### 3. Shot List (`/shot-list`)
+### 3. Shot Hub (`/shot-list`) -- MAJOR FEATURE
 
 | Aspect | Detail |
 |--------|--------|
 | **Current State** | Scene description textarea, AI-generated shot list (falls back to 5 mock shots), inline editing, quick-add buttons, 4 scene templates. |
-| **Gaps** | Save and Export PDF non-functional. Duration estimation is rough. No connection to projects. |
+| **Gaps** | Save and Export PDF non-functional. Duration estimation is rough. No connection to projects. No structured beat/shot breakdown. No lens/lighting intelligence. No Tamil/Tanglish support. No storyboard generation. |
+| **Target** | Full "Shot Hub": script → scenes → beats → shots pipeline. Each shot has INT/EXT, DAY/NIGHT, location, characters, action beat, camera angle, lens, movement, lighting, duration estimate, storyboard frame. Staged pipeline: deterministic extraction → LLM semantic parsing → fill-null AI pass → validation. Tamil/Tanglish supported. See **N15** in Part 3 for the complete deep specification. |
+
+**Core Principle:** Do NOT rely on "one LLM call that invents everything." Use a staged pipeline -- deterministic extraction where possible (scene headings, character cues, INT/EXT tags), LLM for semantic parsing (beats, emotions, implied blocking), a fill-null AI pass for missing fields grounded in extracted context, and a validation pass to prevent hallucinated cast/locations not in script.
 
 **AI Enhancements (P0)**
 
 | Enhancement | Implementation |
 |-------------|---------------|
-| Context-Aware Shot Suggestions | AIML API (GPT-4o) analyzes scene description, genre, emotional tone, character count. Cache suggestions in Redis keyed by scene hash. |
-| Director Style Matching | Prompt AIML API with reference director style (Mani Ratnam, Vetrimaaran, Lokesh Kanagaraj). Style preference stored in PostgreSQL project settings. |
-| Lens & Lighting Recommendations | AIML API factors INT/EXT, time of day, mood for lens + lighting setup recommendations. |
-| Shot Duration Estimation | AIML API estimates realistic duration per shot. Aggregated totals cached in Redis. |
-| Storyboard Generation | AIML API (Stable Diffusion XL or DALL-E 3) generates rough storyboard frames from shot descriptions. Images stored in file storage. |
+| Scene → Beats → Shots Pipeline | AIML API (GPT-4o) segments each scene into beats (micro-actions), then generates 2-8 shots per beat. Deterministic extraction handles INT/EXT, DAY/NIGHT, character cues. LLM handles emotional beats, implied blocking, pacing. Cached in Redis keyed by `shotgen:{scene_hash}:{style}:{version}`. Persisted to PostgreSQL `shots` table with per-field confidence scores. |
+| Fill-Null AI Suggestions | For any shot field left null (camera angle, lens, lighting, duration), a second AIML API pass proposes suggestions grounded in scene context + director style + available camera kit. Suggestions stored in `shot_suggestions` table, auto-applied on user request. Cached in Redis `fillnull:{shot_hash}:{style}:{version}`. Guardrails: must use only known characters, must not invent locations not in script. |
+| Director Style Matching | Style profiles for Mani Ratnam (elegant staging, motivated movement, longer takes, lyrical inserts), Vetrimaaran (grounded realism, handheld, natural lighting, raw staging), Lokesh Kanagaraj (stylized mass moments, kinetic camera, punchy inserts, dramatic lighting). Injected into LLM prompts and used for rule-based weighting on durations and camera choices. Custom style prompt supported. Stored in PostgreSQL `projects.director_style_preset`. |
+| Lens & Lighting Engine | Deterministic rule templates applied first (INT/EXT + time_of_day + mood → base recommendations), then AIML API for nuance. Constrained to project's camera/lens kit (`projects.default_camera_pkg`, `projects.default_lenses`). Flags constraints: "night ext needs generator", "rain risk: protect lens." Outputs stored in shot fields. |
+| Shot Duration Estimation | Base duration by shot type (establishing WS: 4-10s, dialogue MS/OTS: 3-7s per line, reaction CU: 1-3s, action handheld: 1-2.5s), then AIML API adjusts for genre, director style, emotional tone. Aggregated totals per scene + per day cached in Redis `durations:{scene_hash}:{style}:{version}`. |
+| Storyboard Generation | P0: key shots only (1-3 per scene: establishing, major reveal, hero entry, climax beat). AIML API (Stable Diffusion XL or DALL-E 3) renders rough frames from shot JSON → storyboard prompt. Images stored in file storage. Linked via `storyboard_frames` table. Full storyboard is P1. |
+| Tamil/Tanglish Character Aliasing | Character dictionary with canonical names + Tamil spelling variants + nicknames. Scene-character mapping with confidence scores. Prevents hallucination of unknown characters in shot generation. |
+| Save + Export | Full project linkage: project → script → scene → shots. Inline edits persist to `shots` table. PDF export: per-scene or full project, with shot table (shot #, description, characters, camera, lens, lighting, duration, notes) + optional storyboard thumbnails. CSV/JSON export for scheduling/budgeting integration. |
+
+**Pipeline Architecture**
+
+```
+Script Ingest → Scene Extraction (regex + AI fallback)
+  → Entity Extraction (characters, props -- Tamil/Tanglish)
+  → Beat Segmentation (LLM) → Shot Generation (LLM, 2-8 per beat)
+  → Fill-Null Pass (grounded AI suggestions) → Duration Estimation
+  → Lens & Lighting Recommendations → Storyboard (key shots)
+  → Validation Gate → Persist + Cache → UI
+```
+
+**Data Model Additions (PostgreSQL)**
+
+| Table | Key Columns |
+|-------|------------|
+| `projects` (extended) | language_profile (tamil/tanglish/mixed), director_style_preset, style_prompt_custom, default_camera_pkg (jsonb), default_lenses (jsonb) |
+| `characters` | id, project_id, name_canonical, aliases_json (Tamil variants) |
+| `scene_characters` | scene_id, character_id, confidence |
+| `shots` | id, project_id, scene_id, shot_index, beat_index, shot_text, int_ext, time_of_day, location_id, characters_json, action_tags_json, emotion_tags_json, camera (jsonb: shot_size/angle/movement/framing_notes), lens (jsonb: focal_length_mm/lens_type/aperture), lighting (jsonb: key_style/color_temp/fixtures), duration_estimate_sec, confidence_json, generated_by (manual/ai) |
+| `shot_suggestions` | shot_id, suggestion_type, suggestion_json, model_used, created_at |
+| `storyboard_frames` | id, shot_id, image_ref (S3/R2), prompt_used, model_used |
+
+**Redis Keys:**
+- `shotgen:{scene_hash}:{style}:{version}` -- cached shots JSON
+- `fillnull:{shot_hash}:{style}:{version}` -- cached field suggestions
+- `durations:{scene_hash}:{style}:{version}` -- cached duration totals
+
+**Integration Points:**
+- Location Scouter: shots inherit scene location; special sub-locations override via `location_text`
+- Schedule: shot durations roll up to scene runtime estimates; equipment/lighting needs inform day grouping
+- Budget: lighting fixtures and equipment suggestions feed into rental cost calculations; night EXT → generator cost flags
 
 ---
 
@@ -1036,13 +1074,213 @@ Publish `final_schedule_ready` to `schedule_updates:{project_id}` with `schedule
 | Week 2 | TypeScript constraint solver (greedy + local search for P0, CP-SAT via serverless later). Locks support. Persist to shooting_days + day_scenes. LLM ConstraintNormalizer + ScheduleNarrator integration. |
 | Week 3 | Repair loop (infeasible → ConflictResolver → rerun). Cost optimization objective. "Backup rain schedule" generation. Schedule versioning + comparison. Polish UI: mode selector, progress visualization, export. |
 
+### N15. Shot Hub -- Full Specification (P0)
+
+CinePilot's structured shot breakdown engine. Ingests a full script (Tamil/Tanglish supported), auto-splits into Scenes → Beats → Shots, and provides per-shot camera, lens, lighting, and duration intelligence grounded in the actual script content.
+
+#### Core Principle
+
+**Staged pipeline, not a single LLM dump.** Deterministic extraction handles what's known (scene headings, INT/EXT, character cues). LLM handles what requires interpretation (beats, emotions, blocking). A fill-null pass handles what's missing. A validation gate enforces schema correctness and prevents hallucinated characters or locations.
+
+#### Pipeline Stages -- Detail
+
+**Stage 0: Script Ingest**
+
+| Step | Detail |
+|------|--------|
+| Input | PDF/DOCX/TXT (Tamil/Tanglish/English) |
+| Normalize | Preserve line breaks and scene headings. Normalize Unicode for Tamil text (NFC). Remove repeated spaces, preserve punctuation. |
+| Hash | `script_hash = sha256(normalized_text)` for cache keys |
+| Persist | `scripts` row created. Raw text stored in file storage or DB. |
+
+**Stage 1: Scene Extraction (Deterministic + AI Fallback)**
+
+| Step | Detail |
+|------|--------|
+| Deterministic | Regex matches scene headings: INT./EXT./INT/EXT variations in English/Tanglish, Tamil equivalents, "SCENE 12" style. Extracts int_ext, location_text, time_of_day. |
+| AI fallback | Only when headings are messy/non-standard. AIML API (GPT-4o) reconstructs scene boundaries with strict output schema: scene_number, heading_raw, start_line/end_line. Backend validates non-overlapping, sequential boundaries. |
+| Persist | `scenes` table in PostgreSQL |
+
+**Stage 2: Entity Extraction -- Tamil/Tanglish Aware**
+
+| Step | Detail |
+|------|--------|
+| Character dictionary | AIML API extracts candidate character names + aliases (Tamil/English forms, Tanglish spellings). Merged with user-edited list (director can correct). Persisted to `characters` table with `aliases_json`. |
+| Scene-character mapping | Per scene: detect character mentions and dialogue blocks. Output `scene_characters` with confidence. Prevents later hallucination of unknown characters. |
+| Props & vehicles | Optional: extract mentioned props, vehicles, special items into `scenes.extracted_entities_json`. Feeds equipment and budget modules. |
+
+**Stage 3: Scene → Beats → Shots (Main Generation)**
+
+| Step | Detail |
+|------|--------|
+| SceneContext payload | Scene heading + text, detected characters for scene, genre + tone (project-level), director style preset + camera/lens defaults, pacing constraints (slow/medium/fast) |
+| Beat segmentation (LLM) | AIML API segments scene into beats. Each beat: beat_id, what changes (information/emotion/blocking), characters involved, suggested pacing. More stable than directly generating 40 shots. |
+| Beat → Shots (LLM) | Per beat, generate 2-8 shots depending on pacing. Each shot has all fields but allows nulls. Hard rule: unknown values set to null + `ai_reason` for why it's missing. |
+| Cache | Redis key: `shotgen:{scene_hash}:{director_style}:{prompt_version}` |
+| Persist | Insert into `shots` table with `generated_by=ai` and `confidence_json` per field |
+
+**Stage 4: Fill-Null Suggestions (Field Completion Pass)**
+
+| Step | Detail |
+|------|--------|
+| Detect | Scan shot fields: camera shot_size, angle, movement, lens focal length, lighting style, duration -- any null? |
+| LLM call | AIML API (GPT-4o) per shot. Input: shot_text + scene context + director style + camera/lens kit. Output: suggestions with confidence for camera, lens, lighting, duration. Multiple options ranked when uncertain. |
+| Guardrails | Must use ONLY known characters list. Must not invent locations not in scene context. If uncertain, return alternatives ranked. |
+| Cache | Redis key: `fillnull:{shot_hash}:{style}:{version}` |
+| Persist | Stored separately in `shot_suggestions` table. Auto-applied to shot fields on user request via UI. |
+
+**Stage 5: Duration Estimation**
+
+| Step | Detail |
+|------|--------|
+| Base duration rules | Establishing WS: 4-10s. Dialogue coverage MS/OTS: 3-7s per line chunk. Reaction CU: 1-3s. Action handheld: 1-2.5s (faster cuts). |
+| LLM adjustment | AIML API adjusts base using: genre (thriller faster, romance slower), director style (Mani Ratnam = slower composition, Lokesh = faster action beats), emotional tone (tension = tighter cuts, melancholy = longer). |
+| Output | Per-shot `duration_estimate_sec`. Aggregated totals per scene and per shooting day. |
+| Cache | Redis key: `durations:{scene_hash}:{style}:{version}` |
+
+**Stage 6: Lens & Lighting Recommendation Engine**
+
+| Step | Detail |
+|------|--------|
+| Inputs | INT/EXT + time of day, mood/emotion tags, available camera/lens kit (project settings), location type |
+| Rule templates first | Deterministic: EXT DAY → available-light + soft key, INT NIGHT → practical-heavy + hard key, etc. |
+| LLM nuance | AIML API refines based on emotional context, director style, specific scene requirements. |
+| Lens constrained to kit | Recommendations reference project's `default_lenses`. E.g., "24mm for establishing", "50mm for intimacy", "85mm for isolation." |
+| Constraint flags | "Night exterior needs larger fixtures/generator." "Rain risk: protect lens, diffusers." "Temple interior: no artificial lighting allowed." |
+
+**Stage 7: Director Style Profiles**
+
+| Preset | Profile |
+|--------|---------|
+| **Mani Ratnam** | Elegant staging, motivated movement, longer takes, classic coverage + lyrical inserts, warm color palette, natural-light preference |
+| **Vetrimaaran** | Grounded realism, handheld, natural lighting, raw staging, longer observational beats, desaturated look, documentary feel |
+| **Lokesh Kanagaraj** | Stylized mass moments, kinetic camera, punchy inserts, dramatic lighting, fast action grammar, high-contrast visuals |
+| **Custom** | User provides `style_prompt_custom` text describing preferred visual language. LLM extracts style parameters and applies consistently. |
+
+Style profile JSON injected into all LLM prompts and used for rule-based weighting on durations, camera choices, and lighting.
+
+**Stage 8: Storyboard Generation (P0 Scope)**
+
+| Step | Detail |
+|------|--------|
+| Key shot selection | AIML API labels shot "importance" score. Pick top 1-3 per scene: establishing, major reveal, hero entry, climax beat. |
+| Prompt construction | Shot JSON → storyboard prompt: include location, time, shot size, angle, mood, characters (no faces for privacy). |
+| Render | AIML API (Stable Diffusion XL or DALL-E 3) generates low-res "rough frame." |
+| Store | Images in file storage (S3/R2). Linked via `storyboard_frames` table. |
+| P1 expansion | Full storyboard for every shot. Style-consistent generation across scenes. |
+
+**Stage 9: Save / Export / Project Linking**
+
+| Feature | Detail |
+|---------|--------|
+| Save | Everything linked: project_id → script_id → scene_id → shots. Inline edits write to `shots` table. |
+| PDF export | Per-scene or full project. Table: shot #, description, characters, camera, lens, lighting, duration, notes. Optional storyboard thumbnails. Scene headers with INT/EXT, time, location. |
+| CSV/JSON export | For integration with scheduling, call sheets, budgeting. |
+| Integration | Shots feed scene durations to Schedule Engine. Equipment/lighting needs feed Budget module. Location linkage from Location Scouter. |
+
+#### AI Contracts (Strict JSON Schemas)
+
+**BeatSegmentation Output:**
+```json
+{
+  "beats": [
+    {
+      "beat_index": 1,
+      "summary": "Kiran arrives at lakeside, notices something off.",
+      "characters": ["KIRAN"],
+      "tone": ["unease"],
+      "pacing": "medium"
+    }
+  ]
+}
+```
+
+**ShotList Output (per scene):**
+```json
+{
+  "scene_id": "uuid",
+  "shots": [
+    {
+      "shot_index": 1,
+      "beat_index": 1,
+      "shot_text": "Wide establishing of lakeside road with sparse houses.",
+      "characters": ["KIRAN"],
+      "camera": { "shot_size": "WS", "angle": null, "movement": "static" },
+      "lens": { "focal_length_mm": null, "lens_type": null },
+      "lighting": { "key_style": null, "color_temp": null },
+      "duration_estimate_sec": null,
+      "confidence": { "camera": 0.72, "lens": 0.35, "lighting": 0.30, "duration": 0.25 },
+      "ai_reason_missing": {
+        "lens": "Depends on kit; will fill in null pass.",
+        "lighting": "Needs INT/EXT + time; will fill in null pass."
+      }
+    }
+  ]
+}
+```
+
+**FillNull Suggestions Output:**
+```json
+{
+  "shot_id": "uuid",
+  "suggestions": {
+    "camera": [{ "shot_size": "WS", "angle": "eye", "movement": "static", "confidence": 0.8 }],
+    "lens": [{ "focal_length_mm": 24, "lens_type": "prime", "confidence": 0.75 }],
+    "lighting": [{ "key_style": "available-light + soft key", "confidence": 0.70 }],
+    "duration": [{ "duration_estimate_sec": 6, "confidence": 0.68 }]
+  },
+  "alternatives": [],
+  "notes": "Based on Mani Ratnam style: longer composition and motivated movement."
+}
+```
+
+**Validation rules:** Backend schema-validates all LLM JSON output. Characters must be subset of known project characters. Locations must be subset of scene's location_text unless linked by Location Scouter. Reject and retry on invalid output.
+
+#### UI Layout: Shot Hub Page
+
+| Element | Detail |
+|---------|--------|
+| **Top bar** | Project selector, style preset dropdown (Mani/Vetri/Lokesh/Custom), "Regenerate" + "Fill Missing" + "Export PDF" buttons |
+| **Left panel** | Scene list: filter by INT/EXT, location, character. Search by scene number/keywords. |
+| **Main panel** | Editable shot table. Per row: shot # + beat label, description (editable), character chips (from dictionary), INT/EXT + Day/Night chips, location field, camera dropdowns (shot_size, angle, movement), lens dropdowns (constrained to kit), lighting dropdowns + fixture notes, duration (sec) + confidence indicator, "AI Suggest" button (fills nulls for row), "Storyboard" button, warning chips ("missing lens", "night ext lighting heavy", "duration low confidence") |
+| **Right panel** | Shot Inspector: expanded view with AI reasoning, alternative options, style notes, storyboard preview |
+| **Stats row** | Total shots, total estimated runtime, # missing fields, # storyboard frames generated |
+
+#### India / Tamil Cinema Specifics
+
+| Aspect | Detail |
+|--------|--------|
+| Tamil/Tanglish scripts | Unicode NFC normalization for Tamil text. Character name aliasing across Tamil and English spellings. Scene headings in Tamil supported alongside English. |
+| Song sequences | Tamil cinema song sequences get special beat treatment: wider shots, choreography beats, playback lip-sync timing. Director style heavily influences song coverage. |
+| Mass hero entries | Lokesh/commercial style: dedicated "hero introduction" beat with specific camera grammar (slow-mo, low angle, dramatic lighting). Auto-detected from character first-appearance + action cues. |
+| Fight choreography | Action sequences auto-segmented into setup → exchange → climax beats with faster pacing multipliers. Stunt coordinator notes field. |
+| Interval block | Tamil films have intermission. Shot Hub flags "interval scene" for pacing -- typically a cliffhanger or emotional peak requiring specific camera treatment. |
+
+#### Model Strategy (Cost/Quality)
+
+| Model | Used For |
+|-------|---------|
+| GPT-4o (AIML API) | Beat segmentation, shot generation, fill-null, style adaptation |
+| Smaller/cheaper model | Optional: UI summary text |
+| SDXL / DALL-E 3 (AIML API) | Storyboard key shots only |
+
+Scene-hash-based caching prevents re-paying for identical scene generations.
+
+#### P0 Build Plan
+
+| Phase | Deliverables |
+|-------|-------------|
+| Phase 1 (1-2 weeks) | DB tables (projects extended, characters, scene_characters, shots, shot_suggestions, storyboard_frames). Link shot list to projects + persist. Scene-level shot generation (beats → shots) + Redis caching. Fill-null suggestions per shot. Duration estimation + totals. Director style preset injection. Save functional. |
+| Phase 2 (2-4 days) | PDF export (per-scene + full project). CSV/JSON export. Basic storyboard for key shots. |
+| Phase 3 (1 week) | Tamil character aliasing. Confidence + warnings UI. Batch regenerate per scene or filter. Key shot selection logic + storyboard queue. Shot Inspector panel. |
+
 ---
 
 ## Implementation Priority Matrix
 
 | Priority | Features | Rationale |
 |----------|----------|-----------|
-| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script-Aware Location Scouter**, **AI Scheduling Engine**, Script AI analysis, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Location Scouter and Scheduling Engine are the signature differentiators. |
+| **P0 - Immediate** | Next.js API routes, PostgreSQL + PostGIS + ORM, Redis integration, AIML API service, Unify API client, **Script-Aware Location Scouter**, **AI Scheduling Engine**, **Shot Hub**, Script AI analysis, Dashboard intelligence, Call sheet automation, Mission Control real data, AI chatbot, Tamil Script OCR | These establish the new architecture and unlock the core "AI-powered" promise. Location Scouter, Scheduling Engine, and Shot Hub are the signature differentiators. |
 | **P1 - Next Quarter** | Authentication, Budget forecasting, Crew management, Notifications, Weather API, Continuity tracker, Dubbing scripts, CBFC predictor, Storyboard AI, VFX breakdown, Music placement, Dialogue coach, UI theme standardization, File storage | These differentiate CinePilot from generic tools and serve South Indian cinema specifically. |
 | **P2 - Future** | Smart exports, Settings persistence, Production accounting, Crowd management, Release planner, Poster generation, Voice briefings, Preference learning | Premium features for larger productions. |
 

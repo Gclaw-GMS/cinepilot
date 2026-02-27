@@ -36,21 +36,84 @@ export default function TimelinePage() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [filterType, setFilterType] = useState('all');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   
-  // Demo stats - in production, fetch from API
-  const [stats] = useState<Stats>({
+  // Real stats from API
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    completed: 0,
+    inProgress: 0,
+    pending: 0,
+    shootDays: 0,
+    scenes: 0,
+  });
+
+  // Demo stats for when there's no data
+  const DEMO_STATS: Stats = {
     total: 8,
     completed: 2,
     inProgress: 3,
     pending: 3,
     shootDays: 20,
     scenes: 145,
-  });
+  };
 
-  const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1000);
+  // Fetch real stats from API
+  const fetchStats = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    try {
+      const projectId = selectedProject === 'all' ? 'default-project' : selectedProject;
+      
+      // Fetch schedule data
+      const scheduleRes = await fetch(`/api/schedule?projectId=${projectId}`);
+      const scheduleData = await scheduleRes.json();
+      
+      const shootingDays = scheduleData.shootingDays || [];
+      const totalScenes = shootingDays.reduce((sum: number, day: { dayScenes?: unknown[] }) => 
+        sum + (day.dayScenes?.length || 0), 0);
+      
+      // If no real data, use demo stats for better UX
+      if (shootingDays.length === 0) {
+        setStats(DEMO_STATS);
+        setIsDemoMode(true);
+      } else {
+        setIsDemoMode(false);
+        // Calculate stats from real data
+        const completed = shootingDays.filter((d: { status: string }) => d.status === 'completed').length;
+        const inProgress = shootingDays.filter((d: { status: string }) => d.status === 'in-progress').length;
+        const pending = shootingDays.filter((d: { status: string }) => 
+          d.status === 'pending' || !d.status).length;
+        
+        setStats({
+          total: shootingDays.length,
+          completed,
+          inProgress,
+          pending,
+          shootDays: shootingDays.length,
+          scenes: totalScenes,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch timeline stats:', err);
+      // Use demo stats on error for better UX
+      setStats(DEMO_STATS);
+      setIsDemoMode(true);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  }, [selectedProject]);
+
+  // Fetch stats on mount and when project changes
+  useEffect(() => {
+    fetchStats(true);
+  }, [fetchStats]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchStats();
+    setRefreshing(false);
   };
 
   const projectOptions = DEMO_PROJECTS;
@@ -68,7 +131,14 @@ export default function TimelinePage() {
                 </div>
                 Production Timeline
               </h1>
-              <p className="text-slate-500 text-sm mt-1">Visual project timeline with Gantt chart</p>
+              <div className="flex items-center gap-2">
+                <p className="text-slate-500 text-sm mt-1">Visual project timeline with Gantt chart</p>
+                {isDemoMode && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/15 text-amber-400 rounded font-medium">
+                    DEMO
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <select
@@ -251,7 +321,7 @@ export default function TimelinePage() {
                 onClick={handleRefresh}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
             </div>

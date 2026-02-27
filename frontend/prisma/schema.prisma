@@ -50,7 +50,10 @@ model Project {
   expenses         Expense[]
   invoices         Invoice[]
   locations        Location[]
+  milestones       Milestone[]
   notifications    Notification[]
+  productionPhases ProductionPhase[]
+  productionTasks  ProductionTask[]
   user             User              @relation(fields: [userId], references: [id])
   props            Prop[]
   regions          Region[]
@@ -830,4 +833,78 @@ model UserSetting {
 
   @@unique([userId, key])
   @@map("user_settings")
+}
+
+enum MilestoneStatus {
+  pending
+  in_progress
+  completed
+  delayed
+  cancelled
+}
+
+model Milestone {
+  id          String         @id @default(cuid())
+  projectId   String         @map("project_id")
+  name        String
+  description String?
+  targetDate  DateTime       @map("target_date") @db.Date
+  status      MilestoneStatus @default(pending)
+  order       Int            @default(0)
+  phase       String?        // pre_production, production, post_production
+  completedAt DateTime?      @map("completed_at") @db.Date
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       ProductionTask[]
+
+  @@index([projectId, status])
+  @@map("milestones")
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+  blocked
+}
+
+model ProductionTask {
+  id          String     @id @default(cuid())
+  projectId   String     @map("project_id")
+  milestoneId String?    @map("milestone_id")
+  name        String
+  description String?
+  status      TaskStatus @default(pending)
+  progress    Int        @default(0) // 0-100
+  priority    String     @default("medium") // low, medium, high, critical
+  dueDate     DateTime?  @map("due_date") @db.Date
+  completedAt DateTime?  @map("completed_at") @db.Date
+  order       Int        @default(0)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@map("production_tasks")
+}
+
+model ProductionPhase {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String   // pre_production, production, post_production
+  displayName String   @map("display_name")
+  status      String   @default("pending") // pending, active, completed
+  progress    Int      @default(0) // 0-100
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("production_phases")
 }

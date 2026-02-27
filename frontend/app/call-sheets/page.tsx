@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { FileText, Plus, Trash2, Calendar } from 'lucide-react'
+import { FileText, Plus, Trash2, Calendar, Edit2, Save, X, Printer, Download } from 'lucide-react'
 
 type CallSheetContent = {
   callTime?: string
@@ -36,6 +36,14 @@ type CallSheet = {
   } | null
 }
 
+type CrewMember = {
+  id: string
+  name: string
+  role: string
+  department: string | null
+  dailyRate: string | number | null
+}
+
 export default function CallSheetsPage() {
   const [callSheets, setCallSheets] = useState<CallSheet[]>([])
   const [selected, setSelected] = useState<CallSheet | null>(null)
@@ -43,6 +51,19 @@ export default function CallSheetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingContent, setEditingContent] = useState<CallSheetContent>({})
+  const [editingNotes, setEditingNotes] = useState('')
+  const [editingTitle, setEditingTitle] = useState('')
+  const [editingDate, setEditingDate] = useState('')
+  const [saving, setSaving] = useState(false)
+  
+  // Crew for adding to call sheet
+  const [crew, setCrew] = useState<CrewMember[]>([])
+  const [showAddCrew, setShowAddCrew] = useState(false)
+  const [newScene, setNewScene] = useState('')
 
   const fetchCallSheets = useCallback(async () => {
     try {
@@ -62,9 +83,21 @@ export default function CallSheetsPage() {
     }
   }, [])
 
+  const fetchCrew = useCallback(async () => {
+    try {
+      const res = await fetch('/api/crew')
+      if (!res.ok) return
+      const data = await res.json()
+      setCrew(Array.isArray(data) ? data : data.crew || [])
+    } catch {
+      // Ignore crew fetch errors
+    }
+  }, [])
+
   useEffect(() => {
     fetchCallSheets()
-  }, [])
+    fetchCrew()
+  }, [fetchCallSheets, fetchCrew])
 
   const createNew = async () => {
     try {
@@ -112,6 +145,109 @@ export default function CallSheetsPage() {
     }
   }
 
+  const startEditing = () => {
+    if (!selected) return
+    setEditingContent(selected.content || {})
+    setEditingNotes(selected.notes || '')
+    setEditingTitle(selected.title || '')
+    setEditingDate(selected.date.split('T')[0])
+    setIsEditing(true)
+  }
+
+  const cancelEditing = () => {
+    setIsEditing(false)
+    setEditingContent({})
+    setEditingNotes('')
+    setEditingTitle('')
+    setEditingDate('')
+    setShowAddCrew(false)
+    setNewScene('')
+  }
+
+  const saveChanges = async () => {
+    if (!selected) return
+    try {
+      setSaving(true)
+      const res = await fetch('/api/call-sheets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selected.id,
+          title: editingTitle,
+          date: editingDate,
+          content: editingContent,
+          notes: editingNotes,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Failed to save')
+      }
+      const updated = await res.json()
+      setCallSheets((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+      setSelected(updated)
+      setIsEditing(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addScene = () => {
+    if (!newScene.trim()) return
+    const scenes = editingContent.scenes || []
+    if (!scenes.includes(newScene.trim())) {
+      setEditingContent({
+        ...editingContent,
+        scenes: [...scenes, newScene.trim()],
+      })
+    }
+    setNewScene('')
+  }
+
+  const removeScene = (scene: string) => {
+    setEditingContent({
+      ...editingContent,
+      scenes: (editingContent.scenes || []).filter((s) => s !== scene),
+    })
+  }
+
+  const addCrewMember = (member: CrewMember) => {
+    const currentCalls = editingContent.crewCalls || []
+    if (!currentCalls.find((c) => c.name === member.name)) {
+      setEditingContent({
+        ...editingContent,
+        crewCalls: [
+          ...currentCalls,
+          {
+            name: member.name,
+            role: member.role,
+            department: member.department || undefined,
+            callTime: editingContent.callTime || '06:00',
+          },
+        ],
+      })
+    }
+    setShowAddCrew(false)
+  }
+
+  const removeCrewMember = (name: string) => {
+    setEditingContent({
+      ...editingContent,
+      crewCalls: (editingContent.crewCalls || []).filter((c) => c.name !== name),
+    })
+  }
+
+  const updateCrewCallTime = (name: string, callTime: string) => {
+    setEditingContent({
+      ...editingContent,
+      crewCalls: (editingContent.crewCalls || []).map((c) =>
+        c.name === name ? { ...c, callTime } : c
+      ),
+    })
+  }
+
   const formatDate = (d: string) => {
     try {
       return new Date(d).toLocaleDateString('en-IN', {
@@ -137,14 +273,53 @@ export default function CallSheetsPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={createNew}
-          disabled={creating}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black rounded font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          New Call Sheet
-        </button>
+        <div className="flex items-center gap-2">
+          {selected && !isEditing && (
+            <>
+              <button
+                onClick={startEditing}
+                className="flex items-center gap-2 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded font-medium"
+              >
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </button>
+            </>
+          )}
+          {isEditing && (
+            <>
+              <button
+                onClick={cancelEditing}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </button>
+              <button
+                onClick={saveChanges}
+                disabled={saving}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded font-medium"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </>
+          )}
+          <button
+            onClick={createNew}
+            disabled={creating}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black rounded font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            New Call Sheet
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -160,6 +335,7 @@ export default function CallSheetsPage() {
       )}
 
       <div className="grid grid-cols-3 gap-6 p-6">
+        {/* Sidebar - Call Sheet List */}
         <div className="col-span-1 bg-slate-800/50 rounded-lg border border-slate-700 p-4">
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Calendar className="h-4 w-4 text-cyan-400" />
@@ -181,7 +357,10 @@ export default function CallSheetsPage() {
                   }`}
                 >
                   <button
-                    onClick={() => setSelected(sheet)}
+                    onClick={() => {
+                      setSelected(sheet)
+                      setIsEditing(false)
+                    }}
                     className="flex-1 text-left min-w-0"
                   >
                     <div className="font-medium truncate">
@@ -208,110 +387,308 @@ export default function CallSheetsPage() {
           )}
         </div>
 
+        {/* Main Content - Preview/Edit */}
         <div className="col-span-2">
           {selected ? (
             <div className="bg-white text-black rounded-lg overflow-hidden print:shadow-none">
-              <div className="p-8">
-                <div className="text-center border-b-2 border-black pb-4 mb-6">
-                  <h2 className="text-2xl font-bold">
-                    {selected.title ?? 'CALL SHEET'}
-                  </h2>
-                  <p className="text-lg mt-1">{formatDate(selected.date)}</p>
-                </div>
+              {/* View Mode */}
+              {!isEditing ? (
+                <div className="p-8">
+                  <div className="text-center border-b-2 border-black pb-4 mb-6">
+                    <h2 className="text-2xl font-bold">
+                      {selected.title ?? 'CALL SHEET'}
+                    </h2>
+                    <p className="text-lg mt-1">{formatDate(selected.date)}</p>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <div className="font-bold bg-gray-200 p-2">DATE</div>
-                    <div className="p-2 border border-t-0 border-gray-300">
-                      {formatDate(selected.date)}
+                  <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <div className="font-bold bg-gray-200 p-2">DATE</div>
+                      <div className="p-2 border border-t-0 border-gray-300">
+                        {formatDate(selected.date)}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="font-bold bg-gray-200 p-2">CALL TIME</div>
-                    <div className="p-2 border border-t-0 border-gray-300 text-xl font-bold">
-                      {selected.content?.callTime ?? 'TBD'}
+                    <div>
+                      <div className="font-bold bg-gray-200 p-2">CALL TIME</div>
+                      <div className="p-2 border border-t-0 border-gray-300 text-xl font-bold">
+                        {selected.content?.callTime ?? 'TBD'}
+                      </div>
                     </div>
-                  </div>
-                  <div className="col-span-2">
-                    <div className="font-bold bg-gray-200 p-2">LOCATION</div>
-                    <div className="p-2 border border-t-0 border-gray-300">
-                      {selected.content?.location ?? 'TBD'}
-                      {selected.content?.locationAddress && (
-                        <span className="block text-sm text-gray-600 mt-1">
-                          {selected.content.locationAddress}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <div className="font-bold bg-gray-200 p-2">SCENES</div>
-                  <div className="p-2 border border-t-0 border-gray-300 flex gap-2 flex-wrap">
-                    {(selected.content?.scenes ?? []).length > 0
-                      ? (selected.content?.scenes ?? []).map((s) => (
-                          <span
-                            key={s}
-                            className="px-3 py-1 bg-gray-200 rounded"
-                          >
-                            {s}
+                    <div className="col-span-2">
+                      <div className="font-bold bg-gray-200 p-2">LOCATION</div>
+                      <div className="p-2 border border-t-0 border-gray-300">
+                        {selected.content?.location ?? 'TBD'}
+                        {selected.content?.locationAddress && (
+                          <span className="block text-sm text-gray-600 mt-1">
+                            {selected.content.locationAddress}
                           </span>
-                        ))
-                      : 'TBD'}
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <div className="font-bold bg-gray-200 p-2">CREW CALLS</div>
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b-2 border-gray-400">
-                        <th className="text-left p-2">Role</th>
-                        <th className="text-left p-2">Name</th>
-                        <th className="text-right p-2">Call Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selected.content?.crewCalls ?? []).length > 0
-                        ? (selected.content?.crewCalls ?? []).map((c, i) => (
-                            <tr
-                              key={i}
-                              className="border-b border-gray-200"
-                            >
-                              <td className="p-2">{c.role}</td>
-                              <td className="p-2">{c.name}</td>
-                              <td className="p-2 text-right font-bold">
-                                {c.callTime ?? selected.content?.callTime ?? 'TBD'}
-                              </td>
-                            </tr>
-                          ))
-                        : (
-                            <tr>
-                              <td
-                                colSpan={3}
-                                className="p-2 text-gray-500"
-                              >
-                                No crew assigned
-                              </td>
-                            </tr>
-                          )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {selected.notes && (
-                  <div className="mb-6">
-                    <div className="font-bold bg-gray-200 p-2">NOTES</div>
-                    <div className="p-2 border border-t-0 border-gray-300 whitespace-pre-wrap">
-                      {selected.notes}
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
 
-                <div className="text-center text-sm text-gray-500 mt-8 pt-4 border-t border-gray-200">
-                  Generated by CinePilot
+                  <div className="mb-6">
+                    <div className="font-bold bg-gray-200 p-2">SCENES</div>
+                    <div className="p-2 border border-t-0 border-gray-300 flex gap-2 flex-wrap">
+                      {(selected.content?.scenes ?? []).length > 0
+                        ? (selected.content?.scenes ?? []).map((s) => (
+                            <span
+                              key={s}
+                              className="px-3 py-1 bg-gray-200 rounded"
+                            >
+                              {s}
+                            </span>
+                          ))
+                        : 'TBD'}
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="font-bold bg-gray-200 p-2">CREW CALLS</div>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-gray-400">
+                          <th className="text-left p-2">Role</th>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-right p-2">Call Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(selected.content?.crewCalls ?? []).length > 0
+                          ? (selected.content?.crewCalls ?? []).map((c, i) => (
+                              <tr
+                                key={i}
+                                className="border-b border-gray-200"
+                              >
+                                <td className="p-2">{c.role}</td>
+                                <td className="p-2">{c.name}</td>
+                                <td className="p-2 text-right font-bold">
+                                  {c.callTime ?? selected.content?.callTime ?? 'TBD'}
+                                </td>
+                              </tr>
+                            ))
+                          : (
+                              <tr>
+                                <td
+                                  colSpan={3}
+                                  className="p-2 text-gray-500"
+                                >
+                                  No crew assigned
+                                </td>
+                              </tr>
+                            )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {selected.notes && (
+                    <div className="mb-6">
+                      <div className="font-bold bg-gray-200 p-2">NOTES</div>
+                      <div className="p-2 border border-t-0 border-gray-300 whitespace-pre-wrap">
+                        {selected.notes}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-center text-sm text-gray-500 mt-8 pt-4 border-t border-gray-200">
+                    Generated by CinePilot
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Edit Mode */
+                <div className="p-8">
+                  {/* Title & Date */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded"
+                      placeholder="Call Sheet Title"
+                    />
+                  </div>
+                  
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={editingDate}
+                      onChange={(e) => setEditingDate(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded"
+                    />
+                  </div>
+
+                  {/* Call Time */}
+                  <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Call Time</label>
+                      <input
+                        type="time"
+                        value={editingContent.callTime || ''}
+                        onChange={(e) => setEditingContent({ ...editingContent, callTime: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Wrap Time</label>
+                      <input
+                        type="time"
+                        value={editingContent.wrapTime || ''}
+                        onChange={(e) => setEditingContent({ ...editingContent, wrapTime: e.target.value })}
+                        className="w-full p-2 border border-gray-300 rounded"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Location</label>
+                    <input
+                      type="text"
+                      value={editingContent.location || ''}
+                      onChange={(e) => setEditingContent({ ...editingContent, location: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded"
+                      placeholder="Shooting Location"
+                    />
+                  </div>
+                  
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Location Address</label>
+                    <input
+                      type="text"
+                      value={editingContent.locationAddress || ''}
+                      onChange={(e) => setEditingContent({ ...editingContent, locationAddress: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded"
+                      placeholder="Full Address"
+                    />
+                  </div>
+
+                  {/* Scenes */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Scenes</label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newScene}
+                        onChange={(e) => setNewScene(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addScene()}
+                        className="flex-1 p-2 border border-gray-300 rounded"
+                        placeholder="Scene number (e.g., 1A)"
+                      />
+                      <button
+                        onClick={addScene}
+                        className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {(editingContent.scenes || []).map((s) => (
+                        <span
+                          key={s}
+                          className="px-3 py-1 bg-gray-200 rounded flex items-center gap-2"
+                        >
+                          {s}
+                          <button
+                            onClick={() => removeScene(s)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Crew Calls */}
+                  <div className="mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-bold text-gray-700">Crew Calls</label>
+                      <button
+                        onClick={() => setShowAddCrew(!showAddCrew)}
+                        className="text-sm text-cyan-600 hover:text-cyan-800"
+                      >
+                        + Add Crew
+                      </button>
+                    </div>
+                    
+                    {showAddCrew && (
+                      <div className="bg-gray-100 p-3 rounded mb-3">
+                        <p className="text-sm text-gray-600 mb-2">Available crew:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {crew.filter((c) => !(editingContent.crewCalls || []).find((ec) => ec.name === c.name)).map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => addCrewMember(c)}
+                              className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50"
+                            >
+                              {c.name} ({c.role})
+                            </button>
+                          ))}
+                          {crew.length === 0 && (
+                            <p className="text-sm text-gray-500">No crew members found. Add crew first.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-gray-400">
+                          <th className="text-left p-2">Role</th>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-right p-2">Call Time</th>
+                          <th className="p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(editingContent.crewCalls || []).length > 0
+                          ? (editingContent.crewCalls || []).map((c, i) => (
+                              <tr key={i} className="border-b border-gray-200">
+                                <td className="p-2">{c.role}</td>
+                                <td className="p-2">{c.name}</td>
+                                <td className="p-2 text-right">
+                                  <input
+                                    type="time"
+                                    value={c.callTime || ''}
+                                    onChange={(e) => updateCrewCallTime(c.name, e.target.value)}
+                                    className="p-1 border border-gray-300 rounded text-sm w-24"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <button
+                                    onClick={() => removeCrewMember(c.name)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          : (
+                              <tr>
+                                <td colSpan={4} className="p-2 text-gray-500 text-center">
+                                  No crew assigned
+                                </td>
+                              </tr>
+                            )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Notes</label>
+                    <textarea
+                      value={editingNotes}
+                      onChange={(e) => setEditingNotes(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded h-24"
+                      placeholder="Additional notes..."
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-slate-800 rounded-lg border border-slate-700 p-12 text-center">

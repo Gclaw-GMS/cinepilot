@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { 
   Calendar, 
@@ -10,7 +10,11 @@ import {
   Download, 
   RefreshCw,
   AlertCircle,
-  FileText
+  FileText,
+  Filter,
+  CheckCircle,
+  XCircle,
+  Search
 } from 'lucide-react'
 
 interface DOODRow {
@@ -54,6 +58,10 @@ export default function DOODPage() {
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+  const [filterMain, setFilterMain] = useState<'all' | 'main' | 'supporting'>('all')
+  const [sortBy, setSortBy] = useState<'days' | 'name' | 'percentage'>('days')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isDataLoaded, setIsDataLoaded] = useState(false)
 
   const loadDOOD = useCallback(async () => {
     setLoading(true)
@@ -68,15 +76,18 @@ export default function DOODPage() {
       if (data.report && data.report.length > 0) {
         setReport(data.report)
         setStats(data.stats)
+        setIsDataLoaded(true)
       } else {
         // Use demo data if no real data
         setReport(DEMO_DOOD)
         setStats(DEMO_STATS)
+        setIsDataLoaded(false)
       }
     } catch (e) {
       console.warn('Using demo DOOD data:', e)
       setReport(DEMO_DOOD)
       setStats(DEMO_STATS)
+      setIsDataLoaded(false)
     }
     setLoading(false)
   }, [selectedProject])
@@ -103,9 +114,9 @@ export default function DOODPage() {
     setRefreshing(false)
   }
 
-  const handleExport = (format: 'csv' | 'pdf') => {
-    // Generate export
+  const handleExport = async (format: 'csv' | 'pdf') => {
     if (format === 'csv') {
+      // CSV Export
       const headers = ['Character', 'Tamil Name', 'Actor', 'Total Days', 'Days', 'Percentage']
       const rows = report.map(r => [
         r.character,
@@ -122,6 +133,139 @@ export default function DOODPage() {
       a.href = url
       a.download = `dood-report-${new Date().toISOString().split('T')[0]}.csv`
       a.click()
+      URL.revokeObjectURL(url)
+    } else if (format === 'pdf') {
+      // PDF Export using print-friendly HTML
+      const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+      
+      // Build the calendar grids for each character
+      const calendarGrid = (days: number[]) => {
+        return Array.from({ length: Math.max(totalShootingDays, 1) }, (_, i) => {
+          const dayNum = i + 1
+          const isWorking = days.includes(dayNum)
+          return isWorking ? '■' : '□'
+        }).join(' ')
+      }
+
+      // Generate HTML for the PDF
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Day Out of Days Report - ${date}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #06b6d4; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #06b6d4; margin-bottom: 5px; }
+    .header .subtitle { color: #666; font-size: 14px; }
+    .stats { display: flex; justify-content: space-around; margin-bottom: 30px; }
+    .stat { text-align: center; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #06b6d4; }
+    .stat-label { font-size: 12px; color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { background: #06b6d4; color: white; padding: 12px 8px; text-align: left; font-size: 12px; }
+    td { padding: 10px 8px; border-bottom: 1px solid #e5e5e5; font-size: 12px; }
+    tr:nth-child(even) { background: #f9fafb; }
+    .character-cell { display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #06b6d4; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; }
+    .main-badge { background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+    .calendar { font-family: monospace; font-size: 10px; letter-spacing: 2px; color: #666; }
+    .calendar span { color: #06b6d4; font-weight: bold; }
+    .percentage-bar { width: 60px; height: 8px; background: #e5e5e5; border-radius: 4px; overflow: hidden; }
+    .percentage-fill { height: 100%; background: #06b6d4; }
+    .footer { margin-top: 30px; text-align: center; color: #999; font-size: 10px; }
+    @media print {
+      body { padding: 20px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Day Out of Days Report</h1>
+    <div class="subtitle">Generated on ${date}</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">${stats.totalCharacters}</div>
+      <div class="stat-label">Total Characters</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${stats.totalShootingDays}</div>
+      <div class="stat-label">Shooting Days</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${stats.totalCalls}</div>
+      <div class="stat-label">Total Calls</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${stats.avgDaysPerActor}</div>
+      <div class="stat-label">Avg Days/Actor</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Character</th>
+        <th>Actor</th>
+        <th>Total Days</th>
+        <th>Calendar</th>
+        <th>%</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${report.map((row, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>
+            <div class="character-cell">
+              <div class="avatar">${row.character.substring(0, 2).toUpperCase()}</div>
+              <div>
+                <div>${row.character}</div>
+                ${row.characterTamil ? `<div style="font-size:10px;color:#666">${row.characterTamil}</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td>${row.actorName || '-'}</td>
+          <td style="text-align:center">${row.total_days}</td>
+          <td class="calendar">${calendarGrid(row.days)}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="percentage-bar"><div class="percentage-fill" style="width:${row.percentage}%"></div></div>
+              ${row.percentage}%
+            </div>
+          </td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Generated by CinePilot • Film Production Management
+  </div>
+</body>
+</html>`
+
+      // Create blob and open in new window for printing
+      const blob = new Blob([html], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const printWindow = window.open(url, '_blank')
+      
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+        }
+      } else {
+        // Fallback: download as HTML that can be printed to PDF
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `dood-report-${new Date().toISOString().split('T')[0]}.html`
+        a.click()
+      }
     }
   }
 
@@ -185,6 +329,38 @@ export default function DOODPage() {
     },
   ]
 
+  // Filter and sort the report data
+  const filteredReport = useMemo(() => {
+    let filtered = [...report]
+    
+    // Apply search filter (by character name or actor name)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(r => 
+        r.character.toLowerCase().includes(query) ||
+        r.characterTamil.includes(query) ||
+        (r.actorName && r.actorName.toLowerCase().includes(query))
+      )
+    }
+    
+    // Apply filter
+    if (filterMain === 'main') {
+      filtered = filtered.filter(r => r.isMain)
+    } else if (filterMain === 'supporting') {
+      filtered = filtered.filter(r => !r.isMain)
+    }
+    
+    // Apply sort
+    filtered.sort((a, b) => {
+      if (sortBy === 'days') return b.total_days - a.total_days
+      if (sortBy === 'name') return a.character.localeCompare(b.character)
+      if (sortBy === 'percentage') return b.percentage - a.percentage
+      return 0
+    })
+    
+    return filtered
+  }, [report, filterMain, sortBy, searchQuery])
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -205,9 +381,22 @@ export default function DOODPage() {
             ←
           </Link>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              📊 Day Out of Days (DOOD)
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                📊 Day Out of Days (DOOD)
+              </h1>
+              {isDataLoaded ? (
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Live Data
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Demo Data
+                </span>
+              )}
+            </div>
             <p className="text-gray-500 text-sm mt-1">
               Track actor availability across the shooting schedule
             </p>
@@ -299,11 +488,55 @@ export default function DOODPage() {
             <FileText className="w-5 h-5 text-cyan-400" />
             <h2 className="font-semibold">Cast Schedule</h2>
             <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-              {report.length} actors
+              {searchQuery || filterMain !== 'all' ? `${filteredReport.length} / ${report.length}` : report.length} actors
             </span>
           </div>
           
-          <div className="flex gap-2">
+          {/* Filter & Sort Controls */}
+          <div className="flex items-center gap-3">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search character..."
+                className="pl-9 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm w-40 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <select
+                value={filterMain}
+                onChange={(e) => setFilterMain(e.target.value as typeof filterMain)}
+                className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+              >
+                <option value="all">All Cast</option>
+                <option value="main">Main Cast</option>
+                <option value="supporting">Supporting</option>
+              </select>
+            </div>
+            
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+            >
+              <option value="days">Sort by Days</option>
+              <option value="name">Sort by Name</option>
+              <option value="percentage">Sort by %</option>
+            </select>
+            
             <button
               onClick={() => handleExport('csv')}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
@@ -336,7 +569,7 @@ export default function DOODPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {report.map((row, idx) => (
+              {filteredReport.map((row, idx) => (
                 <tr 
                   key={row.characterId} 
                   className="hover:bg-gray-800/30 transition-colors"

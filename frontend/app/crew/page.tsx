@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Users,
   Plus,
@@ -13,11 +13,20 @@ import {
   DollarSign,
   Calendar,
   Briefcase,
+  TrendingUp,
+  UserCheck,
+  Clock,
 } from 'lucide-react';
-
-const DollarSignIcon = DollarSign;
-const CalendarIcon = Calendar;
-const BriefcaseIcon = Briefcase;
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 const DEPARTMENTS = [
   'Camera',
@@ -44,6 +53,19 @@ type CrewMember = {
   createdAt: string;
 };
 
+const DEPT_COLORS: Record<string, string> = {
+  Camera: '#6366f1',
+  Lighting: '#f59e0b',
+  Sound: '#10b981',
+  Art: '#ec4899',
+  Makeup: '#8b5cf6',
+  Costume: '#14b8a6',
+  Direction: '#ef4444',
+  Production: '#3b82f6',
+  VFX: '#f97316',
+  Stunts: '#84cc16',
+};
+
 function getInitials(name: string): string {
   return name
     .trim()
@@ -60,6 +82,7 @@ export default function CrewPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'rate' | 'department'>('name');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -96,15 +119,36 @@ export default function CrewPage() {
     fetchCrew();
   }, [fetchCrew]);
 
-  const filtered = crew.filter((c) => {
-    const matchSearch =
-      !search.trim() ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.role && c.role.toLowerCase().includes(search.toLowerCase())) ||
-      (c.department && c.department.toLowerCase().includes(search.toLowerCase()));
-    const matchDept = deptFilter === 'all' || c.department === deptFilter;
-    return matchSearch && matchDept;
-  });
+  // Memoized filtered and sorted crew
+  const filtered = useMemo(() => {
+    let result = crew.filter((c) => {
+      const matchSearch =
+        !search.trim() ||
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        (c.role && c.role.toLowerCase().includes(search.toLowerCase())) ||
+        (c.department && c.department.toLowerCase().includes(search.toLowerCase()));
+      const matchDept = deptFilter === 'all' || c.department === deptFilter;
+      return matchSearch && matchDept;
+    });
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'rate') {
+        const aRate = Number(a.dailyRate) || 0;
+        const bRate = Number(b.dailyRate) || 0;
+        return bRate - aRate;
+      }
+      if (sortBy === 'department') {
+        if (!a.department) return 1;
+        if (!b.department) return -1;
+        return a.department.localeCompare(b.department);
+      }
+      return 0;
+    });
+
+    return result;
+  }, [crew, search, deptFilter, sortBy]);
 
   // Format currency in Indian Rupees
   const formatINR = (amount: number | string | null | undefined) => {
@@ -116,27 +160,51 @@ export default function CrewPage() {
     return `₹${num.toLocaleString('en-IN')}`;
   };
 
-  const deptCounts = crew.reduce<Record<string, number>>((acc, c) => {
-    const d = c.department || 'Unassigned';
-    acc[d] = (acc[d] ?? 0) + 1;
-    return acc;
-  }, {});
+  // Department statistics
+  const deptStats = useMemo(() => {
+    const stats: Record<string, { count: number; rate: number }> = {};
+    crew.forEach((c) => {
+      const dept = c.department || 'Unassigned';
+      if (!stats[dept]) stats[dept] = { count: 0, rate: 0 };
+      stats[dept].count++;
+      stats[dept].rate += Number(c.dailyRate) || 0;
+    });
+    return Object.entries(stats)
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        rate: data.rate,
+        color: DEPT_COLORS[name] || '#64748b',
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [crew]);
 
-  // Calculate total daily rate
-  const totalDailyRate = crew.reduce((sum, c) => {
-    const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
-    return sum + (isNaN(rate) ? 0 : rate);
-  }, 0);
+  // Total calculations
+  const totalDailyRate = useMemo(
+    () =>
+      crew.reduce((sum, c) => {
+        const rate = c.dailyRate
+          ? typeof c.dailyRate === 'string'
+            ? parseFloat(c.dailyRate)
+            : Number(c.dailyRate)
+          : 0;
+        return sum + (isNaN(rate) ? 0 : rate);
+      }, 0),
+    [crew]
+  );
 
-  // Department breakdown for chart
-  const deptData = DEPARTMENTS.map(dept => ({
-    name: dept,
-    count: deptCounts[dept] || 0,
-    rate: crew.filter(c => c.department === dept).reduce((sum, c) => {
-      const r = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
-      return sum + (isNaN(r) ? 0 : r);
-    }, 0)
-  })).filter(d => d.count > 0).sort((a, b) => b.count - a.count);
+  const totalMonthlyRate = totalDailyRate * 30;
+  const avgDailyRate = crew.length > 0 ? totalDailyRate / crew.length : 0;
+  const departments = Object.keys(
+    crew.reduce(
+      (acc, c) => {
+        const d = c.department || 'Unassigned';
+        acc[d] = (acc[d] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    )
+  ).length;
 
   const openAddModal = () => {
     setEditingId(null);
@@ -241,8 +309,8 @@ export default function CrewPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Crew</h1>
-          <p className="text-slate-400 text-sm">Manage your production crew</p>
+          <h1 className="text-2xl font-semibold">Crew Management</h1>
+          <p className="text-slate-400 text-sm">Manage your production crew and department breakdown</p>
         </div>
         <button
           onClick={openAddModal}
@@ -259,15 +327,15 @@ export default function CrewPage() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
               <Users className="w-5 h-5 text-indigo-400" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm">Total Crew</p>
+              <p className="text-slate-400 text-xs">Total Crew</p>
               <p className="text-xl font-semibold">{crew.length}</p>
             </div>
           </div>
@@ -275,10 +343,10 @@ export default function CrewPage() {
         <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <DollarSignIcon className="w-5 h-5 text-emerald-400" />
+              <DollarSign className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm">Daily Cost</p>
+              <p className="text-slate-400 text-xs">Daily Cost</p>
               <p className="text-xl font-semibold">{formatINR(totalDailyRate)}</p>
             </div>
           </div>
@@ -286,39 +354,103 @@ export default function CrewPage() {
         <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-              <CalendarIcon className="w-5 h-5 text-amber-400" />
+              <Calendar className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm">Monthly Cost</p>
-              <p className="text-xl font-semibold">{formatINR(totalDailyRate * 30)}</p>
+              <p className="text-slate-400 text-xs">Monthly Cost</p>
+              <p className="text-xl font-semibold">{formatINR(totalMonthlyRate)}</p>
             </div>
           </div>
         </div>
         <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-              <BriefcaseIcon className="w-5 h-5 text-purple-400" />
+              <TrendingUp className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-slate-400 text-sm">Departments</p>
-              <p className="text-xl font-semibold">{Object.keys(deptCounts).length}</p>
+              <p className="text-slate-400 text-xs">Avg. Daily Rate</p>
+              <p className="text-xl font-semibold">{formatINR(avgDailyRate)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs">Departments</p>
+              <p className="text-xl font-semibold">{departments}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Department Breakdown */}
-      {deptData.length > 0 && (
-        <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 mb-6">
+      {/* Department Breakdown Chart */}
+      {deptStats.length > 0 && (
+        <div className="bg-slate-900 rounded-xl p-6 border border-slate-800 mb-6">
           <h3 className="text-sm font-medium text-slate-400 mb-4">Department Breakdown</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {deptData.slice(0, 5).map((dept) => (
-              <div key={dept.name} className="text-center">
-                <div className="text-2xl font-semibold text-indigo-400">{dept.count}</div>
-                <div className="text-xs text-slate-500 truncate">{dept.name}</div>
-                <div className="text-xs text-slate-600">{formatINR(dept.rate)}/day</div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Bar Chart */}
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deptStats} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={11} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    stroke="#64748b"
+                    fontSize={11}
+                    width={80}
+                    tickFormatter={(value) => value.length > 10 ? `${value.slice(0, 10)}...` : value}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: '#e2e8f0' }}
+                    formatter={(value: number, name: string) => [
+                      name === 'count' ? `${value} members` : formatINR(value),
+                      name === 'count' ? 'Crew' : 'Daily Rate',
+                    ]}
+                  />
+                  <Bar dataKey="count" name="count" radius={[0, 4, 4, 0]}>
+                    {deptStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Department Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              {deptStats.slice(0, 6).map((dept) => (
+                <div
+                  key={dept.name}
+                  className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: dept.color }}
+                    />
+                    <span className="text-sm font-medium text-slate-200 truncate">
+                      {dept.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400">
+                      {dept.count} {dept.count === 1 ? 'member' : 'members'}
+                    </span>
+                    <span className="text-emerald-400">{formatINR(dept.rate)}/day</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -349,30 +481,74 @@ export default function CrewPage() {
             ))}
             <option value="Unassigned">Unassigned</option>
           </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'name' | 'rate' | 'department')}
+            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="name">Sort by Name</option>
+            <option value="rate">Sort by Rate</option>
+            <option value="department">Sort by Department</option>
+          </select>
         </div>
+      </div>
+
+      {/* Results count */}
+      <div className="mb-4 text-sm text-slate-500">
+        Showing {filtered.length} of {crew.length} crew members
       </div>
 
       {/* Crew Grid */}
       {loading ? (
         <p className="text-slate-400">Loading...</p>
       ) : filtered.length === 0 ? (
-        <p className="text-slate-400">No crew members found.</p>
+        <div className="bg-slate-900 rounded-xl p-12 border border-slate-800 text-center">
+          <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+          <p className="text-slate-400 mb-2">
+            {search || deptFilter !== 'all'
+              ? 'No crew members match your filters'
+              : 'No crew members yet'}
+          </p>
+          {!search && deptFilter === 'all' && (
+            <button
+              onClick={openAddModal}
+              className="text-indigo-400 hover:text-indigo-300 text-sm"
+            >
+              Add your first crew member
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((member) => (
             <div
               key={member.id}
-              className="bg-slate-900 rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-colors"
+              className="bg-slate-900 rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-indigo-500/5"
             >
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/80 to-orange-600/80 flex items-center justify-center text-sm font-semibold text-white shrink-0">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-semibold text-white shrink-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${
+                      DEPT_COLORS[member.department || ''] || '#64748b'
+                    }88, ${DEPT_COLORS[member.department || ''] || '#64748b'}44)`,
+                  }}
+                >
                   {getInitials(member.name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold truncate">{member.name}</h3>
+                  <h3 className="font-semibold truncate text-white">{member.name}</h3>
                   <p className="text-indigo-400 text-sm">{member.role}</p>
                   {member.department && (
-                    <p className="text-slate-500 text-xs">{member.department}</p>
+                    <span
+                      className="inline-block text-xs px-2 py-0.5 rounded mt-1"
+                      style={{
+                        backgroundColor: `${DEPT_COLORS[member.department]}22`,
+                        color: DEPT_COLORS[member.department],
+                      }}
+                    >
+                      {member.department}
+                    </span>
                   )}
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -392,23 +568,26 @@ export default function CrewPage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-4 flex flex-col gap-1">
+              <div className="mt-4 pt-4 border-t border-slate-800 flex flex-col gap-2">
                 {member.phone && (
                   <div className="flex items-center gap-2 text-slate-400 text-sm">
                     <Phone className="w-3.5 h-3.5" />
-                    {member.phone}
+                    <span className="truncate">{member.phone}</span>
                   </div>
                 )}
                 {member.email && (
                   <div className="flex items-center gap-2 text-slate-400 text-sm">
                     <Mail className="w-3.5 h-3.5" />
-                    {member.email}
+                    <span className="truncate">{member.email}</span>
                   </div>
                 )}
                 {member.dailyRate && (
-                  <p className="text-slate-500 text-xs">
-                    Daily: {formatINR(member.dailyRate)}
-                  </p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400 font-medium">
+                      {formatINR(member.dailyRate)}/day
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
@@ -433,42 +612,31 @@ export default function CrewPage() {
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Name *
-                </label>
+                <label className="block text-sm text-slate-400 mb-1">Name *</label>
                 <input
                   type="text"
                   value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, name: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   required
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Role *
-                </label>
+                <label className="block text-sm text-slate-400 mb-1">Role *</label>
                 <input
                   type="text"
                   value={form.role}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, role: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
                   required
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g., Director of Photography"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Department
-                </label>
+                <label className="block text-sm text-slate-400 mb-1">Department</label>
                 <select
                   value={form.department}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, department: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Select department</option>
@@ -479,64 +647,56 @@ export default function CrewPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Phone</label>
-                <input
-                  type="text"
-                  value={form.phone}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, phone: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={form.phone}
+                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="crew@example.com"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Daily Rate
-                </label>
+                <label className="block text-sm text-slate-400 mb-1">Daily Rate (₹)</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={form.dailyRate}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, dailyRate: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, dailyRate: e.target.value }))}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="5000"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">
-                  Notes
-                </label>
+                <label className="block text-sm text-slate-400 mb-1">Notes</label>
                 <textarea
                   value={form.notes}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, notes: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   rows={3}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  placeholder="Additional notes about this crew member..."
                 />
               </div>
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                  className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors font-medium"
                 >
-                  {editingId ? 'Save' : 'Add'}
+                  {editingId ? 'Save Changes' : 'Add Crew Member'}
                 </button>
                 <button
                   type="button"

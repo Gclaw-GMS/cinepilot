@@ -8,6 +8,7 @@ const DEFAULT_PROJECT_ID = 'default-project';
 export async function GET(req: NextRequest) {
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+    const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
 
     const [shootingDays, versions] = await Promise.all([
       prisma.shootingDay.findMany({
@@ -41,6 +42,26 @@ export async function GET(req: NextRequest) {
 
     const totalHours = shootingDays.reduce((s, d) => s + Number(d.estimatedHours || 0), 0);
     const totalScenes = shootingDays.reduce((s, d) => s + d.dayScenes.length, 0);
+
+    // For stats-only requests (dashboard), return flat format with days array
+    if (statsOnly) {
+      return NextResponse.json({
+        days: shootingDays.map(d => ({
+          dayNumber: d.dayNumber,
+          scheduledDate: d.scheduledDate,
+          scenes: d.dayScenes.map(ds => ({
+            sceneNumber: ds.scene.sceneNumber,
+            headingRaw: ds.scene.headingRaw,
+            location: ds.scene.location,
+          })),
+        })),
+        stats: {
+          totalDays: shootingDays.length,
+          totalHours: Math.round(totalHours * 10) / 10,
+          totalScenes,
+        },
+      });
+    }
 
     return NextResponse.json({
       shootingDays,

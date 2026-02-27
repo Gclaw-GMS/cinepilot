@@ -128,10 +128,10 @@ export default function Dashboard() {
         fetch('/api/scripts').then(r => r.json()),
         fetch('/api/shots?stats=true').then(r => r.json()),
         fetch('/api/budget?action=forecast').then(r => r.json()),
-        fetch('/api/schedule').then(r => r.json()),
-        fetch('/api/locations').then(r => r.json()),
-        fetch('/api/censor').then(r => r.json()),
-        fetch('/api/storyboard').then(r => r.json()),
+        fetch('/api/schedule?stats=true').then(r => r.json()),
+        fetch('/api/locations?stats=true').then(r => r.json()),
+        fetch('/api/censor?stats=true').then(r => r.json()),
+        fetch('/api/storyboard?stats=true').then(r => r.json()),
       ])
 
       if (responses[0].status === 'fulfilled') {

@@ -5,10 +5,12 @@ import { scoutLocations, getCandidatesForScene } from '@/lib/locations/scouter';
 const DEFAULT_PROJECT_ID = 'default-project';
 
 // GET /api/locations — get scenes with location intents and candidates
+// GET /api/locations?stats=true — get stats for dashboard
 export async function GET(req: NextRequest) {
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const sceneId = req.nextUrl.searchParams.get('sceneId');
+    const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
 
     if (sceneId) {
       const intent = await getCandidatesForScene(sceneId);
@@ -35,6 +37,18 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { sceneIndex: 'asc' },
     });
+
+    // For stats-only requests (dashboard), return flat format
+    if (statsOnly) {
+      return NextResponse.json({
+        scenes: scenes.map(s => ({
+          sceneNumber: s.sceneNumber,
+          headingRaw: s.headingRaw,
+          location: s.location,
+          candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
+        })),
+      });
+    }
 
     return NextResponse.json({ scenes });
   } catch (error) {

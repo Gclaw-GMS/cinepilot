@@ -9,18 +9,33 @@ import {
 } from '@/lib/shots/pipeline';
 
 // GET /api/shots?scriptId=xxx — get all shots for a script
+// GET /api/shots?stats=true — get stats for first active script (for dashboard)
 export async function GET(req: NextRequest) {
   try {
     const scriptId = req.nextUrl.searchParams.get('scriptId');
     const sceneId = req.nextUrl.searchParams.get('sceneId');
+    const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
 
-    if (!scriptId && !sceneId) {
+    // If no scriptId provided, get the first active script for stats-only requests
+    let targetScriptId = scriptId;
+    if (!targetScriptId && !sceneId && statsOnly) {
+      const firstScript = await prisma.script.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (firstScript) {
+        targetScriptId = firstScript.id;
+      }
+    }
+
+    if (!targetScriptId && !sceneId) {
       return NextResponse.json({ error: 'scriptId or sceneId required' }, { status: 400 });
     }
 
     const where = sceneId
       ? { sceneId }
-      : { scene: { scriptId: scriptId! } };
+      : { scene: { scriptId: targetScriptId! } };
 
     const shots = await prisma.shot.findMany({
       where,
@@ -40,7 +55,7 @@ export async function GET(req: NextRequest) {
     });
 
     const scenes = await prisma.scene.findMany({
-      where: scriptId ? { scriptId } : { id: sceneId! },
+      where: targetScriptId ? { id: targetScriptId } : { id: sceneId! },
       orderBy: { sceneIndex: 'asc' },
       select: {
         id: true,
@@ -60,6 +75,20 @@ export async function GET(req: NextRequest) {
     const missingFields = shots.filter(
       (s) => !s.shotSize || !s.focalLengthMm || !s.keyStyle || !s.durationEstSec
     ).length;
+
+    // For stats-only requests (dashboard), return flat format
+    if (statsOnly) {
+      return NextResponse.json({
+        totalShots: shots.length,
+        totalDurationSec: Math.round(totalDuration),
+        missingFields,
+        scenes: scenes.map(s => ({
+          sceneNumber: s.sceneNumber,
+          headingRaw: s.headingRaw,
+          shotCount: s._count.shots,
+        })),
+      });
+    }
 
     return NextResponse.json({
       shots,

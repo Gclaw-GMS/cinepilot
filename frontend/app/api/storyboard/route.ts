@@ -1,22 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFrames, generateFrame, generateSceneFrames, StoryboardStyle } from '@/lib/storyboard/generator';
 import { prisma } from '@/lib/db';
 
-const VALID_STYLES: StoryboardStyle[] = ['cleanLineArt', 'pencilSketch', 'markerLine', 'blueprint'];
+const DEFAULT_PROJECT_ID = 'default-project';
 
+// GET /api/storyboard — get storyboard frames
+// GET /api/storyboard?stats=true — get stats for dashboard
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
     const scriptId = searchParams.get('scriptId') || undefined;
     const sceneId = searchParams.get('sceneId') || undefined;
+    const statsOnly = searchParams.get('stats') === 'true';
 
-    const frames = await getFrames(scriptId, sceneId);
+    // Build the where clause
+    const where: Record<string, unknown> = {};
+    if (sceneId) {
+      where.shot = { sceneId };
+    } else if (scriptId) {
+      where.shot = { scene: { scriptId } };
+    }
 
+    const frames = await prisma.storyboardFrame.findMany({
+      where,
+      include: {
+        shot: {
+          include: {
+            scene: {
+              select: {
+                id: true,
+                sceneNumber: true,
+                headingRaw: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ shot: { scene: { sceneIndex: 'asc' } } }, { shot: { shotIndex: 'asc' } }, { createdAt: 'asc' }],
+    });
+
+    // Group frames by scene
     const grouped: Record<string, {
       sceneId: string;
       sceneNumber: string;
       heading: string;
-      frames: typeof frames;
+      frames: {
+        id: string;
+        imageUrl: string | null;
+        isApproved: boolean;
+      }[];
     }> = {};
 
     for (const f of frames) {
@@ -29,10 +60,37 @@ export async function GET(req: NextRequest) {
           frames: [],
         };
       }
-      grouped[sId].frames.push(f);
+      grouped[sId].frames.push({
+        id: f.id,
+        imageUrl: f.imageUrl,
+        isApproved: f.isApproved,
+      });
     }
 
-    const scenes = Object.values(grouped).sort((a, b) => parseInt(a.sceneNumber) - parseInt(b.sceneNumber));
+    const scenes = Object.values(grouped).sort((a, b) => {
+      const aNum = parseInt(a.sceneNumber) || 0;
+      const bNum = parseInt(b.sceneNumber) || 0;
+      return aNum - bNum;
+    });
+
+    // For stats-only requests (dashboard), return flat format
+    if (statsOnly) {
+      const totalFrames = frames.length;
+      const approvedFrames = frames.filter(f => f.isApproved).length;
+
+      return NextResponse.json({
+        totalFrames,
+        approvedFrames,
+        scenes: scenes.map(s => ({
+          sceneNumber: s.sceneNumber,
+          headingRaw: s.heading,
+          frames: s.frames.map(f => ({
+            id: f.id,
+            isApproved: f.isApproved,
+          })),
+        })),
+      });
+    }
 
     return NextResponse.json({ scenes, totalFrames: frames.length });
   } catch (err: unknown) {
@@ -41,26 +99,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// POST /api/storyboard — generate frames or update approval
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { action = 'generateScene' } = body;
-
-    if (action === 'generateFrame') {
-      const { shotId, style = 'cleanLineArt', regenerate = false } = body;
-      if (!shotId) return NextResponse.json({ error: 'shotId required' }, { status: 400 });
-      if (!VALID_STYLES.includes(style)) return NextResponse.json({ error: 'Invalid style' }, { status: 400 });
-      const result = await generateFrame({ shotId, style, regenerate });
-      return NextResponse.json(result);
-    }
-
-    if (action === 'generateScene') {
-      const { sceneId, style = 'cleanLineArt', maxFrames = 3 } = body;
-      if (!sceneId) return NextResponse.json({ error: 'sceneId required' }, { status: 400 });
-      if (!VALID_STYLES.includes(style)) return NextResponse.json({ error: 'Invalid style' }, { status: 400 });
-      const results = await generateSceneFrames({ sceneId, style, maxFrames });
-      return NextResponse.json({ sceneId, frames: results });
-    }
 
     if (action === 'approve') {
       const { frameId, approved = true } = body;

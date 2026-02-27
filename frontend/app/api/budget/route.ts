@@ -5,9 +5,23 @@ import { generateBudget, forecastBudget, addExpense } from '@/lib/budget/engine'
 const DEFAULT_PROJECT_ID = 'default-project';
 
 // GET /api/budget — get budget data
+// GET /api/budget?action=forecast — get forecast only (for dashboard)
 export async function GET(req: NextRequest) {
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+    const action = req.nextUrl.searchParams.get('action');
+
+    // Handle action=forecast for dashboard compatibility
+    if (action === 'forecast') {
+      const forecast = await forecastBudget(projectId);
+      return NextResponse.json({
+        totalPlanned: forecast.planned,
+        totalActual: forecast.actual,
+        variance: forecast.variance,
+        percentSpent: forecast.percentSpent,
+        forecast,
+      });
+    }
 
     const [items, expenses, forecast] = await Promise.all([
       prisma.budgetItem.findMany({

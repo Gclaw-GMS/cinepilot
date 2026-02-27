@@ -66,6 +66,25 @@ const DEPT_COLORS: Record<string, string> = {
   Stunts: '#84cc16',
 };
 
+// Rich demo data to showcase all UI features
+const DEMO_CREW: CrewMember[] = [
+  { id: 'd1', name: 'Ravi Kumar', role: 'Director of Photography', department: 'Camera', phone: '+91 98765 43210', email: 'ravi@film.com', dailyRate: 75000, notes: 'Award-winning cinematographer', createdAt: '2026-01-15' },
+  { id: 'd2', name: 'Anand Venkatesh', role: 'Gaffer', department: 'Lighting', phone: '+91 98765 43211', email: 'anand@film.com', dailyRate: 15000, notes: '15+ years experience', createdAt: '2026-01-15' },
+  { id: 'd3', name: 'Vijay Raghavan', role: 'Sound Mixer', department: 'Sound', phone: '+91 98765 43212', email: 'vijay@film.com', dailyRate: 12000, notes: null, createdAt: '2026-01-15' },
+  { id: 'd4', name: 'Madhan Kumar', role: 'Production Designer', department: 'Art', phone: '+91 98765 43213', email: 'madhan@film.com', dailyRate: 45000, notes: 'Specializes in period films', createdAt: '2026-01-16' },
+  { id: 'd5', name: 'Lakshmi Devi', role: 'Chief Makeup Artist', department: 'Makeup', phone: '+91 98765 43214', email: 'lakshmi@film.com', dailyRate: 25000, notes: 'Nationally awarded', createdAt: '2026-01-16' },
+  { id: 'd6', name: 'Vasantha Kumar', role: 'Costume Designer', department: 'Costume', phone: '+91 98765 43215', email: 'vasantha@film.com', dailyRate: 35000, notes: 'Authentic Tamil costumes', createdAt: '2026-01-16' },
+  { id: 'd7', name: 'Kamal Haasan', role: 'Director', department: 'Direction', phone: '+91 98765 43216', email: 'kamal@film.com', dailyRate: 150000, notes: 'Visionary director', createdAt: '2026-01-10' },
+  { id: 'd8', name: 'Rajesh Kumar', role: 'Line Producer', department: 'Production', phone: '+91 98765 43217', email: 'rajesh@film.com', dailyRate: 20000, notes: 'Expert in Tamil Nadu locations', createdAt: '2026-01-17' },
+  { id: 'd9', name: 'Prakash Raj', role: 'VFX Supervisor', department: 'VFX', phone: '+91 98765 43218', email: 'prakash@film.com', dailyRate: 60000, notes: 'Hollywood-level VFX expertise', createdAt: '2026-01-17' },
+  { id: 'd10', name: 'Bala Chandran', role: 'Stunt Choreographer', department: 'Stunts', phone: '+91 98765 43219', email: 'bala@film.com', dailyRate: 30000, notes: 'Master of action choreography', createdAt: '2026-01-18' },
+  { id: 'd11', name: 'Arun Kumar', role: 'Camera Operator', department: 'Camera', phone: '+91 98765 43220', email: 'arun@film.com', dailyRate: 12000, notes: 'Steadicam specialist', createdAt: '2026-01-18' },
+  { id: 'd12', name: 'Suresh Babu', role: 'Best Boy', department: 'Lighting', phone: '+91 98765 43221', email: 'suresh@film.com', dailyRate: 8000, notes: null, createdAt: '2026-01-18' },
+  { id: 'd13', name: 'Ganesh Kumar', role: 'Production Manager', department: 'Production', phone: '+91 98765 43222', email: 'ganesh@film.com', dailyRate: 18000, notes: '10+ years in production', createdAt: '2026-01-19' },
+  { id: 'd14', name: 'Saravanan', role: 'Focus Puller', department: 'Camera', phone: '+91 98765 43223', email: 'saravanan@film.com', dailyRate: 10000, notes: null, createdAt: '2026-01-19' },
+  { id: 'd15', name: 'Divya Raman', role: 'Assistant Director', department: 'Direction', phone: '+91 98765 43224', email: 'divya@film.com', dailyRate: 15000, notes: 'Expert in schedule management', createdAt: '2026-01-20' },
+]
+
 function getInitials(name: string): string {
   return name
     .trim()
@@ -80,6 +99,7 @@ export default function CrewPage() {
   const [crew, setCrew] = useState<CrewMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'rate' | 'department'>('name');
@@ -105,11 +125,20 @@ export default function CrewPage() {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      setCrew(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0) {
+        setCrew(data);
+        setIsDemoMode(false);
+      } else {
+        // Use demo data when no real data
+        setCrew(DEMO_CREW);
+        setIsDemoMode(true);
+      }
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch crew');
-      setCrew([]);
+      // Use demo data on error
+      setCrew(DEMO_CREW);
+      setIsDemoMode(true);
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -309,7 +338,14 @@ export default function CrewPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Crew Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Crew Management</h1>
+            {isDemoMode && (
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                Demo Data
+              </span>
+            )}
+          </div>
           <p className="text-slate-400 text-sm">Manage your production crew and department breakdown</p>
         </div>
         <button

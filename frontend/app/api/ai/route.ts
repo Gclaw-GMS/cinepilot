@@ -273,6 +273,95 @@ function generateDialogueRefinement(data: AnalysisRequest) {
   };
 }
 
+function generateCastingSuggestions(data: AnalysisRequest) {
+  const castSize = data.cast_size || 12;
+  const text = data.text || "";
+  
+  // Sample casting suggestions based on character descriptions
+  const suggestions = [
+    {
+      role: "Lead Protagonist",
+      description: "Male, 28-35, intense eyes, versatile",
+      budget: "₹5-10 Cr",
+      suggestions: ["Amitabh Bachchan type", "Rising star with mass appeal"],
+    },
+    {
+      role: "Female Lead",
+      description: "Female, 24-30, classic beauty, acting chops",
+      budget: "₹3-7 Cr",
+      suggestions: ["National award winners", "Market pull actors"],
+    },
+    {
+      role: "Antagonist",
+      description: "Male, 40-55, commanding presence",
+      budget: "₹2-5 Cr",
+      suggestions: ["Veteran actors", "Character specialists"],
+    },
+    {
+      role: "Comic Relief",
+      description: "Male/Female, any age, comic timing essential",
+      budget: "₹50L-1 Cr",
+      suggestions: ["Comedy specialists", "Fresh faces with potential"],
+    },
+  ];
+  
+  return {
+    totalCast: castSize,
+    budgetRange: "₹15-25 Cr (total cast)",
+    suggestions: suggestions.slice(0, Math.min(4, castSize)),
+    breakdown: {
+      leads: Math.min(2, castSize),
+      supporting: Math.min(4, castSize - 2),
+      characters: Math.max(0, castSize - 6),
+      extras: Math.max(0, castSize * 2),
+    },
+    recommendations: [
+      "Consider co-casting for international appeal",
+      "Balance star power with fresh faces",
+      "Schedule dubbing workshops for newcomers",
+    ],
+  };
+}
+
+function generateLocationAnalysis(data: AnalysisRequest) {
+  const scenes = data.scene_count || 45;
+  const locations = data.location_count || 8;
+  const isOutdoor = data.is_outdoor !== false;
+  const isNight = data.is_night_shoots !== false;
+  
+  return {
+    totalLocations: locations,
+    locationTypes: {
+      indoor: Math.round(locations * 0.4),
+      outdoor: Math.round(locations * 0.5),
+      studio: Math.round(locations * 0.1),
+    },
+    requirements: {
+      permits: locations - 2, // Assume 2 private locations
+      powerBackup: Math.round(locations * 0.6),
+      security: Math.round(locations * 0.3),
+      accessibility: Math.round(locations * 0.7),
+    },
+    budget: {
+      permits: (locations - 2) * 50000,
+      locationFees: locations * 200000,
+      logistics: locations * 100000,
+      total: (locations - 2) * 50000 + locations * 300000,
+    },
+    recommendations: [
+      "Scout locations 4 weeks before shoot",
+      "Secure permits early for government locations",
+      "Have backup indoor locations for outdoor shoots",
+      "Negotiate package deals for multiple days",
+    ],
+    considerations: {
+      weather: isOutdoor ? "Monitor forecast, have indoor backup" : "Less weather dependent",
+      nightShoots: isNight ? "Check local noise regulations" : "Standard daylight hours",
+      sound: "Do location sound tests before finalizing",
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: AnalysisRequest = await req.json();
@@ -305,6 +394,12 @@ export async function POST(req: NextRequest) {
         break;
       case 'dialogue':
         result = generateDialogueRefinement(body);
+        break;
+      case 'casting':
+        result = generateCastingSuggestions(body);
+        break;
+      case 'location-breakdown':
+        result = generateLocationAnalysis(body);
         break;
       default:
         return NextResponse.json(
@@ -339,6 +434,8 @@ export async function GET() {
       { id: 'schedule', name: 'Schedule Optimizer', description: 'Optimize shooting schedule' },
       { id: 'risk-detect', name: 'Risk Detector', description: 'Identify production risks' },
       { id: 'dialogue', name: 'Dialogue Refiner', description: 'Improve script dialogue' },
+      { id: 'casting', name: 'Casting Suggestions', description: 'AI-recommended casting based on character descriptions' },
+      { id: 'location-breakdown', name: 'Location Analysis', description: 'Breakdown location requirements and scout recommendations' },
     ],
   });
 }

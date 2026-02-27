@@ -70,6 +70,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    title: 'AI Tools',
+    items: [
+      { href: '/ai-tools', icon: Sparkles, label: 'AI Tools', badge: 'NEW' },
+      { href: '/progress', icon: BarChart3, label: 'Progress' },
+    ],
+  },
+  {
     title: 'System',
     items: [
       { href: '/weather', icon: Cloud, label: 'Weather' },

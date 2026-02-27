@@ -41,6 +41,17 @@ const EMPTY_STATS: DashboardStats = {
   storyboard: { frames: 0, approved: 0 },
 }
 
+// Demo data for preview when database is not configured
+const DEMO_STATS: DashboardStats = {
+  scripts: { total: 2, scenes: 47, characters: 23 },
+  shots: { total: 312, missingFields: 45, runtimeMin: 142 },
+  budget: { planned: 85000000, actual: 32000000, variance: -53000000 },
+  schedule: { days: 18, scenes: 47 },
+  locations: { scenes: 12, candidates: 34 },
+  censor: { certificate: 'UA 13+', score: 78 },
+  storyboard: { frames: 156, approved: 89 },
+}
+
 const FEATURES = [
   {
     key: 'scripts',
@@ -116,11 +127,10 @@ const FEATURES = [
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
-    setError(null)
     const result = { ...EMPTY_STATS }
 
     try {
@@ -192,8 +202,10 @@ export default function Dashboard() {
 
       setStats(result)
     } catch (err) {
-      setError('Could not connect to backend. Is the database configured?')
-      console.error('[Dashboard]', err)
+      // Use demo data when database is not connected
+      console.log('[Dashboard] Using demo data - database not connected')
+      setStats(DEMO_STATS)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -225,7 +237,14 @@ export default function Dashboard() {
         <div className="px-8 py-5">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Production Dashboard</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-semibold tracking-tight">Production Dashboard</h1>
+                {isDemoMode && (
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                    Demo Mode
+                  </span>
+                )}
+              </div>
               <p className="text-slate-500 text-sm mt-1">CinePilot &mdash; AI Pre-Production Command Center</p>
             </div>
             <button
@@ -241,10 +260,10 @@ export default function Dashboard() {
       </header>
 
       <main className="p-8">
-        {error && (
+        {isDemoMode && (
           <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            {error}
+            Preview mode — Connect a PostgreSQL database to see real production data
           </div>
         )}
 

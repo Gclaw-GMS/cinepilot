@@ -27,16 +27,34 @@ async function ensureDefaultProject(): Promise<string> {
 
 export async function GET() {
   try {
+    // Add timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
     const projectId = await ensureDefaultProject();
+    
     const crew = await prisma.crew.findMany({
       where: { projectId },
       orderBy: { createdAt: 'desc' },
     });
+    
+    clearTimeout(timeoutId);
     return NextResponse.json(crew);
   } catch (error) {
     console.error('[GET /api/crew]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.name === 'AbortError' || error.message.includes('timed out')) {
+        return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 });
+      }
+      if (error.message.includes('connection')) {
+        return NextResponse.json({ error: 'Database connection failed. Please check your database.' }, { status: 503 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    
+    return NextResponse.json({ error: 'Unknown error occurred' }, { status: 500 });
   }
 }
 
@@ -45,11 +63,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, role, department, phone, email, dailyRate, notes } = body;
 
+    // Validate required fields
     if (typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ error: 'name is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
     if (typeof role !== 'string' || !role.trim()) {
-      return NextResponse.json({ error: 'role is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Role is required' }, { status: 400 });
+    }
+
+    // Validate optional fields
+    if (email !== undefined && email !== null && typeof email !== 'string') {
+      return NextResponse.json({ error: 'Email must be a string' }, { status: 400 });
+    }
+    if (phone !== undefined && phone !== null && typeof phone !== 'string') {
+      return NextResponse.json({ error: 'Phone must be a string' }, { status: 400 });
+    }
+    if (dailyRate !== undefined && dailyRate !== null && isNaN(Number(dailyRate))) {
+      return NextResponse.json({ error: 'Daily rate must be a number' }, { status: 400 });
     }
 
     const projectId = await ensureDefaultProject();

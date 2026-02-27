@@ -498,9 +498,25 @@ export default function CrewPage() {
         Showing {filtered.length} of {crew.length} crew members
       </div>
 
-      {/* Crew Grid */}
+      {/* Loading State */}
       {loading ? (
-        <p className="text-slate-400">Loading...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-slate-900 rounded-xl p-4 border border-slate-800 animate-pulse">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-slate-800" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-slate-800 rounded w-3/4" />
+                  <div className="h-3 bg-slate-800 rounded w-1/2" />
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
+                <div className="h-3 bg-slate-800 rounded w-full" />
+                <div className="h-3 bg-slate-800 rounded w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-slate-900 rounded-xl p-12 border border-slate-800 text-center">
           <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />

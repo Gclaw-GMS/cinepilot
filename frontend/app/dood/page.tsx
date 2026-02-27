@@ -1,8 +1,6 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import * as api from '@/lib/api'
 import Link from 'next/link'
 import { 
   Calendar, 
@@ -12,9 +10,7 @@ import {
   Download, 
   RefreshCw,
   AlertCircle,
-  CheckCircle,
-  FileText,
-  BarChart3
+  FileText
 } from 'lucide-react'
 
 interface DOODRow {
@@ -63,7 +59,12 @@ export default function DOODPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.dood.getReport(selectedProject)
+      const res = await fetch(`/api/dood?projectId=${selectedProject}`)
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`)
+      }
+      const data = await res.json()
+      
       if (data.report && data.report.length > 0) {
         setReport(data.report)
         setStats(data.stats)
@@ -87,7 +88,14 @@ export default function DOODPage() {
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      await api.dood.generate(selectedProject)
+      const res = await fetch('/api/dood', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate', projectId: selectedProject })
+      })
+      if (!res.ok) {
+        console.warn('Generate API error:', res.status)
+      }
       await loadDOOD()
     } catch (e) {
       console.warn('Refresh failed, using cached data')

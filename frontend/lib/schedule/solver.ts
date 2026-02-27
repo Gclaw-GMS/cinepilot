@@ -60,10 +60,35 @@ export async function optimizeSchedule(
   });
 
   const scenesForSchedule: SceneForSchedule[] = scenes.map(s => {
+    // Calculate realistic scene duration based on production reality
+    // In film, setup time dominates - each camera setup takes 15-45 minutes
+    const shotCount = s.shots.length || 3; // Default to 3 if no shots
     const shotDuration = s.shots.reduce((sum, sh) => sum + (sh.durationEstSec || 3), 0);
-    const estimatedMinutes = shotDuration > 0
-      ? Math.max(15, Math.round(shotDuration / 60 * 3))
-      : (s.estimatedDuration || DEFAULT_SCENE_MINUTES);
+    
+    // Base time: 30 minutes minimum per scene (actor blocking, discussion)
+    let estimatedMinutes = 30;
+    
+    // Add time per shot: ~15 minutes per setup (lighting, camera, actors)
+    estimatedMinutes += shotCount * 15;
+    
+    // Add time for footage review and retries: 10% of raw footage time
+    estimatedMinutes += Math.max(5, Math.round(shotDuration / 60 * 2));
+    
+    // Exteriors take 30% longer due to weather, permits, natural light changes
+    if (s.intExt === 'EXT') {
+      estimatedMinutes = Math.round(estimatedMinutes * 1.3);
+    }
+    
+    // Night scenes take 50% longer due to lighting setup
+    if (s.timeOfDay === 'NIGHT' || s.timeOfDay === 'DUSK') {
+      estimatedMinutes = Math.round(estimatedMinutes * 1.5);
+    }
+    
+    // Complex scenes with many characters take longer
+    const charCount = s.sceneCharacters.length;
+    if (charCount > 3) {
+      estimatedMinutes += (charCount - 3) * 10; // Extra 10 min per additional actor
+    }
 
     return {
       id: s.id,

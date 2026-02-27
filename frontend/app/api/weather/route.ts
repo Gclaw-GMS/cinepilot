@@ -34,6 +34,38 @@ export interface WeatherForecastDay {
 export interface WeatherResponse {
   location: string;
   forecast: WeatherForecastDay[];
+  isDemo?: boolean;
+  error?: string;
+}
+
+// Demo data for when API key is not available
+function generateDemoForecast(locationName: string): WeatherForecastDay[] {
+  const conditions = ['Clear', 'Clouds', 'Clear', 'Clouds', 'Clear'];
+  const baseDate = new Date();
+  const forecast: WeatherForecastDay[] = [];
+
+  for (let i = 0; i < 5; i++) {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() + i);
+    const condition = conditions[i];
+    const isOutdoorFriendly = condition === 'Clear';
+
+    forecast.push({
+      date: date.toISOString().split('T')[0],
+      condition,
+      tempHigh: Math.round(28 + Math.random() * 5),
+      tempLow: Math.round(20 + Math.random() * 3),
+      humidity: Math.round(65 + Math.random() * 20),
+      windSpeed: Math.round(10 + Math.random() * 15),
+      precipitation: condition === 'Rain' ? Math.round(Math.random() * 10) : 0,
+      icon: condition === 'Clear' ? '01d' : '03d',
+      recommendation: isOutdoorFriendly
+        ? 'Good for outdoor shooting - clear skies expected'
+        : 'Cloudy conditions - good for outdoor, even lighting',
+    });
+  }
+
+  return forecast;
 }
 
 function getShootingRecommendation(
@@ -77,17 +109,11 @@ function getShootingRecommendation(
 
 export async function GET(req: NextRequest) {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
-
-  if (!apiKey || apiKey === 'your-openweathermap-key') {
-    return NextResponse.json(
-      { error: 'Weather API not configured — add OPENWEATHERMAP_API_KEY to .env.local' },
-      { status: 503 }
-    );
-  }
+  const useDemo = !apiKey || apiKey === 'your-openweathermap-key' || apiKey === 'demo';
 
   const lat = req.nextUrl.searchParams.get('lat');
   const lng = req.nextUrl.searchParams.get('lng');
-  const location = req.nextUrl.searchParams.get('location') ?? '';
+  const location = req.nextUrl.searchParams.get('location') ?? 'Unknown Location';
 
   if (!lat || !lng) {
     return NextResponse.json(
@@ -105,6 +131,17 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Use demo data if API key is not configured properly
+  if (useDemo) {
+    console.log('[GET /api/weather] Using demo data (no API key configured)');
+    const forecast = generateDemoForecast(location);
+    return NextResponse.json({
+      location,
+      forecast,
+      isDemo: true,
+    } satisfies WeatherResponse);
+  }
+
   try {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${latNum}&lon=${lngNum}&appid=${apiKey}&units=metric`;
     const res = await fetch(url);
@@ -112,10 +149,14 @@ export async function GET(req: NextRequest) {
     if (!res.ok) {
       const errText = await res.text();
       console.error('[GET /api/weather] OpenWeatherMap error:', res.status, errText);
-      return NextResponse.json(
-        { error: 'Failed to fetch weather data' },
-        { status: 502 }
-      );
+      // Fall back to demo data on API error
+      const forecast = generateDemoForecast(location);
+      return NextResponse.json({
+        location,
+        forecast,
+        isDemo: true,
+        error: 'Using demo data - API call failed',
+      } satisfies WeatherResponse);
     }
 
     const data: OpenWeatherResponse = await res.json();
@@ -207,9 +248,13 @@ export async function GET(req: NextRequest) {
     } satisfies WeatherResponse);
   } catch (error) {
     console.error('[GET /api/weather]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch weather data' },
-      { status: 500 }
-    );
+    // Fall back to demo data on any error
+    const forecast = generateDemoForecast(location);
+    return NextResponse.json({
+      location,
+      forecast,
+      isDemo: true,
+      error: 'Using demo data - API call failed',
+    } satisfies WeatherResponse);
   }
 }

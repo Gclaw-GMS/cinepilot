@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
+const DEFAULT_PROJECT_ID = 'default-project';
+
 async function ensureDefaultProject(): Promise<string> {
   let user = await prisma.user.findFirst({ where: { id: 'default-user' } });
   if (!user) {
@@ -13,10 +15,11 @@ async function ensureDefaultProject(): Promise<string> {
       },
     });
   }
-  let project = await prisma.project.findFirst({ where: { userId: user.id } });
+  // Use fixed project ID to match seed data
+  let project = await prisma.project.findUnique({ where: { id: DEFAULT_PROJECT_ID } });
   if (!project) {
     project = await prisma.project.create({
-      data: { name: 'Default Project', userId: user.id },
+      data: { id: DEFAULT_PROJECT_ID, name: 'Default Project', userId: user.id },
     });
   }
   return project.id;

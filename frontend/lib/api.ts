@@ -148,6 +148,33 @@ export const collaborationNew = {
   addComment: noop,
 };
 
+export const dood = {
+  getReport: async (projectId: string = 'default-project') => {
+    const res = await fetch(`/api/dood?projectId=${projectId}`);
+    if (!res.ok) throw new Error('Failed to fetch DOOD report');
+    return res.json();
+  },
+  generate: async (projectId: string = 'default-project') => {
+    const res = await fetch('/api/dood', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'generate', projectId }),
+    });
+    if (!res.ok) throw new Error('Failed to generate DOOD');
+    return res.json();
+  },
+  getAll: noopArray,
+  getById: noop,
+  update: noop,
+  delete: noop,
+};
+
+export const exportProject = {
+  toJSON: noop,
+  toPDF: noop,
+  toCSV: noop,
+};
+
 export const utils = {
   formatCurrency: (n: number) => `₹${n.toLocaleString('en-IN')}`,
 };

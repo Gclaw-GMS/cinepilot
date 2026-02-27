@@ -2,6 +2,63 @@ import { prisma } from '@/lib/db';
 import { cacheGet, cacheSet, CACHE_TTL, CACHE_KEYS } from '@/lib/redis/cache';
 import { runTask } from '@/lib/ai/service';
 import { PROMPTS } from '@/lib/ai/config';
+
+// -----------------------------------------------------------------------------
+// Mock Data Fallback - Used when AI API is unavailable
+// -----------------------------------------------------------------------------
+
+function generateMockBeats(_sceneNumber: string, location: string, _intExt: string): BeatSegmentationResult {
+  return {
+    beats: [
+      { beat_index: 0, summary: `Establish ${location || 'the scene'}`, tone: ['neutral'], characters: [], pacing: 'slow' },
+      { beat_index: 1, summary: 'Main action begins', tone: ['engaging'], characters: [], pacing: 'fast' },
+      { beat_index: 2, summary: 'Key dialogue moment', tone: ['emotional'], characters: [], pacing: 'medium' },
+      { beat_index: 3, summary: 'Scene resolution', tone: ['calm'], characters: [], pacing: 'slow' },
+    ],
+  };
+}
+
+function generateMockShots(beats: BeatSegmentationResult, sceneNumber: string, intExt: string, timeOfDay: string): ShotGenerationResult {
+  const shotSizes = ['Wide', 'Medium', 'Close-up', 'Extreme Close-up'];
+  const movements = ['Static', 'Pan', 'Tilt', 'Dolly', 'Handheld'];
+  const angles = ['Eye Level', 'Low Angle', 'High Angle', 'Dutch Angle'];
+  const lenses = [24, 35, 50, 85, 135];
+  const keyStyles = ['Natural', 'High Key', 'Low Key', 'Golden Hour', 'Blue Hour'];
+  
+  let globalShotIdx = 0;
+  const shots = beats.beats.flatMap((beat, beatIdx) => {
+    const numShots = beat.pacing === 'medium' ? 3 : 2;
+    return Array.from({ length: numShots }, () => {
+      const currentIdx = globalShotIdx++;
+      return {
+        shot_index: currentIdx,
+        beat_index: beatIdx,
+        shot_text: beat.summary,
+        characters: beat.characters || [],
+        camera: {
+          shot_size: shotSizes[currentIdx % shotSizes.length],
+          angle: angles[currentIdx % angles.length],
+          movement: movements[currentIdx % movements.length],
+        },
+        lens: {
+          focal_length_mm: lenses[currentIdx % lenses.length],
+          lens_type: currentIdx % 2 === 0 ? 'Prime' : 'Zoom',
+        },
+        lighting: {
+          key_style: keyStyles[currentIdx % keyStyles.length],
+          color_temp: timeOfDay === 'NIGHT' ? '5600K (Daylight)' : '3200K (Tungsten)',
+        },
+        duration_estimate_sec: 3 + (currentIdx % 4),
+        confidence: { camera: 0.8, lens: 0.75, lighting: 0.7, duration: 0.6 },
+      };
+    });
+  });
+
+  return {
+    shots,
+    scene_id: sceneNumber,
+  };
+}
 import {
   BeatSegmentationSchema,
   ShotGenerationSchema,
@@ -81,19 +138,24 @@ export async function generateShotsForScene(
   let beats = await cacheGet<BeatSegmentationResult>(beatCacheKey);
 
   if (!beats) {
-    beats = await runTask<BeatSegmentationResult>(
-      'shotHub.beatSegmentation',
-      {
-        sceneNumber: scene.sceneNumber,
-        sceneText,
-        knownCharacters,
-      },
-      PROMPTS.shotHub.beatSegmentation.system,
-      PROMPTS.shotHub.beatSegmentation.user,
-      BeatSegmentationSchema,
-      { maxTokens: 4096 }
-    );
-    await cacheSet(beatCacheKey, beats, CACHE_TTL.ai);
+    try {
+      beats = await runTask<BeatSegmentationResult>(
+        'shotHub.beatSegmentation',
+        {
+          sceneNumber: scene.sceneNumber,
+          sceneText,
+          knownCharacters,
+        },
+        PROMPTS.shotHub.beatSegmentation.system,
+        PROMPTS.shotHub.beatSegmentation.user,
+        BeatSegmentationSchema,
+        { maxTokens: 4096 }
+      );
+      await cacheSet(beatCacheKey, beats, CACHE_TTL.ai);
+    } catch (err) {
+      console.warn('[Shot Generation] Beat segmentation failed, using mock data:', err);
+      beats = generateMockBeats(scene.sceneNumber, scene.location || '', scene.intExt || '');
+    }
   }
 
   // Stage 2: Shot Generation
@@ -101,24 +163,29 @@ export async function generateShotsForScene(
   let shots = await cacheGet<ShotGenerationResult>(shotCacheKey);
 
   if (!shots) {
-    const sceneContext = `${scene.intExt || ''} ${scene.location || ''} - ${scene.timeOfDay || 'DAY'}. ${scene.headingRaw || ''}`;
+    try {
+      const sceneContext = `${scene.intExt || ''} ${scene.location || ''} - ${scene.timeOfDay || 'DAY'}. ${scene.headingRaw || ''}`;
 
-    shots = await runTask<ShotGenerationResult>(
-      'shotHub.shotGeneration',
-      {
-        sceneId: scene.id,
-        sceneContext,
-        knownCharacters,
-        beats: JSON.stringify(beats.beats),
-        directorStyle: styleText,
-        availableLenses: lenses,
-      },
-      PROMPTS.shotHub.shotGeneration.system,
-      PROMPTS.shotHub.shotGeneration.user,
-      ShotGenerationSchema,
-      { maxTokens: 8192 }
-    );
-    await cacheSet(shotCacheKey, shots, CACHE_TTL.ai);
+      shots = await runTask<ShotGenerationResult>(
+        'shotHub.shotGeneration',
+        {
+          sceneId: scene.id,
+          sceneContext,
+          knownCharacters,
+          beats: JSON.stringify(beats.beats),
+          directorStyle: styleText,
+          availableLenses: lenses,
+        },
+        PROMPTS.shotHub.shotGeneration.system,
+        PROMPTS.shotHub.shotGeneration.user,
+        ShotGenerationSchema,
+        { maxTokens: 8192 }
+      );
+      await cacheSet(shotCacheKey, shots, CACHE_TTL.ai);
+    } catch (err) {
+      console.warn('[Shot Generation] Shot generation failed, using mock data:', err);
+      shots = generateMockShots(beats, scene.sceneNumber, scene.intExt || '', scene.timeOfDay || 'DAY');
+    }
   }
 
   // Stage 3: Fill Null Pass

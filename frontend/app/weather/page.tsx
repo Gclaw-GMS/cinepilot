@@ -28,6 +28,7 @@ interface WeatherDay {
 interface WeatherData {
   location: string;
   forecast: WeatherDay[];
+  isDemo?: boolean;
 }
 
 const LOCATIONS: { name: string; lat: number; lng: number }[] = [
@@ -123,20 +124,28 @@ export default function WeatherPage() {
               5-day outlook for South Indian production locations
             </p>
           </div>
-          {selectedLocation && (
-            <button
-              onClick={refreshWeather}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-50 transition-colors"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-              Refresh
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {weatherData?.isDemo && (
+              <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+                Demo Data
+              </span>
+            )}
+            {selectedLocation && (
+              <button
+                onClick={refreshWeather}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-50 transition-colors"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Refresh
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4 mb-8">

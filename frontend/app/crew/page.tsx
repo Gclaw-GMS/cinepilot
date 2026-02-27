@@ -10,7 +10,14 @@ import {
   Pencil,
   Trash2,
   X,
+  DollarSign,
+  Calendar,
+  Briefcase,
 } from 'lucide-react';
+
+const DollarSignIcon = DollarSign;
+const CalendarIcon = Calendar;
+const BriefcaseIcon = Briefcase;
 
 const DEPARTMENTS = [
   'Camera',
@@ -32,7 +39,7 @@ type CrewMember = {
   department: string | null;
   phone: string | null;
   email: string | null;
-  dailyRate: { toString(): string } | null;
+  dailyRate: string | number | null;
   notes: string | null;
   createdAt: string;
 };
@@ -99,11 +106,37 @@ export default function CrewPage() {
     return matchSearch && matchDept;
   });
 
+  // Format currency in Indian Rupees
+  const formatINR = (amount: number | string | null | undefined) => {
+    if (amount === null || amount === undefined) return '₹0';
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (isNaN(num)) return '₹0';
+    if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
+    if (num >= 100000) return `₹${(num / 100000).toFixed(1)} L`;
+    return `₹${num.toLocaleString('en-IN')}`;
+  };
+
   const deptCounts = crew.reduce<Record<string, number>>((acc, c) => {
     const d = c.department || 'Unassigned';
     acc[d] = (acc[d] ?? 0) + 1;
     return acc;
   }, {});
+
+  // Calculate total daily rate
+  const totalDailyRate = crew.reduce((sum, c) => {
+    const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
+    return sum + (isNaN(rate) ? 0 : rate);
+  }, 0);
+
+  // Department breakdown for chart
+  const deptData = DEPARTMENTS.map(dept => ({
+    name: dept,
+    count: deptCounts[dept] || 0,
+    rate: crew.filter(c => c.department === dept).reduce((sum, c) => {
+      const r = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
+      return sum + (isNaN(r) ? 0 : r);
+    }, 0)
+  })).filter(d => d.count > 0).sort((a, b) => b.count - a.count);
 
   const openAddModal = () => {
     setEditingId(null);
@@ -239,18 +272,56 @@ export default function CrewPage() {
             </div>
           </div>
         </div>
-        {Object.entries(deptCounts)
-          .slice(0, 3)
-          .map(([dept, count]) => (
-            <div
-              key={dept}
-              className="bg-slate-900 rounded-xl p-4 border border-slate-800"
-            >
-              <p className="text-slate-400 text-sm">{dept}</p>
-              <p className="text-xl font-semibold">{count}</p>
+        <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+              <DollarSignIcon className="w-5 h-5 text-emerald-400" />
             </div>
-          ))}
+            <div>
+              <p className="text-slate-400 text-sm">Daily Cost</p>
+              <p className="text-xl font-semibold">{formatINR(totalDailyRate)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <CalendarIcon className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-slate-400 text-sm">Monthly Cost</p>
+              <p className="text-xl font-semibold">{formatINR(totalDailyRate * 30)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+              <BriefcaseIcon className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-slate-400 text-sm">Departments</p>
+              <p className="text-xl font-semibold">{Object.keys(deptCounts).length}</p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Department Breakdown */}
+      {deptData.length > 0 && (
+        <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 mb-6">
+          <h3 className="text-sm font-medium text-slate-400 mb-4">Department Breakdown</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {deptData.slice(0, 5).map((dept) => (
+              <div key={dept.name} className="text-center">
+                <div className="text-2xl font-semibold text-indigo-400">{dept.count}</div>
+                <div className="text-xs text-slate-500 truncate">{dept.name}</div>
+                <div className="text-xs text-slate-600">{formatINR(dept.rate)}/day</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 mb-6">
@@ -336,7 +407,7 @@ export default function CrewPage() {
                 )}
                 {member.dailyRate && (
                   <p className="text-slate-500 text-xs">
-                    Daily: {String(member.dailyRate)}
+                    Daily: {formatINR(member.dailyRate)}
                   </p>
                 )}
               </div>

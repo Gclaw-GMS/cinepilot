@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Eye,
   Sparkles,
+  Plane,
 } from 'lucide-react'
 
 type NavItem = {
@@ -50,6 +51,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/schedule', icon: Calendar, label: 'Schedule' },
       { href: '/locations', icon: MapPin, label: 'Location Scout' },
+      { href: '/equipment', icon: Clapperboard, label: 'Equipment' },
+      { href: '/travel', icon: Plane, label: 'Travel Expenses', badge: 'NEW' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: Shield, label: 'Censor Board' },
       { href: '/continuity', icon: Eye, label: 'Continuity' },

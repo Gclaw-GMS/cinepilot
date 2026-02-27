@@ -23,6 +23,7 @@ import {
   Sparkles,
   Plane,
   MessageCircle,
+  Utensils,
 } from 'lucide-react'
 
 type NavItem = {
@@ -55,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/equipment', icon: Clapperboard, label: 'Equipment' },
       { href: '/travel', icon: Plane, label: 'Travel Expenses' },
       { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment', badge: 'NEW' },
+      { href: '/catering', icon: Utensils, label: 'Catering', badge: 'NEW' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: Shield, label: 'Censor Board' },
       { href: '/continuity', icon: Eye, label: 'Continuity' },

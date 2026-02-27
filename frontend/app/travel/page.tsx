@@ -71,6 +71,7 @@ export default function TravelExpensesPage() {
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showForm, setShowForm] = useState(false)
@@ -99,6 +100,7 @@ export default function TravelExpensesPage() {
       if (data.error) throw new Error(data.error)
       setExpenses(data.expenses || [])
       setSummary(data.summary || EMPTY_SUMMARY)
+      setIsDemoMode(data.isDemoMode === true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
@@ -231,6 +233,13 @@ export default function TravelExpensesPage() {
           <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
+          </div>
+        )}
+
+        {isDemoMode && (
+          <div className="flex items-center gap-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl px-5 py-3 mb-6 text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            Preview mode — Connect a PostgreSQL database to save travel expenses
           </div>
         )}
 

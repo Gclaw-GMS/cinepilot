@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface BudgetItemData {
   id: string
@@ -301,23 +302,65 @@ export default function BudgetPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(categoryGroups).map(([cat, catItems]) => {
-                const catTotal = catItems.reduce((s, i) => s + Number(i.total || 0), 0)
-                const pct = totalPlanned > 0 ? (catTotal / totalPlanned) * 100 : 0
-                return (
-                  <div key={cat} className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium text-gray-300">{cat}</h3>
-                      <span className="text-sm text-cinepilot-accent">{formatINR(catTotal)}</span>
+            <div className="grid grid-cols-3 gap-6">
+              {/* Pie Chart */}
+              <div className="col-span-1 bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-300 mb-4">Budget Distribution</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(categoryGroups).map(([cat, catItems]) => ({
+                          name: cat,
+                          value: catItems.reduce((s, i) => s + Number(i.total || 0), 0),
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {Object.keys(categoryGroups).map((_, i) => (
+                          <Cell key={i} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#84cc16', '#f97316'][i % 10]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => [formatINR(value), 'Amount']}
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      />
+                      <Legend 
+                        formatter={(value) => <span className="text-gray-400 text-xs">{value}</span>}
+                        layout="vertical"
+                        align="right"
+                        verticalAlign="middle"
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              
+              {/* Category Cards */}
+              <div className="col-span-2 grid grid-cols-2 gap-4">
+                {Object.entries(categoryGroups).map(([cat, catItems]) => {
+                  const catTotal = catItems.reduce((s, i) => s + Number(i.total || 0), 0)
+                  const pct = totalPlanned > 0 ? (catTotal / totalPlanned) * 100 : 0
+                  const colorIdx = Object.keys(categoryGroups).indexOf(cat) % 10
+                  const color = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#84cc16', '#f97316'][colorIdx]
+                  return (
+                    <div key={cat} className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium text-gray-300">{cat}</h3>
+                        <span className="text-sm font-semibold" style={{ color }}>{formatINR(catTotal)}</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-800 rounded-full">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: color }} />
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">{pct.toFixed(1)}% of total • {catItems.length} items</div>
                     </div>
-                    <div className="w-full h-2 bg-gray-800 rounded-full">
-                      <div className="h-full bg-cinepilot-accent rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">{pct.toFixed(1)}% of total</div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>

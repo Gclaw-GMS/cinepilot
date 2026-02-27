@@ -908,3 +908,70 @@ model ProductionPhase {
   @@index([projectId])
   @@map("production_phases")
 }
+
+// Audience Sentiment Analysis
+model AudienceSentiment {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  title         String
+  platform      String   // youtube, instagram, twitter, etc.
+  videoUrl      String?  @map("video_url")
+  totalComments Int      @default(0) @map("total_comments")
+  analyzedCount Int      @default(0) @map("analyzed_count")
+  positiveCount Int      @default(0) @map("positive_count")
+  negativeCount Int      @default(0) @map("negative_count")
+  neutralCount  Int      @default(0) @map("neutral_count")
+  avgSentiment  Float    @default(0) @map("avg_sentiment")
+  topPositive   Json?    @map("top_positive")
+  topNegative   Json?    @map("top_negative")
+  takeaways     Json?    @map("takeaways")
+  posterTips    Json?    @map("poster_tips")
+  status        String   @default("pending") // pending, analyzing, completed, failed
+  errorMsg      String?  @map("error_msg")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  comments      SentimentComment[]
+
+  @@index([projectId])
+  @@map("audience_sentiments")
+}
+
+model SentimentComment {
+  id            String           @id @default(cuid())
+  sentimentId   String           @map("sentiment_id")
+  commentText   String           @map("comment_text")
+  author        String?
+  sentiment     String           @default("neutral") // positive, negative, neutral
+  sentimentScore Float           @default(0) @map("sentiment_score")
+  emotions      String[]         @default([]) // excited, disappointed, neutral, etc.
+  language      String?          @default("en")
+  likes         Int              @default(0)
+  replies       Int              @default(0)
+  postedAt      DateTime?        @map("posted_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  audienceSentiment AudienceSentiment @relation(fields: [sentimentId], references: [id], onDelete: Cascade)
+
+  @@index([sentimentId])
+  @@map("sentiment_comments")
+}
+
+// Catering Management
+model CateringPlan {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  shootingDayId String?  @map("shooting_day_id")
+  date          DateTime @db.Date
+  mealType      String   // breakfast, lunch, dinner, snacks
+  menuItems     Json?    @map("menu_items")
+  dietaryNotes  String?  @map("dietary_notes")
+  budget        Decimal? @db.Decimal(10, 2)
+  catererName   String?  @map("caterer_name")
+  catererContact String? @map("caterer_contact")
+  status        String   @default("planned") // planned, confirmed, served
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId, date])
+  @@map("catering_plans")
+}

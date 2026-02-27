@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// AI-powered analysis endpoints for film production
-// Uses AIML API when configured, falls back to intelligent mock data
+import { chatCompletion } from '@/lib/ai/service';
+import { generateScriptAnalysis, generateBudgetForecast, generateShotSuggestions, generateScheduleOptimization, generateRiskDetection, generateDialogueRefinement } from './mock-data';
+import { MODELS } from '@/lib/ai/config';
 
 interface AnalysisRequest {
   action: string;
@@ -15,262 +15,226 @@ interface AnalysisRequest {
   budget_total?: number;
 }
 
-// Mock analysis data for demo purposes
-function generateScriptAnalysis(data: AnalysisRequest) {
-  const sceneCount = data.scene_count || 45;
-  const locations = data.location_count || 8;
-  const castSize = data.cast_size || 12;
-  
-  return {
-    summary: `Analyzed ${sceneCount} scenes across ${locations} locations with ${castSize} cast members`,
-    stats: {
-      scenes: sceneCount,
-      locations: locations,
-      cast: castSize,
-      avgSceneLength: Math.round(1500 / sceneCount),
-      dialogueDensity: 0.72,
-      actionDensity: 0.28,
-    },
-    insights: [
-      `High concentration of night shoots - consider batching for efficiency`,
-      `${locations} distinct locations require careful schedule optimization`,
-      `Multiple crowd scenes detected - plan extras availability`,
-      `Emotional intensity peaks in acts 1 and 3`,
-    ],
-    recommendations: [
-      "Group outdoor night shoots together",
-      "Schedule temple/location shoots early in the shoot",
-      "Plan flashback sequences in contiguous blocks",
-    ],
-    sceneBreakdown: {
-      interior: Math.round(sceneCount * 0.6),
-      exterior: Math.round(sceneCount * 0.4),
-      day: Math.round(sceneCount * 0.55),
-      night: Math.round(sceneCount * 0.45),
-    },
-  };
+// Check if AIML API is configured
+const AIML_API_KEY = process.env.AIML_API_KEY || '';
+const isAIConfigured = AIML_API_KEY && AIML_API_KEY !== 'your-aiml-api-key-here';
+
+// AI-powered analysis functions using AIML API
+async function aiScriptAnalysis(data: AnalysisRequest): Promise<any> {
+  const prompt = `You are a film production analyst AI. Analyze the following production parameters and provide detailed insights:
+
+Production Parameters:
+- Number of scenes: ${data.scene_count || 45}
+- Number of locations: ${data.location_count || 8}
+- Cast size: ${data.cast_size || 12}
+- Duration: ${data.duration_days || 30} shooting days
+
+${data.text ? `\nScript excerpt:\n${data.text.substring(0, 2000)}` : ''}
+
+Provide a detailed analysis in JSON format with these fields:
+{
+  "summary": "Brief overview of the production analysis",
+  "stats": { "scenes": number, "locations": number, "cast": number, "avgSceneLength": number, "dialogueDensity": number, "actionDensity": number },
+  "insights": ["insight1", "insight2", "insight3", "insight4"],
+  "recommendations": ["recommendation1", "recommendation2", "recommendation3"],
+  "sceneBreakdown": { "interior": number, "exterior": number, "day": number, "night": number }
 }
 
-function generateBudgetForecast(data: AnalysisRequest) {
-  const scenes = data.scene_count || 45;
-  const days = data.duration_days || 30;
-  const locations = data.location_count || 8;
-  const cast = data.cast_size || 12;
-  
-  // Rough estimation for South Indian film production
-  const perDayRate = 150000; // Average daily rate
-  const locationCost = locations * 500000;
-  const castCost = cast * 100000 * days / 30;
-  const equipmentCost = 2500000;
-  const postProduction = 3000000;
-  
-  const total = perDayRate * days + locationCost + castCost + equipmentCost + postProduction;
-  
-  return {
-    estimatedTotal: total,
-    breakdown: {
-      production: {
-        amount: perDayRate * days,
-        percentage: Math.round((perDayRate * days / total) * 100),
-        items: [
-          { name: "Crew wages", amount: perDayRate * days * 0.4 },
-          { name: "Equipment rental", amount: equipmentCost },
-          { name: "Location fees", amount: locationCost },
-        ],
-      },
-      postProduction: {
-        amount: postProduction,
-        percentage: Math.round((postProduction / total) * 100),
-        items: [
-          { name: "Editing", amount: postProduction * 0.3 },
-          { name: "VFX", amount: postProduction * 0.35 },
-          { name: "Sound/Music", amount: postProduction * 0.2 },
-          { name: "Color grading", amount: postProduction * 0.15 },
-        ],
-      },
-      talent: {
-        amount: castCost,
-        percentage: Math.round((castCost / total) * 100),
-      },
-    },
-    recommendations: [
-      "Consider co-production financing to reduce budget pressure",
-      "Outdoor night shoots add 15-20% cost - schedule strategically",
-      "Post-production buffer of 10% recommended",
-    ],
-    contingencies: {
-      recommended: total * 0.1,
-      minimum: total * 0.05,
-    },
-  };
-}
+Respond with ONLY valid JSON, no additional text.`;
 
-function generateShotSuggestions(data: AnalysisRequest) {
-  const scenes = data.scene_count || 45;
-  const isOutdoor = data.is_outdoor !== false;
-  const isNight = data.is_night_shoots !== false;
-  
-  return {
-    totalShots: scenes * 8, // ~8 shots per scene average
-    shotTypeBreakdown: {
-      wide: Math.round(scenes * 2),
-      medium: Math.round(scenes * 3),
-      closeup: Math.round(scenes * 2.5),
-      insert: Math.round(scenes * 0.5),
-    },
-    recommendations: [
-      "Use drone aerials for establishing outdoor location shots",
-      "Steadicam for dialogue-heavy scenes",
-      "Jib shots for song sequences",
-      "Practical lighting for night interior scenes",
-    ],
-    equipment: [
-      { category: "Camera", items: ["RED Komodo", "Alexa Mini LF", "Ronin RS3 Pro"] },
-      { category: "Lenses", items: ["35mm", "50mm", "85mm primes", "70-200mm zoom"] },
-      { category: "Lighting", items: ["SkyPanel S60", "Aputure 600d", "Negative fill kits"] },
-    ],
-    estimatedDuration: `${Math.round(scenes * 0.5)} shooting days`,
-  };
-}
-
-function generateScheduleOptimization(data: AnalysisRequest) {
-  const scenes = data.scene_count || 45;
-  const locations = data.location_count || 8;
-  const days = data.duration_days || 30;
-  const isOutdoor = data.is_outdoor !== false;
-  const isNight = data.is_night_shoots !== false;
-  
-  const optimalDays = Math.ceil(scenes / 5); // ~5 scenes per day
-  const locationBatches = Math.ceil(locations / 2);
-  
-  return {
-    suggestedDays: optimalDays,
-    currentDays: days,
-    savings: days - optimalDays,
-    strategy: {
-      type: "location-based",
-      description: "Group scenes by location to minimize company moves",
-    },
-    schedule: [
-      { phase: "Day 1-5", focus: "Studio interiors", scenes: 20 },
-      { phase: "Day 6-12", focus: "Outdoor locations", scenes: 15 },
-      { phase: "Day 13-18", focus: "Night shoots", scenes: 10 },
-      { phase: "Day 19-22", focus: "Pickups & VFX plates", scenes: 5 },
-    ],
-    recommendations: [
-      "Schedule night shoots in contiguous blocks",
-      "Morning call: 6AM for outdoor, 10AM for studio",
-      "Buffer day between location changes",
-      "Plan weather contingency for outdoor shoots",
-    ],
-    constraints: {
-      actorAvailability: "Consider lead actor dates",
-      equipment: "Book VFX prep 1 week before shoot",
-      weather: "Monitor 7-day forecast for outdoor days",
-    },
-  };
-}
-
-function generateRiskDetection(data: AnalysisRequest) {
-  const scenes = data.scene_count || 45;
-  const locations = data.location_count || 8;
-  const isOutdoor = data.is_outdoor !== false;
-  const isNight = data.is_night_shoots !== false;
-  
-  const risks = [];
-  
-  if (isOutdoor) {
-    risks.push({
-      category: "Weather",
-      severity: "high",
-      probability: 0.4,
-      description: "Outdoor shoots vulnerable to rain during monsoon season",
-      mitigation: "Secure indoor alternatives, shot list prioritization, weather insurance",
-    });
+  try {
+    const response = await chatCompletion(
+      MODELS.gpt4o,
+      [
+        { role: 'system', content: 'You are a film production expert AI assistant.' },
+        { role: 'user', content: prompt }
+      ],
+      { responseFormat: { type: 'json_object' }, temperature: 0.3, maxTokens: 2000 }
+    );
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('AI Script Analysis failed, using fallback:', error);
+    return generateScriptAnalysis(data);
   }
-  
-  if (isNight) {
-    risks.push({
-      category: "Logistics",
-      severity: "medium",
-      probability: 0.3,
-      description: "Night shoots increase equipment needs and crew fatigue",
-      mitigation: "Extended crew, proper lighting planning, safety measures",
-    });
-  }
-  
-  risks.push({
-    category: "Budget",
-    severity: "medium",
-    probability: 0.25,
-    description: "VFX-heavy sequences may exceed initial estimates",
-    mitigation: "Detailed pre-viz, contingency budget, vendor quotes",
-  });
-  
-  risks.push({
-    category: "Schedule",
-    severity: "low",
-    probability: 0.2,
-    description: "Location permits may take longer than expected",
-    mitigation: "Apply for permits early, have backup locations ready",
-  });
-  
-  risks.push({
-    category: "Cast",
-    severity: "high",
-    probability: 0.15,
-    description: "Lead actor availability conflicts",
-    mitigation: "Clear dates in contract, backup scenes scheduled",
-  });
-  
-  return {
-    riskScore: Math.round(risks.reduce((acc, r) => acc + (r.severity === 'high' ? 30 : r.severity === 'medium' ? 20 : 10) * r.probability, 0)),
-    risks: risks.sort((a, b) => {
-      const severityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
-      return severityOrder[b.severity] - severityOrder[a.severity];
-    }),
-    overallAssessment: risks.filter(r => r.severity === 'high').length > 0 
-      ? "High risk production - detailed planning required"
-      : "Moderate risk - standard precautions recommended",
-  };
 }
 
-function generateDialogueRefinement(data: AnalysisRequest) {
-  const text = data.text || "";
+async function aiBudgetForecast(data: AnalysisRequest): Promise<any> {
+  const prompt = `You are a film budget analyst. Estimate production costs for a South Indian film with:
+
+Parameters:
+- Scenes: ${data.scene_count || 45}
+- Shooting days: ${data.duration_days || 30}
+- Locations: ${data.location_count || 8}
+- Cast size: ${data.cast_size || 12}
+
+Provide detailed budget breakdown in JSON:
+{
+  "estimatedTotal": number,
+  "breakdown": {
+    "production": { "amount": number, "percentage": number, "items": [{ "name": string, "amount": number }] },
+    "postProduction": { "amount": number, "percentage": number, "items": [{ "name": string, "amount": number }] },
+    "talent": { "amount": number, "percentage": number }
+  },
+  "recommendations": ["rec1", "rec2", "rec3"],
+  "contingencies": { "recommended": number, "minimum": number }
+}
+
+Respond with ONLY valid JSON.`;
+
+  try {
+    const response = await chatCompletion(
+      MODELS.gpt4o,
+      [
+        { role: 'system', content: 'You are a film budget expert with knowledge of South Indian film production costs.' },
+        { role: 'user', content: prompt }
+      ],
+      { responseFormat: { type: 'json_object' }, temperature: 0.2, maxTokens: 2000 }
+    );
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('AI Budget Forecast failed, using fallback:', error);
+    return generateBudgetForecast(data);
+  }
+}
+
+async function aiShotSuggestions(data: AnalysisRequest): Promise<any> {
+  const prompt = `You are a cinematographer AI. Recommend shots for:
+
+Production:
+- Scenes: ${data.scene_count || 45}
+- Outdoor: ${data.is_outdoor !== false ? 'Yes' : 'No'}
+- Night shoots: ${data.is_night_shoots !== false ? 'Yes' : 'No'}
+
+Provide shot recommendations in JSON:
+{
+  "totalShots": number,
+  "shotTypeBreakdown": { "wide": number, "medium": number, "closeup": number, "insert": number },
+  "recommendations": ["rec1", "rec2", "rec3", "rec4"],
+  "equipment": [{ "category": string, "items": [string, string, string] }],
+  "estimatedDuration": "string"
+}
+
+Respond with ONLY valid JSON.`;
+
+  try {
+    const response = await chatCompletion(
+      MODELS.gpt4o,
+      [
+        { role: 'system', content: 'You are an experienced cinematographer familiar with South Indian film production.' },
+        { role: 'user', content: prompt }
+      ],
+      { responseFormat: { type: 'json_object' }, temperature: 0.3, maxTokens: 1500 }
+    );
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('AI Shot Suggestions failed, using fallback:', error);
+    return generateShotSuggestions(data);
+  }
+}
+
+async function aiScheduleOptimization(data: AnalysisRequest): Promise<any> {
+  const prompt = `You are a film scheduling expert. Optimize the schedule for:
+
+Parameters:
+- Scenes: ${data.scene_count || 45}
+- Locations: ${data.location_count || 8}
+- Days: ${data.duration_days || 30}
+- Outdoor: ${data.is_outdoor !== false ? 'Yes' : 'No'}
+- Night shoots: ${data.is_night_shoots !== false ? 'Yes' : 'No'}
+
+Provide optimized schedule in JSON:
+{
+  "suggestedDays": number,
+  "currentDays": number,
+  "savings": number,
+  "strategy": { "type": string, "description": string },
+  "schedule": [{ "phase": string, "focus": string, "scenes": number }],
+  "recommendations": ["rec1", "rec2", "rec3", "rec4"],
+  "constraints": { "actorAvailability": string, "equipment": string, "weather": string }
+}
+
+Respond with ONLY valid JSON.`;
+
+  try {
+    const response = await chatCompletion(
+      MODELS.gpt4o,
+      [
+        { role: 'system', content: 'You are a line producer with 20+ years experience in South Indian film schedules.' },
+        { role: 'user', content: prompt }
+      ],
+      { responseFormat: { type: 'json_object' }, temperature: 0.2, maxTokens: 1500 }
+    );
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('AI Schedule Optimization failed, using fallback:', error);
+    return generateScheduleOptimization(data);
+  }
+}
+
+async function aiRiskDetection(data: AnalysisRequest): Promise<any> {
+  const prompt = `You are a production risk analyst. Identify risks for:
+
+Production:
+- Scenes: ${data.scene_count || 45}
+- Outdoor: ${data.is_outdoor !== false ? 'Yes' : 'No'}
+- Night shoots: ${data.is_night_shoots !== false ? 'Yes' : 'No'}
+- Duration: ${data.duration_days || 30} days
+
+Provide risk analysis in JSON:
+{
+  "riskScore": number (0-100),
+  "risks": [{ "category": string, "severity": "high|medium|low", "probability": number, "description": string, "mitigation": string }],
+  "overallAssessment": string
+}
+
+Sort risks by severity (high first). Respond with ONLY valid JSON.`;
+
+  try {
+    const response = await chatCompletion(
+      MODELS.gpt4o,
+      [
+        { role: 'system', content: 'You are a film production risk assessment expert.' },
+        { role: 'user', content: prompt }
+      ],
+      { responseFormat: { type: 'json_object' }, temperature: 0.2, maxTokens: 1500 }
+    );
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('AI Risk Detection failed, using fallback:', error);
+    return generateRiskDetection(data);
+  }
+}
+
+async function aiDialogueRefinement(data: AnalysisRequest): Promise<any> {
+  const text = data.text || "Sample dialogue text for analysis";
   
-  return {
-    suggestions: [
-      {
-        type: "pacing",
-        original: "Long dialogue exchanges",
-        suggested: "Consider breaking up with reaction shots",
-        impact: "improvement",
-      },
-      {
-        type: "clarity",
-        original: "Technical jargon",
-        simplified: "Use more accessible language for wider audience",
-        impact: "reach",
-      },
-      {
-        type: "emotion",
-        original: "Flat emotional beats",
-        enhanced: "Add subtext and emotional layers",
-        impact: "engagement",
-      },
-    ],
-    statistics: {
-      wordCount: text.split(/\s+/).length,
-      dialoguePercentage: 72,
-      avgLineLength: 15,
-      emotionalRange: "medium",
-    },
-    recommendations: [
-      "Vary sentence length for natural dialogue flow",
-      "Add silence beats for emotional emphasis",
-      "Consider regional language nuances for authenticity",
-    ],
-  };
+  const prompt = `You are a screenplay dialogue expert. Analyze and improve this dialogue:
+
+${text.substring(0, 1500)}
+
+Provide suggestions in JSON:
+{
+  "suggestions": [{ "type": string, "original": string, "suggested": string, "impact": string }],
+  "statistics": { "wordCount": number, "dialoguePercentage": number, "avgLineLength": number, "emotionalRange": string },
+  "recommendations": ["rec1", "rec2", "rec3"]
+}
+
+Respond with ONLY valid JSON.`;
+
+  try {
+    const response = await chatCompletion(
+      MODELS.gpt4o,
+      [
+        { role: 'system', content: 'You are a dialogue coach and screenplay consultant expert in Tamil and Telugu cinema.' },
+        { role: 'user', content: prompt }
+      ],
+      { responseFormat: { type: 'json_object' }, temperature: 0.4, maxTokens: 1500 }
+    );
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('AI Dialogue Refinement failed, using fallback:', error);
+    return generateDialogueRefinement(data);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -286,37 +250,76 @@ export async function POST(req: NextRequest) {
     }
 
     let result;
-    
-    switch (action) {
-      case 'script-analyzer':
-        result = generateScriptAnalysis(body);
-        break;
-      case 'budget-forecast':
-        result = generateBudgetForecast(body);
-        break;
-      case 'shot-suggest':
-        result = generateShotSuggestions(body);
-        break;
-      case 'schedule':
-        result = generateScheduleOptimization(body);
-        break;
-      case 'risk-detect':
-        result = generateRiskDetection(body);
-        break;
-      case 'dialogue':
-        result = generateDialogueRefinement(body);
-        break;
-      default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}` },
-          { status: 400 }
-        );
+    let useAI = isAIConfigured;
+
+    // Try AI-powered analysis if API key is configured
+    if (useAI) {
+      try {
+        switch (action) {
+          case 'script-analyzer':
+            result = await aiScriptAnalysis(body);
+            break;
+          case 'budget-forecast':
+            result = await aiBudgetForecast(body);
+            break;
+          case 'shot-suggest':
+            result = await aiShotSuggestions(body);
+            break;
+          case 'schedule':
+            result = await aiScheduleOptimization(body);
+            break;
+          case 'risk-detect':
+            result = await aiRiskDetection(body);
+            break;
+          case 'dialogue':
+            result = await aiDialogueRefinement(body);
+            break;
+          default:
+            return NextResponse.json(
+              { error: `Unknown action: ${action}` },
+              { status: 400 }
+            );
+        }
+      } catch (aiError) {
+        console.error('AI analysis failed, falling back to mock data:', aiError);
+        useAI = false;
+      }
+    }
+
+    // Fallback to mock data if AI not available or failed
+    if (!useAI || !result) {
+      switch (action) {
+        case 'script-analyzer':
+          result = generateScriptAnalysis(body);
+          break;
+        case 'budget-forecast':
+          result = generateBudgetForecast(body);
+          break;
+        case 'shot-suggest':
+          result = generateShotSuggestions(body);
+          break;
+        case 'schedule':
+          result = generateScheduleOptimization(body);
+          break;
+        case 'risk-detect':
+          result = generateRiskDetection(body);
+          break;
+        case 'dialogue':
+          result = generateDialogueRefinement(body);
+          break;
+        default:
+          return NextResponse.json(
+            { error: `Unknown action: ${action}` },
+            { status: 400 }
+          );
+      }
     }
 
     return NextResponse.json({
       success: true,
       action,
       result,
+      source: useAI ? 'ai' : 'demo',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -332,6 +335,7 @@ export async function GET() {
   // Return available AI capabilities
   return NextResponse.json({
     available: true,
+    aiConfigured: isAIConfigured,
     features: [
       { id: 'script-analyzer', name: 'Script Intelligence', description: 'Deep analysis of your script' },
       { id: 'budget-forecast', name: 'Budget Forecast', description: 'Predict production costs' },

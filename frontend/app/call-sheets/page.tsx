@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { FileText, Plus, Trash2, Calendar, Edit2, Save, X, Printer, Download } from 'lucide-react'
+import { 
+  FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
+  Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
+  Printer, Download, RefreshCw
+} from 'lucide-react'
 
 type CallSheetContent = {
   callTime?: string
@@ -41,29 +45,32 @@ type CrewMember = {
   name: string
   role: string
   department: string | null
-  dailyRate: string | number | null
 }
+
+const DEPARTMENTS = [
+  'Camera', 'Lighting', 'Sound', 'Art', 'Makeup', 'Costume', 
+  'Direction', 'Production', 'VFX', 'Stunts', 'Catering', 'Transport'
+]
 
 export default function CallSheetsPage() {
   const [callSheets, setCallSheets] = useState<CallSheet[]>([])
+  const [crew, setCrew] = useState<CrewMember[]>([])
   const [selected, setSelected] = useState<CallSheet | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
-  const [editingContent, setEditingContent] = useState<CallSheetContent>({})
-  const [editingNotes, setEditingNotes] = useState('')
-  const [editingTitle, setEditingTitle] = useState('')
-  const [editingDate, setEditingDate] = useState('')
-  const [saving, setSaving] = useState(false)
-  
-  // Crew for adding to call sheet
-  const [crew, setCrew] = useState<CrewMember[]>([])
-  const [showAddCrew, setShowAddCrew] = useState(false)
+  const [editForm, setEditForm] = useState<CallSheetContent>({})
+  const [editNotes, setEditNotes] = useState('')
+  const [editTitle, setEditTitle] = useState('')
+  const [editDate, setEditDate] = useState('')
   const [newScene, setNewScene] = useState('')
+  const [newCrewMember, setNewCrewMember] = useState('')
+  const [showAddCrew, setShowAddCrew] = useState(false)
 
   const fetchCallSheets = useCallback(async () => {
     try {
@@ -86,11 +93,12 @@ export default function CallSheetsPage() {
   const fetchCrew = useCallback(async () => {
     try {
       const res = await fetch('/api/crew')
-      if (!res.ok) return
-      const data = await res.json()
-      setCrew(Array.isArray(data) ? data : data.crew || [])
-    } catch {
-      // Ignore crew fetch errors
+      if (res.ok) {
+        const data = await res.json()
+        setCrew(Array.isArray(data) ? data : [])
+      }
+    } catch (e) {
+      console.error('Failed to fetch crew:', e)
     }
   }, [])
 
@@ -108,6 +116,15 @@ export default function CallSheetsPage() {
         body: JSON.stringify({
           date: new Date().toISOString().split('T')[0],
           title: 'New Call Sheet',
+          content: {
+            callTime: '06:00',
+            wrapTime: '19:00',
+            location: '',
+            locationAddress: '',
+            scenes: [],
+            crewCalls: [],
+            weather: '',
+          },
         }),
       })
       if (!res.ok) {
@@ -117,6 +134,20 @@ export default function CallSheetsPage() {
       const created = await res.json()
       setCallSheets((prev) => [created, ...prev])
       setSelected(created)
+      // Start editing immediately
+      setEditForm(created.content || {
+        callTime: '06:00',
+        wrapTime: '19:00',
+        location: '',
+        locationAddress: '',
+        scenes: [],
+        crewCalls: [],
+        weather: '',
+      })
+      setEditNotes(created.notes || '')
+      setEditTitle(created.title || '')
+      setEditDate(created.date ? created.date.split('T')[0] : '')
+      setIsEditing(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create')
     } finally {
@@ -137,7 +168,10 @@ export default function CallSheetsPage() {
         throw new Error(data.error ?? 'Failed to delete call sheet')
       }
       setCallSheets((prev) => prev.filter((s) => s.id !== id))
-      if (selected?.id === id) setSelected(null)
+      if (selected?.id === id) {
+        setSelected(null)
+        setIsEditing(false)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete')
     } finally {
@@ -145,38 +179,53 @@ export default function CallSheetsPage() {
     }
   }
 
+  const selectSheet = (sheet: CallSheet) => {
+    setSelected(sheet)
+    setIsEditing(false)
+    setEditForm(sheet.content || {})
+    setEditNotes(sheet.notes || '')
+    setEditTitle(sheet.title || '')
+    setEditDate(sheet.date ? sheet.date.split('T')[0] : '')
+  }
+
   const startEditing = () => {
     if (!selected) return
-    setEditingContent(selected.content || {})
-    setEditingNotes(selected.notes || '')
-    setEditingTitle(selected.title || '')
-    setEditingDate(selected.date.split('T')[0])
+    setEditForm(selected.content || {
+      callTime: '06:00',
+      wrapTime: '19:00',
+      location: '',
+      locationAddress: '',
+      scenes: [],
+      crewCalls: [],
+      weather: '',
+    })
+    setEditNotes(selected.notes || '')
+    setEditTitle(selected.title || '')
+    setEditDate(selected.date ? selected.date.split('T')[0] : '')
     setIsEditing(true)
   }
 
   const cancelEditing = () => {
     setIsEditing(false)
-    setEditingContent({})
-    setEditingNotes('')
-    setEditingTitle('')
-    setEditingDate('')
-    setShowAddCrew(false)
-    setNewScene('')
+    if (selected) {
+      setEditForm(selected.content || {})
+      setEditNotes(selected.notes || '')
+    }
   }
 
   const saveChanges = async () => {
     if (!selected) return
+    setSaving(true)
     try {
-      setSaving(true)
       const res = await fetch('/api/call-sheets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: selected.id,
-          title: editingTitle,
-          date: editingDate,
-          content: editingContent,
-          notes: editingNotes,
+          title: editTitle || null,
+          date: editDate || null,
+          content: editForm,
+          notes: editNotes || null,
         }),
       })
       if (!res.ok) {
@@ -184,7 +233,7 @@ export default function CallSheetsPage() {
         throw new Error(data.error ?? 'Failed to save')
       }
       const updated = await res.json()
-      setCallSheets((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+      setCallSheets((prev) => prev.map((s) => s.id === updated.id ? updated : s))
       setSelected(updated)
       setIsEditing(false)
     } catch (e) {
@@ -196,56 +245,66 @@ export default function CallSheetsPage() {
 
   const addScene = () => {
     if (!newScene.trim()) return
-    const scenes = editingContent.scenes || []
-    if (!scenes.includes(newScene.trim())) {
-      setEditingContent({
-        ...editingContent,
-        scenes: [...scenes, newScene.trim()],
-      })
-    }
+    setEditForm((prev) => ({
+      ...prev,
+      scenes: [...(prev.scenes || []), newScene.trim()],
+    }))
     setNewScene('')
   }
 
-  const removeScene = (scene: string) => {
-    setEditingContent({
-      ...editingContent,
-      scenes: (editingContent.scenes || []).filter((s) => s !== scene),
-    })
+  const removeScene = (idx: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      scenes: (prev.scenes || []).filter((_, i) => i !== idx),
+    }))
   }
 
-  const addCrewMember = (member: CrewMember) => {
-    const currentCalls = editingContent.crewCalls || []
-    if (!currentCalls.find((c) => c.name === member.name)) {
-      setEditingContent({
-        ...editingContent,
-        crewCalls: [
-          ...currentCalls,
-          {
-            name: member.name,
-            role: member.role,
-            department: member.department || undefined,
-            callTime: editingContent.callTime || '06:00',
-          },
-        ],
-      })
-    }
+  const addCrewCall = () => {
+    if (!newCrewMember.trim()) return
+    const parts = newCrewMember.trim().split(':')
+    const name = parts[0].trim()
+    const role = parts[1]?.trim() || 'Cast'
+    setEditForm((prev) => ({
+      ...prev,
+      crewCalls: [
+        ...(prev.crewCalls || []),
+        { name, role, department: undefined, callTime: editForm.callTime || '06:00' }
+      ],
+    }))
+    setNewCrewMember('')
     setShowAddCrew(false)
   }
 
-  const removeCrewMember = (name: string) => {
-    setEditingContent({
-      ...editingContent,
-      crewCalls: (editingContent.crewCalls || []).filter((c) => c.name !== name),
-    })
+  const addCrewFromList = (member: CrewMember) => {
+    setEditForm((prev) => ({
+      ...prev,
+      crewCalls: [
+        ...(prev.crewCalls || []),
+        { 
+          name: member.name, 
+          role: member.role, 
+          department: member.department || undefined, 
+          callTime: editForm.callTime || '06:00' 
+        }
+      ],
+    }))
+    setShowAddCrew(false)
   }
 
-  const updateCrewCallTime = (name: string, callTime: string) => {
-    setEditingContent({
-      ...editingContent,
-      crewCalls: (editingContent.crewCalls || []).map((c) =>
-        c.name === name ? { ...c, callTime } : c
+  const removeCrewCall = (idx: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      crewCalls: (prev.crewCalls || []).filter((_, i) => i !== idx),
+    }))
+  }
+
+  const updateCrewCall = (idx: number, field: string, value: string) => {
+    setEditForm((prev) => ({
+      ...prev,
+      crewCalls: (prev.crewCalls || []).map((c, i) => 
+        i === idx ? { ...c, [field]: value } : c
       ),
-    })
+    }))
   }
 
   const formatDate = (d: string) => {
@@ -255,17 +314,23 @@ export default function CallSheetsPage() {
         month: 'short',
         year: 'numeric',
       })
-    }
-    catch {
+    } catch {
       return d
     }
   }
 
+  // Print functionality
+  const handlePrint = () => {
+    window.print()
+  }
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-      <div className="flex items-center justify-between p-6 border-b border-slate-700">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex items-center justify-between p-6 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <FileText className="h-8 w-8 text-cyan-400" />
+          <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+            <FileText className="w-5 h-5 text-cyan-400" />
+          </div>
           <div>
             <h1 className="text-2xl font-bold">Call Sheets</h1>
             <p className="text-slate-400 text-sm mt-0.5">
@@ -273,78 +338,43 @@ export default function CallSheetsPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {selected && !isEditing && (
-            <>
-              <button
-                onClick={startEditing}
-                className="flex items-center gap-2 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded font-medium"
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium"
-              >
-                <Printer className="h-4 w-4" />
-                Print
-              </button>
-            </>
+        <button
+          onClick={createNew}
+          disabled={creating}
+          className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+        >
+          {creating ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <Plus className="w-4 h-4" />
           )}
-          {isEditing && (
-            <>
-              <button
-                onClick={cancelEditing}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium"
-              >
-                <X className="h-4 w-4" />
-                Cancel
-              </button>
-              <button
-                onClick={saveChanges}
-                disabled={saving}
-                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded font-medium"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </>
-          )}
-          <button
-            onClick={createNew}
-            disabled={creating}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black rounded font-medium"
-          >
-            <Plus className="h-4 w-4" />
-            New Call Sheet
-          </button>
-        </div>
+          New Call Sheet
+        </button>
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 p-4 bg-red-950/50 border border-red-800 rounded text-red-200">
-          {error}
+        <div className="mx-6 mt-4 p-4 bg-red-950/50 border border-red-800 rounded-lg text-red-200 flex justify-between items-center">
+          <span>{error}</span>
           <button
             onClick={() => setError(null)}
-            className="ml-4 text-red-400 hover:text-red-300 underline"
+            className="text-red-400 hover:text-red-300"
           >
-            Dismiss
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       <div className="grid grid-cols-3 gap-6 p-6">
         {/* Sidebar - Call Sheet List */}
-        <div className="col-span-1 bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-cyan-400" />
-            Recent Call Sheets
+        <div className="col-span-1 bg-slate-900/50 rounded-xl border border-slate-800 p-4">
+          <h3 className="font-semibold mb-3 flex items-center gap-2 text-slate-300">
+            <Calendar className="w-4 h-4 text-cyan-400" />
+            Call Sheets
           </h3>
           {loading ? (
             <p className="text-slate-400 text-sm">Loading...</p>
           ) : callSheets.length === 0 ? (
-            <p className="text-slate-400 text-sm">No call sheets yet</p>
+            <p className="text-slate-500 text-sm">No call sheets yet</p>
           ) : (
             <div className="space-y-2">
               {callSheets.map((sheet) => (
@@ -357,13 +387,10 @@ export default function CallSheetsPage() {
                   }`}
                 >
                   <button
-                    onClick={() => {
-                      setSelected(sheet)
-                      setIsEditing(false)
-                    }}
+                    onClick={() => selectSheet(sheet)}
                     className="flex-1 text-left min-w-0"
                   >
-                    <div className="font-medium truncate">
+                    <div className="font-medium truncate text-slate-200">
                       {formatDate(sheet.date)}
                     </div>
                     <div className="text-sm text-slate-400 truncate">
@@ -387,314 +414,403 @@ export default function CallSheetsPage() {
           )}
         </div>
 
-        {/* Main Content - Preview/Edit */}
+        {/* Main Content */}
         <div className="col-span-2">
           {selected ? (
-            <div className="bg-white text-black rounded-lg overflow-hidden print:shadow-none">
-              {/* View Mode */}
-              {!isEditing ? (
-                <div className="p-8">
+            <div className="space-y-4">
+              {/* Header with actions */}
+              <div className="flex items-center justify-between">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-lg font-semibold text-white focus:outline-none focus:border-cyan-500 flex-1 mr-4"
+                    placeholder="Call Sheet Title"
+                  />
+                ) : (
+                  <h2 className="text-xl font-semibold text-white">
+                    {selected.title ?? 'Call Sheet'}
+                  </h2>
+                )}
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={cancelEditing}
+                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveChanges}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-sm"
+                      >
+                        {saving ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Save
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handlePrint}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
+                        title="Print"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={startEditing}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Date picker (edit mode) */}
+              {isEditing && (
+                <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-3">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="bg-transparent text-white text-sm focus:outline-none"
+                  />
+                </div>
+              )}
+
+              {/* Call Sheet Preview / Edit Form */}
+              <div className="bg-white text-black rounded-xl overflow-hidden">
+                <div className="p-6">
+                  {/* Header */}
                   <div className="text-center border-b-2 border-black pb-4 mb-6">
-                    <h2 className="text-2xl font-bold">
-                      {selected.title ?? 'CALL SHEET'}
-                    </h2>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="text-2xl font-bold text-center bg-transparent border-b border-gray-300 focus:outline-none w-full"
+                        placeholder="CALL SHEET"
+                      />
+                    ) : (
+                      <h2 className="text-2xl font-bold">
+                        {selected.title ?? 'CALL SHEET'}
+                      </h2>
+                    )}
                     <p className="text-lg mt-1">{formatDate(selected.date)}</p>
                   </div>
 
+                  {/* Times & Location */}
                   <div className="grid grid-cols-2 gap-6 mb-6">
                     <div>
-                      <div className="font-bold bg-gray-200 p-2">DATE</div>
-                      <div className="p-2 border border-t-0 border-gray-300">
-                        {formatDate(selected.date)}
+                      <div className="font-bold bg-gray-200 p-2 flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> CALL TIME
                       </div>
+                      {isEditing ? (
+                        <input
+                          type="time"
+                          value={editForm.callTime || ''}
+                          onChange={(e) => setEditForm({ ...editForm, callTime: e.target.value })}
+                          className="w-full p-2 border border-gray-300 text-xl font-bold"
+                        />
+                      ) : (
+                        <div className="p-2 border border-t-0 border-gray-300 text-xl font-bold">
+                          {selected.content?.callTime ?? 'TBD'}
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <div className="font-bold bg-gray-200 p-2">CALL TIME</div>
-                      <div className="p-2 border border-t-0 border-gray-300 text-xl font-bold">
-                        {selected.content?.callTime ?? 'TBD'}
+                      <div className="font-bold bg-gray-200 p-2 flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> WRAP TIME
                       </div>
+                      {isEditing ? (
+                        <input
+                          type="time"
+                          value={editForm.wrapTime || ''}
+                          onChange={(e) => setEditForm({ ...editForm, wrapTime: e.target.value })}
+                          className="w-full p-2 border border-gray-300"
+                        />
+                      ) : (
+                        <div className="p-2 border border-t-0 border-gray-300">
+                          {selected.content?.wrapTime ?? 'TBD'}
+                        </div>
+                      )}
                     </div>
                     <div className="col-span-2">
-                      <div className="font-bold bg-gray-200 p-2">LOCATION</div>
-                      <div className="p-2 border border-t-0 border-gray-300">
-                        {selected.content?.location ?? 'TBD'}
-                        {selected.content?.locationAddress && (
-                          <span className="block text-sm text-gray-600 mt-1">
-                            {selected.content.locationAddress}
-                          </span>
-                        )}
+                      <div className="font-bold bg-gray-200 p-2 flex items-center gap-2">
+                        <MapPin className="w-4 h-4" /> LOCATION
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <div className="font-bold bg-gray-200 p-2">SCENES</div>
-                    <div className="p-2 border border-t-0 border-gray-300 flex gap-2 flex-wrap">
-                      {(selected.content?.scenes ?? []).length > 0
-                        ? (selected.content?.scenes ?? []).map((s) => (
-                            <span
-                              key={s}
-                              className="px-3 py-1 bg-gray-200 rounded"
-                            >
-                              {s}
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editForm.location || ''}
+                            onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                            placeholder="Location name"
+                            className="w-full p-2 border border-gray-300"
+                          />
+                          <input
+                            type="text"
+                            value={editForm.locationAddress || ''}
+                            onChange={(e) => setEditForm({ ...editForm, locationAddress: e.target.value })}
+                            placeholder="Address"
+                            className="w-full p-2 border border-gray-300 text-sm"
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-2 border border-t-0 border-gray-300">
+                          {selected.content?.location ?? 'TBD'}
+                          {selected.content?.locationAddress && (
+                            <span className="block text-sm text-gray-600 mt-1">
+                              {selected.content.locationAddress}
                             </span>
-                          ))
-                        : 'TBD'}
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <div className="font-bold bg-gray-200 p-2">CREW CALLS</div>
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b-2 border-gray-400">
-                          <th className="text-left p-2">Role</th>
-                          <th className="text-left p-2">Name</th>
-                          <th className="text-right p-2">Call Time</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(selected.content?.crewCalls ?? []).length > 0
-                          ? (selected.content?.crewCalls ?? []).map((c, i) => (
-                              <tr
-                                key={i}
-                                className="border-b border-gray-200"
-                              >
-                                <td className="p-2">{c.role}</td>
-                                <td className="p-2">{c.name}</td>
-                                <td className="p-2 text-right font-bold">
-                                  {c.callTime ?? selected.content?.callTime ?? 'TBD'}
-                                </td>
-                              </tr>
-                            ))
-                          : (
-                              <tr>
-                                <td
-                                  colSpan={3}
-                                  className="p-2 text-gray-500"
-                                >
-                                  No crew assigned
-                                </td>
-                              </tr>
-                            )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {selected.notes && (
-                    <div className="mb-6">
-                      <div className="font-bold bg-gray-200 p-2">NOTES</div>
-                      <div className="p-2 border border-t-0 border-gray-300 whitespace-pre-wrap">
-                        {selected.notes}
+                    <div className="col-span-2">
+                      <div className="font-bold bg-gray-200 p-2 flex items-center gap-2">
+                        <CloudSun className="w-4 h-4" /> WEATHER
                       </div>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editForm.weather || ''}
+                          onChange={(e) => setEditForm({ ...editForm, weather: e.target.value })}
+                          placeholder="Weather forecast"
+                          className="w-full p-2 border border-gray-300"
+                        />
+                      ) : (
+                        <div className="p-2 border border-t-0 border-gray-300">
+                          {selected.content?.weather ?? 'TBD'}
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  <div className="text-center text-sm text-gray-500 mt-8 pt-4 border-t border-gray-200">
-                    Generated by CinePilot
-                  </div>
-                </div>
-              ) : (
-                /* Edit Mode */
-                <div className="p-8">
-                  {/* Title & Date */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded"
-                      placeholder="Call Sheet Title"
-                    />
-                  </div>
-                  
-                  <div className="mb-6">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={editingDate}
-                      onChange={(e) => setEditingDate(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded"
-                    />
-                  </div>
-
-                  {/* Call Time */}
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-1">Call Time</label>
-                      <input
-                        type="time"
-                        value={editingContent.callTime || ''}
-                        onChange={(e) => setEditingContent({ ...editingContent, callTime: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-1">Wrap Time</label>
-                      <input
-                        type="time"
-                        value={editingContent.wrapTime || ''}
-                        onChange={(e) => setEditingContent({ ...editingContent, wrapTime: e.target.value })}
-                        className="w-full p-2 border border-gray-300 rounded"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Location */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Location</label>
-                    <input
-                      type="text"
-                      value={editingContent.location || ''}
-                      onChange={(e) => setEditingContent({ ...editingContent, location: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded"
-                      placeholder="Shooting Location"
-                    />
-                  </div>
-                  
-                  <div className="mb-6">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Location Address</label>
-                    <input
-                      type="text"
-                      value={editingContent.locationAddress || ''}
-                      onChange={(e) => setEditingContent({ ...editingContent, locationAddress: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded"
-                      placeholder="Full Address"
-                    />
                   </div>
 
                   {/* Scenes */}
                   <div className="mb-6">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Scenes</label>
-                    <div className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={newScene}
-                        onChange={(e) => setNewScene(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && addScene()}
-                        className="flex-1 p-2 border border-gray-300 rounded"
-                        placeholder="Scene number (e.g., 1A)"
-                      />
-                      <button
-                        onClick={addScene}
-                        className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {(editingContent.scenes || []).map((s) => (
-                        <span
-                          key={s}
-                          className="px-3 py-1 bg-gray-200 rounded flex items-center gap-2"
-                        >
-                          {s}
+                    <div className="font-bold bg-gray-200 p-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Film className="w-4 h-4" /> SCENES
+                      </div>
+                      {isEditing && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={newScene}
+                            onChange={(e) => setNewScene(e.target.value)}
+                            placeholder="Add scene #"
+                            className="px-2 py-0.5 text-sm border border-gray-400"
+                            onKeyDown={(e) => e.key === 'Enter' && addScene()}
+                          />
                           <button
-                            onClick={() => removeScene(s)}
-                            className="text-red-500 hover:text-red-700"
+                            onClick={addScene}
+                            className="text-xs bg-gray-600 text-white px-2 py-0.5 rounded hover:bg-gray-500"
                           >
-                            ×
+                            Add
                           </button>
-                        </span>
-                      ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 border border-t-0 border-gray-300 flex gap-2 flex-wrap">
+                      {(isEditing ? editForm.scenes : selected.content?.scenes)?.length ?? 0 > 0 ? (
+                        (isEditing ? editForm.scenes : selected.content?.scenes)?.map((s, i) => (
+                          <span
+                            key={i}
+                            className="px-3 py-1 bg-gray-200 rounded flex items-center gap-1"
+                          >
+                            {s}
+                            {isEditing && (
+                              <button
+                                onClick={() => removeScene(i)}
+                                className="text-red-500 hover:text-red-700 ml-1"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-500">TBD</span>
+                      )}
                     </div>
                   </div>
 
                   {/* Crew Calls */}
                   <div className="mb-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-bold text-gray-700">Crew Calls</label>
-                      <button
-                        onClick={() => setShowAddCrew(!showAddCrew)}
-                        className="text-sm text-cyan-600 hover:text-cyan-800"
-                      >
-                        + Add Crew
-                      </button>
+                    <div className="font-bold bg-gray-200 p-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" /> CREW CALLS
+                      </div>
+                      {isEditing && (
+                        <button
+                          onClick={() => setShowAddCrew(!showAddCrew)}
+                          className="text-xs bg-gray-600 text-white px-2 py-0.5 rounded hover:bg-gray-500 flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Add
+                        </button>
+                      )}
                     </div>
                     
-                    {showAddCrew && (
-                      <div className="bg-gray-100 p-3 rounded mb-3">
-                        <p className="text-sm text-gray-600 mb-2">Available crew:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {crew.filter((c) => !(editingContent.crewCalls || []).find((ec) => ec.name === c.name)).map((c) => (
+                    {/* Add crew dropdown */}
+                    {isEditing && showAddCrew && (
+                      <div className="p-2 border border-t-0 border-gray-300 bg-gray-50">
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={newCrewMember}
+                            onChange={(e) => setNewCrewMember(e.target.value)}
+                            placeholder="Name:Role"
+                            className="flex-1 px-2 py-1 text-sm border border-gray-400"
+                            onKeyDown={(e) => e.key === 'Enter' && addCrewCall()}
+                          />
+                          <button
+                            onClick={addCrewCall}
+                            className="px-3 py-1 bg-cyan-600 text-white text-sm rounded hover:bg-cyan-500"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {crew.length > 0 && (
+                          <div className="text-xs text-gray-500 mb-1">Or select from crew:</div>
+                        )}
+                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                          {crew.map((c) => (
                             <button
                               key={c.id}
-                              onClick={() => addCrewMember(c)}
-                              className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50"
+                              onClick={() => addCrewFromList(c)}
+                              className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
                             >
                               {c.name} ({c.role})
                             </button>
                           ))}
-                          {crew.length === 0 && (
-                            <p className="text-sm text-gray-500">No crew members found. Add crew first.</p>
-                          )}
                         </div>
                       </div>
                     )}
-                    
+
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="border-b-2 border-gray-400">
                           <th className="text-left p-2">Role</th>
                           <th className="text-left p-2">Name</th>
+                          {isEditing && <th className="text-left p-2">Dept</th>}
                           <th className="text-right p-2">Call Time</th>
-                          <th className="p-2"></th>
+                          {isEditing && <th className="w-10"></th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {(editingContent.crewCalls || []).length > 0
-                          ? (editingContent.crewCalls || []).map((c, i) => (
-                              <tr key={i} className="border-b border-gray-200">
-                                <td className="p-2">{c.role}</td>
-                                <td className="p-2">{c.name}</td>
-                                <td className="p-2 text-right">
-                                  <input
-                                    type="time"
-                                    value={c.callTime || ''}
-                                    onChange={(e) => updateCrewCallTime(c.name, e.target.value)}
-                                    className="p-1 border border-gray-300 rounded text-sm w-24"
-                                  />
-                                </td>
-                                <td className="p-2">
-                                  <button
-                                    onClick={() => removeCrewMember(c.name)}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    ×
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          : (
-                              <tr>
-                                <td colSpan={4} className="p-2 text-gray-500 text-center">
-                                  No crew assigned
-                                </td>
-                              </tr>
-                            )}
+                        {(isEditing ? editForm.crewCalls : selected.content?.crewCalls)?.length ?? 0 > 0 ? (
+                          (isEditing ? editForm.crewCalls : selected.content?.crewCalls)?.map((c, i) => (
+                            <tr key={i} className="border-b border-gray-200">
+                              {isEditing ? (
+                                <>
+                                  <td className="p-2">
+                                    <input
+                                      type="text"
+                                      value={c.role}
+                                      onChange={(e) => updateCrewCall(i, 'role', e.target.value)}
+                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <input
+                                      type="text"
+                                      value={c.name}
+                                      onChange={(e) => updateCrewCall(i, 'name', e.target.value)}
+                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <select
+                                      value={c.department || ''}
+                                      onChange={(e) => updateCrewCall(i, 'department', e.target.value)}
+                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm"
+                                    >
+                                      <option value="">—</option>
+                                      {DEPARTMENTS.map(d => (
+                                        <option key={d} value={d}>{d}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="p-2">
+                                    <input
+                                      type="time"
+                                      value={c.callTime || ''}
+                                      onChange={(e) => updateCrewCall(i, 'callTime', e.target.value)}
+                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm text-right"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <button
+                                      onClick={() => removeCrewCall(i)}
+                                      className="text-red-500 hover:text-red-700"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="p-2">{c.role}</td>
+                                  <td className="p-2">{c.name}</td>
+                                  <td className="p-2 text-right font-bold">
+                                    {c.callTime ?? selected.content?.callTime ?? 'TBD'}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={isEditing ? 5 : 3} className="p-4 text-gray-500 text-center">
+                              No crew assigned
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
 
                   {/* Notes */}
                   <div className="mb-6">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Notes</label>
-                    <textarea
-                      value={editingNotes}
-                      onChange={(e) => setEditingNotes(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded h-24"
-                      placeholder="Additional notes..."
-                    />
+                    <div className="font-bold bg-gray-200 p-2">NOTES</div>
+                    {isEditing ? (
+                      <textarea
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        rows={4}
+                        placeholder="Add any notes..."
+                        className="w-full p-2 border border-t-0 border-gray-300 resize-none"
+                      />
+                    ) : (
+                      <div className="p-2 border border-t-0 border-gray-300 whitespace-pre-wrap">
+                        {selected.notes || 'No notes'}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-center text-sm text-gray-500 mt-8 pt-4 border-t border-gray-200">
+                    Generated by CinePilot
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           ) : (
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-12 text-center">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-12 text-center">
               <FileText className="h-12 w-12 text-slate-500 mx-auto mb-4" />
               <p className="text-slate-400">
-                Select a call sheet to preview
+                Select a call sheet to preview or edit
               </p>
             </div>
           )}

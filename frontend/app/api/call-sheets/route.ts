@@ -159,6 +159,46 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, ...updates } = body;
+
+    if (typeof id !== 'string' || !id.trim()) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    const allowedFields = ['title', 'date', 'content', 'notes'];
+    const data: Record<string, unknown> = {};
+
+    for (const key of allowedFields) {
+      if (updates[key] !== undefined) {
+        if (key === 'date' && typeof updates[key] === 'string') {
+          data[key] = new Date(updates[key]);
+        } else if (key === 'content' && typeof updates[key] === 'object') {
+          data[key] = updates[key];
+        } else if (typeof updates[key] === 'string') {
+          data[key] = updates[key].trim() || null;
+        } else {
+          data[key] = updates[key];
+        }
+      }
+    }
+
+    const callSheet = await prisma.callSheet.update({
+      where: { id: id.trim() },
+      data,
+      include: { shootingDay: true },
+    });
+
+    return NextResponse.json(callSheet);
+  } catch (error) {
+    console.error('[PATCH /api/call-sheets]', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();

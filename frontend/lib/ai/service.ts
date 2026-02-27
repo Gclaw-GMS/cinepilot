@@ -54,7 +54,7 @@ export interface AiServiceError {
 const AIML_BASE_URL = process.env.AIML_BASE_URL || 'https://api.aimlapi.com/v1';
 const AIML_API_KEY = process.env.AIML_API_KEY || '';
 const MAX_RETRIES = 2;
-const REQUEST_TIMEOUT_MS = 120_000;
+const REQUEST_TIMEOUT_MS = 180_000;
 
 function getHeaders(): Record<string, string> {
   if (!AIML_API_KEY) {

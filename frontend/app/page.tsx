@@ -137,9 +137,12 @@ export default function Dashboard() {
       if (responses[0].status === 'fulfilled') {
         const d = responses[0].value
         const scripts = d.scripts || []
+        const characters = d.characters || []
         result.scripts.total = scripts.length
-        result.scripts.scenes = scripts.reduce((n: number, s: { _count?: { scenes?: number } }) => n + (s._count?.scenes || 0), 0)
-        result.scripts.characters = scripts.reduce((n: number, s: { _count?: { characters?: number } }) => n + (s._count?.characters || 0), 0)
+        result.scripts.scenes = scripts.reduce(
+          (n: number, s: { scenes?: unknown[] }) => n + (s.scenes?.length || 0), 0
+        )
+        result.scripts.characters = characters.length
       }
 
       if (responses[1].status === 'fulfilled') {

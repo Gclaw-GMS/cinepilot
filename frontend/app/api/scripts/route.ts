@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db';
 import {
   uploadScript,
   runFullPipeline,
+  runCanonicalization,
+  generateBreakdownSummary,
+  runQualityScoring,
 } from '@/lib/scripts/pipeline';
 
 const DEFAULT_PROJECT_ID = 'default-project';
@@ -144,6 +147,63 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('[POST /api/scripts]', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// PATCH /api/scripts — run remaining pipeline stages on existing script
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const scriptId = body.scriptId as string;
+    const projectId = body.projectId || DEFAULT_PROJECT_ID;
+
+    if (!scriptId) {
+      return NextResponse.json({ error: 'scriptId required' }, { status: 400 });
+    }
+
+    const script = await prisma.script.findUnique({
+      where: { id: scriptId },
+      include: { scenes: { orderBy: { sceneIndex: 'asc' } } },
+    });
+
+    if (!script) {
+      return NextResponse.json({ error: 'Script not found' }, { status: 404 });
+    }
+
+    await runCanonicalization(projectId);
+
+    const scenesForSummary = script.scenes.map((s) => ({
+      scene_number: s.sceneNumber,
+      scene_index: s.sceneIndex,
+      heading_raw: s.headingRaw || '',
+      int_ext: s.intExt || '',
+      time_of_day: s.timeOfDay || '',
+      location_text: s.location || '',
+      start_line: s.startLine || 0,
+      end_line: s.endLine || 0,
+      page_start: s.pageStart || undefined,
+      page_end: s.pageEnd || undefined,
+      confidence: s.confidence || 0.8,
+    }));
+
+    const summary = await generateBreakdownSummary(projectId, scriptId, scenesForSummary);
+
+    const quality = await runQualityScoring(
+      projectId,
+      scriptId,
+      script.content || '',
+      Math.ceil((script.content || '').split('\n').length / 55)
+    );
+
+    return NextResponse.json({
+      message: 'Remaining stages complete',
+      summary,
+      quality,
+    });
+  } catch (error) {
+    console.error('[PATCH /api/scripts]', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

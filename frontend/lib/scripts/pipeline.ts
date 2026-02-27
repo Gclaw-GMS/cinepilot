@@ -100,7 +100,11 @@ export async function uploadScript(
   }
 
   const storagePath = `${STORAGE_PATHS.scripts(projectId, filename)}/${script.id}/v${versionNumber}`;
-  await uploadFile(storagePath, file, mimeType);
+  try {
+    await uploadFile(storagePath, file, mimeType);
+  } catch (s3Err) {
+    console.warn('[S3 Upload] Non-fatal – storing locally only:', s3Err instanceof Error ? s3Err.message : s3Err);
+  }
 
   await prisma.script.update({
     where: { id: script.id },
@@ -235,24 +239,60 @@ export async function detectSceneBoundaries(
 
   onProgress?.({ stage: 'scene_detection', percent: 40, message: 'Running AI scene boundary detection...' });
 
-  const chunkSize = 3000;
-  let textForAi = numberedText;
-  if (lines.length > chunkSize) {
-    textForAi = numberedText;
-  }
+  const MAX_CHARS_PER_CHUNK = 60_000;
+  let result: SceneBoundaryResult;
 
-  const result = await runTask<SceneBoundaryResult>(
-    'script.sceneBoundary',
-    {
-      scriptText: textForAi,
-      headingCandidates: JSON.stringify(headingCandidates),
-      lineCount: String(lineCount),
-    },
-    PROMPTS.scriptParsing.sceneBoundary.system,
-    PROMPTS.scriptParsing.sceneBoundary.user,
-    SceneBoundarySchema,
-    { maxTokens: 8192 }
-  );
+  if (numberedText.length <= MAX_CHARS_PER_CHUNK) {
+    result = await runTask<SceneBoundaryResult>(
+      'script.sceneBoundary',
+      {
+        scriptText: numberedText,
+        headingCandidates: JSON.stringify(headingCandidates),
+        lineCount: String(lineCount),
+      },
+      PROMPTS.scriptParsing.sceneBoundary.system,
+      PROMPTS.scriptParsing.sceneBoundary.user,
+      SceneBoundarySchema,
+      { maxTokens: 8192 }
+    );
+  } else {
+    const chunkCount = Math.ceil(numberedText.length / MAX_CHARS_PER_CHUNK);
+    const linesPerChunk = Math.ceil(lines.length / chunkCount);
+    const allScenes: SceneBoundaryResult['scenes'] = [];
+
+    for (let c = 0; c < chunkCount; c++) {
+      const startLine = c * linesPerChunk;
+      const endLine = Math.min((c + 1) * linesPerChunk, lines.length);
+      const chunkLines = lines.slice(startLine, endLine);
+      const chunkText = chunkLines.map((line, i) => `${startLine + i + 1}: ${line}`).join('\n');
+      const chunkCandidates = headingCandidates.filter(
+        (h) => h.lineNumber >= startLine + 1 && h.lineNumber <= endLine
+      );
+
+      onProgress?.({
+        stage: 'scene_detection',
+        percent: 40 + Math.round((c / chunkCount) * 40),
+        message: `Scene detection chunk ${c + 1}/${chunkCount}...`,
+      });
+
+      const chunkResult = await runTask<SceneBoundaryResult>(
+        'script.sceneBoundary',
+        {
+          scriptText: chunkText,
+          headingCandidates: JSON.stringify(chunkCandidates),
+          lineCount: String(endLine - startLine),
+        },
+        PROMPTS.scriptParsing.sceneBoundary.system,
+        PROMPTS.scriptParsing.sceneBoundary.user,
+        SceneBoundarySchema,
+        { maxTokens: 8192 }
+      );
+
+      allScenes.push(...chunkResult.scenes);
+    }
+
+    result = { scenes: allScenes };
+  }
 
   const validated = validateSceneBoundaries(result, lineCount);
 
@@ -516,10 +556,22 @@ export async function runCanonicalization(
     });
 
     for (const dup of toMerge) {
-      await prisma.sceneCharacter.updateMany({
-        where: { characterId: dup.id },
-        data: { characterId: primary.id },
-      });
+      const dupLinks = await prisma.sceneCharacter.findMany({ where: { characterId: dup.id } });
+      for (const link of dupLinks) {
+        const exists = await prisma.sceneCharacter.findUnique({
+          where: { sceneId_characterId: { sceneId: link.sceneId, characterId: primary.id } },
+        });
+        if (exists) {
+          await prisma.sceneCharacter.delete({
+            where: { sceneId_characterId: { sceneId: link.sceneId, characterId: dup.id } },
+          });
+        } else {
+          await prisma.sceneCharacter.update({
+            where: { sceneId_characterId: { sceneId: link.sceneId, characterId: dup.id } },
+            data: { characterId: primary.id },
+          });
+        }
+      }
       await prisma.character.delete({ where: { id: dup.id } }).catch(() => {});
     }
   }

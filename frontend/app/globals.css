@@ -6,6 +6,15 @@
   --foreground-rgb: 248, 250, 252;
   --background-start-rgb: 2, 6, 23;
   --background-end-rgb: 2, 6, 23;
+  
+  /* CinePilot Theme Colors */
+  --cinepilot-dark: #0a0a0a;
+  --cinepilot-card: #111111;
+  --cinepilot-border: #1a1a1a;
+  --cinepilot-accent: #00d4ff;
+  --cinepilot-success: #00e676;
+  --cinepilot-warning: #ffd740;
+  --cinepilot-danger: #ff5252;
 }
 
 * {
@@ -18,6 +27,24 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* CinePilot theme utilities */
+@layer utilities {
+  .bg-cinepilot-dark { background-color: var(--cinepilot-dark); }
+  .bg-cinepilot-card { background-color: var(--cinepilot-card); }
+  .bg-cinepilot-accent { background-color: var(--cinepilot-accent); }
+  .bg-cinepilot-success { background-color: var(--cinepilot-success); }
+  .bg-cinepilot-warning { background-color: var(--cinepilot-warning); }
+  .bg-cinepilot-danger { background-color: var(--cinepilot-danger); }
+  
+  .border-cinepilot-border { border-color: var(--cinepilot-border); }
+  .border-cinepilot-accent { border-color: var(--cinepilot-accent); }
+  
+  .text-cinepilot-accent { color: var(--cinepilot-accent); }
+  .text-cinepilot-success { color: var(--cinepilot-success); }
+  .text-cinepilot-warning { color: var(--cinepilot-warning); }
+  .text-cinepilot-danger { color: var(--cinepilot-danger); }
 }
 
 /* Professional typography */

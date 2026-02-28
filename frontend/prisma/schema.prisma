@@ -835,38 +835,23 @@ model UserSetting {
   @@map("user_settings")
 }
 
-enum MilestoneStatus {
-  pending
-  in_progress
-  completed
-  delayed
-  cancelled
-}
-
 model Milestone {
-  id          String         @id @default(cuid())
-  projectId   String         @map("project_id")
+  id          String           @id @default(cuid())
+  projectId   String           @map("project_id")
   name        String
   description String?
-  targetDate  DateTime       @map("target_date") @db.Date
-  status      MilestoneStatus @default(pending)
-  order       Int            @default(0)
-  phase       String?        // pre_production, production, post_production
-  completedAt DateTime?      @map("completed_at") @db.Date
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targetDate  DateTime         @map("target_date") @db.Date
+  status      MilestoneStatus  @default(pending)
+  order       Int              @default(0)
+  phase       String?
+  completedAt DateTime?        @map("completed_at") @db.Date
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tasks       ProductionTask[]
 
   @@index([projectId, status])
   @@map("milestones")
-}
-
-enum TaskStatus {
-  pending
-  in_progress
-  completed
-  blocked
 }
 
 model ProductionTask {
@@ -876,60 +861,59 @@ model ProductionTask {
   name        String
   description String?
   status      TaskStatus @default(pending)
-  progress    Int        @default(0) // 0-100
-  priority    String     @default("medium") // low, medium, high, critical
+  progress    Int        @default(0)
+  priority    String     @default("medium")
   dueDate     DateTime?  @map("due_date") @db.Date
   completedAt DateTime?  @map("completed_at") @db.Date
   order       Int        @default(0)
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id])
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
 
   @@index([projectId, status])
   @@map("production_tasks")
 }
 
 model ProductionPhase {
-  id          String   @id @default(cuid())
-  projectId   String   @map("project_id")
-  name        String   // pre_production, production, post_production
-  displayName String   @map("display_name")
-  status      String   @default("pending") // pending, active, completed
-  progress    Int      @default(0) // 0-100
+  id          String    @id @default(cuid())
+  projectId   String    @map("project_id")
+  name        String
+  displayName String    @map("display_name")
+  status      String    @default("pending")
+  progress    Int       @default(0)
   startDate   DateTime? @map("start_date") @db.Date
   endDate     DateTime? @map("end_date") @db.Date
-  order       Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, name])
   @@index([projectId])
   @@map("production_phases")
 }
 
-// Audience Sentiment Analysis
 model AudienceSentiment {
-  id            String   @id @default(cuid())
-  projectId     String   @map("project_id")
+  id            String             @id @default(cuid())
+  projectId     String             @map("project_id")
   title         String
-  platform      String   // youtube, instagram, twitter, etc.
-  videoUrl      String?  @map("video_url")
-  totalComments Int      @default(0) @map("total_comments")
-  analyzedCount Int      @default(0) @map("analyzed_count")
-  positiveCount Int      @default(0) @map("positive_count")
-  negativeCount Int      @default(0) @map("negative_count")
-  neutralCount  Int      @default(0) @map("neutral_count")
-  avgSentiment  Float    @default(0) @map("avg_sentiment")
-  topPositive   Json?    @map("top_positive")
-  topNegative   Json?    @map("top_negative")
-  takeaways     Json?    @map("takeaways")
-  posterTips    Json?    @map("poster_tips")
-  status        String   @default("pending") // pending, analyzing, completed, failed
-  errorMsg      String?  @map("error_msg")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  platform      String
+  videoUrl      String?            @map("video_url")
+  totalComments Int                @default(0) @map("total_comments")
+  analyzedCount Int                @default(0) @map("analyzed_count")
+  positiveCount Int                @default(0) @map("positive_count")
+  negativeCount Int                @default(0) @map("negative_count")
+  neutralCount  Int                @default(0) @map("neutral_count")
+  avgSentiment  Float              @default(0) @map("avg_sentiment")
+  topPositive   Json?              @map("top_positive")
+  topNegative   Json?              @map("top_negative")
+  takeaways     Json?              @map("takeaways")
+  posterTips    Json?              @map("poster_tips")
+  status        String             @default("pending")
+  errorMsg      String?            @map("error_msg")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
   comments      SentimentComment[]
 
   @@index([projectId])
@@ -937,41 +921,98 @@ model AudienceSentiment {
 }
 
 model SentimentComment {
-  id            String           @id @default(cuid())
-  sentimentId   String           @map("sentiment_id")
-  commentText   String           @map("comment_text")
-  author        String?
-  sentiment     String           @default("neutral") // positive, negative, neutral
-  sentimentScore Float           @default(0) @map("sentiment_score")
-  emotions      String[]         @default([]) // excited, disappointed, neutral, etc.
-  language      String?          @default("en")
-  likes         Int              @default(0)
-  replies       Int              @default(0)
-  postedAt      DateTime?        @map("posted_at")
-  createdAt     DateTime         @default(now()) @map("created_at")
+  id                String            @id @default(cuid())
+  sentimentId       String            @map("sentiment_id")
+  commentText       String            @map("comment_text")
+  author            String?
+  sentiment         String            @default("neutral")
+  sentimentScore    Float             @default(0) @map("sentiment_score")
+  emotions          String[]          @default([])
+  language          String?           @default("en")
+  likes             Int               @default(0)
+  replies           Int               @default(0)
+  postedAt          DateTime?         @map("posted_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
   audienceSentiment AudienceSentiment @relation(fields: [sentimentId], references: [id], onDelete: Cascade)
 
   @@index([sentimentId])
   @@map("sentiment_comments")
 }
 
-// Catering Management
 model CateringPlan {
-  id            String   @id @default(cuid())
-  projectId     String   @map("project_id")
-  shootingDayId String?  @map("shooting_day_id")
-  date          DateTime @db.Date
-  mealType      String   // breakfast, lunch, dinner, snacks
-  menuItems     Json?    @map("menu_items")
-  dietaryNotes  String?  @map("dietary_notes")
-  budget        Decimal? @db.Decimal(10, 2)
-  catererName   String?  @map("caterer_name")
-  catererContact String? @map("caterer_contact")
-  status        String   @default("planned") // planned, confirmed, served
-  notes         String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                   String                @id @default(cuid())
+  projectId            String                @map("project_id")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  caterer_id           String?
+  dietary_restrictions Json?
+  total_budget         Decimal?              @db.Decimal(12, 2)
+  total_spent          Decimal?              @db.Decimal(12, 2)
+  catering_shoot_days  catering_shoot_days[]
 
-  @@index([projectId, date])
+  @@index([projectId])
   @@map("catering_plans")
+}
+
+model caterers {
+  id             String   @id
+  project_id     String
+  name           String
+  contact_person String
+  phone          String
+  email          String?
+  specialty      String?
+  rating         Decimal? @db.Decimal(2, 1)
+  notes          String?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime
+
+  @@index([project_id])
+}
+
+model catering_meals {
+  id                  String              @id
+  shoot_day_id        String
+  mealType            String
+  menu_items          String[]
+  dietary             String[]
+  budget              Decimal?            @db.Decimal(10, 2)
+  actual_cost         Decimal?            @db.Decimal(10, 2)
+  notes               String?
+  status              String              @default("planned")
+  created_at          DateTime            @default(now())
+  updated_at          DateTime
+  catering_shoot_days catering_shoot_days @relation(fields: [shoot_day_id], references: [id], onDelete: Cascade)
+
+  @@index([shoot_day_id])
+}
+
+model catering_shoot_days {
+  id               String           @id
+  catering_plan_id String
+  date             DateTime         @db.Date
+  total_crew       Int              @default(0)
+  total_cast       Int              @default(0)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime
+  catering_meals   catering_meals[]
+  catering_plans   CateringPlan     @relation(fields: [catering_plan_id], references: [id], onDelete: Cascade)
+
+  @@unique([catering_plan_id, date])
+}
+
+enum MilestoneStatus {
+  pending
+  in_progress
+  completed
+  delayed
+  cancelled
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+  blocked
 }

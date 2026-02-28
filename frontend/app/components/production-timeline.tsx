@@ -2,7 +2,11 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Calendar, Clock, Film, MapPin, Loader2 } from 'lucide-react';
+import { 
+  RefreshCw, Calendar, Clock, Film, MapPin, Loader2, 
+  ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Layers,
+  CheckCircle, AlertCircle, PlayCircle
+} from 'lucide-react';
 
 interface ShootingDay {
   id: string;
@@ -301,7 +305,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
       </div>
 
       {/* Legend */}
-      <div className="flex gap-4 mb-4 text-sm">
+      <div className="flex flex-wrap gap-4 mb-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-blue-500"></div>
           <span className="text-gray-400">Pre-Production</span>
@@ -313,6 +317,18 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-orange-500"></div>
           <span className="text-gray-400">Post-Production</span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <div className="w-3 h-3 rounded bg-green-400"></div>
+          <span className="text-gray-400">Completed</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-yellow-500"></div>
+          <span className="text-gray-400">In Progress</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-gray-400"></div>
+          <span className="text-gray-400">Pending</span>
         </div>
       </div>
 
@@ -329,17 +345,42 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
         <>
           {/* Timeline Grid */}
           <div className="relative overflow-x-auto">
-            {/* Month Headers */}
+            {/* Month & Week Headers */}
             <div className="flex border-b border-gray-700 mb-2">
-              {months.map((month, idx) => (
-                <div
-                  key={idx}
-                  className="text-center text-gray-400 text-sm py-2 border-r border-gray-700 last:border-r-0"
-                  style={{ width: `${100 / months.length}%` }}
-                >
-                  {month.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                </div>
-              ))}
+              {/* Task label column */}
+              <div className="w-40 shrink-0 border-r border-gray-700 px-2 py-2">
+                <span className="text-xs text-gray-500 uppercase tracking-wider">Phase / Task</span>
+              </div>
+              {/* Month headers */}
+              <div className="flex-1 flex">
+                {months.map((month, idx) => {
+                  // Get number of weeks in this month
+                  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+                  const startDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+                  const weeks = Math.ceil((daysInMonth + startDay) / 7);
+                  return (
+                    <div
+                      key={idx}
+                      className="flex flex-col border-r border-gray-700 last:border-r-0"
+                      style={{ flex: weeks }}
+                    >
+                      <div className="text-center text-gray-300 text-sm py-1 font-medium">
+                        {month.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+                      </div>
+                      <div className="flex">
+                        {Array.from({ length: weeks }).map((_, wIdx) => (
+                          <div
+                            key={wIdx}
+                            className="flex-1 text-center text-xs text-gray-500 py-0.5 border-r border-gray-800 last:border-r-0"
+                          >
+                            W{wIdx + 1}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Gantt Bars */}
@@ -356,7 +397,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
               </div>
 
               {/* Task Rows */}
-              <div className="relative space-y-3 pt-8">
+              <div className="relative space-y-2">
                 {tasks.map((task, idx) => {
                   const pos = getTaskPosition(task);
                   return (
@@ -365,34 +406,73 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className="relative h-12 flex items-center cursor-pointer group"
+                      className="relative h-14 flex items-center group cursor-pointer"
                       onClick={() => setSelectedTask(task)}
                     >
                       {/* Task Label */}
-                      <div className="absolute left-0 w-40 text-sm text-gray-300 truncate pr-2 z-10 flex flex-col">
-                        <span className="truncate font-medium">{task.name}</span>
-                        {task.scenes !== undefined && task.scenes > 0 && (
-                          <span className="text-xs text-gray-500">{task.scenes} scenes</span>
-                        )}
+                      <div className="w-40 shrink-0 px-2 pr-4 z-10">
+                        <div className="flex items-center gap-2">
+                          {task.status === 'completed' && (
+                            <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                          )}
+                          {task.status === 'in-progress' && (
+                            <PlayCircle className="w-4 h-4 text-yellow-400 shrink-0" />
+                          )}
+                          {task.status === 'pending' && (
+                            <AlertCircle className="w-4 h-4 text-gray-500 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm text-gray-200 truncate font-medium">{task.name}</div>
+                            {task.scenes !== undefined && task.scenes > 0 && (
+                              <div className="text-xs text-gray-500 flex items-center gap-1">
+                                <Film className="w-3 h-3" />
+                                {task.scenes} scenes
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Task Bar */}
-                      <div
-                        className={`absolute h-10 rounded-lg ${typeColors[task.type]} cursor-pointer hover:opacity-80 transition-opacity border-2 ${
-                          task.status === 'completed' ? 'border-green-400' : 
-                          task.status === 'in-progress' ? 'border-yellow-400' : 'border-transparent'
-                        }`}
-                        style={{ left: `calc(11rem + ${pos.left})`, width: pos.width }}
-                      >
-                        {/* Progress Fill */}
-                        <div
-                          className="h-full bg-white/20 rounded-lg"
-                          style={{ width: `${task.progress}%` }}
-                        />
-                        {/* Progress Text */}
-                        <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
-                          {task.progress > 0 ? `${task.progress}%` : task.status}
-                        </span>
+                      {/* Timeline Track */}
+                      <div className="flex-1 relative h-full">
+                        {/* Grid Lines */}
+                        <div className="absolute inset-0 flex">
+                          {months.map((_, mIdx) => {
+                            const daysInMonth = new Date(months[mIdx].getFullYear(), months[mIdx].getMonth() + 1, 0).getDate();
+                            const startDay = new Date(months[mIdx].getFullYear(), months[mIdx].getMonth(), 1).getDay();
+                            const weeks = Math.ceil((daysInMonth + startDay) / 7);
+                            return Array.from({ length: weeks }).map((_, wIdx) => (
+                              <div key={wIdx} className="flex-1 border-r border-gray-800/50 last:border-r-0" />
+                            ));
+                          })}
+                        </div>
+                        
+                        {/* Task Bar */}
+                        <div className="absolute top-1/2 -translate-y-1/2">
+                          <div
+                            className={`h-8 rounded-lg ${typeColors[task.type]} cursor-pointer hover:opacity-80 transition-all border-2 ${
+                              task.status === 'completed' ? 'border-green-400' : 
+                              task.status === 'in-progress' ? 'border-yellow-400' : 'border-transparent'
+                            } shadow-lg`}
+                            style={{ 
+                              left: pos.left, 
+                              width: pos.width,
+                              minWidth: '40px'
+                            }}
+                          >
+                            {/* Progress Fill */}
+                            <div
+                              className="h-full bg-white/20 rounded-l-lg"
+                              style={{ width: `${task.progress}%` }}
+                            />
+                            {/* Progress Text */}
+                            {pos.width > '15%' && (
+                              <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white truncate px-2">
+                                {task.progress > 0 ? `${task.progress}%` : task.status.replace('-', ' ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </motion.div>
                   );

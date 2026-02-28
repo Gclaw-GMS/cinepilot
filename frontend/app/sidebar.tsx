@@ -27,6 +27,8 @@ import {
   Gauge,
   ListChecks,
   Film,
+  Folder,
+  Briefcase,
 } from 'lucide-react'
 
 type NavItem = {
@@ -84,7 +86,14 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Team',
     items: [
       { href: '/crew', icon: Users, label: 'Crew' },
+      { href: '/collaboration', icon: Briefcase, label: 'Team Collaboration' },
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
+    ],
+  },
+  {
+    title: 'Management',
+    items: [
+      { href: '/projects', icon: Folder, label: 'Projects' },
     ],
   },
   {

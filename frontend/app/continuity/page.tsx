@@ -33,6 +33,7 @@ export default function ContinuityPage() {
   const [checking, setChecking] = useState(false);
   const [filter, setFilter] = useState('');
   const [error, setError] = useState('');
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -48,11 +49,13 @@ export default function ContinuityPage() {
     if (!scriptId) return;
     setLoading(true);
     setError('');
+    setIsDemoMode(false);
     try {
       const res = await fetch(`/api/continuity?scriptId=${scriptId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch');
-      setWarnings(Array.isArray(data) ? data : []);
+      setWarnings(Array.isArray(data) ? data : (data.warnings || []));
+      setIsDemoMode(!!data.isDemo);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load warnings');
       setWarnings([]);
@@ -69,6 +72,7 @@ export default function ContinuityPage() {
     if (!selectedScript) return;
     setChecking(true);
     setError('');
+    setIsDemoMode(false);
     try {
       const res = await fetch('/api/continuity', {
         method: 'POST',
@@ -77,6 +81,7 @@ export default function ContinuityPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Check failed');
+      setIsDemoMode(!!data.isDemo);
       await fetchWarnings(selectedScript);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Continuity check failed');
@@ -173,6 +178,13 @@ export default function ContinuityPage() {
         {error && (
           <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-4 text-red-400 text-sm">
             {error}
+          </div>
+        )}
+
+        {isDemoMode && (
+          <div className="bg-amber-900/20 border border-amber-800/50 rounded-xl p-4 text-amber-400 text-sm flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Showing demo data — connect a database for real continuity analysis
           </div>
         )}
 

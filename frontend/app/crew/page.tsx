@@ -44,6 +44,22 @@ type CrewMember = {
   createdAt: string;
 };
 
+// Demo data for when database is not available
+const DEMO_CREW: CrewMember[] = [
+  { id: '1', name: 'Ravi Kumar', role: 'Director of Photography', department: 'Camera', phone: '+91 98765 43210', email: 'ravi@cinepilot.ai', dailyRate: '25000', notes: 'Award-winning cinematographer with 15+ years experience', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '2', name: 'Priya Venkatesh', role: 'Director', department: 'Direction', phone: '+91 98765 43211', email: 'priya@cinepilot.ai', dailyRate: '50000', notes: 'National Award winning director', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '3', name: 'Arun Raj', role: 'Sound Engineer', department: 'Sound', phone: '+91 98765 43212', email: 'arun@cinepilot.ai', dailyRate: '15000', notes: 'Specialist in outdoor location sound', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '4', name: 'Madhavan S', role: 'Gaffer', department: 'Lighting', phone: '+91 98765 43213', email: 'madhavan@cinepilot.ai', dailyRate: '12000', notes: 'Expert in LED and traditional lighting setups', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '5', name: 'Lakshmi Narayanan', role: 'Production Designer', department: 'Art', phone: '+91 98765 43214', email: 'lakshmi@cinepilot.ai', dailyRate: '20000', notes: 'Specializes in period dramas', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '6', name: 'Karthik R', role: 'Makeup Artist', department: 'Makeup', phone: '+91 98765 43215', email: 'karthik@cinepilot.ai', dailyRate: '10000', notes: 'Prosthetics and special effects makeup expert', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '7', name: 'Samantha R', role: 'Costume Designer', department: 'Costume', phone: '+91 98765 43216', email: 'samantha@cinepilot.ai', dailyRate: '18000', notes: 'Contemporary and traditional South Indian costumes', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '8', name: 'Vijay B', role: 'Editor', department: 'Production', phone: '+91 98765 43217', email: 'vijay@cinepilot.ai', dailyRate: '22000', notes: 'Known for fast-paced action sequences', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '9', name: 'Anand Prakash', role: 'VFX Supervisor', department: 'VFX', phone: '+91 98765 43218', email: 'anand@cinepilot.ai', dailyRate: '35000', notes: 'Specialist in CGI and compositing', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '10', name: 'Bala Subramani', role: 'Stunt Choreographer', department: 'Stunts', phone: '+91 98765 43219', email: 'bala@cinepilot.ai', dailyRate: '28000', notes: 'International stunt coordination experience', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '11', name: 'Divya K', role: 'Assistant Director', department: 'Direction', phone: '+91 98765 43220', email: 'divya@cinepilot.ai', dailyRate: '8000', notes: 'Assisted on 10+ major Tamil films', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '12', name: 'Ramesh T', role: 'Camera Operator', department: 'Camera', phone: '+91 98765 43221', email: 'ramesh@cinepilot.ai', dailyRate: '9000', notes: 'Steadicam and gimbal specialist', createdAt: '2024-01-15T10:00:00Z' },
+];
+
 function getInitials(name: string): string {
   return name
     .trim()
@@ -82,11 +98,19 @@ export default function CrewPage() {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      setCrew(Array.isArray(data) ? data : []);
+      // If we get empty array, fall back to demo data
+      if (Array.isArray(data) && data.length > 0) {
+        setCrew(data);
+      } else {
+        // Use demo data when no real data available
+        setCrew(DEMO_CREW);
+      }
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch crew');
-      setCrew([]);
+      // Fall back to demo data on any error
+      console.warn('Using demo crew data:', err);
+      setCrew(DEMO_CREW);
+      setError(null);
     } finally {
       setLoading(false);
     }

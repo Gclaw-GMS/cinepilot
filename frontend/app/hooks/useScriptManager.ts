@@ -229,7 +229,10 @@ function analyzeScenes(scenes: Scene[]): { breakdown: Analysis, quality: Analysi
   }
 }
 
-// LocalStorage keys
+// API endpoint
+const API_URL = '/api/scripts'
+
+// LocalStorage keys (for offline fallback)
 const SCRIPTS_KEY = 'cinepilot_scripts'
 const CHARACTERS_KEY = 'cinepilot_characters'
 const ANALYSES_KEY = 'cinepilot_analyses'
@@ -413,38 +416,69 @@ export function useScriptManager() {
   const [processing, setProcessing] = useState(false)
   const [processProgress, setProcessProgress] = useState('')
 
-  // Load from localStorage on mount
+  // Load from API on mount
   useEffect(() => {
-    const loadData = () => {
+    const loadData = async () => {
       try {
-        const savedScripts = localStorage.getItem(SCRIPTS_KEY)
-        const savedCharacters = localStorage.getItem(CHARACTERS_KEY)
-        const savedAnalyses = localStorage.getItem(ANALYSES_KEY)
-
-        if (savedScripts) {
-          const parsed = JSON.parse(savedScripts)
-          setScripts(parsed)
-          setIsDemoMode(false)
+        // Try to fetch from API first
+        const res = await fetch(API_URL)
+        if (res.ok) {
+          const data = await res.json()
+          
+          if (data.scripts && data.scripts.length > 0) {
+            // Use real data from API
+            setScripts(data.scripts)
+            setCharacters(data.characters || [])
+            setAnalyses(data.analyses || [])
+            setIsDemoMode(data.isDemo === true)
+            
+            // Cache in localStorage
+            localStorage.setItem(SCRIPTS_KEY, JSON.stringify(data.scripts))
+            localStorage.setItem(CHARACTERS_KEY, JSON.stringify(data.characters || []))
+            localStorage.setItem(ANALYSES_KEY, JSON.stringify(data.analyses || []))
+          } else {
+            // No scripts in DB, load demo data
+            setScripts(DEMO_SCRIPTS)
+            setCharacters(DEMO_CHARACTERS)
+            setAnalyses(DEMO_ANALYSES)
+            setIsDemoMode(true)
+          }
         } else {
-          // Load demo data on first run
+          throw new Error('API returned error')
+        }
+      } catch (e) {
+        console.warn('API fetch failed, trying localStorage:', e)
+        // Fallback to localStorage
+        try {
+          const savedScripts = localStorage.getItem(SCRIPTS_KEY)
+          const savedCharacters = localStorage.getItem(CHARACTERS_KEY)
+          const savedAnalyses = localStorage.getItem(ANALYSES_KEY)
+
+          if (savedScripts) {
+            const parsed = JSON.parse(savedScripts)
+            setScripts(parsed)
+            setIsDemoMode(false)
+          } else {
+            // Load demo data on first run
+            setScripts(DEMO_SCRIPTS)
+            setCharacters(DEMO_CHARACTERS)
+            setAnalyses(DEMO_ANALYSES)
+            setIsDemoMode(true)
+            // Save demo data to localStorage
+            localStorage.setItem(SCRIPTS_KEY, JSON.stringify(DEMO_SCRIPTS))
+            localStorage.setItem(CHARACTERS_KEY, JSON.stringify(DEMO_CHARACTERS))
+            localStorage.setItem(ANALYSES_KEY, JSON.stringify(DEMO_ANALYSES))
+          }
+
+          if (savedCharacters) setCharacters(JSON.parse(savedCharacters))
+          if (savedAnalyses) setAnalyses(JSON.parse(savedAnalyses))
+        } catch (e2) {
+          console.error('Error loading from localStorage:', e2)
           setScripts(DEMO_SCRIPTS)
           setCharacters(DEMO_CHARACTERS)
           setAnalyses(DEMO_ANALYSES)
           setIsDemoMode(true)
-          // Save demo data to localStorage
-          localStorage.setItem(SCRIPTS_KEY, JSON.stringify(DEMO_SCRIPTS))
-          localStorage.setItem(CHARACTERS_KEY, JSON.stringify(DEMO_CHARACTERS))
-          localStorage.setItem(ANALYSES_KEY, JSON.stringify(DEMO_ANALYSES))
         }
-
-        if (savedCharacters) setCharacters(JSON.parse(savedCharacters))
-        if (savedAnalyses) setAnalyses(JSON.parse(savedAnalyses))
-      } catch (e) {
-        console.error('Error loading scripts:', e)
-        setScripts(DEMO_SCRIPTS)
-        setCharacters(DEMO_CHARACTERS)
-        setAnalyses(DEMO_ANALYSES)
-        setIsDemoMode(true)
       } finally {
         setLoading(false)
       }
@@ -469,6 +503,46 @@ export function useScriptManager() {
     setProcessing(true)
     setProcessProgress('Reading file...')
 
+    try {
+      // Try to upload to API first
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      setProcessProgress('Uploading to server...')
+      const apiRes = await fetch(API_URL, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (apiRes.ok) {
+        // API upload successful - reload data from API
+        setProcessProgress('Processing script...')
+        const data = await apiRes.json()
+        
+        // Refresh data from API to get processed script
+        const refreshRes = await fetch(API_URL)
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json()
+          setScripts(refreshData.scripts || [])
+          setCharacters(refreshData.characters || [])
+          setAnalyses(refreshData.analyses || [])
+          setIsDemoMode(refreshData.isDemo === true)
+          
+          // Cache in localStorage
+          saveData(refreshData.scripts || [], refreshData.characters || [], refreshData.analyses || [])
+        }
+        
+        setProcessProgress('Done!')
+        return { success: true }
+      } else {
+        // API failed - fall back to client-side parsing
+        console.warn('API upload failed, using client-side parsing')
+      }
+    } catch (e) {
+      console.warn('API upload failed, using client-side parsing:', e)
+    }
+
+    // Client-side parsing fallback
     try {
       const content = await file.text()
       const title = file.name.replace(/\.[^/.]+$/, '')

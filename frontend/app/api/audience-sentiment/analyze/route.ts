@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/db'
 
 // Sample comments for demo (in production, this would scrape from YouTube/Social media)
 const DEMO_COMMENTS = [

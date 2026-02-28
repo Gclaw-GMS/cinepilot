@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
+} from 'recharts';
 
 type Script = { id: string; title: string };
 
@@ -36,11 +39,47 @@ type Summary = {
   complexityBreakdown: { simple: number; moderate: number; complex: number };
 };
 
+// Demo data for when no real data exists
+const DEMO_VFX_NOTES: VfxNote[] = [
+  { id: 'demo-1', sceneId: 's1', description: 'Explosion sequence with fire and debris - requires CGI fire simulation', vfxType: 'explicit', confidence: 0.92, scene: { sceneNumber: '12', headingRaw: 'EXT. WAREHOUSE - NIGHT', sceneIndex: 11 } },
+  { id: 'demo-2', sceneId: 's1', description: 'Bullet time effect during the chase - wire removal needed', vfxType: 'explicit', confidence: 0.85, scene: { sceneNumber: '15', headingRaw: 'EXT. CITY STREETS - NIGHT', sceneIndex: 14 } },
+  { id: 'demo-3', sceneId: 's2', description: 'Supernatural glow around character hands - digital enhancement', vfxType: 'explicit', confidence: 0.78, scene: { sceneNumber: '23', headingRaw: 'INT. TEMPLE - NIGHT', sceneIndex: 22 } },
+  { id: 'demo-4', sceneId: 's3', description: 'City skyline with digital matte painting for timeline change', vfxType: 'implied', confidence: 0.65, scene: { sceneNumber: '5', headingRaw: 'EXT. ROOFTOP - SUNSET', sceneIndex: 4 } },
+  { id: 'demo-5', sceneId: 's4', description: 'Blood splatter removal for UA certificate', vfxType: 'explicit', confidence: 0.55, scene: { sceneNumber: '31', headingRaw: 'INT. WAREHOUSE - NIGHT', sceneIndex: 30 } },
+  { id: 'demo-6', sceneId: 's5', description: 'Reflective eyes effect for the antagonist', vfxType: 'implied', confidence: 0.42, scene: { sceneNumber: '18', headingRaw: 'INT. VILLAIN LAIR - NIGHT', sceneIndex: 17 } },
+  { id: 'demo-7', sceneId: 's6', description: 'Weather effects - rain and mist for atmosphere', vfxType: 'implied', confidence: 0.35, scene: { sceneNumber: '8', headingRaw: 'EXT. FOREST - NIGHT', sceneIndex: 7 } },
+];
+
+const DEMO_VFX_WARNINGS: VfxWarning[] = [
+  { id: 'w1', sceneId: 's1', warningType: 'vfx', description: 'High VFX complexity detected - budget impact likely for Scene 12', severity: 'high', scene: { sceneNumber: '12', headingRaw: 'EXT. WAREHOUSE - NIGHT', sceneIndex: 11 } },
+  { id: 'w2', sceneId: 's2', warningType: 'vfx', description: 'Bullet time effect requires specialized crew - check availability', severity: 'medium', scene: { sceneNumber: '15', headingRaw: 'EXT. CITY STREETS - NIGHT', sceneIndex: 14 } },
+  { id: 'w3', sceneId: 's3', warningType: 'vfx', description: 'Scene 23 glow effect may affect certification - review content', severity: 'medium', scene: { sceneNumber: '23', headingRaw: 'INT. TEMPLE - NIGHT', sceneIndex: 22 } },
+];
+
+const DEMO_VFX_PROPS: VfxProp[] = [
+  { id: 'p1', scene: { sceneNumber: '12', headingRaw: 'EXT. WAREHOUSE - NIGHT' }, prop: { name: 'Explosion Debris', description: 'CGI debris particles' } },
+  { id: 'p2', scene: { sceneNumber: '23', headingRaw: 'INT. TEMPLE - NIGHT' }, prop: { name: 'Supernatural Glow', description: 'Digital aura effect' } },
+];
+
+const DEMO_SUMMARY: Summary = {
+  totalScenes: 6,
+  totalNotes: 7,
+  totalWarnings: 3,
+  complexityBreakdown: { simple: 2, moderate: 2, complex: 3 },
+};
+
+const DEMO_SCRIPTS: Script[] = [
+  { id: 'demo-script-1', title: 'Thunivu (Demo Script)' },
+  { id: 'demo-script-2', title: 'Jawan (Demo Script)' },
+];
+
 const COMPLEXITY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   simple: { bg: 'bg-slate-700/50', text: 'text-slate-300', border: 'border-slate-600' },
   moderate: { bg: 'bg-amber-900/30', text: 'text-amber-400', border: 'border-amber-700/50' },
   complex: { bg: 'bg-orange-900/30', text: 'text-orange-400', border: 'border-orange-700/50' },
 };
+
+const CHART_COLORS = ['#10b981', '#f59e0b', '#ef4444'];
 
 function getComplexity(confidence: number): string {
   if (confidence >= 0.8) return 'complex';
@@ -62,15 +101,26 @@ export default function VfxPage() {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
+  const [isUsingDemo, setIsUsingDemo] = useState(false);
 
   useEffect(() => {
     fetch('/api/scripts')
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : data.scripts || [];
-        setScripts(list);
+        if (list.length > 0) {
+          setScripts(list);
+        } else {
+          // Use demo scripts if no real scripts exist
+          setScripts(DEMO_SCRIPTS);
+          setIsUsingDemo(true);
+        }
       })
-      .catch(() => setScripts([]));
+      .catch(() => {
+        // Fallback to demo scripts on error
+        setScripts(DEMO_SCRIPTS);
+        setIsUsingDemo(true);
+      });
   }, []);
 
   const fetchVfxData = useCallback(async (scriptId: string) => {
@@ -81,16 +131,30 @@ export default function VfxPage() {
       const res = await fetch(`/api/vfx?scriptId=${scriptId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch');
-      setVfxNotes(data.vfxNotes || []);
-      setVfxWarnings(data.vfxWarnings || []);
-      setVfxProps(data.props || []);
-      setSummary(data.summary || null);
+      
+      // Use real data if available, otherwise use demo data
+      if (data.vfxNotes && data.vfxNotes.length > 0) {
+        setVfxNotes(data.vfxNotes || []);
+        setVfxWarnings(data.vfxWarnings || []);
+        setVfxProps(data.props || []);
+        setSummary(data.summary || null);
+        setIsUsingDemo(false);
+      } else {
+        // Load demo data when no real data exists
+        setVfxNotes(DEMO_VFX_NOTES);
+        setVfxWarnings(DEMO_VFX_WARNINGS);
+        setVfxProps(DEMO_VFX_PROPS);
+        setSummary(DEMO_SUMMARY);
+        setIsUsingDemo(true);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load VFX data');
-      setVfxNotes([]);
-      setVfxWarnings([]);
-      setVfxProps([]);
-      setSummary(null);
+      // On error, load demo data for better UX
+      console.warn('Using demo VFX data:', err);
+      setVfxNotes(DEMO_VFX_NOTES);
+      setVfxWarnings(DEMO_VFX_WARNINGS);
+      setVfxProps(DEMO_VFX_PROPS);
+      setSummary(DEMO_SUMMARY);
+      setIsUsingDemo(true);
     } finally {
       setLoading(false);
     }
@@ -162,7 +226,15 @@ export default function VfxPage() {
               <Sparkles className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">VFX Breakdown</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold">VFX Breakdown</h1>
+                {isUsingDemo && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full border border-amber-500/30">
+                    <AlertCircle className="w-3 h-3" />
+                    Demo Data
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-400">
                 Scene-by-scene visual effects requirements and complexity analysis
               </p>
@@ -205,35 +277,118 @@ export default function VfxPage() {
 
         {/* Summary Stats */}
         {summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Film className="w-4 h-4 text-purple-400" />
-                <span className="text-xs text-slate-400">VFX Scenes</span>
-              </div>
-              <div className="text-2xl font-bold">{summary.totalScenes}</div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-purple-400" />
-                <span className="text-xs text-slate-400">VFX Notes</span>
-              </div>
-              <div className="text-2xl font-bold">{summary.totalNotes}</div>
-            </div>
-            {(['simple', 'moderate', 'complex'] as const).map((level) => {
-              const count = summary.complexityBreakdown[level];
-              const style = getComplexityStyle(level);
-              return (
-                <div
-                  key={level}
-                  className={`${style.bg} border ${style.border} rounded-xl p-4`}
-                >
-                  <div className="text-xs text-slate-400 mb-2 capitalize">{level}</div>
-                  <div className={`text-2xl font-bold ${style.text}`}>{count}</div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Film className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs text-slate-400">VFX Scenes</span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="text-2xl font-bold">{summary.totalScenes}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs text-slate-400">VFX Notes</span>
+                </div>
+                <div className="text-2xl font-bold">{summary.totalNotes}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs text-slate-400">Warnings</span>
+                </div>
+                <div className="text-2xl font-bold">{summary.totalWarnings}</div>
+              </div>
+              {(['simple', 'moderate', 'complex'] as const).map((level) => {
+                const count = summary.complexityBreakdown[level];
+                const style = getComplexityStyle(level);
+                return (
+                  <div
+                    key={level}
+                    className={`${style.bg} border ${style.border} rounded-xl p-4`}
+                  >
+                    <div className="text-xs text-slate-400 mb-2 capitalize">{level}</div>
+                    <div className={`text-2xl font-bold ${style.text}`}>{count}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Visualization Charts */}
+            {vfxNotes.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Complexity Distribution Pie Chart */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-purple-400" />
+                    Complexity Distribution
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Simple', value: summary.complexityBreakdown.simple },
+                            { name: 'Moderate', value: summary.complexityBreakdown.moderate },
+                            { name: 'Complex', value: summary.complexityBreakdown.complex },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {[0, 1, 2].map((index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                          itemStyle={{ color: '#e2e8f0' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Scene Complexity Bar Chart */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-purple-400" />
+                    Scene Complexity
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={sortedScenes.map(([sceneNum, group]) => {
+                          const maxConf = Math.max(...group.notes.map(n => n.confidence), 0);
+                          return {
+                            scene: `S${sceneNum}`,
+                            confidence: Math.round(maxConf * 100),
+                            complexity: getComplexity(maxConf),
+                          };
+                        })}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="scene" stroke="#94a3b8" fontSize={12} />
+                        <YAxis stroke="#94a3b8" fontSize={12} domain={[0, 100]} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                          itemStyle={{ color: '#e2e8f0' }}
+                          formatter={(value: number) => [`${value}%`, 'Confidence']}
+                        />
+                        <Bar dataKey="confidence" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {loading && (

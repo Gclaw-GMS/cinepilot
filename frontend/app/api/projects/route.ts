@@ -3,23 +3,79 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_USER_ID = 'default-user';
 
+// Demo data for when database is not connected
+const DEMO_PROJECTS = [
+  {
+    id: 'demo-project-1',
+    name: 'Kaathal - The Core',
+    description: 'A gripping political drama set in Tamil Nadu',
+    status: 'shooting',
+    language: 'tamil',
+    genre: 'Drama/Political',
+    budget: '85000000',
+    startDate: '2026-01-15',
+    endDate: '2026-03-15',
+    createdAt: '2025-12-01',
+    scriptCount: 2,
+    crewCount: 45,
+    isDemo: true,
+  },
+  {
+    id: 'demo-project-2',
+    name: 'Vettaiyaadu',
+    description: 'An investigative thriller in the hills of Ooty',
+    status: 'pre-production',
+    language: 'tamil',
+    genre: 'Thriller/Mystery',
+    budget: '42000000',
+    startDate: '2026-04-01',
+    endDate: '2026-06-30',
+    createdAt: '2025-11-15',
+    scriptCount: 1,
+    crewCount: 28,
+    isDemo: true,
+  },
+  {
+    id: 'demo-project-3',
+    name: 'Madras Talkies',
+    description: 'A coming-of-age story about film students',
+    status: 'planning',
+    language: 'tamil',
+    genre: 'Comedy/Drama',
+    budget: '25000000',
+    startDate: '2026-07-01',
+    endDate: '2026-09-15',
+    createdAt: '2026-01-10',
+    scriptCount: 1,
+    crewCount: 12,
+    isDemo: true,
+  },
+];
+
 async function ensureDefaultUser(): Promise<string> {
-  let user = await prisma.user.findUnique({ where: { id: DEFAULT_USER_ID } });
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        id: DEFAULT_USER_ID,
-        email: 'dev@cinepilot.ai',
-        passwordHash: 'none',
-        name: 'Dev User',
-      },
-    });
+  try {
+    let user = await prisma.user.findUnique({ where: { id: DEFAULT_USER_ID } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: DEFAULT_USER_ID,
+          email: 'dev@cinepilot.ai',
+          passwordHash: 'none',
+          name: 'Dev User',
+        },
+      });
+    }
+    return user.id;
+  } catch {
+    return DEFAULT_USER_ID;
   }
-  return user.id;
 }
 
 // GET /api/projects - List all projects
 export async function GET(req: NextRequest) {
+  // Check for demo mode flag
+  const isDemoMode = req.nextUrl.searchParams.get('demo') === 'true';
+  
   try {
     const userId = await ensureDefaultUser();
     
@@ -55,9 +111,13 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(transformed);
   } catch (error) {
-    console.error('[GET /api/projects]', error);
+    // If database is not connected, return demo data
+    console.log('[GET /api/projects] Database not connected, using demo data');
+    if (isDemoMode || process.env.NODE_ENV !== 'production') {
+      return NextResponse.json(DEMO_PROJECTS);
+    }
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message, demoData: DEMO_PROJECTS }, { status: 500 });
   }
 }
 

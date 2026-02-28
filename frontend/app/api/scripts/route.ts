@@ -11,40 +11,162 @@ import {
 const DEFAULT_PROJECT_ID = 'default-project';
 const DEFAULT_USER_ID = 'default-user';
 
-async function ensureDefaultProject() {
-  let project = await prisma.project.findFirst({
-    where: { id: DEFAULT_PROJECT_ID },
-  });
+// Demo data for scripts
+const DEMO_SCRIPTS = {
+  scripts: [
+    {
+      id: 'demo-script-1',
+      projectId: 'demo-project-1',
+      title: 'Kaathal - The Core (Final Draft)',
+      version: 3,
+      isActive: true,
+      createdAt: new Date('2025-12-15').toISOString(),
+      updatedAt: new Date('2026-01-10').toISOString(),
+      content: `INT. COURTROOM - DAY\n\nThe judge enters. Everyone stands.\n\nJUDGE\nCourt is now in session.\n\n...`,
+      scenes: [
+        {
+          id: 'scene-1',
+          sceneNumber: '1',
+          sceneIndex: 0,
+          headingRaw: 'INT. COURTROOM - DAY',
+          intExt: 'INT',
+          timeOfDay: 'DAY',
+          location: 'COURTROOM',
+          confidence: 0.95,
+          sceneCharacters: [
+            { character: { id: 'char-1', name: 'JUDGE', aliases: [] } },
+            { character: { id: 'char-2', name: 'RAVI', aliases: [] } },
+          ],
+          sceneLocations: [{ name: 'COURTROOM', details: 'A high court in Chennai' }],
+          sceneProps: [],
+          vfxNotes: [],
+          warnings: [],
+        },
+        {
+          id: 'scene-2',
+          sceneNumber: '2',
+          sceneIndex: 1,
+          headingRaw: 'EXT. TEMPLE - NIGHT',
+          intExt: 'EXT',
+          timeOfDay: 'NIGHT',
+          location: 'KAPALEESHWARAR TEMPLE',
+          confidence: 0.92,
+          sceneCharacters: [
+            { character: { id: 'char-3', name: 'DIVYA', aliases: [] } },
+          ],
+          sceneLocations: [{ name: 'KAPALEESHWARAR TEMPLE', details: 'Mylapore, Chennai' }],
+          sceneProps: [{ prop: { name: 'DIYA' } }],
+          vfxNotes: [],
+          warnings: [{ warningType: 'VFX', description: 'Night shooting requires permits', severity: 'medium' }],
+        },
+        {
+          id: 'scene-3',
+          sceneNumber: '3',
+          sceneIndex: 2,
+          headingRaw: 'INT. RAVI\'S HOUSE - DAY',
+          intExt: 'INT',
+          timeOfDay: 'DAY',
+          location: 'RAVI\'S HOUSE',
+          confidence: 0.98,
+          sceneCharacters: [
+            { character: { id: 'char-2', name: 'RAVI', aliases: [] } },
+            { character: { id: 'char-4', name: 'SARATH', aliases: [] } },
+          ],
+          sceneLocations: [{ name: 'RAVI\'S HOUSE', details: 'A modest apartment in Adyar' }],
+          sceneProps: [{ prop: { name: 'PHOTOGRAPH' } }, { prop: { name: 'COFFEE CUP' } }],
+          vfxNotes: [],
+          warnings: [],
+        },
+      ],
+      scriptVersions: [{ id: 'v1', versionNumber: 3, extractionScore: 0.94 }],
+    },
+    {
+      id: 'demo-script-2',
+      projectId: 'demo-project-1',
+      title: 'Kaathal - Scene Extensions',
+      version: 1,
+      isActive: false,
+      createdAt: new Date('2026-01-05').toISOString(),
+      updatedAt: new Date('2026-01-05').toISOString(),
+      content: `EXT. BEACH - SUNRISE\n\nThe sun rises over the Marina Beach...\n`,
+      scenes: [],
+      scriptVersions: [{ id: 'v2', versionNumber: 1, extractionScore: 0.88 }],
+    },
+  ],
+  characters: [
+    { id: 'char-1', name: 'JUDGE', aliases: [], roleHint: 'Honorable Judge', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }] },
+    { id: 'char-2', name: 'RAVI', aliases: ['Ravi Kumar'], roleHint: 'Protagonist', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }, { sceneId: 'scene-3', isSpeaking: true }] },
+    { id: 'char-3', name: 'DIVYA', aliases: [], roleHint: 'Female Lead', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-2', isSpeaking: true }] },
+    { id: 'char-4', name: 'SARATH', aliases: [], roleHint: 'Antagonist', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-3', isSpeaking: true }] },
+    { id: 'char-5', name: 'KANMANI', aliases: ['Kani'], roleHint: 'Comic Relief', projectId: 'demo-project-1', sceneCharacters: [] },
+  ],
+  props: [
+    { id: 'prop-1', name: 'DIYA', projectId: 'demo-project-1' },
+    { id: 'prop-2', name: 'PHOTOGRAPH', projectId: 'demo-project-1' },
+    { id: 'prop-3', name: 'COFFEE CUP', projectId: 'demo-project-1' },
+  ],
+  analyses: [
+    {
+      id: 'analysis-1',
+      projectId: 'demo-project-1',
+      analysisType: 'breakdown_summary',
+      result: {
+        totalScenes: 3,
+        intScenes: 2,
+        extScenes: 1,
+        dayScenes: 2,
+        nightScenes: 1,
+        locations: ['COURTROOM', 'KAPALEESHWARAR TEMPLE', 'RAVI\'S HOUSE'],
+        characters: ['JUDGE', 'RAVI', 'DIVYA', 'SARATH'],
+        props: ['DIYA', 'PHOTOGRAPH', 'COFFEE CUP'],
+      },
+      modelUsed: 'gpt-4',
+      createdAt: new Date('2025-12-20').toISOString(),
+    },
+  ],
+};
 
-  if (!project) {
-    let user = await prisma.user.findFirst({ where: { id: DEFAULT_USER_ID } });
-    if (!user) {
-      user = await prisma.user.create({
+async function ensureDefaultProject() {
+  try {
+    let project = await prisma.project.findFirst({
+      where: { id: DEFAULT_PROJECT_ID },
+    });
+
+    if (!project) {
+      let user = await prisma.user.findFirst({ where: { id: DEFAULT_USER_ID } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            id: DEFAULT_USER_ID,
+            email: 'admin@cinepilot.local',
+            passwordHash: 'placeholder',
+            name: 'CinePilot Admin',
+            role: 'producer',
+          },
+        });
+      }
+
+      project = await prisma.project.create({
         data: {
-          id: DEFAULT_USER_ID,
-          email: 'admin@cinepilot.local',
-          passwordHash: 'placeholder',
-          name: 'CinePilot Admin',
-          role: 'producer',
+          id: DEFAULT_PROJECT_ID,
+          name: 'Default Project',
+          description: 'Auto-created default project',
+          userId: user.id,
         },
       });
     }
 
-    project = await prisma.project.create({
-      data: {
-        id: DEFAULT_PROJECT_ID,
-        name: 'Default Project',
-        description: 'Auto-created default project',
-        userId: user.id,
-      },
-    });
+    return project;
+  } catch (error) {
+    console.log('[ensureDefaultProject] Database not available');
+    return null;
   }
-
-  return project;
 }
 
 // GET /api/scripts — list scripts for a project
 export async function GET(req: NextRequest) {
+  const isDemoMode = req.nextUrl.searchParams.get('demo') === 'true';
+  
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
 
@@ -92,9 +214,13 @@ export async function GET(req: NextRequest) {
       analyses,
     });
   } catch (error) {
+    console.log('[GET /api/scripts] Database not connected, using demo data');
+    if (isDemoMode || process.env.NODE_ENV !== 'production') {
+      return NextResponse.json(DEMO_SCRIPTS);
+    }
     console.error('[GET /api/scripts]', error);
     return NextResponse.json(
-      { error: 'Failed to fetch scripts' },
+      { error: 'Failed to fetch scripts', ...DEMO_SCRIPTS },
       { status: 500 }
     );
   }

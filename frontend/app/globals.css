@@ -6,6 +6,100 @@
   --foreground-rgb: 248, 250, 252;
   --background-start-rgb: 2, 6, 23;
   --background-end-rgb: 2, 6, 23;
+  
+  /* CinePilot theme colors */
+  --cinepilot-dark: #0a0a0a;
+  --cinepilot-card: #111111;
+  --cinepilot-border: #1a1a1a;
+  --cinepilot-accent: #00d4ff;
+  --cinepilot-success: #00e676;
+  --cinepilot-warning: #ffd740;
+  --cinepilot-danger: #ff5252;
+}
+
+/* CinePilot component utilities */
+@layer components {
+  .bg-cinepilot-dark {
+    background-color: var(--cinepilot-dark);
+  }
+  
+  .bg-cinepilot-card {
+    background-color: var(--cinepilot-card);
+  }
+  
+  .border-cinepilot-border {
+    border-color: var(--cinepilot-border);
+  }
+  
+  .text-cinepilot-accent {
+    color: var(--cinepilot-accent);
+  }
+  
+  .bg-cinepilot-accent {
+    background-color: var(--cinepilot-accent);
+  }
+  
+  .border-cinepilot-accent {
+    border-color: var(--cinepilot-accent);
+  }
+  
+  .ring-cinepilot-accent {
+    --tw-ring-color: var(--cinepilot-accent);
+  }
+  
+  /* Hover variants */
+  .hover\:bg-cinepilot-accent:hover {
+    background-color: var(--cinepilot-accent);
+  }
+  
+  .hover\:text-cinepilot-accent:hover {
+    color: var(--cinepilot-accent);
+  }
+  
+  .hover\:border-cinepilot-accent:hover {
+    border-color: var(--cinepilot-accent);
+  }
+  
+  /* Focus variants */
+  .focus\:border-cinepilot-accent:focus {
+    border-color: var(--cinepilot-accent);
+  }
+  
+  .focus\:ring-cinepilot-accent:focus {
+    --tw-ring-color: var(--cinepilot-accent);
+  }
+  
+  /* Gradient backgrounds */
+  .bg-gradient-to-cinepilot {
+    background-image: linear-gradient(to right, var(--cinepilot-accent), #8b5cf6);
+  }
+  
+  /* Success colors */
+  .text-cinepilot-success {
+    color: var(--cinepilot-success);
+  }
+  
+  .bg-cinepilot-success {
+    background-color: var(--cinepilot-success);
+  }
+  
+  /* Warning colors */
+  .text-cinepilot-warning {
+    color: var(--cinepilot-warning);
+  }
+  
+  .bg-cinepilot-warning {
+    background-color: var(--cinepilot-warning);
+  }
+  
+  /* Danger colors */
+  .text-cinepilot-danger {
+    color: var(--cinepilot-danger);
+  }
+  
+  .bg-cinepilot-danger {
+    background-color: var(--cinepilot-danger);
+  }
 }
 
 * {

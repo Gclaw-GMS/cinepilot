@@ -118,10 +118,10 @@ export async function GET(req: NextRequest) {
         }
         case 'equipment': {
           // Equipment rentals
-          const equipment = await prisma.equipmentRental?.findMany?.({
+          const equipment = await prisma.equipmentRental.findMany({
             where: { projectId },
-          }).catch(() => []);
-          data = { equipment: equipment || [] };
+          });
+          data = { equipment };
           filename = 'equipment.json';
           break;
         }

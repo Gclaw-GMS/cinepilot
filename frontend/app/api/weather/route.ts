@@ -107,19 +107,30 @@ function getShootingRecommendation(
   return 'Suitable for filming with appropriate preparation';
 }
 
+// Default location: Chennai (Tamil Nadu) - hub for Tamil film industry
+const DEFAULT_LOCATION = {
+  lat: 13.0827,  // Chennai coordinates
+  lng: 80.2707,
+  name: 'Chennai, Tamil Nadu'
+};
+
 export async function GET(req: NextRequest) {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
   const useDemo = !apiKey || apiKey === 'your-openweathermap-key' || apiKey === 'demo';
 
-  const lat = req.nextUrl.searchParams.get('lat');
-  const lng = req.nextUrl.searchParams.get('lng');
-  const location = req.nextUrl.searchParams.get('location') ?? 'Unknown Location';
+  // Get lat/lng from query params, fall back to defaults
+  let lat = req.nextUrl.searchParams.get('lat');
+  let lng = req.nextUrl.searchParams.get('lng');
+  let location = req.nextUrl.searchParams.get('location');
 
+  // Use default location if not provided
   if (!lat || !lng) {
-    return NextResponse.json(
-      { error: 'Missing required parameters: lat and lng' },
-      { status: 400 }
-    );
+    lat = DEFAULT_LOCATION.lat.toString();
+    lng = DEFAULT_LOCATION.lng.toString();
+    location = location || DEFAULT_LOCATION.name;
+    console.log('[GET /api/weather] Using default location: Chennai, Tamil Nadu');
+  } else if (!location) {
+    location = `${lat}, ${lng}`;
   }
 
   const latNum = parseFloat(lat);

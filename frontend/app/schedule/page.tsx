@@ -51,6 +51,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true)
   const [optimizing, setOptimizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -66,6 +67,7 @@ export default function SchedulePage() {
       setShootingDays(data.shootingDays || [])
       setVersions(data.versions || [])
       setStats(data.stats || { totalDays: 0, totalHours: 0, totalScenes: 0 })
+      setIsDemoMode(data.isDemoMode === true)
     } catch (e) {
       console.error(e)
     } finally {

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp } from 'lucide-react'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface EquipmentRental {
   id: string
@@ -25,12 +26,19 @@ interface EquipmentStats {
 }
 
 const CATEGORIES = [
-  { id: 'camera', label: 'Camera', icon: Camera },
-  { id: 'lighting', label: 'Lighting', icon: Package },
-  { id: 'sound', label: 'Sound', icon: Package },
-  { id: 'grip', label: 'Grip', icon: Clapperboard },
-  { id: 'art', label: 'Art', icon: Package },
+  { id: 'camera', label: 'Camera', icon: Camera, color: '#6366f1' },
+  { id: 'lighting', label: 'Lighting', icon: Package, color: '#f59e0b' },
+  { id: 'sound', label: 'Sound', icon: Package, color: '#10b981' },
+  { id: 'grip', label: 'Grip', icon: Clapperboard, color: '#ec4899' },
+  { id: 'art', label: 'Art', icon: Package, color: '#8b5cf6' },
 ]
+
+const STATUS_COLORS: Record<string, string> = {
+  available: '#10b981',
+  'in-use': '#f59e0b',
+  maintenance: '#ef4444',
+  returned: '#6b7280',
+}
 
 const DEMO_EQUIPMENT: EquipmentRental[] = [
   { id: 'demo-1', projectId: 'demo', name: 'RED Komodo', category: 'camera', dateStart: '2026-03-01', dateEnd: '2026-03-15', dailyRate: 15000, vendor: 'Film Gear', status: 'available', quantity: 1, notes: null },
@@ -38,14 +46,20 @@ const DEMO_EQUIPMENT: EquipmentRental[] = [
   { id: 'demo-3', projectId: 'demo', name: 'Sennheiser MKH 416', category: 'sound', dateStart: '2026-03-05', dateEnd: '2026-03-20', dailyRate: 2500, vendor: 'Audio Pro', status: 'available', quantity: 1, notes: null },
   { id: 'demo-4', projectId: 'demo', name: 'DJI Ronin RS3 Pro', category: 'grip', dateStart: '2026-02-20', dateEnd: '2026-02-28', dailyRate: 5000, vendor: 'Stabilizer Co', status: 'maintenance', quantity: 1, notes: null },
   { id: 'demo-5', projectId: 'demo', name: 'Alexa Mini LF', category: 'camera', dateStart: '2026-03-10', dateEnd: '2026-03-25', dailyRate: 35000, vendor: 'Film Gear', status: 'available', quantity: 1, notes: null },
+  { id: 'demo-6', projectId: 'demo', name: 'Arri M40', category: 'lighting', dateStart: '2026-03-05', dateEnd: '2026-03-20', dailyRate: 12000, vendor: 'Light House', status: 'in-use', quantity: 1, notes: null },
+  { id: 'demo-7', projectId: 'demo', name: 'Zoom F6', category: 'sound', dateStart: '2026-03-01', dateEnd: '2026-03-15', dailyRate: 1200, vendor: 'Audio Pro', status: 'available', quantity: 1, notes: null },
+  { id: 'demo-8', projectId: 'demo', name: 'Dana Dolly', category: 'grip', dateStart: '2026-03-10', dateEnd: '2026-03-25', dailyRate: 1500, vendor: 'Film Gear', status: 'available', quantity: 1, notes: null },
+  { id: 'demo-9', projectId: 'demo', name: 'Cooke S7/i', category: 'camera', dateStart: '2026-03-15', dateEnd: '2026-03-30', dailyRate: 25000, vendor: 'Lens Hub', status: 'available', quantity: 1, notes: null },
+  { id: 'demo-10', projectId: 'demo', name: 'Kino Flo 4Bank', category: 'lighting', dateStart: '2026-03-01', dateEnd: '2026-03-15', dailyRate: 2000, vendor: 'Light House', status: 'returned', quantity: 1, notes: null },
 ]
 
-function StatCard({ title, value, color, icon }: { title: string; value: string | number; color: string; icon: React.ReactNode }) {
+function StatCard({ title, value, color, icon, subtext }: { title: string; value: string | number; color: string; icon: React.ReactNode; subtext?: string }) {
   const colorClasses: Record<string, string> = {
     indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
     emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
     violet: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
     amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+    rose: 'bg-rose-500/10 border-rose-500/20 text-rose-400',
   }
   
   return (
@@ -54,6 +68,7 @@ function StatCard({ title, value, color, icon }: { title: string; value: string 
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wider">{title}</p>
           <p className="text-2xl font-semibold mt-1">{value}</p>
+          {subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
         </div>
         <div className="p-2 rounded-lg bg-slate-800/50">
           {icon}
@@ -144,6 +159,69 @@ export default function EquipmentPage() {
     return matchSearch && matchCat
   })
 
+  // Chart data preparation
+  const categoryData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    const rates: Record<string, number> = {}
+    equipment.forEach(eq => {
+      counts[eq.category] = (counts[eq.category] || 0) + 1
+      rates[eq.category] = (rates[eq.category] || 0) + eq.dailyRate
+    })
+    return {
+      pie: Object.entries(counts).map(([name, value]) => ({ 
+        name: name.charAt(0).toUpperCase() + name.slice(1), 
+        value,
+        fill: CATEGORIES.find(c => c.id === name)?.color || '#6366f1'
+      })),
+      bar: Object.entries(rates).map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        rate: value
+      }))
+    }
+  }, [equipment])
+
+  const statusData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    equipment.forEach(eq => {
+      counts[eq.status] = (counts[eq.status] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, value]) => ({
+      name: name === 'in-use' ? 'In Use' : name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+      fill: STATUS_COLORS[name] || '#6b7280'
+    }))
+  }, [equipment])
+
+  const vendorData = useMemo(() => {
+    const rates: Record<string, number> = {}
+    equipment.forEach(eq => {
+      if (eq.vendor) {
+        rates[eq.vendor] = (rates[eq.vendor] || 0) + eq.dailyRate
+      }
+    })
+    return Object.entries(rates)
+      .map(([name, rate]) => ({ name, rate }))
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 5)
+  }, [equipment])
+
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; fill: string }>; label?: string }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
+          <p className="text-slate-300 text-sm font-medium">{label || payload[0]?.name}</p>
+          {payload.map((entry, index) => (
+            <p key={index} className="text-slate-400 text-xs mt-1">
+              {entry.name}: <span className="text-white font-semibold">{entry.value}</span>
+            </p>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -217,10 +295,98 @@ export default function EquipmentPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Total Items" value={stats.totalItems} color="indigo" icon={<Package className="w-5 h-5 text-indigo-400" />} />
-        <StatCard title="Daily Value" value={`₹${(stats.totalDailyRate / 1000).toFixed(0)}K`} color="emerald" icon={<DollarSign className="w-5 h-5 text-emerald-400" />} />
-        <StatCard title="Available" value={stats.available} color="violet" icon={<Camera className="w-5 h-5 text-violet-400" />} />
-        <StatCard title="In Use" value={stats.inUse} color="amber" icon={<Clapperboard className="w-5 h-5 text-amber-400" />} />
+        <StatCard title="Total Items" value={stats.totalItems} color="indigo" icon={<Package className="w-5 h-5 text-indigo-400" />} subtext={`${equipment.length} rentals tracked`} />
+        <StatCard title="Daily Value" value={`₹${(stats.totalDailyRate / 1000).toFixed(0)}K`} color="emerald" icon={<DollarSign className="w-5 h-5 text-emerald-400" />} subtext="per day" />
+        <StatCard title="Available" value={stats.available} color="violet" icon={<Camera className="w-5 h-5 text-violet-400" />} subtext={`${Math.round((stats.available / (stats.totalItems || 1)) * 100)}% of inventory`} />
+        <StatCard title="In Use" value={stats.inUse} color="amber" icon={<Clapperboard className="w-5 h-5 text-amber-400" />} subtext={`${Math.round((stats.inUse / (stats.totalItems || 1)) * 100)}% deployed`} />
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Category Distribution */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-lg font-semibold">By Category</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={categoryData.pie}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={4}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {categoryData.pie.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend 
+                  formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Status Distribution */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="w-5 h-5 text-violet-400" />
+            <h3 className="text-lg font-semibold">By Status</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={4}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend 
+                  formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Top Vendors by Spend */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-lg font-semibold">Top Vendors</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={vendorData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={10} tickFormatter={(v) => `₹${(v/1000)}k`} />
+                <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} width={80} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="rate" fill="#10b981" radius={[0, 4, 4, 0]} name="Daily Rate" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}

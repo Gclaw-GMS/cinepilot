@@ -449,6 +449,7 @@ model ShootingDay {
   callTime       String?     @map("call_time")
   locationId     String?     @map("location_id")
   estimatedHours Decimal?    @map("estimated_hours") @db.Decimal(5, 2)
+  actualHours    Decimal?    @map("actual_hours") @db.Decimal(5, 2)
   weatherData    Json?       @map("weather_data")
   notes          String?
   status         String      @default("scheduled")

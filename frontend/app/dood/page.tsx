@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { 
   Calendar, 
@@ -14,7 +14,8 @@ import {
   Filter,
   CheckCircle,
   XCircle,
-  Search
+  Search,
+  Keyboard
 } from 'lucide-react'
 
 interface DOODRow {
@@ -62,6 +63,10 @@ export default function DOODPage() {
   const [sortBy, setSortBy] = useState<'days' | 'name' | 'percentage'>('days')
   const [searchQuery, setSearchQuery] = useState('')
   const [isDataLoaded, setIsDataLoaded] = useState(false)
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const tableRef = useRef<HTMLDivElement>(null)
+  const filteredReportLength = useRef(0)
 
   const loadDOOD = useCallback(async () => {
     setLoading(true)
@@ -113,6 +118,63 @@ export default function DOODPage() {
     }
     setRefreshing(false)
   }
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if user is typing in an input
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    const maxIndex = filteredReportLength.current - 1
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedRowIndex(prev => Math.min(prev + 1, maxIndex))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedRowIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedRowIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedRowIndex(maxIndex)
+        break
+      case 'Escape':
+        setSelectedRowIndex(-1)
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'c':
+        if (!e.ctrlKey && !e.metaKey) {
+          // Toggle calendar view
+          setViewMode(prev => prev === 'calendar' ? 'list' : 'calendar')
+        }
+        break
+      case 'f':
+        if (!e.ctrlKey && !e.metaKey) {
+          // Focus search
+          const searchInput = document.querySelector('input[placeholder="Search character..."]') as HTMLInputElement
+          searchInput?.focus()
+        }
+        break
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     if (format === 'csv') {
@@ -358,6 +420,9 @@ export default function DOODPage() {
       return 0
     })
     
+    // Update the ref for keyboard navigation
+    filteredReportLength.current = filtered.length
+    
     return filtered
   }, [report, filterMain, sortBy, searchQuery])
 
@@ -459,6 +524,67 @@ export default function DOODPage() {
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Keyboard Help Button */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowKeyboardHelp(true)}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-300 bg-gray-800/50 hover:bg-gray-800 rounded transition-colors"
+        >
+          <Keyboard className="w-3 h-3" />
+          Keyboard shortcuts
+        </button>
+        {selectedRowIndex >= 0 && (
+          <span className="text-xs text-cyan-400">
+            Row {selectedRowIndex + 1} of {filteredReport.length} selected
+          </span>
+        )}
+      </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1a1a1a] border border-gray-700 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-cyan-400" />
+                Keyboard Shortcuts
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { keys: ['↑', '↓'], desc: 'Navigate rows' },
+                { keys: ['Home'], desc: 'Go to first row' },
+                { keys: ['End'], desc: 'Go to last row' },
+                { keys: ['Esc'], desc: 'Clear selection' },
+                { keys: ['C'], desc: 'Toggle calendar/list view' },
+                { keys: ['F'], desc: 'Focus search' },
+                { keys: ['?'], desc: 'Toggle this help' },
+              ].map((shortcut, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {shortcut.keys.map((key, i) => (
+                      <kbd key={i} className="px-2 py-1 bg-gray-800 rounded text-xs font-mono">
+                        {key}
+                      </kbd>
+                    ))}
+                  </div>
+                  <span className="text-gray-400 text-sm">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
+              Press <kbd className="px-1.5 py-0.5 bg-gray-800 rounded">?</kbd> to toggle help
+            </div>
+          </div>
         </div>
       )}
 
@@ -572,7 +698,12 @@ export default function DOODPage() {
               {filteredReport.map((row, idx) => (
                 <tr 
                   key={row.characterId} 
-                  className="hover:bg-gray-800/30 transition-colors"
+                  className={`transition-colors cursor-pointer ${
+                    selectedRowIndex === idx 
+                      ? 'bg-cyan-500/10 border-l-2 border-l-cyan-400' 
+                      : 'hover:bg-gray-800/30'
+                  }`}
+                  onClick={() => setSelectedRowIndex(idx)}
                 >
                   <td className="p-4">
                     <span className="text-gray-500 text-sm">{idx + 1}</span>

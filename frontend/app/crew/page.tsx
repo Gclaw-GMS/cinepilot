@@ -16,6 +16,9 @@ import {
   TrendingUp,
   UserCheck,
   Clock,
+  AlertTriangle,
+  CheckCircle,
+  RotateCcw,
 } from 'lucide-react';
 import {
   BarChart,
@@ -85,6 +88,37 @@ const DEMO_CREW: CrewMember[] = [
   { id: 'd15', name: 'Divya Raman', role: 'Assistant Director', department: 'Direction', phone: '+91 98765 43224', email: 'divya@film.com', dailyRate: 15000, notes: 'Expert in schedule management', createdAt: '2026-01-20' },
 ]
 
+const STORAGE_KEY = 'cinepilot_crew_demo';
+
+// Load from localStorage or return demo data
+function loadFromStorage(): CrewMember[] {
+  if (typeof window === 'undefined') return DEMO_CREW;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load from localStorage:', e);
+  }
+  // Initialize with demo data and store
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_CREW));
+  return DEMO_CREW;
+}
+
+// Save to localStorage
+function saveToStorage(crew: CrewMember[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(crew));
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e);
+  }
+}
+
 function getInitials(name: string): string {
   return name
     .trim()
@@ -105,6 +139,7 @@ export default function CrewPage() {
   const [sortBy, setSortBy] = useState<'name' | 'rate' | 'department'>('name');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [form, setForm] = useState({
     name: '',
     role: '',
@@ -114,6 +149,11 @@ export default function CrewPage() {
     dailyRate: '',
     notes: '',
   });
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const fetchCrew = useCallback(async () => {
     setLoading(true);
@@ -128,15 +168,19 @@ export default function CrewPage() {
       if (Array.isArray(data) && data.length > 0) {
         setCrew(data);
         setIsDemoMode(false);
+        // Clear any stored demo data when real data exists
+        localStorage.removeItem(STORAGE_KEY);
       } else {
         // Use demo data when no real data
-        setCrew(DEMO_CREW);
+        const stored = loadFromStorage();
+        setCrew(stored);
         setIsDemoMode(true);
       }
       setError(null);
     } catch (err) {
-      // Use demo data on error
-      setCrew(DEMO_CREW);
+      // Use demo data on error - load from localStorage or use defaults
+      const stored = loadFromStorage();
+      setCrew(stored);
       setIsDemoMode(true);
       setError(null);
     } finally {
@@ -271,6 +315,52 @@ export default function CrewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (isDemoMode) {
+        // Handle demo mode with localStorage
+        const currentCrew = loadFromStorage();
+        
+        if (editingId) {
+          // Update existing
+          const updated = currentCrew.map(c => 
+            c.id === editingId 
+              ? { 
+                  ...c, 
+                  name: form.name.trim(), 
+                  role: form.role.trim(), 
+                  department: form.department.trim() || null,
+                  phone: form.phone.trim() || null,
+                  email: form.email.trim() || null,
+                  dailyRate: form.dailyRate ? Number(form.dailyRate) : null,
+                  notes: form.notes.trim() || null,
+                }
+              : c
+          );
+          saveToStorage(updated);
+          setCrew(updated);
+          showToast('success', 'Crew member updated');
+        } else {
+          // Add new
+          const newMember: CrewMember = {
+            id: `demo-${Date.now()}`,
+            name: form.name.trim(),
+            role: form.role.trim(),
+            department: form.department.trim() || null,
+            phone: form.phone.trim() || null,
+            email: form.email.trim() || null,
+            dailyRate: form.dailyRate ? Number(form.dailyRate) : null,
+            notes: form.notes.trim() || null,
+            createdAt: new Date().toISOString(),
+          };
+          const updated = [newMember, ...currentCrew];
+          saveToStorage(updated);
+          setCrew(updated);
+          showToast('success', 'Crew member added');
+        }
+        closeModal();
+        return;
+      }
+
+      // Real API mode
       if (editingId) {
         const res = await fetch('/api/crew', {
           method: 'PATCH',
@@ -290,6 +380,7 @@ export default function CrewPage() {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `HTTP ${res.status}`);
         }
+        showToast('success', 'Crew member updated');
       } else {
         const res = await fetch('/api/crew', {
           method: 'POST',
@@ -308,17 +399,31 @@ export default function CrewPage() {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `HTTP ${res.status}`);
         }
+        showToast('success', 'Crew member added');
       }
       closeModal();
       fetchCrew();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this crew member?')) return;
+    
     try {
+      if (isDemoMode) {
+        // Handle demo mode with localStorage
+        const currentCrew = loadFromStorage();
+        const updated = currentCrew.filter(c => c.id !== id);
+        saveToStorage(updated);
+        setCrew(updated);
+        showToast('success', 'Crew member deleted');
+        return;
+      }
+
+      // Real API mode
       const res = await fetch('/api/crew', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -328,14 +433,34 @@ export default function CrewPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
+      showToast('success', 'Crew member deleted');
       fetchCrew();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete');
+      showToast('error', err instanceof Error ? err.message : 'Failed to delete');
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-xl border ${
+          toast.type === 'success' 
+            ? 'bg-emerald-900/90 border-emerald-700 text-emerald-200' 
+            : 'bg-red-900/90 border-red-700 text-red-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : (
+              <AlertTriangle className="w-4 h-4" />
+            )}
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -355,6 +480,21 @@ export default function CrewPage() {
           <Plus className="w-4 h-4" />
           Add Crew
         </button>
+        {isDemoMode && (
+          <button
+            onClick={() => {
+              if (confirm('Reset to original demo data? This will remove all your changes.')) {
+                localStorage.removeItem(STORAGE_KEY);
+                setCrew(DEMO_CREW);
+                showToast('success', 'Demo data restored');
+              }
+            }}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors text-sm"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset Demo
+          </button>
+        )}
       </div>
 
       {error && (

@@ -191,9 +191,49 @@ CREATE TABLE ai_analyses (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Project Notes table (Phase 28)
+CREATE TABLE project_notes (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    category VARCHAR(50) DEFAULT 'general',
+    author VARCHAR(255),
+    is_pinned BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tasks table (Phase 28)
+CREATE TABLE tasks (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'pending',
+    priority VARCHAR(20) DEFAULT 'medium',
+    assignee VARCHAR(255),
+    due_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Activity Log table (Phase 28)
+CREATE TABLE activity_log (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+    activity_type VARCHAR(100) NOT NULL,
+    description TEXT,
+    user_email VARCHAR(255),
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX idx_scenes_script ON scenes(script_id);
 CREATE INDEX idx_elements_scene ON scene_elements(scene_id);
 CREATE INDEX idx_day_scenes_day ON day_scenes(shooting_day_id);
 CREATE INDEX idx_budget_project ON budget_items(project_id);
 CREATE INDEX idx_crew_project ON crew(project_id);
+CREATE INDEX idx_notes_project ON project_notes(project_id);
+CREATE INDEX idx_tasks_project ON tasks(project_id);
+CREATE INDEX idx_activity_project ON activity_log(project_id);

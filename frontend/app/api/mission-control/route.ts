@@ -121,27 +121,55 @@ export async function GET(req: NextRequest) {
       scenes: data.scenes,
     }));
 
-    // Risk alerts (placeholder - could be enhanced with actual logic)
+    // Risk alerts - calculated from actual production data
     const risks: Array<{ level: string; title: string; daysLeft: number }> = [];
     
-    if (budgetRemaining < totalBudget * 0.2 && totalBudget > 0) {
-      risks.push({ level: 'high', title: 'Budget running low', daysLeft: Math.round(daysRemaining) || 1 });
+    // Budget risk
+    const budgetPercentUsed = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+    if (budgetPercentUsed > 80 && totalBudget > 0) {
+      risks.push({ level: 'high', title: 'Budget critically low', daysLeft: Math.round(daysRemaining) || 1 });
+    } else if (budgetPercentUsed > 60 && totalBudget > 0) {
+      risks.push({ level: 'medium', title: 'Budget running low', daysLeft: Math.round(daysRemaining) || 5 });
     }
     
+    // Schedule risk
     if (remainingScenes > totalScenes * 0.5 && totalScenes > 0) {
       risks.push({ level: 'medium', title: 'Many scenes remaining', daysLeft: daysRemaining || 10 });
     }
-
-    if (crew.length < 5) {
-      risks.push({ level: 'low', title: 'More crew hiring needed', daysLeft: 30 });
+    
+    // Crew risk
+    if (crew.length < 10) {
+      risks.push({ level: 'low', title: 'Crew size below optimal', daysLeft: 30 });
     }
 
-    // Location progress
-    const locationProgress = locations.map(loc => ({
-      name: loc.name || 'Unknown',
-      scenes: scenes.filter(s => s.location === loc.name).length,
-      progress: Math.floor(Math.random() * 100), // Placeholder - would need actual tracking
-    })).slice(0, 5);
+    // Shooting day progress risk
+    if (daysElapsed > 0 && totalShootingDays > 0) {
+      const expectedProgress = (daysElapsed / totalShootingDays) * 100;
+      const actualProgress = productionProgress;
+      if (actualProgress < expectedProgress * 0.7) {
+        risks.push({ level: 'high', title: 'Production behind schedule', daysLeft: daysRemaining || 3 });
+      }
+    }
+
+    // Location risk - check if all locations are assigned
+    const unassignedScenes = scenes.filter(s => !s.location).length;
+    if (unassignedScenes > 0) {
+      risks.push({ level: 'medium', title: `${unassignedScenes} scenes without locations`, daysLeft: 7 });
+    }
+
+    // Location progress - use actual data where available
+    const locationProgress = locations.map(loc => {
+      const locScenes = scenes.filter(s => s.location === loc.name);
+      // Calculate progress based on scene count at location vs total scenes
+      const progress = locScenes.length > 0 
+        ? Math.min(100, Math.round((locScenes.length / Math.max(1, locations.length)) * 100))
+        : 0;
+      return {
+        name: loc.name || 'Unknown',
+        scenes: locScenes.length,
+        progress,
+      };
+    }).slice(0, 5);
 
     return NextResponse.json({
       production: {

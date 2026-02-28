@@ -29,6 +29,8 @@ import {
   Film,
   Folder,
   Briefcase,
+  Shirt,
+  Utensils,
 } from 'lucide-react'
 
 type NavItem = {
@@ -68,6 +70,8 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/locations', icon: MapPin, label: 'Location Scout' },
       { href: '/equipment', icon: Clapperboard, label: 'Equipment' },
       { href: '/travel', icon: Plane, label: 'Travel Expenses' },
+      { href: '/catering', icon: Utensils, label: 'Catering' },
+      { href: '/character-costume', icon: Shirt, label: 'Costume Design' },
       { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: Shield, label: 'Censor Board' },

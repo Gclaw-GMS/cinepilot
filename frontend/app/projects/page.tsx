@@ -353,7 +353,7 @@ export default function ProjectsPage() {
                 <div className="flex items-center gap-4 text-xs text-slate-500 pt-3 border-t border-slate-800">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {project.createdAt}
+                    {new Date(project.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
                   <div className="flex items-center gap-1">
                     <Film className="w-3 h-3" />

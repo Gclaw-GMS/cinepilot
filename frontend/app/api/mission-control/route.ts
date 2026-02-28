@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db';
 const DEFAULT_PROJECT_ID = 'default-project';
 
 // GET /api/mission-control — aggregate all production data for the mission control dashboard
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;

@@ -11,12 +11,15 @@ const DEMO_DOOD = {
     { characterId: '3', character: 'Mahendra', characterTamil: 'மகேந்திரா', actorName: 'Vijay Sethupathi', isMain: true, total_days: 8, days: [3,7,11,15,16,17,18,19], percentage: 40 },
     { characterId: '4', character: 'Sathya', characterTamil: 'சத்யா', actorName: 'Nivin Pauly', isMain: false, total_days: 10, days: [1,4,5,9,10,14,15,16,20,21], percentage: 50 },
     { characterId: '5', character: 'Divya', characterTamil: 'திவ்யா', actorName: 'Aishwarya Rajesh', isMain: false, total_days: 6, days: [2,3,8,12,13,19], percentage: 30 },
+    { characterId: '6', character: 'Raghav', characterTamil: 'ராகவ்', actorName: 'Karthi', isMain: true, total_days: 14, days: [1,2,3,4,5,6,7,9,10,11,12,14,15,16], percentage: 70 },
+    { characterId: '7', character: 'Meera', characterTamil: 'மீரா', actorName: 'Nithya Menen', isMain: false, total_days: 9, days: [2,4,5,8,9,10,13,14,18], percentage: 45 },
+    { characterId: '8', character: 'Vikram', characterTamil: 'விக்னேஷ்', actorName: 'Vijay', isMain: true, total_days: 11, days: [1,3,5,7,9,11,13,15,17,19,20], percentage: 55 },
   ],
   stats: {
-    totalCharacters: 5,
+    totalCharacters: 8,
     totalShootingDays: 20,
-    totalCalls: 51,
-    avgDaysPerActor: 10.2,
+    totalCalls: 85,
+    avgDaysPerActor: 10.6,
   },
   isDemo: true,
 };

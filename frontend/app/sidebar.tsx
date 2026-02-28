@@ -25,6 +25,7 @@ import {
   MessageCircle,
   Utensils,
   Shirt,
+  StickyNote,
 } from 'lucide-react'
 
 type NavItem = {
@@ -74,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/crew', icon: Users, label: 'Crew' },
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
       { href: '/dood', icon: Calendar, label: 'DOOD' },
+      { href: '/notes', icon: StickyNote, label: 'Notes' },
     ],
   },
   {

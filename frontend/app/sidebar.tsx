@@ -24,6 +24,7 @@ import {
   Plane,
   MessageCircle,
   Utensils,
+  Shirt,
 } from 'lucide-react'
 
 type NavItem = {
@@ -43,6 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Core',
     items: [
       { href: '/', icon: Home, label: 'Dashboard' },
+      { href: '/mission-control', icon: BarChart3, label: 'Mission Control', badge: 'NEW' },
       { href: '/scripts', icon: FileText, label: 'Script Breakdown' },
       { href: '/shot-list', icon: Video, label: 'Shot Hub' },
       { href: '/storyboard', icon: ImageIcon, label: 'Storyboard' },
@@ -52,10 +54,12 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Production',
     items: [
       { href: '/schedule', icon: Calendar, label: 'Schedule' },
+      { href: '/timeline', icon: BarChart3, label: 'Timeline' },
       { href: '/locations', icon: MapPin, label: 'Location Scout' },
       { href: '/equipment', icon: Clapperboard, label: 'Equipment' },
       { href: '/travel', icon: Plane, label: 'Travel Expenses' },
-      { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment', badge: 'NEW' },
+      { href: '/character-costume', icon: Shirt, label: 'Character Costume', badge: 'NEW' },
+      { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment' },
       { href: '/catering', icon: Utensils, label: 'Catering', badge: 'NEW' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: Shield, label: 'Censor Board' },
@@ -69,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/crew', icon: Users, label: 'Crew' },
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
+      { href: '/dood', icon: Calendar, label: 'DOOD' },
     ],
   },
   {

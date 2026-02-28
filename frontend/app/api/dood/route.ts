@@ -3,10 +3,31 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Demo data for when database is not connected
+const DEMO_DOOD = {
+  report: [
+    { characterId: '1', character: 'Arjun', characterTamil: 'அர்ஜுன்', actorName: 'Ajith Kumar', isMain: true, total_days: 15, days: [1,2,3,5,6,7,9,10,11,12,14,15,16,18,20], percentage: 75 },
+    { characterId: '2', character: 'Priya', characterTamil: 'பிரியா', actorName: 'Sai Pallavi', isMain: true, total_days: 12, days: [1,2,4,5,6,8,9,10,12,13,14,15], percentage: 60 },
+    { characterId: '3', character: 'Mahendra', characterTamil: 'மகேந்திரா', actorName: 'Vijay Sethupathi', isMain: true, total_days: 8, days: [3,7,11,15,16,17,18,19], percentage: 40 },
+    { characterId: '4', character: 'Sathya', characterTamil: 'சத்யா', actorName: 'Nivin Pauly', isMain: false, total_days: 10, days: [1,4,5,9,10,14,15,16,20,21], percentage: 50 },
+    { characterId: '5', character: 'Divya', characterTamil: 'திவ்யா', actorName: 'Aishwarya Rajesh', isMain: false, total_days: 6, days: [2,3,8,12,13,19], percentage: 30 },
+  ],
+  stats: {
+    totalCharacters: 5,
+    totalShootingDays: 20,
+    totalCalls: 51,
+    avgDaysPerActor: 10.2,
+  },
+  isDemo: true,
+};
+
 // GET /api/dood — get Day Out of Days report
 export async function GET(req: NextRequest) {
+  const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+
   try {
-    const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+    // Test database connection
+    await prisma.$connect();
 
     // Get all shooting days for the project
     const shootingDays = await prisma.shootingDay.findMany({
@@ -109,7 +130,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('[GET /api/dood]', error);
-    return NextResponse.json({ error: 'Failed to fetch DOOD report' }, { status: 500 });
+    // Return demo data when database is not connected
+    return NextResponse.json(DEMO_DOOD);
+  } finally {
+    await prisma.$disconnect().catch(() => {});
   }
 }
 

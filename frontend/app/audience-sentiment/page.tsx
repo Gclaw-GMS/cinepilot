@@ -72,6 +72,7 @@ export default function AudienceSentimentPage() {
     platform: 'youtube',
     videoUrl: '',
   })
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const fetchAnalyses = useCallback(async () => {
     setLoading(true)
@@ -79,8 +80,9 @@ export default function AudienceSentimentPage() {
     try {
       const res = await fetch(`/api/audience-sentiment?projectId=${DEMO_PROJECT_ID}`)
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (data.error && !data.isDemo) throw new Error(data.error)
       setAnalyses(data.sentiments || [])
+      setIsDemoMode(!!data.isDemo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
@@ -168,7 +170,14 @@ export default function AudienceSentimentPage() {
                 <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-white">Audience Sentiment</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold text-white">Audience Sentiment</h1>
+                  {isDemoMode && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                      Demo
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-slate-400">Analyze trailer & first look reactions</p>
               </div>
             </div>

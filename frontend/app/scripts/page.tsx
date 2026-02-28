@@ -1,97 +1,70 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useScriptManager, Script, Scene, Character, Analysis } from '@/app/hooks/useScriptManager'
 import ScriptComparison from '@/components/ScriptComparison'
-
-interface ScriptData {
-  id: string
-  title: string
-  fileSize: number | null
-  mimeType: string | null
-  version: number
-  createdAt: string
-  scenes: SceneData[]
-  scriptVersions: { id: string; versionNumber: number; extractionScore: number | null }[]
-}
-
-interface SceneData {
-  id: string
-  sceneNumber: string
-  sceneIndex: number
-  headingRaw: string | null
-  intExt: string | null
-  timeOfDay: string | null
-  location: string | null
-  startLine: number | null
-  endLine: number | null
-  confidence: number
-  sceneCharacters: { character: { id: string; name: string; aliases: string[] } }[]
-  sceneLocations: { name: string; details: string | null }[]
-  sceneProps: { prop: { name: string } }[]
-  vfxNotes: { description: string; vfxType: string }[]
-  warnings: { warningType: string; description: string; severity: string }[]
-}
-
-interface CharacterData {
-  id: string
-  name: string
-  aliases: string[]
-  roleHint: string | null
-  sceneCharacters: { sceneId: string; isSpeaking: boolean }[]
-}
-
-interface AnalysisData {
-  id: string
-  analysisType: string
-  result: any
-  modelUsed: string | null
-  createdAt: string
-}
+import {
+  FileText, Upload, Trash2, Check, AlertTriangle, Sparkles,
+  Users, RefreshCw, X, Search, ChevronDown, ChevronRight
+} from 'lucide-react'
 
 type ActiveTab = 'upload' | 'scenes' | 'characters' | 'quality' | 'warnings' | 'compare'
 
 export default function ScriptsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [activeTab, setActiveTab] = useState<ActiveTab>('upload')
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState('')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('scenes')
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const [scripts, setScripts] = useState<ScriptData[]>([])
-  const [characters, setCharacters] = useState<CharacterData[]>([])
-  const [analyses, setAnalyses] = useState<AnalysisData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isDemoMode, setIsDemoMode] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const [sceneFilter, setSceneFilter] = useState('')
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
-  const [selectedScene, setSelectedScene] = useState<SceneData | null>(null)
+  const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch('/api/scripts')
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setScripts(data.scripts || [])
-      setCharacters(data.characters || [])
-      setAnalyses(data.analyses || [])
-      setIsDemoMode(data.isDemo || false)
-    } catch (e) {
-      console.error('Fetch scripts error:', e)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Use the hook
+  const {
+    scripts,
+    characters,
+    analyses,
+    loading,
+    isDemoMode,
+    processing,
+    processProgress,
+    uploadScript,
+    deleteScript,
+    setActiveScript,
+    resetToDemo,
+  } = useScriptManager()
 
-  useEffect(() => { fetchData() }, [fetchData])
-
-  const activeScript = scripts[0]
+  const activeScript = scripts.find(s => s.isActive) || scripts[0]
   const scenes = activeScript?.scenes || []
   const qualityAnalysis = analyses.find(a => a.analysisType === 'quality_score')
   const summaryAnalysis = analyses.find(a => a.analysisType === 'breakdown_summary')
-  const allWarnings = scenes.flatMap(s => s.warnings.map(w => ({ ...w, sceneNumber: s.sceneNumber })))
-  const allVfx = scenes.flatMap(s => s.vfxNotes.map(v => ({ ...v, sceneNumber: s.sceneNumber })))
+  const allWarnings = scenes.flatMap(s => s.warnings.map(w => ({ ...w, sceneNumber: s.sceneNumber, sceneId: s.id })))
+  const allVfx = scenes.flatMap(s => s.vfxNotes.map(v => ({ ...v, sceneNumber: s.sceneNumber, sceneId: s.id })))
+
+  // Filter scenes
+  const filteredScenes = useMemo(() => {
+    return scenes.filter(s => {
+      const matchesSearch = !sceneFilter ||
+        s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
+        (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
+        (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
+      const matchesIntExt = intExtFilter === 'all' || s.intExt === intExtFilter
+      return matchesSearch && matchesIntExt
+    })
+  }, [scenes, sceneFilter, intExtFilter])
+
+  // Filter characters
+  const filteredCharacters = useMemo(() => {
+    if (!searchQuery) return characters
+    const q = searchQuery.toLowerCase()
+    return characters.filter(c => 
+      c.name.toLowerCase().includes(q) ||
+      c.aliases?.some(a => a.toLowerCase().includes(q))
+    )
+  }, [characters, searchQuery])
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -114,39 +87,42 @@ export default function ScriptsPage() {
   }
 
   const handleFileUpload = async (file: File) => {
-    setUploading(true)
     setError(null)
-    setUploadProgress('Uploading script...')
+    setSuccess(null)
 
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      setUploadProgress('Processing script (extraction + AI analysis)...')
-      const res = await fetch('/api/scripts', { method: 'POST', body: formData })
-      const data = await res.json()
-
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-
-      setUploadProgress(`Done! ${data.sceneCount || 0} scenes detected.`)
-      await fetchData()
+    const result = await uploadScript(file)
+    
+    if (result.success) {
+      setSuccess(`Successfully uploaded "${file.name}" with ${result.script?.scenes.length || 0} scenes!`)
       setActiveTab('scenes')
-    } catch (e: any) {
-      setError(e.message || 'Upload failed')
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    } else {
+      setError(result.error || 'Upload failed')
     }
   }
 
-  const filteredScenes = scenes.filter(s => {
-    const matchesSearch = !sceneFilter ||
-      s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
-      (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
-      (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
-    const matchesIntExt = intExtFilter === 'all' || s.intExt === intExtFilter
-    return matchesSearch && matchesIntExt
-  })
+  const handleDeleteScript = (scriptId: string) => {
+    if (confirm('Are you sure you want to delete this script?')) {
+      deleteScript(scriptId)
+      setSuccess('Script deleted')
+    }
+  }
+
+  // Export script data
+  const handleExport = () => {
+    if (!activeScript) return
+    const data = JSON.stringify({
+      script: activeScript,
+      characters,
+      analyses
+    }, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${activeScript.title}-export.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const tabs: { key: ActiveTab; label: string; count?: number }[] = [
     { key: 'upload', label: 'Upload' },
@@ -160,60 +136,112 @@ export default function ScriptsPage() {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <div className="text-gray-400 animate-pulse">Loading scripts...</div>
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+          <p className="text-gray-400">Loading scripts...</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Script Management</h1>
+            <h1 className="text-2xl font-bold text-white">Script Management</h1>
             {isDemoMode && (
               <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">
                 Demo Mode
               </span>
             )}
-          </div>
-          <p className="text-gray-500 text-sm mt-1">
-            {activeScript
-              ? `${activeScript.title} (v${activeScript.version}) — ${scenes.length} scenes`
-              : 'Upload and analyze your screenplay'}
-          </p>
-        </div>
-        {activeScript && (
-          <div className="flex gap-2 items-center">
-            <span className="text-xs px-2 py-1 bg-green-900/40 text-green-400 rounded">
-              Analyzed
-            </span>
-            {activeScript.scriptVersions[0]?.extractionScore && (
-              <span className="text-xs px-2 py-1 bg-gray-800 text-gray-400 rounded">
-                Quality: {activeScript.scriptVersions[0].extractionScore}/100
+            {processing && (
+              <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full font-medium flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                {processProgress}
               </span>
             )}
           </div>
-        )}
+          <p className="text-gray-500 text-sm mt-1">
+            {activeScript
+              ? `${activeScript.title} (v${activeScript.version}) — ${scenes.length} scenes • ${characters.length} characters`
+              : 'Upload and analyze your screenplay'}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {scripts.length > 0 && (
+            <select
+              value={activeScript?.id || ''}
+              onChange={e => setActiveScript(e.target.value)}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+            >
+              {scripts.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.title} {s.isActive ? '(active)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          
+          {activeScript && (
+            <button
+              onClick={handleExport}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 transition-colors"
+              title="Export"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          )}
+          
+          {isDemoMode && (
+            <button
+              onClick={resetToDemo}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 transition-colors"
+              title="Reset to demo"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Alerts */}
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-6 text-red-400 flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-300 text-sm">Dismiss</button>
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            {error}
+          </span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-300">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      
+      {success && (
+        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-6 text-green-400 flex justify-between items-center">
+          <span className="flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            {success}
+          </span>
+          <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-300">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 mb-6 border-b border-gray-800 pb-px">
+      <div className="flex gap-1 mb-6 border-b border-gray-800 pb-px overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium rounded-t transition-colors whitespace-nowrap ${
               activeTab === tab.key
-                ? 'bg-cinepilot-card text-cinepilot-accent border border-b-0 border-cinepilot-border'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'bg-cinepilot-card text-indigo-400 border border-b-0 border-cinepilot-border'
+                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
             }`}
           >
             {tab.label}
@@ -228,7 +256,10 @@ export default function ScriptsPage() {
       {activeTab === 'upload' && (
         <div className="space-y-6">
           <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-            <h2 className="font-semibold mb-4">Upload Script</h2>
+            <h2 className="font-semibold mb-4 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-indigo-400" />
+              Upload Script
+            </h2>
             <label
               className={`block cursor-pointer ${dragActive ? 'scale-[1.01]' : ''} transition-transform`}
               onDragEnter={handleDrag}
@@ -238,22 +269,21 @@ export default function ScriptsPage() {
             >
               <div className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${
                 dragActive
-                  ? 'border-cinepilot-accent bg-cinepilot-accent/10'
-                  : 'border-gray-700 hover:border-cinepilot-accent'
+                  ? 'border-indigo-500 bg-indigo-500/10'
+                  : 'border-gray-700 hover:border-indigo-500'
               }`}>
-                {uploading ? (
+                {processing ? (
                   <div className="space-y-3">
-                    <div className="w-8 h-8 border-2 border-cinepilot-accent border-t-transparent rounded-full animate-spin mx-auto" />
-                    <div className="text-gray-300">{uploadProgress}</div>
-                    <div className="text-gray-500 text-xs">This may take a minute for AI analysis</div>
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <div className="text-gray-300 font-medium">{processProgress || 'Processing...'}</div>
                   </div>
                 ) : (
                   <>
                     <div className="text-5xl mb-3 opacity-50">+</div>
                     <div className="text-gray-300 font-medium">Drop script here or click to upload</div>
-                    <div className="text-gray-500 text-sm mt-2">PDF, DOCX, FDX, TXT supported (max 10MB)</div>
+                    <div className="text-gray-500 text-sm mt-2">PDF, DOCX, TXT, FDX supported (max 10MB)</div>
                     <div className="text-gray-600 text-xs mt-3">
-                      AI will automatically extract text, detect scenes, characters, locations, props, VFX notes, and safety warnings.
+                      AI will automatically extract scenes, detect characters, locations, and analyze.
                     </div>
                   </>
                 )}
@@ -261,46 +291,84 @@ export default function ScriptsPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.fdx,.txt"
+                accept=".pdf,.docx,.txt,.fdx"
                 onChange={handleFileChange}
                 className="hidden"
-                disabled={uploading}
+                disabled={processing}
               />
             </label>
             <div className="mt-4 flex gap-2">
-              {['PDF', 'DOCX', 'FDX', 'TXT'].map(fmt => (
+              {['PDF', 'DOCX', 'TXT', 'FDX'].map(fmt => (
                 <span key={fmt} className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-400">{fmt}</span>
               ))}
+              <span className="px-2 py-1 bg-green-900/30 rounded text-xs text-green-400 ml-auto flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Local Storage
+              </span>
             </div>
           </div>
 
-          {/* Summary Cards (if data exists) */}
+          {/* Summary Cards */}
           {summaryAnalysis?.result && (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h2 className="font-semibold mb-4">Breakdown Summary</h2>
+              <h2 className="font-semibold mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-400" />
+                Breakdown Summary
+              </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label="Scenes" value={summaryAnalysis.result.total_scenes} />
-                <StatCard label="Characters" value={summaryAnalysis.result.unique_characters} />
-                <StatCard label="Locations" value={summaryAnalysis.result.unique_locations} />
-                <StatCard label="VFX Shots" value={summaryAnalysis.result.vfx_count} />
-                <StatCard label="Safety Warnings" value={summaryAnalysis.result.safety_warnings_count} />
-                {summaryAnalysis.result.estimated_shoot_days && (
-                  <StatCard label="Est. Shoot Days" value={summaryAnalysis.result.estimated_shoot_days} />
-                )}
+                <StatCard label="Scenes" value={summaryAnalysis.result.totalScenes} />
+                <StatCard label="Characters" value={summaryAnalysis.result.totalCharacters} />
+                <StatCard label="Locations" value={summaryAnalysis.result.totalLocations} />
+                <StatCard label="VFX Shots" value={summaryAnalysis.result.vfxShots} />
               </div>
-              {summaryAnalysis.result.summary && (
-                <p className="mt-4 text-sm text-gray-400">{summaryAnalysis.result.summary}</p>
-              )}
-              {summaryAnalysis.result.cultural_notes?.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-xs font-medium text-blue-400 mb-2">Cultural Notes</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {summaryAnalysis.result.cultural_notes.map((n: string, i: number) => (
-                      <span key={i} className="text-xs px-2 py-1 bg-blue-900/30 text-blue-300 rounded">{n}</span>
-                    ))}
+            </div>
+          )}
+
+          {/* Script List */}
+          {scripts.length > 0 && (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h2 className="font-semibold mb-4">Your Scripts</h2>
+              <div className="space-y-2">
+                {scripts.map(script => (
+                  <div 
+                    key={script.id}
+                    className={`p-3 rounded-lg border flex items-center justify-between ${
+                      script.isActive 
+                        ? 'border-indigo-500 bg-indigo-500/10' 
+                        : 'border-gray-800 hover:border-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-gray-500" />
+                      <div>
+                        <div className="font-medium text-gray-200">{script.title}</div>
+                        <div className="text-xs text-gray-500">
+                          {script.scenes.length} scenes • {new Date(script.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {script.isActive && (
+                        <span className="text-xs px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded">Active</span>
+                      )}
+                      <button
+                        onClick={() => setActiveScript(script.id)}
+                        className="p-1.5 hover:bg-gray-700 rounded text-gray-400"
+                        title="Set active"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteScript(script.id)}
+                        className="p-1.5 hover:bg-red-900/30 rounded text-gray-400 hover:text-red-400"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -310,137 +378,57 @@ export default function ScriptsPage() {
       {activeTab === 'scenes' && (
         <div className="space-y-4">
           <div className="flex gap-3 items-center">
-            <input
-              type="text"
-              placeholder="Search scenes..."
-              value={sceneFilter}
-              onChange={e => setSceneFilter(e.target.value)}
-              className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:border-cinepilot-accent focus:outline-none"
-            />
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search scenes..."
+                value={sceneFilter}
+                onChange={e => setSceneFilter(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+              />
+            </div>
             <select
               value={intExtFilter}
               onChange={e => setIntExtFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none"
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
             >
-              <option value="all">All</option>
+              <option value="all">All Types</option>
               <option value="INT">INT</option>
               <option value="EXT">EXT</option>
               <option value="INT/EXT">INT/EXT</option>
             </select>
+            <span className="text-sm text-gray-500">
+              {filteredScenes.length} of {scenes.length} scenes
+            </span>
           </div>
 
           {filteredScenes.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              {scenes.length === 0 ? 'No scenes yet. Upload a script first.' : 'No scenes match your filter.'}
+              {scenes.length === 0 ? (
+                <>
+                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No scenes yet. Upload a script first.</p>
+                  <button 
+                    onClick={() => setActiveTab('upload')}
+                    className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium"
+                  >
+                    Upload Script
+                  </button>
+                </>
+              ) : (
+                'No scenes match your filter.'
+              )}
             </div>
           ) : (
             <div className="space-y-2">
               {filteredScenes.map(scene => (
-                <div
+                <SceneCard
                   key={scene.id}
+                  scene={scene}
+                  isSelected={selectedScene?.id === scene.id}
                   onClick={() => setSelectedScene(selectedScene?.id === scene.id ? null : scene)}
-                  className={`bg-cinepilot-card border rounded-lg p-4 cursor-pointer transition-colors ${
-                    selectedScene?.id === scene.id
-                      ? 'border-cinepilot-accent'
-                      : 'border-cinepilot-border hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono bg-gray-800 px-2 py-0.5 rounded">{scene.sceneNumber}</span>
-                        {scene.intExt && (
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            scene.intExt === 'INT' ? 'bg-blue-900/40 text-blue-400' :
-                            scene.intExt === 'EXT' ? 'bg-amber-900/40 text-amber-400' :
-                            'bg-purple-900/40 text-purple-400'
-                          }`}>{scene.intExt}</span>
-                        )}
-                        {scene.timeOfDay && (
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            scene.timeOfDay === 'NIGHT' ? 'bg-indigo-900/40 text-indigo-400' : 'bg-yellow-900/40 text-yellow-400'
-                          }`}>{scene.timeOfDay}</span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-300 mt-1">{scene.headingRaw || scene.location || 'Untitled Scene'}</div>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      {scene.sceneCharacters.length > 0 && (
-                        <span>{scene.sceneCharacters.length} chars</span>
-                      )}
-                      {scene.sceneProps.length > 0 && (
-                        <span>{scene.sceneProps.length} props</span>
-                      )}
-                      {scene.startLine && scene.endLine && (
-                        <span>L{scene.startLine}-{scene.endLine}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanded scene detail */}
-                  {selectedScene?.id === scene.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-800 space-y-3">
-                      {scene.sceneCharacters.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 mb-1.5">Characters</h4>
-                          <div className="flex flex-wrap gap-1.5">
-                            {scene.sceneCharacters.map(sc => (
-                              <span key={sc.character.id} className="text-xs px-2 py-1 bg-emerald-900/30 text-emerald-400 rounded">
-                                {sc.character.name}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {scene.sceneLocations.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 mb-1.5">Locations</h4>
-                          <div className="flex flex-wrap gap-1.5">
-                            {scene.sceneLocations.map((loc, i) => (
-                              <span key={i} className="text-xs px-2 py-1 bg-blue-900/30 text-blue-400 rounded">
-                                {loc.name}{loc.details ? ` (${loc.details})` : ''}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {scene.sceneProps.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 mb-1.5">Props</h4>
-                          <div className="flex flex-wrap gap-1.5">
-                            {scene.sceneProps.map(sp => (
-                              <span key={sp.prop.name} className="text-xs px-2 py-1 bg-orange-900/30 text-orange-400 rounded">{sp.prop.name}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {scene.vfxNotes.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 mb-1.5">VFX Notes</h4>
-                          {scene.vfxNotes.map((v, i) => (
-                            <div key={i} className="text-xs text-gray-400 flex items-center gap-2">
-                              <span className={`px-1.5 py-0.5 rounded ${v.vfxType === 'explicit' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'}`}>{v.vfxType}</span>
-                              {v.description}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {scene.warnings.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-medium text-red-400 mb-1.5">Warnings</h4>
-                          {scene.warnings.map((w, i) => (
-                            <div key={i} className="text-xs text-red-300 flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${
-                                w.severity === 'high' ? 'bg-red-500' : w.severity === 'med' ? 'bg-yellow-500' : 'bg-gray-500'
-                              }`} />
-                              {w.description}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                />
               ))}
             </div>
           )}
@@ -450,31 +438,31 @@ export default function ScriptsPage() {
       {/* Characters Tab */}
       {activeTab === 'characters' && (
         <div className="space-y-4">
-          {characters.length === 0 ? (
+          <div className="flex gap-3 items-center">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search characters..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+              />
+            </div>
+            <span className="text-sm text-gray-500">
+              {filteredCharacters.length} characters
+            </span>
+          </div>
+
+          {filteredCharacters.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No characters extracted yet. Upload a script first.
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No characters found. Upload a script to extract characters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {characters.map(char => (
-                <div key={char.id} className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold text-gray-200">{char.name}</h3>
-                      {char.roleHint && <span className="text-xs text-gray-500">{char.roleHint}</span>}
-                    </div>
-                    <span className="text-xs bg-gray-800 px-2 py-1 rounded">
-                      {char.sceneCharacters.length} scenes
-                    </span>
-                  </div>
-                  {char.aliases.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {char.aliases.map((alias, i) => (
-                        <span key={i} className="text-xs px-2 py-0.5 bg-gray-800 text-gray-500 rounded">{alias}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCharacters.map(char => (
+                <CharacterCard key={char.id} character={char} />
               ))}
             </div>
           )}
@@ -485,43 +473,23 @@ export default function ScriptsPage() {
       {activeTab === 'quality' && (
         <div className="space-y-6">
           {qualityAnalysis?.result ? (
-            <>
-              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-                <h2 className="font-semibold mb-4">Screenplay Quality Scores</h2>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  {Object.entries(qualityAnalysis.result.scores || {}).map(([key, val]) => (
-                    <QualityGauge key={key} label={key} score={val as number} />
-                  ))}
-                </div>
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h2 className="font-semibold mb-6 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+                Screenplay Quality Scores
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {Object.entries(qualityAnalysis.result).filter(([k]) => !['suggestions'].includes(k)).map(([key, val]) => (
+                  typeof val === 'number' ? (
+                    <QualityGauge key={key} label={key} score={val} />
+                  ) : null
+                ))}
               </div>
-              {qualityAnalysis.result.notes?.length > 0 && (
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-                  <h3 className="font-medium mb-3 text-gray-300">Notes</h3>
-                  <ul className="space-y-1.5">
-                    {qualityAnalysis.result.notes.map((n: string, i: number) => (
-                      <li key={i} className="text-sm text-gray-400 flex items-start gap-2">
-                        <span className="text-gray-600 mt-0.5">-</span> {n}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {qualityAnalysis.result.quick_fixes?.length > 0 && (
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-                  <h3 className="font-medium mb-3 text-yellow-400">Quick Fixes</h3>
-                  <ul className="space-y-1.5">
-                    {qualityAnalysis.result.quick_fixes.map((f: string, i: number) => (
-                      <li key={i} className="text-sm text-yellow-300/80 flex items-start gap-2">
-                        <span className="text-yellow-600 mt-0.5">!</span> {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </>
+            </div>
           ) : (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No quality analysis yet. Upload a script to get AI quality scoring.
+              <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No quality analysis yet. Upload a script to get quality scoring.</p>
             </div>
           )}
         </div>
@@ -532,24 +500,29 @@ export default function ScriptsPage() {
         <div className="space-y-4">
           {allWarnings.length === 0 && allVfx.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No warnings detected.
+              <Check className="w-12 h-12 mx-auto mb-3 text-green-500" />
+              <p className="text-lg font-medium text-gray-300">All Clear!</p>
+              <p className="text-sm mt-1">No warnings or VFX notes detected in your script.</p>
             </div>
           ) : (
             <>
               {allWarnings.length > 0 && (
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-                  <h2 className="font-semibold mb-4 text-red-400">Safety & Content Warnings</h2>
+                <div className="bg-cinepilot-card border border-red-900/30 rounded-lg p-6">
+                  <h2 className="font-semibold mb-4 text-red-400 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    Safety & Content Warnings ({allWarnings.length})
+                  </h2>
                   <div className="space-y-2">
                     {allWarnings.map((w, i) => (
                       <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0">
                         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                          w.severity === 'high' ? 'bg-red-500' : w.severity === 'med' ? 'bg-yellow-500' : 'bg-gray-500'
+                          w.severity === 'high' ? 'bg-red-500' : w.severity === 'medium' ? 'bg-yellow-500' : 'bg-gray-500'
                         }`} />
                         <span className="text-xs font-mono bg-gray-800 px-2 py-0.5 rounded shrink-0">Scene {w.sceneNumber}</span>
                         <span className="text-sm text-gray-300 flex-1">{w.description}</span>
                         <span className={`text-xs px-2 py-0.5 rounded ${
                           w.severity === 'high' ? 'bg-red-900/40 text-red-400' :
-                          w.severity === 'med' ? 'bg-yellow-900/40 text-yellow-400' :
+                          w.severity === 'medium' ? 'bg-yellow-900/40 text-yellow-400' :
                           'bg-gray-800 text-gray-500'
                         }`}>{w.severity}</span>
                       </div>
@@ -557,14 +530,18 @@ export default function ScriptsPage() {
                   </div>
                 </div>
               )}
+              
               {allVfx.length > 0 && (
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-                  <h2 className="font-semibold mb-4 text-purple-400">VFX Notes</h2>
+                <div className="bg-cinepilot-card border border-purple-900/30 rounded-lg p-6">
+                  <h2 className="font-semibold mb-4 text-purple-400 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5" />
+                    VFX Notes ({allVfx.length})
+                  </h2>
                   <div className="space-y-2">
                     {allVfx.map((v, i) => (
                       <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0">
                         <span className={`text-xs px-2 py-0.5 rounded ${
-                          v.vfxType === 'explicit' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'
+                          v.vfxType === 'crowd' ? 'bg-purple-900/30 text-purple-400' : 'bg-yellow-900/30 text-yellow-400'
                         }`}>{v.vfxType}</span>
                         <span className="text-xs font-mono bg-gray-800 px-2 py-0.5 rounded shrink-0">Scene {v.sceneNumber}</span>
                         <span className="text-sm text-gray-300 flex-1">{v.description}</span>
@@ -584,11 +561,180 @@ export default function ScriptsPage() {
   )
 }
 
+// Sub-components
+
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="bg-gray-900/50 rounded-lg p-4 text-center">
-      <div className="text-2xl font-bold text-cinepilot-accent">{value}</div>
+      <div className="text-2xl font-bold text-indigo-400">{value}</div>
       <div className="text-xs text-gray-500 mt-1">{label}</div>
+    </div>
+  )
+}
+
+function SceneCard({ 
+  scene, 
+  isSelected, 
+  onClick 
+}: { 
+  scene: Scene
+  isSelected: boolean
+  onClick: () => void
+}) {
+  return (
+    <div 
+      onClick={onClick}
+      className={`bg-cinepilot-card border rounded-lg p-4 cursor-pointer transition-all ${
+        isSelected
+          ? 'border-indigo-500 shadow-lg shadow-indigo-500/10'
+          : 'border-cinepilot-border hover:border-gray-600'
+      }`}
+    >
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-mono bg-gray-800 px-2 py-0.5 rounded text-gray-300">
+              Scene {scene.sceneNumber}
+            </span>
+            {scene.intExt && (
+              <span className={`text-xs px-2 py-0.5 rounded ${
+                scene.intExt === 'INT' ? 'bg-blue-900/40 text-blue-400' :
+                scene.intExt === 'EXT' ? 'bg-amber-900/40 text-amber-400' :
+                'bg-purple-900/40 text-purple-400'
+              }`}>{scene.intExt}</span>
+            )}
+            {scene.timeOfDay && (
+              <span className={`text-xs px-2 py-0.5 rounded ${
+                scene.timeOfDay === 'NIGHT' ? 'bg-indigo-900/40 text-indigo-400' : 'bg-yellow-900/40 text-yellow-400'
+              }`}>{scene.timeOfDay}</span>
+            )}
+          </div>
+          <div className="text-sm text-gray-300 mt-2 font-medium">
+            {scene.headingRaw || scene.location || 'Untitled Scene'}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          {scene.sceneCharacters.length > 0 && (
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {scene.sceneCharacters.length}
+            </span>
+          )}
+          {scene.warnings.length > 0 && (
+            <span className="flex items-center gap-1 text-amber-400">
+              <AlertTriangle className="w-3 h-3" />
+              {scene.warnings.length}
+            </span>
+          )}
+          <ChevronDown className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {isSelected && (
+        <div className="mt-4 pt-4 border-t border-gray-800 space-y-4">
+          {scene.sceneCharacters.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Characters</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {scene.sceneCharacters.map((sc, i) => (
+                  <span key={i} className="text-xs px-2 py-1 bg-emerald-900/30 text-emerald-400 rounded">
+                    {sc.character.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {scene.sceneLocations && scene.sceneLocations.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Locations</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {scene.sceneLocations.map((loc, i) => (
+                  <span key={i} className="text-xs px-2 py-1 bg-blue-900/30 text-blue-400 rounded">
+                    {loc.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {scene.sceneProps && scene.sceneProps.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Props</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {scene.sceneProps.map((sp, i) => (
+                  <span key={i} className="text-xs px-2 py-1 bg-orange-900/30 text-orange-400 rounded">
+                    {sp.prop.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {scene.vfxNotes && scene.vfxNotes.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-purple-400 mb-2">VFX Notes</h4>
+              {scene.vfxNotes.map((v, i) => (
+                <div key={i} className="text-xs text-gray-400 flex items-center gap-2">
+                  <span className="px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-400">{v.vfxType}</span>
+                  {v.description}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {scene.warnings && scene.warnings.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-red-400 mb-2">Warnings</h4>
+              {scene.warnings.map((w, i) => (
+                <div key={i} className="text-xs text-red-300 flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${
+                    w.severity === 'high' ? 'bg-red-500' : w.severity === 'medium' ? 'bg-yellow-500' : 'bg-gray-500'
+                  }`} />
+                  {w.description}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CharacterCard({ character }: { character: Character }) {
+  return (
+    <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 className="font-semibold text-gray-200">{character.name}</h3>
+          {character.nameTamil && (
+            <span className="text-xs text-gray-500">{character.nameTamil}</span>
+          )}
+        </div>
+        {character.isMain && (
+          <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded">Lead</span>
+        )}
+      </div>
+      
+      {character.description && (
+        <p className="text-sm text-gray-400 mb-2">{character.description}</p>
+      )}
+      
+      {character.actorName && (
+        <div className="text-xs text-gray-500 mb-2">
+          <span className="text-gray-600">Actor:</span> {character.actorName}
+        </div>
+      )}
+      
+      {character.aliases && character.aliases.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {character.aliases.map((alias, i) => (
+            <span key={i} className="text-xs px-2 py-0.5 bg-gray-800 text-gray-500 rounded">{alias}</span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

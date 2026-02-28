@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Shield, AlertTriangle, FileText, CheckCircle, XCircle, RefreshCw, Loader2, Sparkles } from 'lucide-react'
+import { Shield, AlertTriangle, FileText, CheckCircle, XCircle, RefreshCw, Loader2, Sparkles, Download } from 'lucide-react'
 
 interface SceneFlagData {
   id: string
@@ -165,6 +165,139 @@ export default function CensorBoardPage() {
     }
   }
 
+  const handleExportPDF = (analysis: AnalysisData) => {
+    const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+    
+    // Generate HTML for the PDF
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Censor Board Report - ${date}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a2e; background: #fff; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #dc2626; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #dc2626; margin-bottom: 5px; }
+    .header .subtitle { color: #666; font-size: 14px; }
+    .cert-box { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; }
+    .cert { padding: 20px 40px; border-radius: 8px; text-align: center; }
+    .cert.predicted { background: #fef3c7; border: 2px solid #f59e0b; }
+    .cert .label { font-size: 12px; color: #666; text-transform: uppercase; }
+    .cert .value { font-size: 36px; font-weight: bold; }
+    .cert .confidence { font-size: 12px; color: #888; }
+    .stats { display: flex; justify-content: space-around; margin-bottom: 30px; }
+    .stat { text-align: center; padding: 15px; background: #f8fafc; border-radius: 8px; }
+    .stat-value { font-size: 28px; font-weight: bold; color: #1e293b; }
+    .stat-label { font-size: 12px; color: #64748b; }
+    .section { margin-bottom: 25px; }
+    .section h2 { font-size: 18px; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    .flag { display: flex; align-items: center; gap: 10px; padding: 10px; background: #f8fafc; margin-bottom: 8px; border-radius: 6px; border-left: 3px solid #dc2626; }
+    .flag .sev { display: flex; gap: 2px; }
+    .flag .sev-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .flag .sev-dot.active { background: #dc2626; }
+    .flag .sev-dot.inactive { background: #cbd5e1; }
+    .flag .cat { font-size: 11px; padding: 2px 8px; background: #fee2e2; color: #dc2626; border-radius: 4px; text-transform: uppercase; }
+    .flag .scene { font-size: 12px; font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
+    .flag .desc { flex: 1; font-size: 13px; color: #475569; }
+    .suggestion { padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 10px; }
+    .suggestion .rank { font-weight: bold; color: #16a34a; }
+    .suggestion .scene { font-size: 12px; font-family: monospace; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
+    .suggestion .issue { color: #dc2626; font-weight: 500; margin: 8px 0; }
+    .suggestion .fix { color: #16a34a; }
+    .suggestion .impact { font-size: 12px; color: #7c3aed; margin-top: 8px; }
+    .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 11px; }
+    @media print {
+      body { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎬 Censor Board Analysis Report</h1>
+    <div class="subtitle">Generated on ${date}</div>
+  </div>
+  
+  <div class="cert-box">
+    <div class="cert predicted">
+      <div class="label">Predicted Certificate</div>
+      <div class="value" style="color: #d97706;">${analysis.predictedCertificate || '—'}</div>
+      <div class="confidence">Confidence: ${analysis.confidence || 'N/A'}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">${analysis.deterministicScore?.toFixed(1) || '0'}</div>
+      <div class="stat-label">Sensitivity Score</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${analysis.sceneFlags.length}</div>
+      <div class="stat-label">Content Flags</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${analysis.sceneFlags.filter(f => f.severity >= 4).length}</div>
+      <div class="stat-label">High Severity</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${analysis.suggestions.length}</div>
+      <div class="stat-label">Suggestions</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Content Flags (${analysis.sceneFlags.length} total)</h2>
+    ${analysis.sceneFlags.map(flag => `
+    <div class="flag">
+      <div class="sev">
+        ${[1,2,3,4,5].map(i => `<div class="sev-dot ${i <= flag.severity ? 'active' : 'inactive'}"></div>`).join('')}
+      </div>
+      <span class="cat">${flag.category.replace('_', ' ')}</span>
+      <span class="scene">Scene ${flag.scene.sceneNumber}</span>
+      <span class="desc">${flag.context || 'No context'}</span>
+    </div>
+    `).join('')}
+  </div>
+
+  ${analysis.suggestions.length > 0 ? `
+  <div class="section">
+    <h2>✂️ Cut Suggestions</h2>
+    ${analysis.suggestions.map(sug => `
+    <div class="suggestion">
+      <span class="rank">#${sug.rank}</span>
+      <span class="scene">Scene ${sug.sceneNumber}</span>
+      <div class="issue">Issue: ${sug.issue}</div>
+      <div class="fix">Fix: ${sug.suggestedChange}</div>
+      ${sug.expectedCertImpact ? `<div class="impact">Expected Impact: ${sug.expectedCertImpact}</div>` : ''}
+    </div>
+    `).join('')}
+  </div>
+  ` : ''}
+
+  <div class="footer">
+    Generated by CinePilot • Film Production Management
+  </div>
+</body>
+</html>`
+
+    // Create blob and open in new window for printing
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const printWindow = window.open(url, '_blank')
+    
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print()
+      }
+    } else {
+      // Fallback: download as HTML
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `censor-report-${new Date().toISOString().split('T')[0]}.html`
+      a.click()
+    }
+  }
+
   const categoryCounts = analysis?.sceneFlags.reduce<Record<string, number>>((acc, f) => {
     acc[f.category] = (acc[f.category] || 0) + 1
     return acc
@@ -212,6 +345,15 @@ export default function CensorBoardPage() {
             <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
               Demo Mode
             </span>
+          )}
+          {analysis && (
+            <button
+              onClick={() => handleExportPDF(analysis)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium text-sm transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export PDF
+            </button>
           )}
           <button 
             onClick={handleAnalyze} 

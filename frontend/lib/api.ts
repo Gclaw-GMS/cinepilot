@@ -5,10 +5,8 @@
 // build errors while we wire real data.
 // =============================================================================
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-const noop = () => Promise.resolve({} as any);
-const noopArray = () => Promise.resolve([] as any[]);
+const noop = () => Promise.resolve({} as Record<string, unknown>);
+const noopArray = () => Promise.resolve([] as unknown[]);
 
 const api = {};
 export default api;

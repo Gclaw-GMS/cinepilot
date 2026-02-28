@@ -17,6 +17,8 @@ import {
   Download,
   Loader2,
   AlertCircle,
+  Calendar,
+  X,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -74,6 +76,8 @@ export default function TravelExpensesPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' })
+  const [showDateFilter, setShowDateFilter] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -94,6 +98,8 @@ export default function TravelExpensesPage() {
       const params = new URLSearchParams()
       if (filterCategory !== 'all') params.set('category', filterCategory)
       if (filterStatus !== 'all') params.set('status', filterStatus)
+      if (dateRange.start) params.set('startDate', dateRange.start)
+      if (dateRange.end) params.set('endDate', dateRange.end)
       
       const res = await fetch(`/api/travel?${params}`)
       const data = await res.json()
@@ -106,11 +112,44 @@ export default function TravelExpensesPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterCategory, filterStatus])
+  }, [filterCategory, filterStatus, dateRange])
 
   useEffect(() => {
     fetchExpenses()
   }, [fetchExpenses])
+
+  // CSV Export function
+  const exportToCSV = () => {
+    const headers = ['Date', 'Person', 'Category', 'Description', 'Vendor', 'Amount', 'Status']
+    const rows = expenses.map(exp => {
+      const match = exp.description.match(/^([^:]+):\s*(.*)$/)
+      const personName = match ? match[1] : ''
+      const description = match ? match[2] : exp.description
+      return [
+        new Date(exp.date).toLocaleDateString('en-IN'),
+        personName,
+        exp.category,
+        description,
+        exp.vendor || '',
+        exp.amount.toString(),
+        exp.status
+      ]
+    })
+    
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const clearDateFilter = () => {
+    setDateRange({ start: '', end: '' })
+    setShowDateFilter(false)
+  }
 
   const resetForm = () => {
     setFormData({
@@ -394,6 +433,52 @@ export default function TravelExpensesPage() {
               <option value="rejected">Rejected</option>
               <option value="reimbursed">Reimbursed</option>
             </select>
+            <button
+              onClick={() => setShowDateFilter(!showDateFilter)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                showDateFilter || dateRange.start || dateRange.end
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              {dateRange.start || dateRange.end ? 'Date Range Active' : 'Date Range'}
+            </button>
+            {(dateRange.start || dateRange.end) && (
+              <button
+                onClick={clearDateFilter}
+                className="flex items-center gap-1 px-2 py-1 text-sm text-slate-400 hover:text-white"
+              >
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
+            {showDateFilter && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg">
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                  className="bg-transparent border-none text-sm text-slate-300 focus:outline-none"
+                  placeholder="Start date"
+                />
+                <span className="text-slate-500">to</span>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                  className="bg-transparent border-none text-sm text-slate-300 focus:outline-none"
+                  placeholder="End date"
+                />
+              </div>
+            )}
+            <button
+              onClick={exportToCSV}
+              disabled={expenses.length === 0}
+              className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-sm transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
             <button
               onClick={fetchExpenses}
               className="ml-auto text-sm text-slate-400 hover:text-white transition-colors"

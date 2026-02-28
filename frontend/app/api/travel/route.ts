@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
@@ -38,37 +39,78 @@ interface TravelExpense {
 const TRAVEL_CATEGORIES = ['Flight', 'Train', 'Bus', 'Taxi', 'Auto', 'Hotel', 'Stay', 'Per Diem', 'Daily Allowance'];
 const EXPENSE_STATUSES = ['pending', 'approved', 'rejected', 'reimbursed'];
 
-// Helper to check if we're in demo mode (no DB)
-function isDemoMode(): boolean {
-  try {
-    // Try to import prisma - if it fails or DB not available, use demo mode
-    const { PrismaClient } = require('@prisma/client');
-    return false; // Prisma available
-  } catch {
-    return true; // Demo mode
-  }
-}
-
-// Safe prisma accessor
-function getPrisma() {
-  try {
-    const { PrismaClient } = require('@prisma/client');
-    return new PrismaClient();
-  } catch {
-    return null;
-  }
-}
-
+// GET /api/travel - Get all travel expenses with optional filters
 export async function GET(req: NextRequest) {
-  const prisma = getPrisma();
-  const isDemo = !prisma || isDemoMode();
-  
   const { searchParams } = new URL(req.url);
   const category = searchParams.get('category');
   const status = searchParams.get('status');
+  const startDate = searchParams.get('startDate');
+  const endDate = searchParams.get('endDate');
   const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
 
-  if (isDemo) {
+  try {
+    // Try database first
+    await prisma.$connect();
+    
+    const where: Record<string, unknown> = { projectId };
+    if (category && category !== 'all') where.category = category;
+    if (status && status !== 'all') where.status = status;
+    
+    // Date range filtering
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) {
+        (where.date as Record<string, Date>).gte = new Date(startDate);
+      }
+      if (endDate) {
+        (where.date as Record<string, Date>).lte = new Date(endDate);
+      }
+    }
+
+    const expenses = await prisma.expense.findMany({
+      where,
+      orderBy: { date: 'desc' },
+      include: { project: { select: { name: true } } },
+    });
+
+    // Get all expenses for summary
+    const allExpenses = await prisma.expense.findMany({ where: { projectId } });
+    const totalAmount = allExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const byCategory: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+
+    for (const expense of allExpenses) {
+      const cat = expense.category;
+      const stat = expense.status;
+      byCategory[cat] = (byCategory[cat] || 0) + Number(expense.amount);
+      byStatus[stat] = (byStatus[stat] || 0) + Number(expense.amount);
+    }
+
+    // Format expenses for response
+    const formattedExpenses = expenses.map(e => ({
+      id: e.id,
+      category: e.category,
+      description: e.description,
+      amount: Number(e.amount),
+      date: e.date.toISOString().split('T')[0],
+      vendor: e.vendor || undefined,
+      status: e.status,
+      notes: e.notes || undefined,
+    }));
+
+    return NextResponse.json({
+      expenses: formattedExpenses,
+      summary: {
+        totalAmount,
+        totalCount: allExpenses.length,
+        byCategory,
+        byStatus,
+      },
+      isDemoMode: false,
+    });
+  } catch (error) {
+    console.log('[GET /api/travel] Database not connected, using demo data');
+    
     // Demo mode - return demo data with filters
     let expenses = demoExpenses.get(projectId) || [];
     
@@ -77,6 +119,13 @@ export async function GET(req: NextRequest) {
     }
     if (status && status !== 'all') {
       expenses = expenses.filter(e => e.status === status);
+    }
+    // Date range filtering
+    if (startDate) {
+      expenses = expenses.filter(e => new Date(e.date) >= new Date(startDate));
+    }
+    if (endDate) {
+      expenses = expenses.filter(e => new Date(e.date) <= new Date(endDate));
     }
     
     // Sort by date descending
@@ -103,64 +152,13 @@ export async function GET(req: NextRequest) {
       },
       isDemoMode: true,
     });
-  }
-
-  // Database mode
-  try {
-    const where: Record<string, unknown> = { projectId };
-    if (category && category !== 'all') where.category = category;
-    if (status && status !== 'all') where.status = status;
-
-    const expenses = await prisma.expense.findMany({
-      where,
-      orderBy: { date: 'desc' },
-      include: { project: { select: { name: true } } },
-    });
-
-    const allExpenses = await prisma.expense.findMany({ where: { projectId } });
-    const totalAmount = allExpenses.reduce((sum: number, e: { amount: unknown }) => sum + Number(e.amount), 0);
-    const byCategory: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-
-    for (const expense of allExpenses) {
-      const cat = expense.category;
-      const stat = expense.status;
-      byCategory[cat] = (byCategory[cat] || 0) + Number(expense.amount);
-      byStatus[stat] = (byStatus[stat] || 0) + Number(expense.amount);
-    }
-
-    return NextResponse.json({
-      expenses,
-      summary: {
-        totalAmount,
-        totalCount: allExpenses.length,
-        byCategory,
-        byStatus,
-      },
-    });
-  } catch (error) {
-    console.error('[GET /api/travel]', error);
-    // Fallback to demo data on error
-    const expenses = demoExpenses.get(DEFAULT_PROJECT_ID) || [];
-    const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const byCategory: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-    for (const expense of expenses) {
-      byCategory[expense.category] = (byCategory[expense.category] || 0) + expense.amount;
-      byStatus[expense.status] = (byStatus[expense.status] || 0) + expense.amount;
-    }
-    return NextResponse.json({
-      expenses,
-      summary: { totalAmount, totalCount: expenses.length, byCategory, byStatus },
-      isDemoMode: true,
-    });
+  } finally {
+    await prisma.$disconnect().catch(() => {});
   }
 }
 
+// POST /api/travel - Create a new travel expense
 export async function POST(req: NextRequest) {
-  const prisma = getPrisma();
-  const isDemo = !prisma || isDemoMode();
-  
   try {
     const body = await req.json();
     const { category, description, amount, date, vendor, personName, status, notes } = body;
@@ -182,25 +180,9 @@ export async function POST(req: NextRequest) {
 
     const fullDescription = personName ? `${personName}: ${description}` : description;
 
-    if (isDemo) {
-      // Demo mode - add to in-memory storage
-      const expenses = demoExpenses.get(projectId) || [];
-      const newExpense: TravelExpense = {
-        id: `t${Date.now()}`,
-        category,
-        description: fullDescription,
-        amount,
-        date,
-        vendor: vendor || undefined,
-        status: status || 'pending',
-        notes: notes || undefined,
-      };
-      expenses.push(newExpense);
-      demoExpenses.set(projectId, expenses);
-      return NextResponse.json(newExpense);
-    }
-
-    // Database mode
+    // Try database first
+    await prisma.$connect();
+    
     const expense = await prisma.expense.create({
       data: {
         projectId,
@@ -214,17 +196,50 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(expense);
+    return NextResponse.json({
+      id: expense.id,
+      category: expense.category,
+      description: expense.description,
+      amount: Number(expense.amount),
+      date: expense.date.toISOString().split('T')[0],
+      vendor: expense.vendor || undefined,
+      status: expense.status,
+      notes: expense.notes || undefined,
+    });
   } catch (error) {
     console.error('[POST /api/travel]', error);
-    return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 });
+    
+    // Demo mode - add to in-memory storage
+    try {
+      const body = await req.json();
+      const { category, description, amount, date, vendor, personName, status, notes } = body;
+      const projectId = body.projectId || DEFAULT_PROJECT_ID;
+      
+      const fullDescription = personName ? `${personName}: ${description}` : description;
+      const expenses = demoExpenses.get(projectId) || [];
+      const newExpense: TravelExpense = {
+        id: `t${Date.now()}`,
+        category,
+        description: fullDescription,
+        amount,
+        date,
+        vendor: vendor || undefined,
+        status: status || 'pending',
+        notes: notes || undefined,
+      };
+      expenses.push(newExpense);
+      demoExpenses.set(projectId, expenses);
+      return NextResponse.json({ ...newExpense, isDemoMode: true });
+    } catch {
+      return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 });
+    }
+  } finally {
+    await prisma.$disconnect().catch(() => {});
   }
 }
 
+// PATCH /api/travel - Update an existing expense
 export async function PATCH(req: NextRequest) {
-  const prisma = getPrisma();
-  const isDemo = !prisma || isDemoMode();
-  
   try {
     const body = await req.json();
     const { id, category, description, amount, date, vendor, personName, status, notes } = body;
@@ -233,27 +248,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    if (isDemo) {
-      // Demo mode - update in-memory storage
-      for (const [projectId, expenses] of demoExpenses.entries()) {
-        const idx = expenses.findIndex(e => e.id === id);
-        if (idx !== -1) {
-          const exp = expenses[idx];
-          if (category) exp.category = category;
-          if (description) exp.description = personName ? `${personName}: ${description}` : description;
-          if (amount !== undefined) exp.amount = amount;
-          if (date) exp.date = date;
-          if (vendor !== undefined) exp.vendor = vendor;
-          if (status) exp.status = status;
-          if (notes !== undefined) exp.notes = notes;
-          demoExpenses.set(projectId, expenses);
-          return NextResponse.json(exp);
-        }
-      }
-      return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
-    }
-
-    // Database mode
+    // Try database first
+    await prisma.$connect();
+    
     const updateData: Record<string, unknown> = {};
     if (category && TRAVEL_CATEGORIES.includes(category)) updateData.category = category;
     if (description !== undefined) {
@@ -270,17 +267,50 @@ export async function PATCH(req: NextRequest) {
       data: updateData,
     });
 
-    return NextResponse.json(expense);
+    return NextResponse.json({
+      id: expense.id,
+      category: expense.category,
+      description: expense.description,
+      amount: Number(expense.amount),
+      date: expense.date.toISOString().split('T')[0],
+      vendor: expense.vendor || undefined,
+      status: expense.status,
+      notes: expense.notes || undefined,
+    });
   } catch (error) {
     console.error('[PATCH /api/travel]', error);
-    return NextResponse.json({ error: 'Failed to update expense' }, { status: 500 });
+    
+    // Demo mode - update in-memory storage
+    try {
+      const body = await req.json();
+      const { id, category, description, amount, date, vendor, personName, status, notes } = body;
+      
+      for (const [projectId, expenses] of demoExpenses.entries()) {
+        const idx = expenses.findIndex(e => e.id === id);
+        if (idx !== -1) {
+          const exp = expenses[idx];
+          if (category) exp.category = category;
+          if (description) exp.description = personName ? `${personName}: ${description}` : description;
+          if (amount !== undefined) exp.amount = amount;
+          if (date) exp.date = date;
+          if (vendor !== undefined) exp.vendor = vendor;
+          if (status) exp.status = status;
+          if (notes !== undefined) exp.notes = notes;
+          demoExpenses.set(projectId, expenses);
+          return NextResponse.json({ ...exp, isDemoMode: true });
+        }
+      }
+      return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+    } catch {
+      return NextResponse.json({ error: 'Failed to update expense' }, { status: 500 });
+    }
+  } finally {
+    await prisma.$disconnect().catch(() => {});
   }
 }
 
+// DELETE /api/travel - Delete an expense
 export async function DELETE(req: NextRequest) {
-  const prisma = getPrisma();
-  const isDemo = !prisma || isDemoMode();
-  
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
 
@@ -288,24 +318,25 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'id is required' }, { status: 400 });
   }
 
-  if (isDemo) {
+  try {
+    // Try database first
+    await prisma.$connect();
+    await prisma.expense.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[DELETE /api/travel]', error);
+    
     // Demo mode - remove from in-memory storage
     for (const [projectId, expenses] of demoExpenses.entries()) {
       const idx = expenses.findIndex(e => e.id === id);
       if (idx !== -1) {
         expenses.splice(idx, 1);
         demoExpenses.set(projectId, expenses);
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, isDemoMode: true });
       }
     }
     return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
-  }
-
-  try {
-    await prisma.expense.delete({ where: { id } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('[DELETE /api/travel]', error);
-    return NextResponse.json({ error: 'Failed to delete expense' }, { status: 500 });
+  } finally {
+    await prisma.$disconnect().catch(() => {});
   }
 }

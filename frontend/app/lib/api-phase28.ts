@@ -1,8 +1,7 @@
 // Stub — will be replaced during feature implementation.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export type ProjectNote = any;
-export type Activity = any;
-export type Task = any;
+export type ProjectNote = unknown;
+export type Activity = unknown;
+export type Task = unknown;
 
 export const getNotes = () => Promise.resolve([]);
 export const createNote = () => Promise.resolve({});

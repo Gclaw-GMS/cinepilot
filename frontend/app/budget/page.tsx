@@ -296,7 +296,7 @@ export default function BudgetPage() {
           {items.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
               <div className="text-gray-500 mb-3">No budget generated yet</div>
-              <p className="text-gray-600 text-sm mb-4">Upload a script first, then click "Generate Budget" to create an AI-powered budget from your script breakdown.</p>
+              <p className="text-gray-600 text-sm mb-4">Upload a script first, then click &quot;Generate Budget&quot; to create an AI-powered budget from your script breakdown.</p>
               <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium">
                 Generate Budget from Script
               </button>

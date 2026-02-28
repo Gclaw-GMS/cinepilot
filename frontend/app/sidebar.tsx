@@ -23,6 +23,10 @@ import {
   Sparkles,
   Plane,
   MessageCircle,
+  Target,
+  Gauge,
+  ListChecks,
+  Film,
 } from 'lucide-react'
 
 type NavItem = {
@@ -48,18 +52,32 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    title: 'Planning',
+    items: [
+      { href: '/timeline', icon: BarChart3, label: 'Timeline' },
+      { href: '/schedule', icon: Calendar, label: 'Schedule' },
+      { href: '/progress', icon: ListChecks, label: 'Progress' },
+      { href: '/dood', icon: Film, label: 'DOOD' },
+    ],
+  },
+  {
     title: 'Production',
     items: [
-      { href: '/schedule', icon: Calendar, label: 'Schedule' },
       { href: '/locations', icon: MapPin, label: 'Location Scout' },
       { href: '/equipment', icon: Clapperboard, label: 'Equipment' },
       { href: '/travel', icon: Plane, label: 'Travel Expenses' },
-      { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment', badge: 'NEW' },
+      { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: Shield, label: 'Censor Board' },
       { href: '/continuity', icon: Eye, label: 'Continuity' },
       { href: '/vfx', icon: Sparkles, label: 'VFX Breakdown' },
       { href: '/dubbing', icon: Languages, label: 'Dubbing' },
+    ],
+  },
+  {
+    title: 'Command',
+    items: [
+      { href: '/mission-control', icon: Gauge, label: 'Mission Control' },
     ],
   },
   {

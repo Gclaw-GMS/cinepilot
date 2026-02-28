@@ -38,6 +38,7 @@ export default function DubbingPage() {
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<TranslatedScene[]>([])
   const [loadingScripts, setLoadingScripts] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
     async function loadScripts() {
@@ -65,8 +66,10 @@ export default function DubbingPage() {
       if (!res.ok) throw new Error('Failed to load dubbed versions')
       const data = await res.json()
       setDubbedVersions(data.scripts || [])
+      setIsDemoMode(!!data.isDemo)
     } catch {
       setDubbedVersions([])
+      setIsDemoMode(false)
     }
   }, [])
 
@@ -95,21 +98,37 @@ export default function DubbingPage() {
         throw new Error(data.error || 'Generation failed')
       }
 
-      await loadDubbedVersions(selectedScriptId)
+      const data = await res.json()
+      
+      // Check if demo mode - API returns translatedScenes directly
+      if (data.translatedScenes) {
+        setPreview(data.translatedScenes)
+        setIsDemoMode(true)
+        // Add the new dub to the list
+        setDubbedVersions(prev => [...prev, {
+          id: data.scriptId,
+          title: `Kaadhal Enbadhu (${targetLanguage.charAt(0).toUpperCase() + targetLanguage.slice(1)})`,
+          language: targetLanguage,
+          createdAt: new Date().toISOString()
+        }])
+      } else {
+        // Real mode - fetch the content
+        await loadDubbedVersions(selectedScriptId)
 
-      const newScript = dubbedVersions.find(
-        (d) => d.language === targetLanguage,
-      )
-      if (newScript) {
-        try {
-          const contentRes = await fetch(`/api/scripts/${newScript.id}`)
-          if (contentRes.ok) {
-            const contentData = await contentRes.json()
-            const parsed = JSON.parse(contentData.content || '{}')
-            setPreview(parsed.translatedScenes || [])
+        const newScript = dubbedVersions.find(
+          (d) => d.language === targetLanguage,
+        )
+        if (newScript) {
+          try {
+            const contentRes = await fetch(`/api/scripts/${newScript.id}`)
+            if (contentRes.ok) {
+              const contentData = await contentRes.json()
+              const parsed = JSON.parse(contentData.content || '{}')
+              setPreview(parsed.translatedScenes || [])
+            }
+          } catch {
+            // preview not critical
           }
-        } catch {
-          // preview not critical
         }
       }
     } catch (err) {
@@ -131,16 +150,24 @@ export default function DubbingPage() {
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-            <Languages className="w-5 h-5 text-indigo-400" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+              <Languages className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Dubbing Script Generator</h1>
+              <p className="text-sm text-slate-400">
+                Translate scripts with cultural adaptation and lip-sync matching
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Dubbing Script Generator</h1>
-            <p className="text-sm text-slate-400">
-              Translate scripts with cultural adaptation and lip-sync matching
-            </p>
-          </div>
+          {isDemoMode && (
+            <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+              Demo Data
+            </span>
+          )}
         </div>
 
         {error && (

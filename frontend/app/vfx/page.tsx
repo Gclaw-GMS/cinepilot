@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, Loader2, BarChart3, PieChart, RefreshCw } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, Loader2, BarChart3, PieChart, RefreshCw, Download } from 'lucide-react';
 import { 
   PieChart as RechartsPie, Pie, Cell, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -169,7 +169,8 @@ export default function VfxPage() {
         setVfxWarnings(data.vfxWarnings || []);
         setVfxProps(data.props || []);
         setSummary(data.summary || null);
-        setIsDemoMode(false);
+        // Check for isDemo flag in response body (new API format)
+        setIsDemoMode(data.isDemo === true);
       }
     } catch (err) {
       // Use demo data on error
@@ -217,6 +218,48 @@ export default function VfxPage() {
     setVfxProps(DEMO_VFX_DATA.props);
     setSummary(DEMO_VFX_DATA.summary);
     setIsDemoMode(true);
+  }
+
+  // Export VFX data as CSV
+  function exportToCSV() {
+    if (vfxNotes.length === 0 && vfxWarnings.length === 0) return;
+    
+    const rows = [['Scene', 'Type', 'Description', 'Confidence', 'Severity', 'Warning Type']];
+    
+    // Add VFX notes
+    vfxNotes.forEach(note => {
+      rows.push([
+        note.scene.sceneNumber,
+        note.vfxType,
+        `"${note.description.replace(/"/g, '""')}"`,
+        `${Math.round(note.confidence * 100)}%`,
+        getComplexity(note.confidence),
+        ''
+      ]);
+    });
+    
+    // Add warnings
+    vfxWarnings.forEach(warn => {
+      rows.push([
+        warn.scene.sceneNumber,
+        'Warning',
+        `"${warn.description.replace(/"/g, '""')}"`,
+        '',
+        warn.severity,
+        warn.warningType
+      ]);
+    });
+    
+    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `vfx-breakdown-${selectedScript || 'demo'}-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   // Group data by scene
@@ -332,6 +375,17 @@ export default function VfxPage() {
               <Wand2 className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
               {analyzing ? 'Analyzing...' : 'Run VFX Analysis'}
             </button>
+
+            {(vfxNotes.length > 0 || vfxWarnings.length > 0) && (
+              <button
+                onClick={exportToCSV}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                title="Export VFX breakdown as CSV"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
+            )}
           </div>
         </div>
 

@@ -1022,3 +1022,18 @@ model Caterer {
   @@index([projectId])
   @@map("caterers")
 }
+
+model Note {
+  id         String   @id @default(cuid())
+  projectId  String   @map("project_id")
+  content    String
+  category   String   @default("general") // todo, decision, idea, feedback, general
+  author     String   @default("User")
+  isPinned   Boolean  @default(false) @map("is_pinned")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([category])
+  @@map("notes")
+}

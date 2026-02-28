@@ -58,6 +58,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [showForm, setShowForm] = useState(false)
@@ -83,8 +84,12 @@ export default function NotesPage() {
       if (!res.ok) throw new Error('Failed to fetch notes')
       const data = await res.json()
       setNotes(data)
+      // Detect demo mode by checking if notes have demo IDs
+      const isDemo = data.length > 0 && data.every((n: Note) => String(n.id).startsWith('demo-'))
+      setIsDemoMode(isDemo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -256,7 +261,14 @@ export default function NotesPage() {
                 <StickyNote className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Production Notes</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-semibold tracking-tight">Production Notes</h1>
+                  {isDemoMode && (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full">
+                      Demo
+                    </span>
+                  )}
+                </div>
                 <p className="text-slate-500 text-sm mt-1">Capture ideas, decisions, and to-dos</p>
               </div>
             </div>

@@ -62,6 +62,7 @@ export default function ScriptsPage() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
   const [analyses, setAnalyses] = useState<AnalysisData[]>([])
   const [loading, setLoading] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const [sceneFilter, setSceneFilter] = useState('')
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
@@ -75,6 +76,7 @@ export default function ScriptsPage() {
       setScripts(data.scripts || [])
       setCharacters(data.characters || [])
       setAnalyses(data.analyses || [])
+      setIsDemoMode(data.isDemo || false)
     } catch (e) {
       console.error('Fetch scripts error:', e)
     } finally {
@@ -167,7 +169,14 @@ export default function ScriptsPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Script Management</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">Script Management</h1>
+            {isDemoMode && (
+              <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">
+                Demo Mode
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm mt-1">
             {activeScript
               ? `${activeScript.title} (v${activeScript.version}) — ${scenes.length} scenes`

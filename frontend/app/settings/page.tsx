@@ -10,11 +10,49 @@ import {
   Database,
   Save,
   Check,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
 
 type SettingsState = Record<string, unknown>;
+
+const STORAGE_KEY = 'cinepilot-settings';
+
+const DEFAULT_SETTINGS: SettingsState = {
+  language: 'tamil',
+  tamilCinemaEnabled: true,
+  aiModel: 'gpt4o',
+  theme: 'dark',
+  notificationsPush: true,
+  notificationsEmail: false,
+  analyticsEnabled: false,
+};
+
+// Load settings from localStorage
+function loadFromStorage(): SettingsState {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    }
+  } catch (e) {
+    console.error('Failed to load settings from storage:', e);
+  }
+  return DEFAULT_SETTINGS;
+}
+
+// Save settings to localStorage
+function saveToStorage(settings: SettingsState): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.error('Failed to save settings to storage:', e);
+  }
+}
 
 function Toggle({
   checked,
@@ -57,23 +95,35 @@ const THEMES = [
 const AI_MODELS = Object.keys(MODELS) as ModelKey[];
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsState>({});
-  const [local, setLocal] = useState<SettingsState>({});
+  const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
+  const [local, setLocal] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dbConnected, setDbConnected] = useState<boolean | null>(null);
 
   const fetchSettings = useCallback(async () => {
+    // First load from localStorage for instant display
+    const stored = loadFromStorage();
+    setSettings(stored);
+    setLocal(stored);
+    
+    // Then try to fetch from API
     try {
       const res = await fetch('/api/settings');
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setSettings(data);
-      setLocal(data);
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+        setLocal(data);
+        setDbConnected(true);
+        // Sync localStorage with database data
+        saveToStorage(data);
+      } else {
+        setDbConnected(false);
+      }
     } catch (err) {
-      console.error(err);
-      setSettings({});
-      setLocal({});
+      console.warn('Database not connected, using local storage fallback');
+      setDbConnected(false);
     } finally {
       setLoading(false);
     }
@@ -94,19 +144,28 @@ export default function SettingsPage() {
   const save = async () => {
     setSaving(true);
     setSaved(false);
+    
+    // Always save to localStorage first (instant)
+    saveToStorage(local);
+    setSettings(local);
+    
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'bulk', settings: local }),
       });
-      if (!res.ok) throw new Error('Failed to save');
-      setSettings(local);
+      if (res.ok) {
+        setDbConnected(true);
+      } else {
+        setDbConnected(false);
+      }
+    } catch (err) {
+      console.warn('Failed to save to database, using local storage only');
+      setDbConnected(false);
+    } finally {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error(err);
-    } finally {
       setSaving(false);
     }
   };
@@ -114,7 +173,10 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex items-center justify-center">
-        <p className="text-slate-500">Loading...</p>
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+          <p className="text-slate-500">Loading settings...</p>
+        </div>
       </div>
     );
   }
@@ -122,10 +184,38 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-slate-100 p-6">
       <div className="max-w-xl mx-auto space-y-6">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Settings className="h-6 w-6" />
-          Settings
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <Settings className="h-6 w-6" />
+            Settings
+          </h1>
+          {dbConnected === false && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-amber-400" />
+              <span className="text-xs text-amber-400">Local mode</span>
+            </div>
+          )}
+          {dbConnected === true && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
+              <Database className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs text-emerald-400">Database connected</span>
+            </div>
+          )}
+        </div>
+        
+        {dbConnected === false && (
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-slate-300 font-medium">Using local storage</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Your settings are saved locally. Connect a PostgreSQL database to sync across devices.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-6">
           <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">

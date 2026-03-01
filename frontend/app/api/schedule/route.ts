@@ -4,11 +4,42 @@ import { optimizeSchedule } from '@/lib/schedule/solver';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Demo data for when database is not available
+const DEMO_SHOOTING_DAYS = [
+  { id: 'day-1', dayNumber: 1, scheduledDate: '2026-03-15', callTime: '06:00', estimatedHours: 12, location: { name: 'Marina Beach' }, status: 'scheduled', dayScenes: [
+    { scene: { sceneNumber: '1', headingRaw: 'EXT. BEACH - SUNRISE', location: 'Marina Beach' }, orderNumber: 1, estimatedMinutes: 90 },
+    { scene: { sceneNumber: '2', headingRaw: 'EXT. BEACH - DAY', location: 'Marina Beach' }, orderNumber: 2, estimatedMinutes: 120 },
+  ]},
+  { id: 'day-2', dayNumber: 2, scheduledDate: '2026-03-16', callTime: '07:00', estimatedHours: 10, location: { name: 'Kapaleeshwarar Temple' }, status: 'scheduled', dayScenes: [
+    { scene: { sceneNumber: '3', headingRaw: 'EXT. TEMPLE - MORNING', location: 'Kapaleeshwarar Temple' }, orderNumber: 1, estimatedMinutes: 150 },
+    { scene: { sceneNumber: '5', headingRaw: 'INT. TEMPLE - DAY', location: 'Kapaleeshwarar Temple' }, orderNumber: 2, estimatedMinutes: 90 },
+  ]},
+  { id: 'day-3', dayNumber: 3, scheduledDate: '2026-03-17', callTime: '08:00', estimatedHours: 14, location: { name: 'Chennai Studio' }, status: 'scheduled', dayScenes: [
+    { scene: { sceneNumber: '8', headingRaw: 'INT. COURTROOM - DAY', location: 'Courtroom Set' }, orderNumber: 1, estimatedMinutes: 180 },
+    { scene: { sceneNumber: '10', headingRaw: 'INT. COURTROOM - DAY', location: 'Courtroom Set' }, orderNumber: 2, estimatedMinutes: 120 },
+  ]},
+  { id: 'day-4', dayNumber: 4, scheduledDate: '2026-03-18', callTime: '06:00', estimatedHours: 12, location: { name: 'Ooty Hill Station' }, status: 'scheduled', dayScenes: [
+    { scene: { sceneNumber: '12', headingRaw: 'EXT. HILL STATION - MORNING', location: 'Ooty' }, orderNumber: 1, estimatedMinutes: 150 },
+    { scene: { sceneNumber: '15', headingRaw: 'EXT. HILL STATION - SUNSET', location: 'Ooty' }, orderNumber: 2, estimatedMinutes: 90 },
+  ]},
+  { id: 'day-5', dayNumber: 5, scheduledDate: '2026-03-19', callTime: '07:00', estimatedHours: 10, location: { name: 'Tamil Restaurant' }, status: 'scheduled', dayScenes: [
+    { scene: { sceneNumber: '18', headingRaw: 'INT. RESTAURANT - DAY', location: 'Saravana Bhavan' }, orderNumber: 1, estimatedMinutes: 120 },
+    { scene: { sceneNumber: '20', headingRaw: 'INT. RESTAURANT - NIGHT', location: 'Saravana Bhavan' }, orderNumber: 2, estimatedMinutes: 90 },
+  ]},
+]
+
+const DEMO_VERSIONS = [
+  { id: 'v-1', versionNum: 1, label: 'Initial Schedule', createdAt: '2026-01-10' },
+  { id: 'v-2', versionNum: 2, label: 'Optimized v1', createdAt: '2026-02-01' },
+  { id: 'v-3', versionNum: 3, label: 'Final Draft', createdAt: '2026-02-15' },
+]
+
 // GET /api/schedule — get schedule data
 export async function GET(req: NextRequest) {
+  const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
+
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
-    const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
 
     const [shootingDays, versions] = await Promise.all([
       prisma.shootingDay.findMany({
@@ -73,8 +104,38 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[GET /api/schedule]', error);
-    return NextResponse.json({ error: 'Failed to fetch schedule' }, { status: 500 });
+    console.error('[GET /api/schedule] Database not available, using demo data');
+    // Use demo data when database is not available
+    if (statsOnly) {
+      return NextResponse.json({
+        days: DEMO_SHOOTING_DAYS.map(d => ({
+          dayNumber: d.dayNumber,
+          scheduledDate: d.scheduledDate,
+          scenes: d.dayScenes.map(ds => ({
+            sceneNumber: ds.scene.sceneNumber,
+            headingRaw: ds.scene.headingRaw,
+            location: ds.scene.location,
+          })),
+        })),
+        stats: {
+          totalDays: DEMO_SHOOTING_DAYS.length,
+          totalHours: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.estimatedHours, 0),
+          totalScenes: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.dayScenes.length, 0),
+        },
+        _demo: true,
+      });
+    }
+
+    return NextResponse.json({
+      shootingDays: DEMO_SHOOTING_DAYS,
+      versions: DEMO_VERSIONS,
+      stats: {
+        totalDays: DEMO_SHOOTING_DAYS.length,
+        totalHours: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.estimatedHours, 0),
+        totalScenes: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.dayScenes.length, 0),
+      },
+      _demo: true,
+    });
   }
 }
 
@@ -91,6 +152,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         message: `Schedule optimized: ${result.totalDays} days`,
         ...result,
+      });
+    }
+
+    // Demo mode: return mock optimized schedule
+    if (action === 'optimize' && process.env.NODE_ENV !== 'production') {
+      const startDateStr = startDate || new Date().toISOString().split('T')[0];
+      const days = DEMO_SHOOTING_DAYS.map((d, i) => {
+        const date = new Date(startDateStr);
+        date.setDate(date.getDate() + i);
+        return {
+          ...d,
+          scheduledDate: date.toISOString().split('T')[0],
+        };
+      });
+
+      return NextResponse.json({
+        message: `Schedule optimized: ${days.length} days (demo mode)`,
+        totalDays: days.length,
+        days,
+        _demo: true,
       });
     }
 

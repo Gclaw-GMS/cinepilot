@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { 
   StickyNote, Plus, Search, Edit2, Trash2, X, Save, 
   Calendar, Tag, User, Clock, CheckCircle, AlertCircle,
-  FolderOpen, Filter, RefreshCw, Loader2
+  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
+} from 'recharts'
 
 type Note = {
   id: string
@@ -27,6 +31,17 @@ const CATEGORIES = [
   { value: 'logistics', label: 'Logistics', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
   { value: 'budget', label: 'Budget', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
 ]
+
+const CHART_COLORS = {
+  general: '#64748b',
+  production: '#3b82f6',
+  creative: '#8b5cf6',
+  technical: '#10b981',
+  logistics: '#f59e0b',
+  budget: '#22c55e',
+}
+
+const CATEGORY_PALETTE = Object.values(CHART_COLORS)
 
 const DEMO_NOTES: Note[] = [
   { 
@@ -141,6 +156,48 @@ export default function NotesPage() {
   const pinnedNotes = filteredNotes.filter(n => n.isPinned)
   const regularNotes = filteredNotes.filter(n => !n.isPinned)
 
+  // Chart data computation
+  const categoryData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    notes.forEach(note => {
+      counts[note.category] = (counts[note.category] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, value]) => ({
+      name: CATEGORIES.find(c => c.value === name)?.label || name,
+      value,
+      color: CHART_COLORS[name as keyof typeof CHART_COLORS] || '#64748b'
+    }))
+  }, [notes])
+
+  const timelineData = useMemo(() => {
+    const byMonth: Record<string, number> = {}
+    notes.forEach(note => {
+      const date = new Date(note.createdAt)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      byMonth[key] = (byMonth[key] || 0) + 1
+    })
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([month, count]) => ({
+        month,
+        notes: count
+      }))
+  }, [notes])
+
+  const tagData = useMemo(() => {
+    const tagCounts: Record<string, number> = {}
+    notes.forEach(note => {
+      note.tags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+      })
+    })
+    return Object.entries(tagCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8)
+  }, [notes])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title.trim()) return
@@ -228,17 +285,27 @@ export default function NotesPage() {
               <p className="text-sm text-slate-400">Keep track of important production details</p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setShowForm(true)
-              setEditingId(null)
-              setFormData({ title: '', content: '', category: 'general', tags: '', isPinned: false })
-            }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Note
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchNotes}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                setShowForm(true)
+                setEditingId(null)
+                setFormData({ title: '', content: '', category: 'general', tags: '', isPinned: false })
+              }}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Note
+            </button>
+          </div>
         </div>
 
         {/* Search and Filter */}
@@ -289,6 +356,134 @@ export default function NotesPage() {
             </p>
           </div>
         </div>
+
+        {/* Charts Section */}
+        {notes.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Notes by Category - Pie Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-indigo-400" />
+                Notes by Category
+              </h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      dataKey="value"
+                      nameKey="name"
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ 
+                        backgroundColor: '#1e293b', 
+                        border: '1px solid #334155', 
+                        borderRadius: '8px',
+                        color: '#f1f5f9'
+                      }}
+                    />
+                    <Legend 
+                      formatter={(value) => <span className="text-slate-400 text-xs">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Notes Timeline - Area Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                Notes Over Time
+              </h3>
+              <div className="h-48">
+                {timelineData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={timelineData}>
+                      <defs>
+                        <linearGradient id="colorNotes" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="month" stroke="#64748b" fontSize={10} />
+                      <YAxis stroke="#64748b" fontSize={10} />
+                      <Tooltip
+                        contentStyle={{ 
+                          backgroundColor: '#1e293b', 
+                          border: '1px solid #334155', 
+                          borderRadius: '8px',
+                          color: '#f1f5f9'
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="notes" 
+                        stroke="#6366f1" 
+                        strokeWidth={2}
+                        fillOpacity={1} 
+                        fill="url(#colorNotes)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                    Not enough data
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Top Tags - Bar Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+                <Tag className="w-4 h-4 text-amber-400" />
+                Top Tags
+              </h3>
+              <div className="h-48">
+                {tagData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={tagData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                      <XAxis type="number" stroke="#64748b" fontSize={10} />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        stroke="#64748b" 
+                        fontSize={10} 
+                        width={60}
+                        tickFormatter={(value) => value.length > 8 ? `${value.slice(0,8)}...` : value}
+                      />
+                      <Tooltip
+                        contentStyle={{ 
+                          backgroundColor: '#1e293b', 
+                          border: '1px solid #334155', 
+                          borderRadius: '8px',
+                          color: '#f1f5f9'
+                        }}
+                      />
+                      <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                    No tags yet
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">

@@ -3,9 +3,48 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Demo fallback data
+const DEMO_DATA = {
+  overall: 42,
+  phases: [
+    { name: 'pre_production', displayName: 'Pre-Production', status: 'in_progress', progress: 75, order: 0 },
+    { name: 'production', displayName: 'Production', status: 'pending', progress: 15, order: 1 },
+    { name: 'post_production', displayName: 'Post-Production', status: 'pending', progress: 0, order: 2 },
+  ],
+  milestones: [
+    { id: '1', name: 'Script Lock', date: '2026-01-15', status: 'completed', tasks: 3 },
+    { id: '2', name: 'Casting Complete', date: '2026-02-20', status: 'in_progress', tasks: 3 },
+    { id: '3', name: 'Location Scouting', date: '2026-03-15', status: 'in_progress', tasks: 2 },
+    { id: '4', name: 'Pre-Production Complete', date: '2026-04-01', status: 'pending', tasks: 3 },
+    { id: '5', name: 'Principal Photography', date: '2026-05-01', status: 'pending', tasks: 0 },
+    { id: '6', name: 'First Cut', date: '2026-07-15', status: 'pending', tasks: 0 },
+    { id: '7', name: 'Final Delivery', date: '2026-09-01', status: 'pending', tasks: 0 },
+  ],
+  tasks: [
+    { id: 't1', name: 'Script Analysis', description: 'Initial script review and breakdown', status: 'completed', progress: 100, priority: 'critical', dueDate: '2026-01-10' },
+    { id: 't2', name: 'Script Revisions', description: 'Incorporate feedback', status: 'completed', progress: 100, priority: 'high', dueDate: '2026-01-15' },
+    { id: 't3', name: 'Character Breakdown', description: 'Detailed character analysis', status: 'completed', progress: 100, priority: 'high', dueDate: '2026-01-20' },
+    { id: 't4', name: 'Location Shortlist', description: 'Create list of potential locations', status: 'in_progress', progress: 75, priority: 'high', dueDate: '2026-03-10' },
+    { id: 't5', name: 'Casting Calls', description: 'Post casting calls and auditions', status: 'in_progress', progress: 50, priority: 'critical', dueDate: '2026-02-15' },
+    { id: 't6', name: 'Auditions', description: 'Conduct actor auditions', status: 'in_progress', progress: 30, priority: 'critical', dueDate: '2026-02-20' },
+    { id: 't7', name: 'Permits Application', description: 'Film permits for locations', status: 'in_progress', progress: 20, priority: 'high', dueDate: '2026-03-25' },
+    { id: 't8', name: 'Equipment Booking', description: 'Reserve cameras, lights, grip', status: 'pending', progress: 0, priority: 'high', dueDate: '2026-04-01' },
+    { id: 't9', name: 'Crew Hiring', description: 'Hire key crew members', status: 'pending', progress: 0, priority: 'high', dueDate: '2026-04-05' },
+    { id: 't10', name: 'Shot List Creation', description: 'Detailed shot list for production', status: 'pending', progress: 0, priority: 'medium', dueDate: '2026-04-10' },
+  ],
+  upcoming_deadlines: [
+    { task: 'Casting Calls', date: '2026-02-15', days_left: 14 },
+    { task: 'Auditions', date: '2026-02-20', days_left: 19 },
+    { task: 'Location Shortlist', date: '2026-03-10', days_left: 37 },
+    { task: 'Permits Application', date: '2026-03-25', days_left: 52 },
+  ],
+};
+
 // GET /api/progress — get production progress data
 // GET /api/progress?summary=true — get just the summary for dashboard
 export async function GET(req: NextRequest) {
+  let isDemoMode = false;
+  
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const summaryOnly = req.nextUrl.searchParams.get('summary') === 'true';
@@ -78,6 +117,7 @@ export async function GET(req: NextRequest) {
           progress: t.progress,
         })),
         upcoming_deadlines: upcomingTasks.slice(0, 5),
+        isDemoMode,
       });
     }
 
@@ -108,10 +148,15 @@ export async function GET(req: NextRequest) {
         milestoneId: t.milestoneId,
       })),
       upcoming_deadlines: upcomingTasks,
+      isDemoMode,
     });
   } catch (error) {
     console.error('[GET /api/progress]', error);
-    return NextResponse.json({ error: 'Failed to fetch progress data' }, { status: 500 });
+    // Return demo data on error
+    return NextResponse.json({
+      ...DEMO_DATA,
+      isDemoMode: true,
+    });
   }
 }
 

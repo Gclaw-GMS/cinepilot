@@ -77,17 +77,21 @@ export default function ProgressPage() {
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'timeline' | 'kanban' | 'tasks'>('timeline')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const fetchProgress = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/progress')
+      const data = await res.json()
+      
+      // Detect demo mode from API response
+      setIsDemoMode(!!data.isDemoMode)
+      
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to fetch progress')
       }
-      const data = await res.json()
       setProgress(data)
     } catch (err) {
       console.error('Progress fetch error:', err)
@@ -208,6 +212,12 @@ export default function ProgressPage() {
           >
             <RefreshCw className="w-5 h-5" />
           </button>
+          {isDemoMode && (
+            <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+              Demo Data
+            </span>
+          )}
         </div>
       </div>
 

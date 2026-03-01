@@ -1032,3 +1032,25 @@ model Note {
   @@index([projectId])
   @@map("notes")
 }
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  title       String
+  description String?  @db.Text
+  type        String   @default("milestone") // shoot, pre-production, post-production, milestone, review
+  status      String   @default("pending") // pending, in-progress, completed, delayed
+  startDate   DateTime @db.Date @map("start_date")
+  endDate     DateTime @db.Date @map("end_date")
+  location    String?
+  scenes      Int      @default(0)
+  budget      Decimal? @db.Decimal(12, 2)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([type])
+  @@index([status])
+  @@map("timeline_events")
+}

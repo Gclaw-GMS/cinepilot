@@ -52,6 +52,143 @@ interface ScheduleStats {
   totalScenes: number
 }
 
+// Demo data for when no real data exists
+const DEMO_SHOOTING_DAYS: ShootingDayData[] = [
+  {
+    id: 'day-1',
+    dayNumber: 1,
+    scheduledDate: '2026-03-15',
+    callTime: '06:00',
+    estimatedHours: '11',
+    notes: null,
+    status: 'scheduled',
+    locationId: 'loc-1',
+    location: { name: 'KAPALEESHWARAR TEMPLE' },
+    dayScenes: [
+      { id: 'ds-1', orderNumber: 1, estimatedMinutes: 45, scene: { id: 's1', sceneNumber: '1', headingRaw: 'EXT. TEMPLE - DAWN', intExt: 'EXT', timeOfDay: 'DAWN', location: 'KAPALEESHWARAR TEMPLE' }},
+      { id: 'ds-2', orderNumber: 2, estimatedMinutes: 30, scene: { id: 's2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE COURTYARD - DAWN', intExt: 'EXT', timeOfDay: 'DAWN', location: 'KAPALEESHWARAR TEMPLE' }},
+      { id: 'ds-3', orderNumber: 3, estimatedMinutes: 60, scene: { id: 's3', sceneNumber: '3', headingRaw: 'INT. TEMPLE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'KAPALEESHWARAR TEMPLE' }},
+    ]
+  },
+  {
+    id: 'day-2',
+    dayNumber: 2,
+    scheduledDate: '2026-03-16',
+    callTime: '07:00',
+    estimatedHours: '10',
+    notes: null,
+    status: 'scheduled',
+    locationId: 'loc-2',
+    location: { name: 'MARINA BEACH' },
+    dayScenes: [
+      { id: 'ds-4', orderNumber: 1, estimatedMinutes: 45, scene: { id: 's4', sceneNumber: '5', headingRaw: 'EXT. BEACH - SUNRISE', intExt: 'EXT', timeOfDay: 'DAWN', location: 'MARINA BEACH' }},
+      { id: 'ds-5', orderNumber: 2, estimatedMinutes: 30, scene: { id: 's5', sceneNumber: '6', headingRaw: 'EXT. BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'MARINA BEACH' }},
+      { id: 'ds-6', orderNumber: 3, estimatedMinutes: 90, scene: { id: 's6', sceneNumber: '7', headingRaw: 'EXT. BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'MARINA BEACH' }},
+    ]
+  },
+  {
+    id: 'day-3',
+    dayNumber: 3,
+    scheduledDate: '2026-03-17',
+    callTime: '18:00',
+    estimatedHours: '8',
+    notes: 'Night shoot - pack warm',
+    status: 'scheduled',
+    locationId: 'loc-3',
+    location: { name: 'CHENNAI POLICE STATION' },
+    dayScenes: [
+      { id: 'ds-7', orderNumber: 1, estimatedMinutes: 60, scene: { id: 's7', sceneNumber: '12', headingRaw: 'EXT. POLICE STATION - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'CHENNAI POLICE STATION' }},
+      { id: 'ds-8', orderNumber: 2, estimatedMinutes: 45, scene: { id: 's8', sceneNumber: '13', headingRaw: 'INT. POLICE STATION - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'CHENNAI POLICE STATION' }},
+    ]
+  },
+  {
+    id: 'day-4',
+    dayNumber: 4,
+    scheduledDate: '2026-03-18',
+    callTime: '06:00',
+    estimatedHours: '12',
+    notes: 'CRITICAL: Major action sequence',
+    status: 'scheduled',
+    locationId: 'loc-4',
+    location: { name: 'WAREHOUSE DISTRICT' },
+    dayScenes: [
+      { id: 'ds-9', orderNumber: 1, estimatedMinutes: 90, scene: { id: 's9', sceneNumber: '15', headingRaw: 'EXT. WAREHOUSE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'WAREHOUSE DISTRICT' }},
+      { id: 'ds-10', orderNumber: 2, estimatedMinutes: 120, scene: { id: 's10', sceneNumber: '16', headingRaw: 'INT. WAREHOUSE - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'WAREHOUSE DISTRICT' }},
+      { id: 'ds-11', orderNumber: 3, estimatedMinutes: 60, scene: { id: 's11', sceneNumber: '17', headingRaw: 'EXT. WAREHOUSE ROOFTOP - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'WAREHOUSE DISTRICT' }},
+    ]
+  },
+  {
+    id: 'day-5',
+    dayNumber: 5,
+    scheduledDate: '2026-03-19',
+    callTime: '08:00',
+    estimatedHours: '9',
+    notes: null,
+    status: 'scheduled',
+    locationId: 'loc-5',
+    location: { name: 'RAVI\'S HOUSE' },
+    dayScenes: [
+      { id: 'ds-12', orderNumber: 1, estimatedMinutes: 45, scene: { id: 's12', sceneNumber: '20', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' }},
+      { id: 'ds-13', orderNumber: 2, estimatedMinutes: 60, scene: { id: 's13', sceneNumber: '21', headingRaw: 'EXT. RAVI\'S HOUSE - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' }},
+      { id: 'ds-14', orderNumber: 3, estimatedMinutes: 30, scene: { id: 's14', sceneNumber: '22', headingRaw: 'INT. RAVI\'S BEDROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' }},
+    ]
+  },
+  {
+    id: 'day-6',
+    dayNumber: 6,
+    scheduledDate: '2026-03-20',
+    callTime: '19:00',
+    estimatedHours: '7',
+    notes: 'Emotional scene - allow extra time',
+    status: 'scheduled',
+    locationId: 'loc-6',
+    location: { name: 'DIVYA\'S APARTMENT' },
+    dayScenes: [
+      { id: 'ds-15', orderNumber: 1, estimatedMinutes: 60, scene: { id: 's15', sceneNumber: '25', headingRaw: 'INT. DIVYA\'S APARTMENT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'DIVYA\'S APARTMENT' }},
+      { id: 'ds-16', orderNumber: 2, estimatedMinutes: 45, scene: { id: 's16', sceneNumber: '26', headingRaw: 'EXT. DIVYA\'S BALCONY - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'DIVYA\'S APARTMENT' }},
+    ]
+  },
+  {
+    id: 'day-7',
+    dayNumber: 7,
+    scheduledDate: '2026-03-21',
+    callTime: '06:00',
+    estimatedHours: '10',
+    notes: null,
+    status: 'scheduled',
+    locationId: 'loc-7',
+    location: { name: 'COURTROOM' },
+    dayScenes: [
+      { id: 'ds-17', orderNumber: 1, estimatedMinutes: 90, scene: { id: 's17', sceneNumber: '30', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' }},
+      { id: 'ds-18', orderNumber: 2, estimatedMinutes: 60, scene: { id: 's18', sceneNumber: '31', headingRaw: 'EXT. COURTROOM - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'COURTROOM' }},
+    ]
+  },
+  {
+    id: 'day-8',
+    dayNumber: 8,
+    scheduledDate: '2026-03-22',
+    callTime: '18:00',
+    estimatedHours: '9',
+    notes: 'Final climax - critical day',
+    status: 'scheduled',
+    locationId: 'loc-8',
+    location: { name: 'STADIUM' },
+    dayScenes: [
+      { id: 'ds-19', orderNumber: 1, estimatedMinutes: 90, scene: { id: 's19', sceneNumber: '40', headingRaw: 'EXT. STADIUM - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'STADIUM' }},
+      { id: 'ds-20', orderNumber: 2, estimatedMinutes: 120, scene: { id: 's20', sceneNumber: '41', headingRaw: 'EXT. STADIUM - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'STADIUM' }},
+      { id: 'ds-21', orderNumber: 3, estimatedMinutes: 60, scene: { id: 's21', sceneNumber: '42', headingRaw: 'EXT. STADIUM - DAWN', intExt: 'EXT', timeOfDay: 'DAWN', location: 'STADIUM' }},
+    ]
+  },
+]
+
+const DEMO_VERSIONS: VersionData[] = [
+  { id: 'v3', versionNum: 3, label: 'Final', score: 94, isActive: true, createdAt: '2026-02-28T10:00:00Z' },
+  { id: 'v2', versionNum: 2, label: 'Weather Backup', score: 88, isActive: false, createdAt: '2026-02-25T14:30:00Z' },
+  { id: 'v1', versionNum: 1, label: 'Initial', score: 76, isActive: false, createdAt: '2026-02-20T09:15:00Z' },
+]
+
+const DEMO_STATS: ScheduleStats = { totalDays: 8, totalHours: 76, totalScenes: 21 }
+
 const COLORS = {
   primary: '#6366f1',
   secondary: '#8b5cf6',
@@ -92,6 +229,7 @@ export default function SchedulePage() {
   const [optimizing, setOptimizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'timeline' | 'chart'>('timeline')
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -106,12 +244,27 @@ export default function SchedulePage() {
       const res = await fetch('/api/schedule')
       if (!res.ok) throw new Error(`API error: ${res.status}`)
       const data = await res.json()
-      setShootingDays(data.shootingDays || [])
-      setVersions(data.versions || [])
-      setStats(data.stats || { totalDays: 0, totalHours: 0, totalScenes: 0 })
+      
+      // Use real data if available, otherwise use demo data
+      if (data.shootingDays && data.shootingDays.length > 0) {
+        setShootingDays(data.shootingDays || [])
+        setVersions(data.versions || [])
+        setStats(data.stats || { totalDays: 0, totalHours: 0, totalScenes: 0 })
+        setIsDemoMode(false)
+      } else {
+        // Use demo data when no real data exists
+        setShootingDays(DEMO_SHOOTING_DAYS)
+        setVersions(DEMO_VERSIONS)
+        setStats(DEMO_STATS)
+        setIsDemoMode(true)
+      }
     } catch (e) {
       console.error('Schedule fetch error:', e)
-      setError(e instanceof Error ? e.message : 'Failed to load schedule')
+      // Use demo data on error for better UX
+      setShootingDays(DEMO_SHOOTING_DAYS)
+      setVersions(DEMO_VERSIONS)
+      setStats(DEMO_STATS)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -174,6 +327,36 @@ export default function SchedulePage() {
     ].filter(d => d.value > 0)
   }, [shootingDays])
 
+  // Location breakdown
+  const locationData = useMemo(() => {
+    const locMap = new Map<string, { scenes: number; hours: number; days: number }>()
+    shootingDays.forEach(day => {
+      const locName = day.location?.name || 'Unknown'
+      const existing = locMap.get(locName) || { scenes: 0, hours: 0, days: 0 }
+      existing.scenes += day.dayScenes.length
+      existing.hours += Number(day.estimatedHours || 0)
+      existing.days += 1
+      locMap.set(locName, existing)
+    })
+    return Array.from(locMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.scenes - a.scenes)
+  }, [shootingDays])
+
+  // Night vs Day breakdown
+  const dayNightData = useMemo(() => {
+    const dayShoots = shootingDays.filter(d => 
+      !d.dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
+    ).length
+    const nightShoots = shootingDays.filter(d => 
+      d.dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
+    ).length
+    return [
+      { name: 'Day Shoots', value: dayShoots, color: COLORS.warning },
+      { name: 'Night Shoots', value: nightShoots, color: COLORS.secondary },
+    ]
+  }, [shootingDays])
+
   // Stats computation
   const computedStats = useMemo(() => {
     const totalHours = shootingDays.reduce((sum, d) => sum + Number(d.estimatedHours || 0), 0)
@@ -220,10 +403,17 @@ export default function SchedulePage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Calendar className="w-6 h-6 text-indigo-400" />
-            Schedule Engine
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <Calendar className="w-6 h-6 text-indigo-400" />
+              Schedule Engine
+            </h1>
+            {isDemoMode && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full border border-amber-500/30">
+                Demo Data
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm mt-1">AI-powered shooting schedule with TFPC compliance</p>
         </div>
         <div className="flex items-center gap-2 bg-gray-800/50 p-1 rounded-lg">
@@ -422,6 +612,67 @@ export default function SchedulePage() {
                 />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Day vs Night Pie */}
+          <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-5">
+            <h3 className="text-lg font-semibold text-white mb-4">Day vs Night Shoots</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={dayNightData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value} days`}
+                >
+                  {dayNightData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1f2937', 
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Location Breakdown */}
+          <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-5">
+            <h3 className="text-lg font-semibold text-white mb-4">Location Breakdown</h3>
+            <div className="space-y-3 max-h-[260px] overflow-y-auto">
+              {locationData.map((loc, idx) => (
+                <div key={loc.name} className="flex items-center gap-3">
+                  <div className="w-8 text-center text-xs font-bold text-indigo-400">{idx + 1}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-300 truncate">{loc.name}</div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span>{loc.days} days</span>
+                      <span className="text-gray-600">•</span>
+                      <span>{loc.scenes} scenes</span>
+                      <span className="text-gray-600">•</span>
+                      <span>{loc.hours}h</span>
+                    </div>
+                  </div>
+                  <div className="w-20">
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-500 rounded-full"
+                        style={{ width: `${(loc.scenes / Math.max(...locationData.map(l => l.scenes))) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Day Utilization Chart */}

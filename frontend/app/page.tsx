@@ -46,7 +46,7 @@ const DEMO_STATS: DashboardStats = {
   scripts: { total: 2, scenes: 47, characters: 23 },
   shots: { total: 312, missingFields: 45, runtimeMin: 142 },
   budget: { planned: 85000000, actual: 32000000, variance: -53000000 },
-  schedule: { days: 18, scenes: 47 },
+  schedule: { days: 8, scenes: 21 },
   locations: { scenes: 12, candidates: 34 },
   censor: { certificate: 'UA 13+', score: 78 },
   storyboard: { frames: 156, approved: 89 },

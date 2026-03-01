@@ -7,6 +7,7 @@ import {
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2
 } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 
 interface Milestone {
   id: string
@@ -282,6 +283,104 @@ export default function ProgressPage() {
               })}
             </div>
           </div>
+
+          {/* Task Status Breakdown */}
+          {progress?.tasks && progress.tasks.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Target className="w-5 h-5 text-cyan-400" />
+                Task Status Breakdown
+              </h2>
+              <div className="flex items-center gap-8">
+                {/* Pie Chart */}
+                <div className="w-40 h-40">
+                  {(() => {
+                    const statusCounts = {
+                      completed: progress.tasks.filter(t => t.status === 'completed').length,
+                      in_progress: progress.tasks.filter(t => t.status === 'in_progress').length,
+                      pending: progress.tasks.filter(t => t.status === 'pending').length,
+                      blocked: progress.tasks.filter(t => t.status === 'blocked').length,
+                    }
+                    const pieData = [
+                      { name: 'Completed', value: statusCounts.completed, color: '#10b981' },
+                      { name: 'In Progress', value: statusCounts.in_progress, color: '#3b82f6' },
+                      { name: 'Pending', value: statusCounts.pending, color: '#64748b' },
+                      { name: 'Blocked', value: statusCounts.blocked, color: '#ef4444' },
+                    ].filter(d => d.value > 0)
+                    return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={35}
+                            outerRadius={60}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )
+                  })()}
+                </div>
+                {/* Legend */}
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  {[
+                    { label: 'Completed', count: progress.tasks.filter(t => t.status === 'completed').length, color: 'bg-emerald-500', text: 'text-emerald-400' },
+                    { label: 'In Progress', count: progress.tasks.filter(t => t.status === 'in_progress').length, color: 'bg-blue-500', text: 'text-blue-400' },
+                    { label: 'Pending', count: progress.tasks.filter(t => t.status === 'pending').length, color: 'bg-slate-500', text: 'text-slate-400' },
+                    { label: 'Blocked', count: progress.tasks.filter(t => t.status === 'blocked').length, color: 'bg-red-500', text: 'text-red-400' },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${item.color}`} />
+                      <span className="text-sm text-slate-400">{item.label}</span>
+                      <span className={`text-sm font-medium ${item.text}`}>{item.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Priority Distribution */}
+          {progress?.tasks && progress.tasks.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                Priority Distribution
+              </h2>
+              <div className="grid grid-cols-4 gap-4">
+                {[
+                  { label: 'Critical', count: progress.tasks.filter(t => t.priority === 'critical').length, color: 'bg-red-500', text: 'text-red-400', bar: 'bg-red-500' },
+                  { label: 'High', count: progress.tasks.filter(t => t.priority === 'high').length, color: 'bg-orange-500', text: 'text-orange-400', bar: 'bg-orange-500' },
+                  { label: 'Medium', count: progress.tasks.filter(t => t.priority === 'medium').length, color: 'bg-yellow-500', text: 'text-yellow-400', bar: 'bg-yellow-500' },
+                  { label: 'Low', count: progress.tasks.filter(t => t.priority === 'low').length, color: 'bg-slate-500', text: 'text-slate-400', bar: 'bg-slate-500' },
+                ].map((item) => {
+                  const percentage = progress.tasks.length > 0 ? Math.round((item.count / progress.tasks.length) * 100) : 0
+                  return (
+                    <div key={item.label} className="bg-slate-800/50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-sm font-medium ${item.text}`}>{item.label}</span>
+                        <span className={`text-lg font-bold ${item.text}`}>{item.count}</span>
+                      </div>
+                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${item.bar} transition-all`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">{percentage}% of tasks</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Timeline View */}
           {viewMode === 'timeline' && (

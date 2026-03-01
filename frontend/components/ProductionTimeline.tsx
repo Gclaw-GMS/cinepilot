@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface TimelineEvent {
   id: string
@@ -14,8 +14,30 @@ interface TimelineEvent {
 }
 
 interface ProductionTimelineProps {
-  projectName: string
+  projectId?: string
+  projectName?: string
   events?: TimelineEvent[]
+}
+
+interface TimelineData {
+  phases: Array<{
+    id: string
+    name: string
+    displayName: string
+    status: string
+    progress: number
+    startDate: string
+    endDate: string
+    scenes: number
+  }>
+  milestones: Array<{
+    id: string
+    name: string
+    date: string
+    status: string
+    phase: string
+  }>
+  isDemo?: boolean
 }
 
 const DEFAULT_EVENTS: TimelineEvent[] = [
@@ -110,11 +132,80 @@ const DEFAULT_EVENTS: TimelineEvent[] = [
 ]
 
 export default function ProductionTimeline({ 
+  projectId, 
   projectName, 
-  events = DEFAULT_EVENTS 
+  events: initialEvents 
 }: ProductionTimelineProps) {
   const [view, setView] = useState<'timeline' | 'list'>('timeline')
   const [filter, setFilter] = useState<string>('all')
+  const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
+  const [loading, setLoading] = useState(false)
+  
+  // Use projectName if provided, otherwise use a formatted projectId
+  const displayName = projectName || (projectId === 'all' ? 'All Projects' : `Project ${projectId}`)
+
+  // Fetch timeline data from API
+  useEffect(() => {
+    if (!projectId) return
+    
+    const fetchTimeline = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/timeline?projectId=${projectId}`)
+        const data = await res.json()
+        setTimelineData(data)
+      } catch (err) {
+        console.error('Failed to fetch timeline:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchTimeline()
+  }, [projectId])
+
+  // Convert API data to events
+  const events: TimelineEvent[] = (() => {
+    // If initial events provided (backwards compatibility), use those
+    if (initialEvents && initialEvents.length > 0) {
+      return initialEvents
+    }
+    
+    // Convert from API data
+    if (timelineData) {
+      const timelineEvents: TimelineEvent[] = []
+      
+      // Add phases as events
+      timelineData.phases?.forEach(phase => {
+        timelineEvents.push({
+          id: phase.id,
+          title: phase.displayName,
+          date: phase.startDate,
+          type: phase.name.toLowerCase().includes('production') ? 'shoot' : 'milestone',
+          status: phase.status === 'completed' ? 'completed' : phase.status === 'in_progress' ? 'current' : 'upcoming',
+          description: `${phase.scenes} scenes • ${phase.progress}% complete`,
+          sceneCount: phase.scenes,
+        })
+      })
+      
+      // Add milestones
+      timelineData.milestones?.forEach(milestone => {
+        timelineEvents.push({
+          id: milestone.id,
+          title: milestone.name,
+          date: milestone.date,
+          type: 'milestone',
+          status: milestone.status === 'completed' ? 'completed' : milestone.status === 'in_progress' ? 'current' : 'upcoming',
+        })
+      })
+      
+      // Sort by date
+      return timelineEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    }
+    
+    // Fall back to default events
+    return DEFAULT_EVENTS
+  })()
 
   const filteredEvents = filter === 'all' 
     ? events 
@@ -160,7 +251,7 @@ export default function ProductionTimeline({
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">📅 Production Timeline</h1>
-          <p className="text-gray-500 text-sm mt-1">{projectName}</p>
+          <p className="text-gray-500 text-sm mt-1">{displayName}</p>
         </div>
         
         <div className="flex gap-2">

@@ -114,11 +114,14 @@ export default function NotificationsPage() {
     try {
       const res = await fetch('/api/notifications');
       if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
+      const response = await res.json();
+      
+      // Handle new API response format: { data: [...], isDemoMode: true/false }
+      const data = response.data || response;
       
       if (Array.isArray(data) && data.length > 0) {
         setNotifications(data);
-        setIsDemoMode(false);
+        setIsDemoMode(response.isDemoMode || false);
       } else {
         setNotifications(DEMO_NOTIFICATIONS);
         setIsDemoMode(true);
@@ -162,11 +165,10 @@ export default function NotificationsPage() {
 
   const deleteNotification = async (id: string) => {
     try {
-      await fetch('/api/notifications', {
+      const res = await fetch(`/api/notifications?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
       });
+      if (!res.ok) throw new Error('Failed to delete');
       await fetchNotifications();
     } catch (err) {
       if (isDemoMode) {

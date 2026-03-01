@@ -156,6 +156,14 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
+    // If no records in DB, return demo data
+    if (sentiments.length === 0) {
+      return NextResponse.json({ 
+        sentiments: demoSentiments,
+        isDemo: true 
+      })
+    }
+
     return NextResponse.json({ sentiments, isDemo: false })
   } catch (error) {
     console.error('Error fetching sentiments:', error)

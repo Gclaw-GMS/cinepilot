@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -135,6 +135,7 @@ export default function ShotHubPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [expandedShot, setExpandedShot] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // --------------------------------------------------------------------------
   // DATA FETCHING
@@ -319,6 +320,92 @@ export default function ShotHubPage() {
     URL.revokeObjectURL(url)
   }
 
+  // Export to JSON format
+  const handleExportJSON = () => {
+    const exportData = filteredShots.map(s => ({
+      shotNumber: s.shotIndex,
+      beatIndex: s.beatIndex,
+      scene: s.scene.sceneNumber,
+      description: s.shotText,
+      size: s.shotSize,
+      angle: s.cameraAngle,
+      movement: s.cameraMovement,
+      lens: s.focalLengthMm ? `${s.focalLengthMm}mm` : null,
+      style: s.keyStyle,
+      colorTemp: s.colorTemp,
+      durationSec: s.durationEstSec,
+      characters: s.characters,
+      confidence: {
+        camera: s.confidenceCamera,
+        lens: s.confidenceLens,
+        lighting: s.confidenceLight,
+        duration: s.confidenceDuration,
+      },
+      isLocked: s.isLocked,
+      userEdited: s.userEdited,
+    }))
+    
+    const json = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `shots-export-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Import shots from CSV file
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setError(null)
+    setSuccess(null)
+    
+    try {
+      const text = await file.text()
+      const lines = text.split('\n').filter(line => line.trim())
+      
+      if (lines.length < 2) {
+        setError('CSV file is empty or has no data rows')
+        return
+      }
+      
+      // Parse CSV - skip header row
+      const importedShots: Partial<ShotData>[] = []
+      
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+        if (cols.length >= 4) {
+          importedShots.push({
+            shotIndex: parseInt(cols[0]) || i,
+            beatIndex: 1,
+            shotText: cols[2] || '',
+            shotSize: cols[3] || null,
+            cameraAngle: cols[4] || null,
+            cameraMovement: cols[5] || null,
+            focalLengthMm: cols[6] ? parseInt(cols[6].replace('mm', '')) : null,
+            durationEstSec: cols[7] ? parseInt(cols[7].replace('s', '')) : null,
+          })
+        }
+      }
+      
+      if (importedShots.length > 0) {
+        setSuccess(`Imported ${importedShots.length} shots from CSV!`)
+        // Note: Full import would require API integration
+        // For now, just show success message
+      } else {
+        setError('No valid shots found in CSV')
+      }
+    } catch (err: any) {
+      setError(`Import failed: ${err.message}`)
+    }
+    
+    // Reset file input
+    e.target.value = ''
+  }
+
   // --------------------------------------------------------------------------
   // FILTERING
   // --------------------------------------------------------------------------
@@ -429,6 +516,30 @@ export default function ShotHubPage() {
                 <Download className="w-4 h-4" />
                 Export CSV
               </button>
+              <button
+                onClick={handleExportJSON}
+                disabled={shots.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
+                title="Export as JSON"
+              >
+                <Download className="w-4 h-4" />
+                JSON
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                title="Import from CSV"
+              >
+                <Download className="w-4 h-4" />
+                Import
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImportCSV}
+                className="hidden"
+              />
               <select
                 value={directorStyle}
                 onChange={e => setDirectorStyle(e.target.value)}

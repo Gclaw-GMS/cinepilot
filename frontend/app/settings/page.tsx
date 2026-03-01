@@ -62,6 +62,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -70,10 +71,13 @@ export default function SettingsPage() {
       const data = await res.json();
       setSettings(data);
       setLocal(data);
+      // Detect demo mode from API response
+      setIsDemoMode(data.isDemoMode === true);
     } catch (err) {
       console.error(err);
       setSettings({});
       setLocal({});
+      setIsDemoMode(true);
     } finally {
       setLoading(false);
     }
@@ -122,10 +126,23 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-slate-100 p-6">
       <div className="max-w-xl mx-auto space-y-6">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Settings className="h-6 w-6" />
-          Settings
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <Settings className="h-6 w-6" />
+            Settings
+          </h1>
+          {isDemoMode && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/15 text-amber-400 rounded font-medium">
+              DEMO
+            </span>
+          )}
+        </div>
+
+        {isDemoMode && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-sm text-amber-200">
+            Running in demo mode — settings are simulated and will reset on refresh. Connect your database to enable persistent settings.
+          </div>
+        )}
 
         <div className="space-y-6">
           <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">

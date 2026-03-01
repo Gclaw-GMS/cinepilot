@@ -4,6 +4,33 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_USER_ID = 'default-user';
 
+// Demo settings for when database is unavailable
+const DEMO_SETTINGS = {
+  language: 'en',
+  theme: 'dark',
+  notifications: true,
+  emailNotifications: true,
+  whatsappNotifications: false,
+  autoSave: true,
+  compactView: false,
+  showTutorial: true,
+  defaultProject: 'default-project',
+  region: 'in',
+  currency: 'INR',
+  dateFormat: 'DD/MM/YYYY',
+  timezone: 'Asia/Kolkata',
+};
+
+// Helper to check if database is connected
+async function checkDbConnection(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureDefaultUser(): Promise<void> {
   let user = await prisma.user.findFirst({ where: { id: DEFAULT_USER_ID } });
   if (!user) {
@@ -19,6 +46,15 @@ async function ensureDefaultUser(): Promise<void> {
 }
 
 export async function GET() {
+  const isDemo = !(await checkDbConnection());
+  
+  if (isDemo) {
+    return NextResponse.json({
+      ...DEMO_SETTINGS,
+      isDemoMode: true,
+    });
+  }
+  
   try {
     await ensureDefaultUser();
     const settings = await prisma.userSetting.findMany({
@@ -28,15 +64,36 @@ export async function GET() {
     for (const s of settings) {
       result[s.key] = s.value;
     }
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...DEMO_SETTINGS,
+      ...result,
+      isDemoMode: false,
+    });
   } catch (error) {
     console.error('[GET /api/settings]', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ 
+      ...DEMO_SETTINGS,
+      isDemoMode: true,
+    });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const isDemo = !(await checkDbConnection());
+  
+  if (isDemo) {
+    // In demo mode, simulate successful save
+    const body = await req.json();
+    const { action, key, value, settings: bulkSettings } = body;
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Setting saved (Demo Mode)',
+      isDemoMode: true,
+    });
+  }
+  
   try {
     const body = await req.json();
     const { action, key, value, settings: bulkSettings } = body;

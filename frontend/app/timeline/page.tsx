@@ -7,8 +7,12 @@ import {
   Calendar, Download, Plus, Layers, Grid3X3, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Target, CheckCircle, Zap, Clock, Film, MapPin,
-  Filter, RefreshCw
+  Filter, RefreshCw, TrendingUp, TrendingDown
 } from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
 
 interface Project {
   id: string;
@@ -247,6 +251,114 @@ export default function TimelinePage() {
             </div>
             <p className="text-2xl font-semibold text-indigo-400">{stats.scenes}</p>
           </motion.div>
+        </div>
+
+        {/* Progress Visualization Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* Phase Progress Pie Chart */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+              <Target className="w-4 h-4 text-purple-400" />
+              Phase Completion
+            </h3>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Completed', value: stats.completed, color: '#10b981' },
+                      { name: 'In Progress', value: stats.inProgress, color: '#f59e0b' },
+                      { name: 'Pending', value: stats.pending, color: '#64748b' },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={75}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {[0, 1, 2].map((index) => (
+                      <Cell key={`cell-${index}`} fill={[
+                        '#10b981', '#f59e0b', '#64748b'
+                      ][index]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #334155', 
+                      borderRadius: '8px' 
+                    }}
+                    formatter={(value: number) => [`${value} phases`, '']}
+                  />
+                  <Legend 
+                    formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Progress Trend Area Chart */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 lg:col-span-2">
+            <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-400" />
+              Weekly Progress Trend
+            </h3>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={[
+                    { week: 'Week 1', planned: 4, completed: 4 },
+                    { week: 'Week 2', planned: 3, completed: 3 },
+                    { week: 'Week 3', planned: 5, completed: 4 },
+                    { week: 'Week 4', planned: 2, completed: 2 },
+                    { week: 'Week 5', planned: 4, completed: 1 },
+                    { week: 'Week 6', planned: 3, completed: 0 },
+                  ]}
+                >
+                  <defs>
+                    <linearGradient id="colorPlanned" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="week" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #334155', 
+                      borderRadius: '8px' 
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="planned"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorPlanned)"
+                    name="Planned Scenes"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="completed"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorCompleted)"
+                    name="Completed Scenes"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
 
         {/* Controls Bar */}

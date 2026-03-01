@@ -1037,3 +1037,21 @@ model Note {
   @@index([category])
   @@map("notes")
 }
+
+// Team Collaboration - for managing team members and collaborators
+model TeamMember {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  role        String
+  email       String?
+  phone       String?
+  status      String   @default("offline") // active, busy, offline
+  skills      String[] @default([]) // JSON array stored as string array
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([status])
+  @@map("team_members")
+}

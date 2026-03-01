@@ -113,6 +113,7 @@ export default function CollaborationPage() {
   const [stats, setStats] = useState<Stats>({ total: 0, active: 0, busy: 0, offline: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
@@ -133,6 +134,8 @@ export default function CollaborationPage() {
       const res = await fetch('/api/collaboration')
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
+      // Check for demo mode from API response
+      setIsDemoMode(data.isDemoMode === true)
       if (data.members && data.members.length > 0) {
         setMembers(data.members)
         setStats(data.stats)
@@ -145,6 +148,7 @@ export default function CollaborationPage() {
           busy: DEMO_MEMBERS.filter(m => m.status === 'busy').length,
           offline: DEMO_MEMBERS.filter(m => m.status === 'offline').length,
         })
+        setIsDemoMode(true)
       }
     } catch (err) {
       console.error('Fetch error:', err)
@@ -156,6 +160,7 @@ export default function CollaborationPage() {
         busy: DEMO_MEMBERS.filter(m => m.status === 'busy').length,
         offline: DEMO_MEMBERS.filter(m => m.status === 'offline').length,
       })
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -286,6 +291,11 @@ export default function CollaborationPage() {
               <Users className="w-5 h-5 text-white" />
             </div>
             Team Collaboration
+            {isDemoMode && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20 rounded-full">
+                Demo
+              </span>
+            )}
           </h1>
           <p className="text-slate-400 text-sm mt-1">Manage your production team and communications</p>
         </div>

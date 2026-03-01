@@ -66,34 +66,31 @@ export default function TimelinePage() {
     try {
       const projectId = selectedProject === 'all' ? 'default-project' : selectedProject;
       
-      // Fetch schedule data
-      const scheduleRes = await fetch(`/api/schedule?projectId=${projectId}`);
-      const scheduleData = await scheduleRes.json();
+      // Fetch timeline data from dedicated API
+      const timelineRes = await fetch(`/api/timeline?projectId=${projectId}`);
+      const timelineData = await timelineRes.json();
       
-      const shootingDays = scheduleData.shootingDays || [];
-      const totalScenes = shootingDays.reduce((sum: number, day: { dayScenes?: unknown[] }) => 
-        sum + (day.dayScenes?.length || 0), 0);
-      
-      // If no real data, use demo stats for better UX
-      if (shootingDays.length === 0) {
+      // Check if we're in demo mode
+      if (timelineData.isDemo) {
         setStats(DEMO_STATS);
         setIsDemoMode(true);
       } else {
-        setIsDemoMode(false);
-        // Calculate stats from real data
-        const completed = shootingDays.filter((d: { status: string }) => d.status === 'completed').length;
-        const inProgress = shootingDays.filter((d: { status: string }) => d.status === 'in-progress').length;
-        const pending = shootingDays.filter((d: { status: string }) => 
-          d.status === 'pending' || !d.status).length;
-        
-        setStats({
-          total: shootingDays.length,
-          completed,
-          inProgress,
-          pending,
-          shootDays: shootingDays.length,
-          scenes: totalScenes,
-        });
+        // Use real data from API
+        const statsFromApi = timelineData.stats;
+        if (statsFromApi && statsFromApi.totalPhases > 0) {
+          setIsDemoMode(false);
+          setStats({
+            total: statsFromApi.totalPhases,
+            completed: statsFromApi.completedPhases,
+            inProgress: statsFromApi.totalPhases - statsFromApi.completedPhases,
+            pending: 0,
+            shootDays: statsFromApi.totalScenes,
+            scenes: statsFromApi.totalScenes,
+          });
+        } else {
+          setStats(DEMO_STATS);
+          setIsDemoMode(true);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch timeline stats:', err);

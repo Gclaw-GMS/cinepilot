@@ -5,8 +5,13 @@ import { motion } from 'framer-motion';
 import { 
   RefreshCw, Calendar, Clock, Film, MapPin, Loader2, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Layers,
-  CheckCircle, AlertCircle, PlayCircle
+  CheckCircle, AlertCircle, PlayCircle, TrendingUp,
+  BarChart3
 } from 'lucide-react';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
 
 interface ShootingDay {
   id: string;
@@ -65,9 +70,19 @@ const typeColorVars: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  'pending': 'bg-gray-400',
+  'pending': 'bg-slate-400',
   'in-progress': 'bg-yellow-500',
   'completed': 'bg-green-500',
+};
+
+// Chart colors
+const CHART_COLORS = {
+  completed: '#10b981',
+  inProgress: '#f59e0b',
+  pending: '#64748b',
+  preProduction: '#3b82f6',
+  production: '#8b5cf6',
+  postProduction: '#f97316',
 };
 
 interface ProductionTimelineProps {
@@ -240,11 +255,11 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
 
   if (loading) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+      <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
         <div className="flex items-center justify-center h-[400px]">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-            <span className="text-gray-400">Loading timeline...</span>
+            <span className="text-slate-400">Loading timeline...</span>
           </div>
         </div>
       </div>
@@ -253,7 +268,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
 
   if (error) {
     return (
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+      <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
         <div className="flex flex-col items-center justify-center h-[400px] gap-4">
           <div className="text-red-400">{error}</div>
           <button 
@@ -269,8 +284,45 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
 
   const hasNoData = tasks.length === 0;
 
+  // Chart data for progress visualization
+  const progressChartData = useMemo(() => [
+    { name: 'Completed', value: stats.completed, color: CHART_COLORS.completed },
+    { name: 'In Progress', value: stats.inProgress, color: CHART_COLORS.inProgress },
+    { name: 'Pending', value: stats.pending, color: CHART_COLORS.pending },
+  ], [stats]);
+
+  const typeChartData = useMemo(() => {
+    const types: Record<string, number> = {};
+    tasks.forEach(task => {
+      types[task.type] = (types[task.type] || 0) + 1;
+    });
+    return Object.entries(types).map(([name, value]) => ({
+      name: name.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value,
+      color: name === 'pre-production' ? CHART_COLORS.preProduction :
+             name === 'production' ? CHART_COLORS.production :
+             CHART_COLORS.postProduction,
+    }));
+  }, [tasks]);
+
+  // Weekly progress data for bar chart
+  const weeklyProgressData = useMemo(() => {
+    const weeks: Record<string, { completed: number; total: number }> = {};
+    tasks.forEach(task => {
+      const weekNum = Math.ceil(task.start.getDate() / 7);
+      const monthKey = `${task.start.toLocaleDateString('en-US', { month: 'short' })} W${weekNum}`;
+      if (!weeks[monthKey]) weeks[monthKey] = { completed: 0, total: 0 };
+      weeks[monthKey].total += 1;
+      if (task.status === 'completed') weeks[monthKey].completed += 1;
+    });
+    return Object.entries(weeks).map(([name, data]) => ({
+      name,
+      ...data,
+    }));
+  }, [tasks]);
+
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+    <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-white flex items-center gap-2">
           <span className="text-2xl">📅</span> Production Timeline
@@ -278,7 +330,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
         <div className="flex items-center gap-3">
           <button
             onClick={fetchData}
-            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
@@ -287,7 +339,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
             <button
               onClick={() => setViewMode('month')}
               className={`px-3 py-1 rounded-lg text-sm ${
-                viewMode === 'month' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
+                viewMode === 'month' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300'
               }`}
             >
               Month
@@ -295,7 +347,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
             <button
               onClick={() => setViewMode('week')}
               className={`px-3 py-1 rounded-lg text-sm ${
-                viewMode === 'week' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
+                viewMode === 'week' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300'
               }`}
             >
               Week
@@ -308,48 +360,58 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
       <div className="flex flex-wrap gap-4 mb-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-blue-500"></div>
-          <span className="text-gray-400">Pre-Production</span>
+          <span className="text-slate-400">Pre-Production</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-purple-500"></div>
-          <span className="text-gray-400">Production</span>
+          <span className="text-slate-400">Production</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-orange-500"></div>
-          <span className="text-gray-400">Post-Production</span>
+          <span className="text-slate-400">Post-Production</span>
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <div className="w-3 h-3 rounded bg-green-400"></div>
-          <span className="text-gray-400">Completed</span>
+          <span className="text-slate-400">Completed</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-yellow-500"></div>
-          <span className="text-gray-400">In Progress</span>
+          <span className="text-slate-400">In Progress</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-gray-400"></div>
-          <span className="text-gray-400">Pending</span>
+          <div className="w-3 h-3 rounded bg-slate-400"></div>
+          <span className="text-slate-400">Pending</span>
         </div>
       </div>
 
       {/* Empty State */}
       {hasNoData ? (
         <div className="flex flex-col items-center justify-center h-[300px] text-center">
-          <Calendar className="w-16 h-16 text-gray-600 mb-4" />
+          <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-4">
+            <Calendar className="w-10 h-10 text-slate-600" />
+          </div>
           <h4 className="text-xl font-semibold text-white mb-2">No Schedule Yet</h4>
-          <p className="text-gray-400 max-w-md">
+          <p className="text-slate-400 max-w-md mb-6">
             Optimize your schedule in the Schedule tab to see your production timeline here.
           </p>
+          <div className="flex gap-3">
+            <button className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium transition-colors">
+              Create Schedule
+            </button>
+            <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+              Import Data
+            </button>
+          </div>
         </div>
       ) : (
         <>
           {/* Timeline Grid */}
           <div className="relative overflow-x-auto">
             {/* Month & Week Headers */}
-            <div className="flex border-b border-gray-700 mb-2">
+            <div className="flex border-b border-slate-700 mb-2">
               {/* Task label column */}
-              <div className="w-40 shrink-0 border-r border-gray-700 px-2 py-2">
-                <span className="text-xs text-gray-500 uppercase tracking-wider">Phase / Task</span>
+              <div className="w-40 shrink-0 border-r border-slate-700 px-2 py-2">
+                <span className="text-xs text-slate-500 uppercase tracking-wider">Phase / Task</span>
               </div>
               {/* Month headers */}
               <div className="flex-1 flex">
@@ -361,17 +423,17 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                   return (
                     <div
                       key={idx}
-                      className="flex flex-col border-r border-gray-700 last:border-r-0"
+                      className="flex flex-col border-r border-slate-700 last:border-r-0"
                       style={{ flex: weeks }}
                     >
-                      <div className="text-center text-gray-300 text-sm py-1 font-medium">
+                      <div className="text-center text-slate-300 text-sm py-1 font-medium">
                         {month.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
                       </div>
                       <div className="flex">
                         {Array.from({ length: weeks }).map((_, wIdx) => (
                           <div
                             key={wIdx}
-                            className="flex-1 text-center text-xs text-gray-500 py-0.5 border-r border-gray-800 last:border-r-0"
+                            className="flex-1 text-center text-xs text-slate-500 py-0.5 border-r border-slate-800 last:border-r-0"
                           >
                             W{wIdx + 1}
                           </div>
@@ -390,7 +452,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                 {months.map((_, idx) => (
                   <div
                     key={idx}
-                    className="border-r border-gray-800 h-full"
+                    className="border-r border-slate-800 h-full"
                     style={{ width: `${100 / months.length}%` }}
                   />
                 ))}
@@ -419,12 +481,12 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                             <PlayCircle className="w-4 h-4 text-yellow-400 shrink-0" />
                           )}
                           {task.status === 'pending' && (
-                            <AlertCircle className="w-4 h-4 text-gray-500 shrink-0" />
+                            <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
                           )}
                           <div className="min-w-0">
-                            <div className="text-sm text-gray-200 truncate font-medium">{task.name}</div>
+                            <div className="text-sm text-slate-200 truncate font-medium">{task.name}</div>
                             {task.scenes !== undefined && task.scenes > 0 && (
-                              <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <div className="text-xs text-slate-500 flex items-center gap-1">
                                 <Film className="w-3 h-3" />
                                 {task.scenes} scenes
                               </div>
@@ -442,7 +504,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                             const startDay = new Date(months[mIdx].getFullYear(), months[mIdx].getMonth(), 1).getDay();
                             const weeks = Math.ceil((daysInMonth + startDay) / 7);
                             return Array.from({ length: weeks }).map((_, wIdx) => (
-                              <div key={wIdx} className="flex-1 border-r border-gray-800/50 last:border-r-0" />
+                              <div key={wIdx} className="flex-1 border-r border-slate-800/50 last:border-r-0" />
                             ));
                           })}
                         </div>
@@ -491,7 +553,7 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h4 className="text-lg font-semibold text-white">{selectedTask.name}</h4>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+                  <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       {selectedTask.start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -507,20 +569,20 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                     )}
                   </div>
                   {selectedTask.details && (
-                    <p className="text-sm text-gray-500 mt-2">{selectedTask.details}</p>
+                    <p className="text-sm text-slate-500 mt-2">{selectedTask.details}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-white">{selectedTask.progress}%</div>
-                    <div className="text-xs text-gray-500">Complete</div>
+                    <div className="text-xs text-slate-500">Complete</div>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[selectedTask.status]} text-white`}>
                     {selectedTask.status}
                   </div>
                   <button
                     onClick={() => setSelectedTask(null)}
-                    className="text-gray-400 hover:text-white p-1"
+                    className="text-slate-400 hover:text-white p-1"
                   >
                     ✕
                   </button>
@@ -531,32 +593,124 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
         </>
       )}
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-5 gap-4 mt-6">
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-2xl mb-1">📋</div>
-          <div className="text-2xl font-bold text-white">{stats.total}</div>
-          <div className="text-xs text-gray-400">Total Phases</div>
+      {/* Stats Summary with Charts */}
+      <div className="mt-8">
+        <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-purple-400" />
+          Progress Analytics
+        </h4>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Progress Pie Chart */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <h5 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-green-400" />
+              Status Distribution
+            </h5>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={progressChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {progressChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [value, 'Tasks']}
+                  />
+                  <Legend 
+                    formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Type Distribution Chart */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <h5 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-blue-400" />
+              Phase Distribution
+            </h5>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={typeChartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={10} />
+                  <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} width={80} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {typeChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Weekly Progress Chart */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <h5 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-yellow-400" />
+              Weekly Progress
+            </h5>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyProgressData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={9} interval={0} />
+                  <YAxis stroke="#64748b" fontSize={10} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  />
+                  <Legend formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>} />
+                  <Bar dataKey="completed" name="Completed" stackId="a" fill={CHART_COLORS.completed} radius={[0, 0, 4, 4]} />
+                  <Bar dataKey="total" name="Total" stackId="a" fill="#334155" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-2xl mb-1">✅</div>
-          <div className="text-2xl font-bold text-green-400">{stats.completed}</div>
-          <div className="text-xs text-gray-400">Completed</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-2xl mb-1">🔄</div>
-          <div className="text-2xl font-bold text-yellow-400">{stats.inProgress}</div>
-          <div className="text-xs text-gray-400">In Progress</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-2xl mb-1">⏳</div>
-          <div className="text-2xl font-bold text-gray-400">{stats.pending}</div>
-          <div className="text-xs text-gray-400">Pending</div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="text-2xl mb-1">🎬</div>
-          <div className="text-2xl font-bold text-purple-400">{stats.totalScenes}</div>
-          <div className="text-xs text-gray-400">Total Scenes</div>
+
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-5 gap-4 mt-6">
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div className="text-2xl mb-1">📋</div>
+            <div className="text-2xl font-bold text-white">{stats.total}</div>
+            <div className="text-xs text-slate-400">Total Phases</div>
+          </div>
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div className="text-2xl mb-1">✅</div>
+            <div className="text-2xl font-bold text-green-400">{stats.completed}</div>
+            <div className="text-xs text-slate-400">Completed</div>
+          </div>
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div className="text-2xl mb-1">🔄</div>
+            <div className="text-2xl font-bold text-yellow-400">{stats.inProgress}</div>
+            <div className="text-xs text-slate-400">In Progress</div>
+          </div>
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div className="text-2xl mb-1">⏳</div>
+            <div className="text-2xl font-bold text-slate-400">{stats.pending}</div>
+            <div className="text-xs text-slate-400">Pending</div>
+          </div>
+          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div className="text-2xl mb-1">🎬</div>
+            <div className="text-2xl font-bold text-purple-400">{stats.totalScenes}</div>
+            <div className="text-xs text-slate-400">Total Scenes</div>
+          </div>
         </div>
       </div>
     </div>

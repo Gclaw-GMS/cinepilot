@@ -98,6 +98,7 @@ export default function EquipmentPage() {
   const [stats, setStats] = useState<EquipmentStats>({ totalItems: 0, totalDailyRate: 0, available: 0, inUse: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -115,15 +116,21 @@ export default function EquipmentPage() {
   const fetchEquipment = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setIsDemoMode(false)
     try {
       const res = await fetch('/api/equipment')
       const data = await res.json()
       
       if (res.ok) {
+        // Check if API indicates demo mode
+        if (data.isDemo) {
+          setIsDemoMode(true)
+        }
         setEquipment(data.rentals || [])
         setStats(data.stats || { totalItems: 0, totalDailyRate: 0, available: 0, inUse: 0 })
       } else {
         // Fall back to demo data if API fails
+        setIsDemoMode(true)
         setEquipment(DEMO_EQUIPMENT)
         const totalDailyRate = DEMO_EQUIPMENT.reduce((acc, eq) => acc + eq.dailyRate, 0)
         setStats({
@@ -134,7 +141,9 @@ export default function EquipmentPage() {
         })
       }
     } catch (err) {
+      // Fall back to demo data on error
       console.error('Failed to fetch equipment:', err)
+      setIsDemoMode(true)
       setEquipment(DEMO_EQUIPMENT)
       const totalDailyRate = DEMO_EQUIPMENT.reduce((acc, eq) => acc + eq.dailyRate, 0)
       setStats({
@@ -273,9 +282,16 @@ export default function EquipmentPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold">Equipment Rental</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage your production equipment inventory</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Equipment Rental</h1>
+            <p className="text-slate-500 text-sm mt-1">Manage your production equipment inventory</p>
+          </div>
+          {isDemoMode && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              Demo
+            </span>
+          )}
         </div>
         <button
           onClick={() => setModalOpen(true)}

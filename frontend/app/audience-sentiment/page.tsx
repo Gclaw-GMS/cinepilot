@@ -112,19 +112,30 @@ export default function AudienceSentimentPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      // Auto-start analysis
-      setAnalyzing(data.sentiment.id)
-      const analyzeRes = await fetch('/api/audience-sentiment/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sentimentId: data.sentiment.id }),
-      })
-      await analyzeRes.json()
-      setAnalyzing(null)
+      // Add the new sentiment to our list
+      if (data.sentiment) {
+        setAnalyses(prev => [data.sentiment, ...prev])
+        
+        // Auto-start analysis
+        setAnalyzing(data.sentiment.id)
+        const analyzeRes = await fetch('/api/audience-sentiment/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sentimentId: data.sentiment.id }),
+        })
+        const analyzeData = await analyzeRes.json()
+        
+        if (analyzeData.sentiment) {
+          // Update the analysis with the result
+          setAnalyses(prev => prev.map(a => 
+            a.id === data.sentiment.id ? { ...a, ...analyzeData.sentiment } : a
+          ))
+        }
+        setAnalyzing(null)
+      }
 
       setShowForm(false)
       setFormData({ title: '', platform: 'youtube', videoUrl: '' })
-      fetchAnalyses()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create analysis')
     }
@@ -148,8 +159,14 @@ export default function AudienceSentimentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sentimentId: id }),
       })
-      await res.json()
-      fetchAnalyses()
+      const data = await res.json()
+      
+      if (data.sentiment) {
+        // Update the analysis in our local state with the result
+        setAnalyses(prev => prev.map(a => 
+          a.id === id ? { ...a, ...data.sentiment } : a
+        ))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze')
     } finally {

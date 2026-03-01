@@ -3,8 +3,9 @@ import { prisma } from '@/lib/db'
 
 const DEMO_PROJECT_ID = 'demo-project'
 
-// Demo data for when database is unavailable
-const DEMO_SENTIMENTS = [
+// In-memory store for demo mode - survives during server runtime
+// This allows newly created analyses to persist during the session
+let demoSentiments: any[] = [
   {
     id: 'demo-1',
     projectId: DEMO_PROJECT_ID,
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
   
   if (!dbConnected) {
     return NextResponse.json({ 
-      sentiments: DEMO_SENTIMENTS,
+      sentiments: demoSentiments,
       isDemo: true 
     })
   }
@@ -160,7 +161,7 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching sentiments:', error)
     // Fallback to demo data on error
     return NextResponse.json({ 
-      sentiments: DEMO_SENTIMENTS,
+      sentiments: demoSentiments,
       isDemo: true,
       error: 'Using demo data due to server error' 
     })
@@ -172,13 +173,16 @@ export async function POST(request: NextRequest) {
   const dbConnected = await checkDbConnection()
   
   if (!dbConnected) {
-    // Return demo sentiment for offline mode
-    const demoSentiment = {
+    // Create a new demo sentiment in our in-memory store
+    const body = await request.json().catch(() => ({}))
+    const { title = 'New Analysis', platform = 'youtube', videoUrl = null } = body
+    
+    const newDemoSentiment = {
       id: `demo-${Date.now()}`,
       projectId: DEMO_PROJECT_ID,
-      title: 'New Analysis (Demo Mode)',
-      platform: 'youtube',
-      videoUrl: null,
+      title,
+      platform,
+      videoUrl,
       totalComments: 0,
       analyzedCount: 0,
       positiveCount: 0,
@@ -189,14 +193,18 @@ export async function POST(request: NextRequest) {
       topNegative: [],
       takeaways: [],
       posterTips: [],
-      status: 'completed',
+      status: 'pending',
       errorMsg: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       _count: { comments: 0 },
     }
+    
+    // Add to beginning of demo sentiments
+    demoSentiments = [newDemoSentiment, ...demoSentiments]
+    
     return NextResponse.json({ 
-      sentiment: demoSentiment,
+      sentiment: newDemoSentiment,
       isDemo: true 
     })
   }
@@ -231,6 +239,27 @@ export async function PATCH(request: NextRequest) {
   const dbConnected = await checkDbConnection()
   
   if (!dbConnected) {
+    // Update the demo sentiment in our in-memory store
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+    
+    if (id && id.startsWith('demo-')) {
+      const body = await request.json().catch(() => ({}))
+      const index = demoSentiments.findIndex(s => s.id === id)
+      
+      if (index !== -1) {
+        demoSentiments[index] = {
+          ...demoSentiments[index],
+          ...body,
+          updatedAt: new Date().toISOString()
+        }
+        return NextResponse.json({ 
+          sentiment: demoSentiments[index],
+          isDemo: true 
+        })
+      }
+    }
+    
     return NextResponse.json({ 
       sentiment: { id: 'demo-update', status: 'completed' },
       isDemo: true 
@@ -264,6 +293,14 @@ export async function DELETE(request: NextRequest) {
   const dbConnected = await checkDbConnection()
   
   if (!dbConnected) {
+    // Remove from demo store
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+    
+    if (id) {
+      demoSentiments = demoSentiments.filter(s => s.id !== id)
+    }
+    
     return NextResponse.json({ success: true, isDemo: true })
   }
 

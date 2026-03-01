@@ -99,10 +99,41 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('[GET /api/equipment]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch equipment' },
-      { status: 500 }
-    );
+    
+    // Return demo data when database is unavailable
+    const rentalsWithStatus = DEMO_EQUIPMENT.map(rental => {
+      let status = 'available';
+      const startDate = new Date(rental.dateStart);
+      const endDate = new Date(rental.dateEnd);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (startDate <= today && endDate >= today) {
+        status = 'in-use';
+      } else if (endDate < today) {
+        status = 'returned';
+      }
+
+      return {
+        ...rental,
+        status,
+        quantity: 1,
+        dailyRate: rental.dailyRate,
+      };
+    });
+
+    const totalDailyRate = DEMO_EQUIPMENT.reduce((acc, r) => acc + r.dailyRate, 0);
+
+    return NextResponse.json({
+      rentals: rentalsWithStatus,
+      stats: {
+        totalItems: DEMO_EQUIPMENT.length,
+        totalDailyRate,
+        available: rentalsWithStatus.filter(r => r.status === 'available').length,
+        inUse: rentalsWithStatus.filter(r => r.status === 'in-use').length,
+      },
+      isDemo: true,
+    });
   }
 }
 

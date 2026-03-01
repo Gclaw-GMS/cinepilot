@@ -231,6 +231,43 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
     return { startDate: minDate, endDate: maxDate, days: totalDays };
   }, [tasks]);
 
+  // Chart data for progress visualization - must be before any early returns
+  const progressChartData = useMemo(() => [
+    { name: 'Completed', value: stats.completed, color: CHART_COLORS.completed },
+    { name: 'In Progress', value: stats.inProgress, color: CHART_COLORS.inProgress },
+    { name: 'Pending', value: stats.pending, color: CHART_COLORS.pending },
+  ], [stats]);
+
+  const typeChartData = useMemo(() => {
+    const types: Record<string, number> = {};
+    tasks.forEach(task => {
+      types[task.type] = (types[task.type] || 0) + 1;
+    });
+    return Object.entries(types).map(([name, value]) => ({
+      name: name.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value,
+      color: name === 'pre-production' ? CHART_COLORS.preProduction :
+             name === 'production' ? CHART_COLORS.production :
+             CHART_COLORS.postProduction,
+    }));
+  }, [tasks]);
+
+  // Weekly progress data for bar chart
+  const weeklyProgressData = useMemo(() => {
+    const weeks: Record<string, { completed: number; total: number }> = {};
+    tasks.forEach(task => {
+      const weekNum = Math.ceil(task.start.getDate() / 7);
+      const monthKey = `${task.start.toLocaleDateString('en-US', { month: 'short' })} W${weekNum}`;
+      if (!weeks[monthKey]) weeks[monthKey] = { completed: 0, total: 0 };
+      weeks[monthKey].total += 1;
+      if (task.status === 'completed') weeks[monthKey].completed += 1;
+    });
+    return Object.entries(weeks).map(([name, data]) => ({
+      name,
+      ...data,
+    }));
+  }, [tasks]);
+
   const getTaskPosition = (task: GanttTask) => {
     const startOffset = Math.max(0, (task.start.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const duration = Math.max(1, (task.end.getTime() - task.start.getTime()) / (1000 * 60 * 60 * 24));
@@ -283,43 +320,6 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
   }
 
   const hasNoData = tasks.length === 0;
-
-  // Chart data for progress visualization
-  const progressChartData = useMemo(() => [
-    { name: 'Completed', value: stats.completed, color: CHART_COLORS.completed },
-    { name: 'In Progress', value: stats.inProgress, color: CHART_COLORS.inProgress },
-    { name: 'Pending', value: stats.pending, color: CHART_COLORS.pending },
-  ], [stats]);
-
-  const typeChartData = useMemo(() => {
-    const types: Record<string, number> = {};
-    tasks.forEach(task => {
-      types[task.type] = (types[task.type] || 0) + 1;
-    });
-    return Object.entries(types).map(([name, value]) => ({
-      name: name.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      value,
-      color: name === 'pre-production' ? CHART_COLORS.preProduction :
-             name === 'production' ? CHART_COLORS.production :
-             CHART_COLORS.postProduction,
-    }));
-  }, [tasks]);
-
-  // Weekly progress data for bar chart
-  const weeklyProgressData = useMemo(() => {
-    const weeks: Record<string, { completed: number; total: number }> = {};
-    tasks.forEach(task => {
-      const weekNum = Math.ceil(task.start.getDate() / 7);
-      const monthKey = `${task.start.toLocaleDateString('en-US', { month: 'short' })} W${weekNum}`;
-      if (!weeks[monthKey]) weeks[monthKey] = { completed: 0, total: 0 };
-      weeks[monthKey].total += 1;
-      if (task.status === 'completed') weeks[monthKey].completed += 1;
-    });
-    return Object.entries(weeks).map(([name, data]) => ({
-      name,
-      ...data,
-    }));
-  }, [tasks]);
 
   return (
     <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">

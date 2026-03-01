@@ -1,7 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { FileText, Plus, Trash2, Calendar, Edit2, Save, X, Printer, Download } from 'lucide-react'
+import { FileText, Plus, Trash2, Calendar, Edit2, Save, X, Printer, Download, Cloud, Sun, CloudRain, Wind, Droplets, Thermometer } from 'lucide-react'
+
+// Weather types for call sheet
+type WeatherInfo = {
+  temp: number
+  condition: 'sunny' | 'cloudy' | 'rainy' | 'windy'
+  humidity: number
+  wind: number
+  sunrise: string
+  sunset: string
+}
 
 type CallSheetContent = {
   callTime?: string
@@ -42,7 +52,17 @@ type CrewMember = {
   role: string
   department: string | null
   dailyRate: string | number | null
+  phone?: string
 }
+
+// Emergency contacts for production
+const EMERGENCY_CONTACTS = [
+  { role: 'Unit Production Manager', name: 'Producer', phone: '+91 98765 43210' },
+  { role: 'First AD', name: 'First Assistant Director', phone: '+91 98765 43211' },
+  { role: 'Location Manager', name: 'Location Manager', phone: '+91 98765 43212' },
+  { role: 'Police', name: 'Emergency', phone: '100' },
+  { role: 'Ambulance', name: 'Medical Emergency', phone: '108' },
+]
 
 export default function CallSheetsPage() {
   const [callSheets, setCallSheets] = useState<CallSheet[]>([])
@@ -64,6 +84,222 @@ export default function CallSheetsPage() {
   const [crew, setCrew] = useState<CrewMember[]>([])
   const [showAddCrew, setShowAddCrew] = useState(false)
   const [newScene, setNewScene] = useState('')
+  
+  // Weather state
+  const [weather, setWeather] = useState<WeatherInfo | null>(null)
+  const [loadingWeather, setLoadingWeather] = useState(false)
+
+  // Fetch weather for the call sheet date
+  const fetchWeather = useCallback(async (date: string) => {
+    if (!date) return
+    setLoadingWeather(true)
+    try {
+      // Try to fetch from API (if weather service is configured)
+      const res = await fetch(`/api/weather?date=${date}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.temp) {
+          setWeather(data)
+          return
+        }
+      }
+    } catch {
+      // Weather API not available
+    }
+    
+    // Generate realistic demo weather data
+    const demoWeather: WeatherInfo = {
+      temp: Math.round(24 + Math.random() * 10),
+      condition: (['sunny', 'cloudy', 'rainy', 'windy'] as const)[Math.floor(Math.random() * 4)],
+      humidity: Math.round(50 + Math.random() * 30),
+      wind: Math.round(5 + Math.random() * 15),
+      sunrise: '06:12',
+      sunset: '18:35',
+    }
+    setWeather(demoWeather)
+    setLoadingWeather(false)
+  }, [])
+
+  // Load weather when selected call sheet changes
+  useEffect(() => {
+    if (selected?.date) {
+      fetchWeather(selected.date)
+    }
+  }, [selected?.date, fetchWeather])
+
+  // Get weather icon based on condition
+  const getWeatherIcon = (condition: string) => {
+    switch (condition) {
+      case 'sunny': return <Sun className="w-6 h-6 text-amber-400" />
+      case 'cloudy': return <Cloud className="w-6 h-6 text-slate-400" />
+      case 'rainy': return <CloudRain className="w-6 h-6 text-blue-400" />
+      case 'windy': return <Wind className="w-6 h-6 text-cyan-400" />
+      default: return <Sun className="w-6 h-6 text-amber-400" />
+    }
+  }
+
+  // Print function
+  const handlePrint = () => {
+    window.print()
+  }
+
+  // PDF Export function - generates clean HTML for printing/PDF
+  const handleExportPDF = () => {
+    if (!selected) return
+    
+    const formatDate = (d: string) => {
+      try {
+        return new Date(d).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })
+      } catch {
+        return d
+      }
+    }
+
+    const weatherHtml = weather ? `
+      <div style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 6px; display: inline-flex; gap: 15px; align-items: center;">
+        <span style="font-weight: bold; font-size: 18px;">${weather.temp}°C</span>
+        <span style="color: #6b7280;">💧 ${weather.humidity}%</span>
+        <span style="color: #6b7280;">🌬️ ${weather.wind} km/h</span>
+        <span style="color: #6b7280;">🌅 ${weather.sunrise}</span>
+      </div>
+    ` : ''
+
+    const crewRows = (selected.content?.crewCalls ?? []).map(c => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.role}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.name}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${c.callTime ?? selected.content?.callTime ?? 'TBD'}</td>
+      </tr>
+    `).join('')
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Call Sheet - ${formatDate(selected.date)}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #111; background: white; }
+    .header { text-align: center; border-bottom: 3px solid #111; padding-bottom: 20px; margin-bottom: 30px; }
+    .header h1 { font-size: 32px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+    .header .date { font-size: 20px; color: #444; margin-top: 8px; }
+    .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; }
+    .info-box .label { font-size: 11px; text-transform: uppercase; color: #666; letter-spacing: 1px; margin-bottom: 5px; }
+    .info-box .value { font-size: 18px; font-weight: bold; }
+    .section { margin-bottom: 25px; }
+    .section h3 { font-size: 14px; text-transform: uppercase; background: #111; color: white; padding: 10px 15px; margin-bottom: 0; }
+    .scenes { display: flex; flex-wrap: wrap; gap: 8px; padding: 15px; border: 1px solid #e5e7eb; border-top: none; }
+    .scene-tag { background: #e5e7eb; padding: 5px 12px; border-radius: 4px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px; background: #f3f4f6; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    .notes { background: #fefce8; border: 1px solid #fde047; padding: 15px; border-radius: 6px; white-space: pre-wrap; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 12px; }
+    @media print {
+      body { padding: 20px; }
+      @page { size: A4; margin: 0.5cm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${selected.title ?? 'Call Sheet'}</h1>
+    <div class="date">${formatDate(selected.date)}</div>
+    ${weatherHtml}
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="label">Date</div>
+      <div class="value">${formatDate(selected.date)}</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Call Time</div>
+      <div class="value" style="font-size: 24px; color: #059669;">${selected.content?.callTime ?? 'TBD'}</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Wrap Time</div>
+      <div class="value">${selected.content?.wrapTime ?? 'TBD'}</div>
+    </div>
+    <div class="info-box">
+      <div class="label">Location</div>
+      <div class="value" style="font-size: 16px;">${selected.content?.location ?? 'TBD'}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Scenes</h3>
+    <div class="scenes">
+      ${(selected.content?.scenes ?? []).length > 0 
+        ? (selected.content?.scenes ?? []).map(s => `<span class="scene-tag">${s}</span>`).join('')
+        : '<span style="color: #666;">TBD</span>'}
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Crew Calls</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Name</th>
+          <th style="text-align: right;">Call Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${crewRows || '<tr><td colspan="3" style="text-align: center; color: #666; padding: 20px;">No crew assigned</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+
+  ${selected.notes ? `
+  <div class="section">
+    <h3>Notes</h3>
+    <div class="notes">${selected.notes}</div>
+  </div>
+  ` : ''}
+
+  <div class="section">
+    <h3>🚨 Emergency Contacts</h3>
+    <table style="margin-top: 10px;">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Contact Person</th>
+          <th>Phone</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${EMERGENCY_CONTACTS.map(c => `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.role}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${c.name}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">${c.phone}</td>
+        </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    Generated by CinePilot • Film Production Management
+  </div>
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `call-sheet-${selected.date}-${(selected.title || 'production').replace(/\s+/g, '-')}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const fetchCallSheets = useCallback(async () => {
     try {
@@ -284,6 +520,13 @@ export default function CallSheetsPage() {
                 Edit
               </button>
               <button
+                onClick={handleExportPDF}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+              <button
                 onClick={() => window.print()}
                 className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium"
               >
@@ -399,6 +642,28 @@ export default function CallSheetsPage() {
                       {selected.title ?? 'CALL SHEET'}
                     </h2>
                     <p className="text-lg mt-1">{formatDate(selected.date)}</p>
+
+                    {/* Weather Widget */}
+                    {weather && (
+                      <div className="mt-4 flex items-center justify-center gap-6 bg-gray-100 rounded-lg p-3 inline-flex">
+                        <div className="flex items-center gap-2">
+                          {getWeatherIcon(weather.condition)}
+                          <span className="font-bold text-lg">{weather.temp}°C</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Droplets className="w-4 h-4" />
+                          {weather.humidity}%
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Wind className="w-4 h-4" />
+                          {weather.wind} km/h
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Thermometer className="w-4 h-4" />
+                          🌅 {weather.sunrise} 🌇 {weather.sunset}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-6 mb-6">
@@ -489,6 +754,31 @@ export default function CallSheetsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Emergency Contacts */}
+                  <div className="mb-6">
+                    <div className="font-bold bg-red-100 p-2 text-red-800">🚨 EMERGENCY CONTACTS</div>
+                    <div className="p-2 border border-t-0 border-gray-300">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left p-2 text-sm">Role</th>
+                            <th className="text-left p-2 text-sm">Contact</th>
+                            <th className="text-right p-2 text-sm">Phone</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {EMERGENCY_CONTACTS.map((contact, idx) => (
+                            <tr key={idx} className="border-b border-gray-100">
+                              <td className="p-2 text-sm">{contact.role}</td>
+                              <td className="p-2 text-sm">{contact.name}</td>
+                              <td className="p-2 text-sm text-right font-bold">{contact.phone}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
 
                   <div className="text-center text-sm text-gray-500 mt-8 pt-4 border-t border-gray-200">
                     Generated by CinePilot
@@ -700,6 +990,32 @@ export default function CallSheetsPage() {
           )}
         </div>
       </div>
+
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 0.5cm;
+          }
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
+          }
+          .print-break-before {
+            page-break-before: always;
+          }
+        }
+        .print-only {
+          display: none;
+        }
+      `}</style>
     </div>
   )
 }

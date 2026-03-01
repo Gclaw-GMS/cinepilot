@@ -3,6 +3,31 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Demo crew data for fallback when database is unavailable
+const DEMO_CREW = [
+  { id: 'd1', name: 'Ravi Kumar', role: 'Director of Photography', department: 'Camera', phone: '+91 98765 43210', email: 'ravi@film.com', dailyRate: 75000, notes: 'Award-winning cinematographer', createdAt: '2026-01-15T00:00:00Z' },
+  { id: 'd2', name: 'Anand Venkatesh', role: 'Gaffer', department: 'Lighting', phone: '+91 98765 43211', email: 'anand@film.com', dailyRate: 15000, notes: '15+ years experience', createdAt: '2026-01-15T00:00:00Z' },
+  { id: 'd3', name: 'Vijay Raghavan', role: 'Sound Mixer', department: 'Sound', phone: '+91 98765 43212', email: 'vijay@film.com', dailyRate: 12000, notes: null, createdAt: '2026-01-15T00:00:00Z' },
+  { id: 'd4', name: 'Madhan Kumar', role: 'Production Designer', department: 'Art', phone: '+91 98765 43213', email: 'madhan@film.com', dailyRate: 45000, notes: 'Specializes in period films', createdAt: '2026-01-16T00:00:00Z' },
+  { id: 'd5', name: 'Lakshmi Devi', role: 'Chief Makeup Artist', department: 'Makeup', phone: '+91 98765 43214', email: 'lakshmi@film.com', dailyRate: 25000, notes: 'Nationally awarded', createdAt: '2026-01-16T00:00:00Z' },
+  { id: 'd6', name: 'Vasantha Kumar', role: 'Costume Designer', department: 'Costume', phone: '+91 98765 43215', email: 'vasantha@film.com', dailyRate: 35000, notes: 'Authentic Tamil costumes', createdAt: '2026-01-16T00:00:00Z' },
+  { id: 'd7', name: 'Kamal Haasan', role: 'Director', department: 'Direction', phone: '+91 98765 43216', email: 'kamal@film.com', dailyRate: 150000, notes: 'Visionary director', createdAt: '2026-01-10T00:00:00Z' },
+  { id: 'd8', name: 'Rajesh Kumar', role: 'Line Producer', department: 'Production', phone: '+91 98765 43217', email: 'rajesh@film.com', dailyRate: 20000, notes: 'Expert in Tamil Nadu locations', createdAt: '2026-01-17T00:00:00Z' },
+  { id: 'd9', name: 'Prakash Raj', role: 'VFX Supervisor', department: 'VFX', phone: '+91 98765 43218', email: 'prakash@film.com', dailyRate: 60000, notes: 'Hollywood-level VFX expertise', createdAt: '2026-01-17T00:00:00Z' },
+  { id: 'd10', name: 'Bala Chandran', role: 'Stunt Choreographer', department: 'Stunts', phone: '+91 98765 43219', email: 'bala@film.com', dailyRate: 30000, notes: 'Master of action choreography', createdAt: '2026-01-18T00:00:00Z' },
+];
+
+// Helper function to check database connection
+async function checkDbConnection(): Promise<boolean> {
+  try {
+    await prisma.$connect();
+    await prisma.$disconnect();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureDefaultProject(): Promise<string> {
   let user = await prisma.user.findFirst({ where: { id: 'default-user' } });
   if (!user) {
@@ -26,6 +51,17 @@ async function ensureDefaultProject(): Promise<string> {
 }
 
 export async function GET() {
+  // Check database connection first
+  const isDbConnected = await checkDbConnection();
+
+  if (!isDbConnected) {
+    // Return demo data if database is not connected
+    return NextResponse.json({
+      crew: DEMO_CREW,
+      isDemoMode: true,
+    });
+  }
+
   try {
     // Add timeout controller
     const controller = new AbortController();
@@ -39,22 +75,37 @@ export async function GET() {
     });
     
     clearTimeout(timeoutId);
-    return NextResponse.json(crew);
+    return NextResponse.json({
+      crew,
+      isDemoMode: false,
+    });
   } catch (error) {
     console.error('[GET /api/crew]', error);
     
-    // Handle specific error types
+    // Handle specific error types - return demo data on failure
     if (error instanceof Error) {
       if (error.name === 'AbortError' || error.message.includes('timed out')) {
-        return NextResponse.json({ error: 'Request timed out. Please try again.' }, { status: 504 });
+        return NextResponse.json({
+          crew: DEMO_CREW,
+          isDemoMode: true,
+          error: 'Request timed out, using demo data',
+        });
       }
       if (error.message.includes('connection')) {
-        return NextResponse.json({ error: 'Database connection failed. Please check your database.' }, { status: 503 });
+        return NextResponse.json({
+          crew: DEMO_CREW,
+          isDemoMode: true,
+          error: 'Database connection failed, using demo data',
+        });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
-    return NextResponse.json({ error: 'Unknown error occurred' }, { status: 500 });
+    // Return demo data on any error
+    return NextResponse.json({
+      crew: DEMO_CREW,
+      isDemoMode: true,
+      error: 'Using demo data',
+    });
   }
 }
 

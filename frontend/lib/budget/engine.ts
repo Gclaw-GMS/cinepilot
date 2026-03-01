@@ -426,15 +426,26 @@ export async function forecastBudget(projectId: string) {
 
 export async function addExpense(
   projectId: string,
-  data: { category: string; description: string; amount: number; date: string; vendor?: string; notes?: string }
+  data: { category: string; description: string; amount: number; date?: string; vendor?: string; notes?: string }
 ) {
+  // Handle empty or invalid date
+  let expenseDate: Date;
+  if (!data.date || data.date === '') {
+    expenseDate = new Date();
+  } else {
+    expenseDate = new Date(data.date);
+    if (isNaN(expenseDate.getTime())) {
+      expenseDate = new Date();
+    }
+  }
+
   return prisma.expense.create({
     data: {
       projectId,
       category: data.category,
       description: data.description,
       amount: new Decimal(data.amount),
-      date: new Date(data.date),
+      date: expenseDate,
       vendor: data.vendor || null,
       notes: data.notes || null,
     },

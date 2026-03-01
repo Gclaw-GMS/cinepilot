@@ -160,15 +160,19 @@ export default function CrewPage() {
     setError(null);
     try {
       const res = await fetch('/api/crew');
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      
+      // Handle new API format: { crew: [...], isDemoMode: true/false }
+      if (data.crew && Array.isArray(data.crew)) {
+        setCrew(data.crew);
+        setIsDemoMode(data.isDemoMode === true);
+        if (!data.isDemoMode) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } else if (Array.isArray(data) && data.length > 0) {
+        // Handle legacy API format (array directly)
         setCrew(data);
         setIsDemoMode(false);
-        // Clear any stored demo data when real data exists
         localStorage.removeItem(STORAGE_KEY);
       } else {
         // Use demo data when no real data

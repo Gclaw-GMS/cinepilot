@@ -189,6 +189,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(DEMO_FORECAST);
     }
 
+    // Handle updateExpenseStatus action
+    if (action === 'updateExpenseStatus') {
+      const { id, status } = body;
+      return NextResponse.json({
+        message: 'Status updated (Demo Mode)',
+        id,
+        status,
+        isDemoMode: true,
+      });
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
   
@@ -247,7 +258,17 @@ export async function PATCH(req: NextRequest) {
   
   if (isDemo) {
     const body = await req.json();
-    const { id, type, ...updates } = body;
+    const { id, type, action, ...updates } = body;
+    
+    // Handle expense status update in demo mode
+    if (action === 'updateExpenseStatus') {
+      return NextResponse.json({
+        message: 'Status updated (Demo Mode)',
+        id,
+        status: updates.status,
+        isDemoMode: true,
+      });
+    }
     
     // Simulate update in demo mode
     return NextResponse.json({
@@ -261,7 +282,16 @@ export async function PATCH(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { id, type, ...data } = body;
+    const { id, type, action, ...data } = body;
+    
+    // Handle expense status update
+    if (action === 'updateExpenseStatus') {
+      const expense = await prisma.expense.update({
+        where: { id },
+        data: { status: data.status },
+      });
+      return NextResponse.json({ message: 'Status updated', expense, isDemoMode: false });
+    }
     
     if (type === 'item') {
       const item = await prisma.budgetItem.update({
@@ -300,5 +330,42 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error('[PATCH /api/budget]', error);
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+  }
+}
+
+// DELETE /api/budget — delete expense
+export async function DELETE(req: NextRequest) {
+  const isDemo = !(await checkDbConnection());
+  
+  if (isDemo) {
+    const body = await req.json();
+    const { action, id } = body;
+    
+    if (action === 'deleteExpense') {
+      return NextResponse.json({
+        message: 'Expense deleted (Demo Mode)',
+        id,
+        isDemoMode: true,
+      });
+    }
+    
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  }
+  
+  try {
+    const body = await req.json();
+    const { action, id } = body;
+    
+    if (action === 'deleteExpense') {
+      await prisma.expense.delete({
+        where: { id },
+      });
+      return NextResponse.json({ message: 'Expense deleted', isDemoMode: false });
+    }
+    
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    console.error('[DELETE /api/budget]', error);
+    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
   }
 }

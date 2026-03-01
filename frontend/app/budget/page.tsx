@@ -127,7 +127,16 @@ export default function BudgetPage() {
   const [scale, setScale] = useState('mid')
 
   const [showAddExpense, setShowAddExpense] = useState(false)
-  const [newExpense, setNewExpense] = useState({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
+  const [editingExpense, setEditingExpense] = useState<string | null>(null)
+  const [newExpense, setNewExpense] = useState({ 
+    category: 'Production', 
+    description: '', 
+    amount: '', 
+    date: '', 
+    vendor: '',
+    notes: '',
+    status: 'pending'
+  })
 
   const fetchData = useCallback(async () => {
     try {
@@ -185,10 +194,42 @@ export default function BudgetPage() {
       await fetch('/api/budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'addExpense', ...newExpense, amount: parseFloat(newExpense.amount) }),
+        body: JSON.stringify({ 
+          action: 'addExpense', 
+          ...newExpense, 
+          amount: parseFloat(newExpense.amount),
+          status: newExpense.status || 'pending'
+        }),
       })
       setShowAddExpense(false)
-      setNewExpense({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
+      setNewExpense({ category: 'Production', description: '', amount: '', date: '', vendor: '', notes: '', status: 'pending' })
+      await fetchData()
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm('Delete this expense?')) return
+    try {
+      await fetch('/api/budget', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteExpense', id }),
+      })
+      await fetchData()
+    } catch (e: any) {
+      setError(e.message)
+    }
+  }
+
+  const handleUpdateExpenseStatus = async (id: string, status: string) => {
+    try {
+      await fetch('/api/budget', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateExpenseStatus', id, status }),
+      })
       await fetchData()
     } catch (e: any) {
       setError(e.message)
@@ -409,41 +450,88 @@ export default function BudgetPage() {
           </div>
 
           {showAddExpense && (
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 grid grid-cols-5 gap-3">
-              <select value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}
-                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
-                {['Production', 'Art Department', 'Costume', 'Makeup & Hair', 'Locations', 'Post Production', 'Music', 'Cast', 'Crew', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
-                <option value="Other">Other</option>
-              </select>
-              <input type="text" placeholder="Description" value={newExpense.description}
-                onChange={e => setNewExpense({ ...newExpense, description: e.target.value })}
-                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
-              <input type="number" placeholder="Amount (₹)" value={newExpense.amount}
-                onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })}
-                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
-              <input type="date" value={newExpense.date}
-                onChange={e => setNewExpense({ ...newExpense, date: e.target.value })}
-                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
-              <button onClick={handleAddExpense} className="px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium">Save</button>
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <div className="grid grid-cols-6 gap-3 mb-3">
+                <select value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+                  {['Production', 'Art Department', 'Costume', 'Makeup & Hair', 'Locations', 'Post Production', 'Music', 'Cast', 'Crew', 'Marketing', 'Travel', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="text" placeholder="Description" value={newExpense.description}
+                  onChange={e => setNewExpense({ ...newExpense, description: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm col-span-2" />
+                <input type="number" placeholder="Amount (₹)" value={newExpense.amount}
+                  onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
+                <input type="date" value={newExpense.date}
+                  onChange={e => setNewExpense({ ...newExpense, date: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm" />
+                <select value={newExpense.status} onChange={e => setNewExpense({ ...newExpense, status: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-6 gap-3 mb-3">
+                <input type="text" placeholder="Vendor (optional)" value={newExpense.vendor}
+                  onChange={e => setNewExpense({ ...newExpense, vendor: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm col-span-2" />
+                <input type="text" placeholder="Notes (optional)" value={newExpense.notes}
+                  onChange={e => setNewExpense({ ...newExpense, notes: e.target.value })}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm col-span-3" />
+                <div className="flex gap-2">
+                  <button onClick={handleAddExpense} className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium">Save</button>
+                  <button onClick={() => setShowAddExpense(false)} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">Cancel</button>
+                </div>
+              </div>
             </div>
           )}
 
           {expenses.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No expenses recorded yet.
+              No expenses recorded yet. Click "Add Expense" to track your first expense.
             </div>
           ) : (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden divide-y divide-gray-800">
+              <div className="px-4 py-2 bg-gray-800/50 grid grid-cols-12 gap-4 text-xs text-gray-500 font-medium uppercase">
+                <div className="col-span-2">Category</div>
+                <div className="col-span-3">Description</div>
+                <div className="col-span-2">Vendor</div>
+                <div className="col-span-2">Date</div>
+                <div className="col-span-2 text-right">Amount</div>
+                <div className="col-span-1 text-center">Action</div>
+              </div>
               {expenses.map(exp => (
-                <div key={exp.id} className="px-4 py-3 flex items-center gap-4">
-                  <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-400 rounded">{exp.category}</span>
-                  <div className="flex-1 text-sm text-gray-300">{exp.description}</div>
-                  {exp.vendor && <span className="text-xs text-gray-500">{exp.vendor}</span>}
-                  <span className="text-xs text-gray-500">{exp.date ? new Date(exp.date).toLocaleDateString('en-IN') : '—'}</span>
-                  <span className="text-sm font-medium text-gray-300">{formatINR(Number(exp.amount))}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded ${
-                    exp.status === 'approved' ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
-                  }`}>{exp.status}</span>
+                <div key={exp.id} className="px-4 py-3 flex items-center gap-4 hover:bg-gray-800/30">
+                  <div className="col-span-2 text-xs px-2 py-1 bg-gray-800 text-gray-400 rounded w-fit">{exp.category}</div>
+                  <div className="col-span-3 text-sm text-gray-300">{exp.description}</div>
+                  <div className="col-span-2 text-xs text-gray-500">{exp.vendor || '—'}</div>
+                  <div className="col-span-2 text-xs text-gray-500">{exp.date ? new Date(exp.date).toLocaleDateString('en-IN') : '—'}</div>
+                  <div className="col-span-2 text-sm font-medium text-gray-300 text-right">{formatINR(Number(exp.amount))}</div>
+                  <div className="col-span-1 flex items-center justify-center gap-2">
+                    <select 
+                      value={exp.status} 
+                      onChange={(e) => handleUpdateExpenseStatus(exp.id, e.target.value)}
+                      className={`text-[10px] px-2 py-1 rounded border-0 cursor-pointer ${
+                        exp.status === 'approved' ? 'bg-green-900/50 text-green-400' : 
+                        exp.status === 'rejected' ? 'bg-red-900/50 text-red-400' : 
+                        'bg-yellow-900/50 text-yellow-400'
+                      }`}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                    <button 
+                      onClick={() => handleDeleteExpense(exp.id)}
+                      className="text-gray-600 hover:text-red-400 transition-colors"
+                      title="Delete expense"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

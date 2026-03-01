@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
-  MoreHorizontal, Edit2, Trash2
+  MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
+  TrendingUp, Activity
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, AreaChart, Area
+} from 'recharts'
 
 interface Milestone {
   id: string
@@ -47,6 +52,17 @@ const PHASE_COLORS: Record<string, { bg: string; text: string; gradient: string 
   pre_production: { bg: 'bg-blue-500/20', text: 'text-blue-400', gradient: 'from-blue-500 to-cyan-500' },
   production: { bg: 'bg-orange-500/20', text: 'text-orange-400', gradient: 'from-orange-500 to-red-500' },
   post_production: { bg: 'bg-purple-500/20', text: 'text-purple-400', gradient: 'from-purple-500 to-pink-500' },
+}
+
+const CHART_COLORS = {
+  completed: '#10b981',
+  in_progress: '#3b82f6',
+  pending: '#64748b',
+  blocked: '#ef4444',
+  critical: '#ef4444',
+  high: '#f59e0b',
+  medium: '#eab308',
+  low: '#64748b',
 }
 
 function getPriorityColor(priority: string): string {
@@ -135,6 +151,43 @@ export default function ProgressPage() {
   useEffect(() => {
     fetchProgress()
   }, [fetchProgress, refreshKey])
+
+  // Compute chart data from progress
+  const chartData = useMemo(() => {
+    if (!progress) return null
+    
+    // Task status distribution
+    const taskStatus = [
+      { name: 'Completed', value: progress.tasks?.filter(t => t.status === 'completed').length || 0, color: CHART_COLORS.completed },
+      { name: 'In Progress', value: progress.tasks?.filter(t => t.status === 'in_progress').length || 0, color: CHART_COLORS.in_progress },
+      { name: 'Pending', value: progress.tasks?.filter(t => t.status === 'pending').length || 0, color: CHART_COLORS.pending },
+      { name: 'Blocked', value: progress.tasks?.filter(t => t.status === 'blocked').length || 0, color: CHART_COLORS.blocked },
+    ].filter(d => d.value > 0)
+
+    // Priority distribution
+    const priorityDist = [
+      { name: 'Critical', value: progress.tasks?.filter(t => t.priority === 'critical').length || 0, color: CHART_COLORS.critical },
+      { name: 'High', value: progress.tasks?.filter(t => t.priority === 'high').length || 0, color: CHART_COLORS.high },
+      { name: 'Medium', value: progress.tasks?.filter(t => t.priority === 'medium').length || 0, color: CHART_COLORS.medium },
+      { name: 'Low', value: progress.tasks?.filter(t => t.priority === 'low').length || 0, color: CHART_COLORS.low },
+    ].filter(d => d.value > 0)
+
+    // Milestone progress data
+    const milestoneProgress = progress.milestones?.map(m => ({
+      name: m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name,
+      tasks: m.tasks,
+      status: m.status,
+    })) || []
+
+    // Phase progress data
+    const phaseProgress = progress.phases?.map(p => ({
+      name: p.displayName,
+      progress: p.progress,
+      status: p.status,
+    })) || []
+
+    return { taskStatus, priorityDist, milestoneProgress, phaseProgress }
+  }, [progress])
 
   const handleInitialize = async () => {
     setInitializing(true)
@@ -306,6 +359,134 @@ export default function ProgressPage() {
               })}
             </div>
           </div>
+
+          {/* Analytics Charts Row */}
+          {chartData && chartData.taskStatus.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              {/* Task Status Pie Chart */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
+                  <PieChartIcon className="w-5 h-5 text-cyan-400" />
+                  Task Status Distribution
+                </h3>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData.taskStatus}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={80}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {chartData.taskStatus.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        formatter={(value: number) => [`${value} tasks`, '']}
+                      />
+                      <Legend 
+                        formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                        wrapperStyle={{ fontSize: '12px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Priority Distribution Bar Chart */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-purple-400" />
+                  Priority Breakdown
+                </h3>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.priorityDist} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} width={60} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        formatter={(value: number) => [`${value} tasks`, '']}
+                      />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {chartData.priorityDist.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Phase Progress Area Chart */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-md font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-green-400" />
+                  Phase Progress
+                </h3>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData.phaseProgress}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={10} />
+                      <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        formatter={(value: number) => [`${value}%`, 'Progress']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="progress" 
+                        stroke="#10b981" 
+                        fill="#10b981" 
+                        fillOpacity={0.3}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Stats Row */}
+          {hasData && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs text-slate-400 uppercase">Total Tasks</span>
+                </div>
+                <p className="text-2xl font-semibold text-white">{progress?.tasks?.length || 0}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  <span className="text-xs text-slate-400 uppercase">Completed</span>
+                </div>
+                <p className="text-2xl font-semibold text-green-400">{progress?.tasks?.filter(t => t.status === 'completed').length || 0}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs text-slate-400 uppercase">In Progress</span>
+                </div>
+                <p className="text-2xl font-semibold text-blue-400">{progress?.tasks?.filter(t => t.status === 'in_progress').length || 0}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <span className="text-xs text-slate-400 uppercase">Blocked</span>
+                </div>
+                <p className="text-2xl font-semibold text-red-400">{progress?.tasks?.filter(t => t.status === 'blocked').length || 0}</p>
+              </div>
+            </div>
+          )}
 
           {/* Timeline View */}
           {viewMode === 'timeline' && (

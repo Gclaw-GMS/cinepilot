@@ -165,14 +165,14 @@ function getShootingRecommendation(
 
 // Calculate golden hour and blue hour
 function calculateLightHours(sunriseTs: number, sunsetTs: number): { goldenMorning: string; goldenEvening: string; blueMorning: string; blueEvening: string } {
-  const goldenHourDuration = 60 * 60 * 1000; // 1 hour
-  const blueHourDuration = 30 * 60 * 1000; // 30 minutes
+  const goldenHourDuration = 60 * 60; // 1 hour in seconds
+  const blueHourDuration = 30 * 60; // 30 minutes in seconds
 
   return {
-    goldenMorning: new Date(sunriseTs * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    goldenEvening: new Date((sunsetTs - goldenHourDuration) * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    blueMorning: new Date((sunriseTs - blueHourDuration) * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    blueEvening: new Date((sunsetTs) * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    goldenMorning: new Date(sunriseTs * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    goldenEvening: new Date((sunsetTs - goldenHourDuration) * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    blueMorning: new Date((sunriseTs - blueHourDuration) * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    blueEvening: new Date((sunsetTs) * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
   };
 }
 
@@ -207,9 +207,12 @@ function generateDemoForecast(locationName: string, lat: number, lng: number): W
       tempHigh
     );
 
-    // Generate mock sunrise/sunset times
-    const sunriseTs = Math.floor(date.getTime() / 1000) + (6 * 3600) + Math.floor(Math.random() * 1800);
-    const sunsetTs = Math.floor(date.getTime() / 1000) + (18 * 3600) + Math.floor(Math.random() * 1800);
+    // Generate mock sunrise/sunset times - calculate from midnight of the target date
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    const midnightTs = Math.floor(targetDate.getTime() / 1000);
+    const sunriseTs = midnightTs + (6 * 3600) + Math.floor(Math.random() * 1800); // ~6:00 AM
+    const sunsetTs = midnightTs + (18 * 3600) + Math.floor(Math.random() * 1800); // ~6:00 PM
     const lightHours = calculateLightHours(sunriseTs, sunsetTs);
 
     forecast.push({
@@ -232,8 +235,8 @@ function generateDemoForecast(locationName: string, lat: number, lng: number): W
       bestTimeToShoot: bestTime,
       uvIndex: Math.round(6 + Math.random() * 4),
       visibility: 8000 + Math.round(Math.random() * 2000),
-      sunrise: new Date(sunriseTs * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      sunset: new Date(sunsetTs * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      sunrise: new Date(sunriseTs * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      sunset: new Date(sunsetTs * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
       goldenHourMorning: lightHours.goldenMorning,
       goldenHourEvening: lightHours.goldenEvening,
       blueHourMorning: lightHours.blueMorning,
@@ -433,8 +436,8 @@ export async function GET(req: NextRequest) {
         bestTimeToShoot: bestTime,
         uvIndex,
         visibility: Math.round(avgVisibility),
-        sunrise: new Date(citySunrise * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-        sunset: new Date(citySunset * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        sunrise: new Date(citySunrise * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        sunset: new Date(citySunset * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
         goldenHourMorning: lightHours.goldenMorning,
         goldenHourEvening: lightHours.goldenEvening,
         blueHourMorning: lightHours.blueMorning,

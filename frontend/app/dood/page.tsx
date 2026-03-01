@@ -51,6 +51,7 @@ export default function DOODPage() {
   const [stats, setStats] = useState<DOODStats>(DEMO_STATS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
@@ -65,6 +66,11 @@ export default function DOODPage() {
       }
       const data = await res.json()
       
+      // Check for demo mode
+      if (data.isDemoMode) {
+        setIsDemoMode(true)
+      }
+      
       if (data.report && data.report.length > 0) {
         setReport(data.report)
         setStats(data.stats)
@@ -72,11 +78,13 @@ export default function DOODPage() {
         // Use demo data if no real data
         setReport(DEMO_DOOD)
         setStats(DEMO_STATS)
+        setIsDemoMode(true)
       }
     } catch (e) {
       console.warn('Using demo DOOD data:', e)
       setReport(DEMO_DOOD)
       setStats(DEMO_STATS)
+      setIsDemoMode(true)
     }
     setLoading(false)
   }, [selectedProject])
@@ -213,6 +221,14 @@ export default function DOODPage() {
             </p>
           </div>
         </div>
+        
+        {/* Demo Mode Banner */}
+        {isDemoMode && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/50 rounded-lg">
+            <AlertCircle className="w-4 h-4 text-amber-400" />
+            <span className="text-amber-400 text-sm font-medium">Demo Data</span>
+          </div>
+        )}
         
         <div className="flex items-center gap-3">
           {/* View Toggle */}

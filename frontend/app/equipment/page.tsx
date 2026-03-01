@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2 } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 
 interface EquipmentRental {
   id: string
@@ -96,6 +97,28 @@ export default function EquipmentPage() {
     notes: '',
   })
   const [saving, setSaving] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingEquipment, setEditingEquipment] = useState<EquipmentRental | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: 'camera',
+    dateStart: '',
+    dateEnd: '',
+    dailyRate: '',
+    vendor: '',
+    notes: '',
+  })
+
+  // Calculate category breakdown for chart
+  const categoryData = useCallback(() => {
+    const breakdown: Record<string, number> = {}
+    equipment.forEach(eq => {
+      breakdown[eq.category] = (breakdown[eq.category] || 0) + eq.dailyRate
+    })
+    return Object.entries(breakdown).map(([name, value]) => ({ name, value }))
+  }, [equipment])()
+
+  const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true)
@@ -183,6 +206,50 @@ export default function EquipmentPage() {
     }
   }
 
+  const handleEdit = (eq: EquipmentRental) => {
+    setEditingEquipment(eq)
+    setEditForm({
+      name: eq.name,
+      category: eq.category,
+      dateStart: eq.dateStart.split('T')[0],
+      dateEnd: eq.dateEnd.split('T')[0],
+      dailyRate: eq.dailyRate.toString(),
+      vendor: eq.vendor || '',
+      notes: eq.notes || '',
+    })
+    setEditModalOpen(true)
+  }
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingEquipment) return
+    setSaving(true)
+    
+    try {
+      const res = await fetch('/api/equipment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingEquipment.id,
+          ...editForm,
+        }),
+      })
+      
+      if (res.ok) {
+        setEditModalOpen(false)
+        setEditingEquipment(null)
+        await fetchEquipment()
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to update equipment')
+      }
+    } catch (err) {
+      setError('Failed to update equipment')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex items-center justify-center">
@@ -222,6 +289,39 @@ export default function EquipmentPage() {
         <StatCard title="Available" value={stats.available} color="violet" icon={<Camera className="w-5 h-5 text-violet-400" />} />
         <StatCard title="In Use" value={stats.inUse} color="amber" icon={<Clapperboard className="w-5 h-5 text-amber-400" />} />
       </div>
+
+      {/* Category Breakdown Chart */}
+      {categoryData.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Category Breakdown</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  formatter={(value: number) => [`₹${value.toLocaleString()}/day`, '']}
+                />
+                <Legend formatter={(value) => <span className="text-slate-300 text-sm capitalize">{value}</span>} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6">
@@ -270,12 +370,20 @@ export default function EquipmentPage() {
                 <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
                 <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
               </div>
-              <button
-                onClick={() => handleDelete(eq.id)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={() => handleEdit(eq)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(eq.id)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
             <div className="flex items-center gap-2 mb-4">
@@ -425,6 +533,121 @@ export default function EquipmentPage() {
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   Add Equipment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold">Edit Equipment</h2>
+              <button
+                onClick={() => { setEditModalOpen(false); setEditingEquipment(null) }}
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Equipment Name *</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Category *</label>
+                <select
+                  value={editForm.category}
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                  required
+                >
+                  {CATEGORIES.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1.5">Start Date *</label>
+                  <input
+                    type="date"
+                    value={editForm.dateStart}
+                    onChange={(e) => setEditForm({ ...editForm, dateStart: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1.5">End Date *</label>
+                  <input
+                    type="date"
+                    value={editForm.dateEnd}
+                    onChange={(e) => setEditForm({ ...editForm, dateEnd: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Daily Rate (₹) *</label>
+                <input
+                  type="number"
+                  value={editForm.dailyRate}
+                  onChange={(e) => setEditForm({ ...editForm, dailyRate: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Vendor</label>
+                <input
+                  type="text"
+                  value={editForm.vendor}
+                  onChange={(e) => setEditForm({ ...editForm, vendor: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Notes</label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 h-20 resize-none"
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditModalOpen(false); setEditingEquipment(null) }}
+                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit2 className="w-4 h-4" />}
+                  Save Changes
                 </button>
               </div>
             </form>

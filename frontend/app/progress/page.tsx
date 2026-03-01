@@ -5,9 +5,9 @@ import Link from 'next/link'
 import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
-  MoreHorizontal, Edit2, Trash2
+  MoreHorizontal, Edit2, Trash2, BarChart3
 } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 
 interface Milestone {
   id: string
@@ -228,6 +228,60 @@ export default function ProgressPage() {
         </div>
       )}
 
+      {/* Quick Stats Cards */}
+      {hasData && (
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 uppercase">Total Tasks</p>
+                <p className="text-2xl font-bold text-white mt-1">{progress?.tasks?.length || 0}</p>
+              </div>
+              <div className="p-2 bg-cyan-500/20 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-cyan-400" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 uppercase">Completed</p>
+                <p className="text-2xl font-bold text-emerald-400 mt-1">
+                  {progress?.tasks?.filter(t => t.status === 'completed').length || 0}
+                </p>
+              </div>
+              <div className="p-2 bg-emerald-500/20 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 uppercase">In Progress</p>
+                <p className="text-2xl font-bold text-blue-400 mt-1">
+                  {progress?.tasks?.filter(t => t.status === 'in_progress').length || 0}
+                </p>
+              </div>
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Clock className="w-5 h-5 text-blue-400" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 uppercase">Milestones</p>
+                <p className="text-2xl font-bold text-purple-400 mt-1">{progress?.milestones?.length || 0}</p>
+              </div>
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <Target className="w-5 h-5 text-purple-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Initialize Prompt */}
       {!hasData && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 mb-6 text-center">
@@ -293,6 +347,31 @@ export default function ProgressPage() {
               })}
             </div>
           </div>
+
+          {/* Phase Progress Bar Chart */}
+          {progress?.phases && progress.phases.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-violet-400" />
+                Phase Progress Comparison
+              </h2>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={progress.phases} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="displayName" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} domain={[0, 100]} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      labelStyle={{ color: '#f1f5f9' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="progress" name="Progress %" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           {/* Task Status Breakdown */}
           {progress?.tasks && progress.tasks.length > 0 && (
@@ -428,6 +507,50 @@ export default function ProgressPage() {
                     No milestones yet. Initialize progress tracking to get started.
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Milestone Progress */}
+          {viewMode === 'timeline' && progress?.milestones && progress.milestones.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mt-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Target className="w-5 h-5 text-green-400" />
+                Milestone Progress Details
+              </h2>
+              <div className="space-y-4">
+                {progress.milestones.map((milestone) => {
+                  const statusColors = getStatusColor(milestone.status)
+                  const progressValue = milestone.status === 'completed' ? 100 : milestone.status === 'in_progress' ? 50 : 0
+                  return (
+                    <div key={milestone.id} className="bg-slate-800/50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-2 h-2 rounded-full ${milestone.status === 'completed' ? 'bg-green-500' : milestone.status === 'in_progress' ? 'bg-cyan-500' : 'bg-slate-500'}`} />
+                          <span className="font-medium">{milestone.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-slate-500">{milestone.date}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors.bg} ${statusColors.text}`}>
+                            {milestone.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              milestone.status === 'completed' ? 'bg-green-500' : 
+                              milestone.status === 'in_progress' ? 'bg-cyan-500' : 'bg-slate-500'
+                            }`}
+                            style={{ width: `${progressValue}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-slate-500 w-12">{milestone.tasks} tasks</span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

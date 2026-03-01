@@ -90,6 +90,7 @@ export default function CharacterCostumePage() {
   const [summary, setSummary] = useState<CostumeSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
   const [showForm, setShowForm] = useState(false)
@@ -124,6 +125,7 @@ export default function CharacterCostumePage() {
       if (data.error) throw new Error(data.error)
       setCharacters(data.characters || [])
       setSummary(data.summary || null)
+      setIsDemoMode(!!data.isDemoMode)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
@@ -253,6 +255,12 @@ export default function CharacterCostumePage() {
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <Shirt className="w-8 h-8 text-purple-400" />
               Character Costume
+              {isDemoMode && (
+                <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+                  Demo Data
+                </span>
+              )}
             </h1>
             <p className="text-slate-400 mt-1">Design and track character costumes for your film</p>
           </div>
@@ -264,6 +272,16 @@ export default function CharacterCostumePage() {
             Add Character
           </button>
         </div>
+
+        {/* Demo Mode Banner */}
+        {isDemoMode && (
+          <div className="mb-6 px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3">
+            <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+            <p className="text-sm text-amber-400">
+              <span className="font-medium">Demo Mode</span> — Using sample characters. Connect a database to save your own.
+            </p>
+          </div>
+        )}
 
         {/* Summary Cards */}
         {summary && (

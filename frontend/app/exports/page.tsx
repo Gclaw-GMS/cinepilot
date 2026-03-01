@@ -11,18 +11,47 @@ interface RecentExport {
 }
 
 export default function ExportsPage() {
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [recentExports, setRecentExports] = useState<RecentExport[]>([
     { id: '1', name: 'Schedule Report', icon: '📄', timestamp: 'Today, 2:30 AM' },
     { id: '2', name: 'Shot List', icon: '📊', timestamp: 'Yesterday' },
     { id: '3', name: 'Shooting Calendar', icon: '📆', timestamp: 'Feb 13, 2026' },
   ])
 
+  useEffect(() => {
+    // Check if we're in demo mode
+    fetch('/api/exports')
+      .then(res => res.json())
+      .then(data => {
+        if (data.isDemoMode) {
+          setIsDemoMode(true)
+        }
+      })
+      .catch(() => setIsDemoMode(true))
+  }, [])
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="max-w-4xl mx-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Export Center</h1>
-          <p className="text-slate-400 mt-2">Download production data in various formats</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-white">Export Center</h1>
+              <p className="text-slate-400 mt-2">Download production data in various formats</p>
+            </div>
+            {isDemoMode && (
+              <span className="ml-auto px-3 py-1 bg-amber-500/20 text-amber-400 text-sm font-medium rounded-full border border-amber-500/30">
+                Demo
+              </span>
+            )}
+          </div>
+          {isDemoMode && (
+            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="text-amber-400 text-sm">
+                ⚠️ Database unavailable. Showing demo data.
+              </p>
+            </div>
+          )}
         </header>
 
         <ExportPanel />

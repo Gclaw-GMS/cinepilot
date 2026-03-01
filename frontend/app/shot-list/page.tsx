@@ -119,6 +119,7 @@ export default function ShotHubPage() {
     bySize: {}, byMovement: {}, byScene: []
   })
   const [loading, setLoading] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState('')
 
@@ -159,6 +160,9 @@ export default function ShotHubPage() {
       const data = await res.json()
       const shotList = data.shots || []
       const sceneList = data.scenes || []
+      
+      // Check if using demo data
+      setIsDemoMode(data.isDemo === true)
       
       // Calculate detailed stats
       const bySize: Record<string, number> = {}
@@ -400,6 +404,11 @@ export default function ShotHubPage() {
                   <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-400 text-xs rounded-full font-medium">
                     AI-Powered
                   </span>
+                  {isDemoMode && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                      Demo
+                    </span>
+                  )}
                 </div>
                 <p className="text-slate-500 text-sm mt-0.5">Intelligent shot breakdown & planning</p>
               </div>

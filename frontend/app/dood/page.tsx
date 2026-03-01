@@ -59,6 +59,7 @@ export default function DOODPage() {
   const [stats, setStats] = useState<DOODStats>(DEMO_STATS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'heatmap'>('calendar')
@@ -74,12 +75,16 @@ export default function DOODPage() {
   const loadDOOD = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setIsDemoMode(false)
     try {
       const res = await fetch(`/api/dood?projectId=${selectedProject}`)
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`)
       }
       const data = await res.json()
+      
+      // Check if API returned demo data
+      setIsDemoMode(data.isDemo === true)
       
       if (data.report && data.report.length > 0) {
         setReport(data.report)
@@ -90,12 +95,14 @@ export default function DOODPage() {
         setReport(DEMO_DOOD)
         setStats(DEMO_STATS)
         setIsDataLoaded(false)
+        setIsDemoMode(true)
       }
     } catch (e) {
       console.warn('Using demo DOOD data:', e)
       setReport(DEMO_DOOD)
       setStats(DEMO_STATS)
       setIsDataLoaded(false)
+      setIsDemoMode(true)
     }
     setLoading(false)
   }, [selectedProject])
@@ -530,6 +537,11 @@ export default function DOODPage() {
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 📊 Day Out of Days (DOOD)
               </h1>
+              {isDemoMode && (
+                <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">
+                  Demo
+                </span>
+              )}
               {isDataLoaded ? (
                 <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" />

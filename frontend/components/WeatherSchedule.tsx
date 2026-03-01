@@ -14,7 +14,7 @@ export default function WeatherSchedule({ schedule = [] }: WeatherScheduleProps)
   const analyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/ai/weather-schedule', {
+      const res = await fetch('/api/ai/weather-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schedule, location }),

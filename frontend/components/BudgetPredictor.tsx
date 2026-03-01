@@ -16,7 +16,7 @@ export default function BudgetPredictor({ scenes = [], genre = 'drama' }: Budget
   const analyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/ai/predict-budget', {
+      const res = await fetch('/api/ai/predict-budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenes, duration, genre: selectedGenre }),

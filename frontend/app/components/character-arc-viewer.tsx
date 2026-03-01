@@ -24,7 +24,7 @@ export default function CharacterArcViewer({ projectId = 1 }: CharacterArcViewer
     setSelectedCharacter(charId)
     
     try {
-      const response = await fetch(`http://localhost:8000/api/projects/${projectId}/characters/${charId}/arc`)
+      const response = await fetch(`/api/projects/${projectId}/characters/${charId}/arc`)
       const data = await response.json()
       setArcData(data)
     } catch (error) {
@@ -52,7 +52,7 @@ export default function CharacterArcViewer({ projectId = 1 }: CharacterArcViewer
 
   const fetchCharacterScenes = async (charId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/projects/${projectId}/characters/${charId}/scenes`)
+      const response = await fetch(`/api/projects/${projectId}/characters/${charId}/scenes`)
       const data = await response.json()
       return data
     } catch (error) {

@@ -66,6 +66,7 @@ export default function CateringPage() {
   const [caterers, setCaterers] = useState<Caterer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [showDayForm, setShowDayForm] = useState(false)
   const [showMealForm, setShowMealForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -87,6 +88,8 @@ export default function CateringPage() {
       const res = await fetch(`/api/catering?projectId=${DEMO_PROJECT_ID}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      // Check if API returned demo data
+      setIsDemoMode(data.isDemoMode === true)
       setPlan(data.plan)
       setCaterers(data.caterers || [])
     } catch (err) {
@@ -229,6 +232,11 @@ export default function CateringPage() {
                   <Utensils className="w-5 h-5 text-white" />
                 </div>
                 Catering Management
+                {isDemoMode && (
+                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded">
+                    Demo
+                  </span>
+                )}
               </h1>
               <p className="text-slate-500 text-sm mt-1">Meal planning & budget tracking</p>
             </div>

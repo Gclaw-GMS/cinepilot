@@ -58,6 +58,7 @@ export default function StoryboardPage() {
   const [noteText, setNoteText] = useState('')
   const [loading, setLoading] = useState(true)
   const [maxFrames, setMaxFrames] = useState(3)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -81,6 +82,8 @@ export default function StoryboardPage() {
       const data = await res.json()
       setScenes(data.scenes || [])
       setTotalFrames(data.totalFrames || 0)
+      // Detect demo mode from API response
+      setIsDemoMode(data.isDemo === true)
     } catch (err) {
       console.error('Failed to load frames:', err)
     } finally {
@@ -175,8 +178,13 @@ export default function StoryboardPage() {
             <Link href="/" className="text-sm text-gray-500 hover:text-gray-300 mb-2 inline-block">
               &larr; Dashboard
             </Link>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent flex items-center gap-3">
               Storyboard
+              {isDemoMode && (
+                <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">
+                  Demo
+                </span>
+              )}
             </h1>
             <p className="text-gray-500 text-sm mt-1">
               AI-generated storyboard frames from your shot list

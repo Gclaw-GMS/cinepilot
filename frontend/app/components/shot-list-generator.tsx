@@ -19,7 +19,7 @@ export default function ShotListGenerator({ projectId = 1 }: ShotListGeneratorPr
   const generateShots = async () => {
     setLoading(true)
     try {
-      const response = await fetch('http://localhost:8000/api/ai/generate-shot-list', {
+      const response = await fetch('/api/ai/generate-shot-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

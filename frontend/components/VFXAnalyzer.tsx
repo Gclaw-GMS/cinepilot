@@ -13,7 +13,7 @@ export default function VFXAnalyzer({ scenes = [] }: VFXAnalyzerProps) {
   const analyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/ai/vfx-analysis', {
+      const res = await fetch('/api/ai/vfx-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenes }),

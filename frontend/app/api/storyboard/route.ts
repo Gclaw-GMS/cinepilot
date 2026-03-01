@@ -3,6 +3,50 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Demo data for storyboard when database is not connected
+const DEMO_FRAMES = [
+  { id: 'demo-f1', imageUrl: null, prompt: 'Wide beach shot at sunset', style: 'cleanLineArt', status: 'generated', directorNotes: null, isApproved: false, shot: { id: 's1', shotIndex: 1, shotText: 'Wide establishing shot of beach', shotSize: 'WS', characters: ['ARJUN', 'PRIYA'], scene: { id: 'sc1', sceneNumber: 1, headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY' } } },
+  { id: 'demo-f2', imageUrl: null, prompt: 'Medium shot couple walking', style: 'cleanLineArt', status: 'generated', directorNotes: null, isApproved: true, shot: { id: 's2', shotIndex: 2, shotText: 'Medium shot of couple walking', shotSize: 'MS', characters: ['ARJUN', 'PRIYA'], scene: { id: 'sc1', sceneNumber: 1, headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY' } } },
+  { id: 'demo-f3', imageUrl: null, prompt: 'Close-up ice cream', style: 'cleanLineArt', status: 'generated', directorNotes: 'Focus on texture', isApproved: false, shot: { id: 's3', shotIndex: 3, shotText: 'Close-up of ice cream', shotSize: 'CU', characters: [], scene: { id: 'sc1', sceneNumber: 1, headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY' } } },
+  { id: 'demo-f4', imageUrl: null, prompt: 'Reaction shot Priya laughing', style: 'pencilSketch', status: 'generated', directorNotes: null, isApproved: true, shot: { id: 's4', shotIndex: 4, shotText: 'Reaction shot - Priya laughing', shotSize: 'CU', characters: ['PRIYA'], scene: { id: 'sc1', sceneNumber: 1, headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY' } } },
+  { id: 'demo-f5', imageUrl: null, prompt: 'Sunset silhouette', style: 'blueprint', status: 'generated', directorNotes: 'Use golden hour lighting', isApproved: false, shot: { id: 's5', shotIndex: 5, shotText: 'Sunset silhouette shot', shotSize: 'WS', characters: ['ARJUN', 'PRIYA'], scene: { id: 'sc1', sceneNumber: 1, headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY' } } },
+  { id: 'demo-f6', imageUrl: null, prompt: 'Restaurant establishing', style: 'cleanLineArt', status: 'generated', directorNotes: null, isApproved: false, shot: { id: 's6', shotIndex: 1, shotText: 'Establishing shot of restaurant', shotSize: 'WS', characters: [], scene: { id: 'sc2', sceneNumber: 2, headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT' } } },
+  { id: 'demo-f7', imageUrl: null, prompt: 'Two-shot at table', style: 'markerLine', status: 'generated', directorNotes: 'Romantic angle', isApproved: true, shot: { id: 's7', shotIndex: 2, shotText: 'Two-shot at table', shotSize: 'MS', characters: ['ARJUN', 'RAHUL'], scene: { id: 'sc2', sceneNumber: 2, headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT' } } },
+  { id: 'demo-f8', imageUrl: null, prompt: 'Over-shoulder dialogue', style: 'cleanLineArt', status: 'generated', directorNotes: null, isApproved: false, shot: { id: 's8', shotIndex: 3, shotText: 'Over-the-shoulder dialogue', shotSize: 'OTS', characters: ['ARJUN', 'RAHUL'], scene: { id: 'sc2', sceneNumber: 2, headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT' } } },
+];
+
+function groupDemoFrames(frames: typeof DEMO_FRAMES) {
+  const grouped: Record<string, { sceneId: string; sceneNumber: number; heading: string; frames: typeof frames }> = {};
+  for (const f of frames) {
+    const sId = f.shot.scene.id;
+    if (!grouped[sId]) {
+      grouped[sId] = {
+        sceneId: sId,
+        sceneNumber: f.shot.scene.sceneNumber,
+        heading: f.shot.scene.headingRaw || `Scene ${f.shot.scene.sceneNumber}`,
+        frames: [],
+      };
+    }
+    grouped[sId].frames.push(f);
+  }
+  return Object.values(grouped).sort((a, b) => {
+    const aNum = a.sceneNumber || 0;
+    const bNum = b.sceneNumber || 0;
+    return aNum - bNum;
+  });
+}
+
+// Helper function to check database connection
+async function checkDbConnection(): Promise<boolean> {
+  try {
+    await prisma.$connect()
+    await prisma.$disconnect()
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Helper function to generate prompts for storyboard frames
 function generateStoryboardPrompt(
   shotText: string,
@@ -47,12 +91,33 @@ function generateStoryboardPrompt(
 // GET /api/storyboard — get storyboard frames
 // GET /api/storyboard?stats=true — get stats for dashboard
 export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = req.nextUrl;
-    const scriptId = searchParams.get('scriptId') || undefined;
-    const sceneId = searchParams.get('sceneId') || undefined;
-    const statsOnly = searchParams.get('stats') === 'true';
+  const { searchParams } = req.nextUrl;
+  const scriptId = searchParams.get('scriptId') || undefined;
+  const sceneId = searchParams.get('sceneId') || undefined;
+  const statsOnly = searchParams.get('stats') === 'true';
 
+  // Check database connection
+  const isDbConnected = await checkDbConnection();
+
+  // If database not connected, return demo data
+  if (!isDbConnected) {
+    const demoScenes = groupDemoFrames(DEMO_FRAMES);
+    if (statsOnly) {
+      return NextResponse.json({
+        totalFrames: DEMO_FRAMES.length,
+        approvedFrames: DEMO_FRAMES.filter(f => f.isApproved).length,
+        scenes: demoScenes.map(s => ({
+          sceneNumber: s.sceneNumber,
+          headingRaw: s.heading,
+          frames: s.frames.map(f => ({ id: f.id, isApproved: f.isApproved })),
+        })),
+        isDemo: true,
+      });
+    }
+    return NextResponse.json({ scenes: demoScenes, totalFrames: DEMO_FRAMES.length, isDemo: true });
+  }
+
+  try {
     // Build the where clause
     const where: Record<string, unknown> = {};
     if (sceneId) {
@@ -136,7 +201,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ scenes, totalFrames: frames.length });
   } catch (err: unknown) {
     console.error('[API/storyboard] GET error:', err);
-    return NextResponse.json({ error: 'Failed to fetch storyboard' }, { status: 500 });
+    // Return demo data on error
+    const demoScenes = groupDemoFrames(DEMO_FRAMES);
+    if (statsOnly) {
+      return NextResponse.json({
+        totalFrames: DEMO_FRAMES.length,
+        approvedFrames: DEMO_FRAMES.filter(f => f.isApproved).length,
+        scenes: demoScenes.map(s => ({
+          sceneNumber: s.sceneNumber,
+          headingRaw: s.heading,
+          frames: s.frames.map(f => ({ id: f.id, isApproved: f.isApproved })),
+        })),
+        isDemo: true,
+      });
+    }
+    return NextResponse.json({ scenes: demoScenes, totalFrames: DEMO_FRAMES.length, isDemo: true });
   }
 }
 

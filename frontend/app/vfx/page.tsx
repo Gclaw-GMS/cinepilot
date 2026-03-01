@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -184,6 +184,41 @@ export default function VfxPage() {
     }
   }
 
+  // Export VFX data to CSV
+  function handleExport() {
+    const headers = ['Scene', 'Heading', 'Type', 'Description', 'Confidence', 'Severity', 'Warning'];
+    const rows = sortedScenes.map(([sceneNum, group]) => {
+      const notes = group.notes.map(n => ({
+        scene: sceneNum,
+        heading: group.heading || '',
+        type: n.vfxType,
+        description: n.description,
+        confidence: Math.round(n.confidence * 100) + '%',
+        severity: '',
+        warning: ''
+      }));
+      const warnings = group.warnings.map(w => ({
+        scene: sceneNum,
+        heading: group.heading || '',
+        type: w.warningType,
+        description: w.description,
+        confidence: '',
+        severity: w.severity,
+        warning: w.description
+      }));
+      return [...notes, ...warnings];
+    }).flat();
+
+    const csv = [headers, ...rows.map(r => [r.scene, r.heading, r.type, r.description, r.confidence, r.severity, r.warning].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vfx-breakdown-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const sceneGroups = new Map<
     string,
     { heading: string | null; notes: VfxNote[]; warnings: VfxWarning[]; props: VfxProp[] }
@@ -266,6 +301,16 @@ export default function VfxPage() {
               <Wand2 className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
               {analyzing ? 'Analyzing...' : 'Run VFX Analysis'}
             </button>
+
+            {vfxNotes.length > 0 && (
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors ml-auto"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
+            )}
           </div>
         </div>
 

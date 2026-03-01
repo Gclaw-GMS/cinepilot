@@ -1,22 +1,40 @@
-// @ts-nocheck
 /**
  * Task Manager Component
  * CinePilot Phase 28
+ * Type-safe implementation
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Task, getTasks, createTask, updateTask, deleteTask } from '../lib/api-phase28'
+import { 
+  Task, 
+  getTasks, 
+  createTask, 
+  updateTask, 
+  deleteTask 
+} from '../lib/api-phase28'
 
 interface TaskManagerProps {
-  projectId: number
+  projectId: string | number
+}
+
+interface NewTaskData {
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high'
+  assignee: string
 }
 
 export default function TaskManager({ projectId }: TaskManagerProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' as const, assignee: '' })
+  const [newTask, setNewTask] = useState<NewTaskData>({ 
+    title: '', 
+    description: '', 
+    priority: 'medium', 
+    assignee: '' 
+  })
 
   useEffect(() => {
     loadTasks()
@@ -26,7 +44,7 @@ export default function TaskManager({ projectId }: TaskManagerProps) {
     try {
       const data = await getTasks(projectId)
       setTasks(data)
-    } catch (e) {
+    } catch {
       setTasks([])
     }
   }
@@ -38,32 +56,32 @@ export default function TaskManager({ projectId }: TaskManagerProps) {
       setNewTask({ title: '', description: '', priority: 'medium', assignee: '' })
       setShowForm(false)
       loadTasks()
-    } catch (e) {
+    } catch {
       console.error('Failed to create task')
     }
   }
 
   const handleToggle = async (task: Task) => {
     try {
-      await updateTask(projectId, task.id, {
+      await updateTask(task.id, {
         status: task.status === 'completed' ? 'pending' : 'completed'
       })
       loadTasks()
-    } catch (e) {
+    } catch {
       console.error('Failed to update task')
     }
   }
 
   const handleDelete = async (taskId: number) => {
     try {
-      await deleteTask(projectId, taskId)
+      await deleteTask(taskId)
       loadTasks()
-    } catch (e) {
+    } catch {
       console.error('Failed to delete task')
     }
   }
 
-  const priorityColors = {
+  const priorityColors: Record<string, string> = {
     low: 'bg-gray-100 text-gray-600',
     medium: 'bg-blue-100 text-blue-600',
     high: 'bg-orange-100 text-orange-600',

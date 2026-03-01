@@ -64,6 +64,16 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
+  // Apply theme to document
+  const applyTheme = useCallback((theme: string) => {
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, []);
+
   const fetchSettings = useCallback(async () => {
     try {
       const res = await fetch('/api/settings');
@@ -73,6 +83,9 @@ export default function SettingsPage() {
       setLocal(data);
       // Detect demo mode from API response
       setIsDemoMode(data.isDemoMode === true);
+      // Apply saved theme
+      const savedTheme = data.theme || 'dark';
+      applyTheme(savedTheme);
     } catch (err) {
       console.error(err);
       setSettings({});
@@ -89,6 +102,10 @@ export default function SettingsPage() {
 
   const set = (key: string, value: unknown) => {
     setLocal((prev) => ({ ...prev, [key]: value }));
+    // Apply theme immediately when changed
+    if (key === 'theme' && typeof value === 'string') {
+      applyTheme(value);
+    }
   };
 
   const get = (key: string): unknown => {
@@ -107,6 +124,13 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error('Failed to save');
       setSettings(local);
       setSaved(true);
+      // Apply theme on save (for persistence)
+      const theme = local.theme as string;
+      if (theme) {
+        applyTheme(theme);
+        // Also save to localStorage for demo mode persistence
+        localStorage.setItem('cinepilot-theme', theme);
+      }
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error(err);
@@ -117,14 +141,14 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0d0d0d] dark:bg-slate-950 text-slate-100 p-6 flex items-center justify-center">
         <p className="text-slate-500">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] text-slate-100 p-6">
+    <div className="min-h-screen bg-[#0d0d0d] dark:bg-slate-950 text-slate-100 p-6">
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold flex items-center gap-2">

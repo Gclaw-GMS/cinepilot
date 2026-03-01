@@ -17,6 +17,21 @@
   --cinepilot-danger: #ff5252;
 }
 
+/* Light theme */
+[data-theme="light"] {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 248, 250, 252;
+  --background-end-rgb: 248, 250, 252;
+  
+  --cinepilot-dark: #f8fafc;
+  --cinepilot-card: #ffffff;
+  --cinepilot-border: #e2e8f0;
+  --cinepilot-accent: #0891b2;
+  --cinepilot-success: #059669;
+  --cinepilot-warning: #d97706;
+  --cinepilot-danger: #dc2626;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -79,6 +94,74 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 12px;
 }
 
+/* Light theme card overrides */
+[data-theme="light"] .card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] {
+  /* Slate color overrides for light theme */
+  --slate-900: #f1f5f9;
+  --slate-800: #e2e8f0;
+  --slate-700: #cbd5e1;
+  --slate-600: #94a3b8;
+  --slate-500: #64748b;
+}
+
+[data-theme="light"] .bg-slate-900 {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .bg-slate-800 {
+  background-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .bg-slate-950 {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .text-slate-100 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-slate-200 {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .text-slate-300 {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .text-slate-500 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .border-slate-800 {
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .border-slate-700 {
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .hover\:bg-slate-800:hover {
+  background-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] nav {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
 /* Input styles */
 input, textarea, select {
   background: #1e293b;
@@ -87,6 +170,14 @@ input, textarea, select {
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
   font-size: 0.875rem;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
 }
 
 input:focus, textarea:focus, select:focus {

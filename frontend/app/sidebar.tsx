@@ -99,9 +99,9 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 fixed h-screen overflow-y-auto flex flex-col">
+    <aside className="w-64 bg-slate-900 dark:bg-slate-900 border-r border-slate-800 dark:border-slate-800 fixed h-screen overflow-y-auto flex flex-col">
       {/* Logo */}
-      <div className="p-5 border-b border-slate-800">
+      <div className="p-5 border-b border-slate-800 dark:border-slate-800">
         <Link href="/" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
             <Clapperboard className="w-5 h-5 text-white" />
@@ -114,7 +114,7 @@ export default function Sidebar() {
       </div>
 
       {/* Quick Actions */}
-      <div className="px-4 py-4 border-b border-slate-800">
+      <div className="px-4 py-4 border-b border-slate-800 dark:border-slate-800">
         <div className="flex flex-col gap-2">
           <button
             onClick={() => (window.location.href = '/scripts')}

@@ -1,7 +1,7 @@
-// @ts-nocheck
 /**
  * Project Notes Component
  * CinePilot Phase 28
+ * Type-safe implementation
  */
 
 'use client'
@@ -10,14 +10,19 @@ import { useState, useEffect } from 'react'
 import { ProjectNote, getNotes, createNote, deleteNote } from '../lib/api-phase28'
 
 interface ProjectNotesProps {
-  projectId: number
+  projectId: string | number
   currentUser?: string
+}
+
+interface NewNoteData {
+  content: string
+  category: 'general' | 'idea' | 'feedback' | 'decision' | 'todo'
 }
 
 export default function ProjectNotes({ projectId, currentUser = 'User' }: ProjectNotesProps) {
   const [notes, setNotes] = useState<ProjectNote[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [newNote, setNewNote] = useState({ content: '', category: 'general' as const })
+  const [newNote, setNewNote] = useState<NewNoteData>({ content: '', category: 'general' })
 
   useEffect(() => {
     loadNotes()
@@ -27,7 +32,7 @@ export default function ProjectNotes({ projectId, currentUser = 'User' }: Projec
     try {
       const data = await getNotes(projectId)
       setNotes(data)
-    } catch (e) {
+    } catch {
       setNotes([])
     }
   }
@@ -39,7 +44,7 @@ export default function ProjectNotes({ projectId, currentUser = 'User' }: Projec
       setNewNote({ content: '', category: 'general' })
       setShowForm(false)
       loadNotes()
-    } catch (e) {
+    } catch {
       console.error('Failed to create note')
     }
   }
@@ -48,7 +53,7 @@ export default function ProjectNotes({ projectId, currentUser = 'User' }: Projec
     try {
       await deleteNote(projectId, noteId)
       loadNotes()
-    } catch (e) {
+    } catch {
       console.error('Failed to delete note')
     }
   }
@@ -92,7 +97,7 @@ export default function ProjectNotes({ projectId, currentUser = 'User' }: Projec
           <div className="flex gap-2">
             <select
               value={newNote.category}
-              onChange={e => setNewNote({ ...newNote, category: e.target.value as any })}
+              onChange={e => setNewNote({ ...newNote, category: e.target.value as NewNoteData['category'] })}
               className="px-3 py-2 border rounded"
             >
               <option value="general">💭 General</option>
@@ -131,7 +136,7 @@ export default function ProjectNotes({ projectId, currentUser = 'User' }: Projec
             </div>
             <p className="text-gray-700">{note.content}</p>
             <div className="text-xs text-gray-500 mt-2">
-              By {note.author} • {new Date(note.created_at).toLocaleDateString()}
+              By {note.author} • {new Date(note.createdAt).toLocaleDateString()}
             </div>
           </div>
         ))}

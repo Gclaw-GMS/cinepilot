@@ -1,7 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
-import Sidebar from './sidebar'
-import ChatWidget from './components/ChatWidget'
+import ClientLayout from './client-layout'
 
 export const metadata: Metadata = {
   title: 'CinePilot - AI-Powered Pre-Production',
@@ -13,17 +12,5 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <html lang="en">
-      <body className="bg-cinepilot-dark text-white font-mono">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 min-h-screen overflow-auto ml-64">
-            {children}
-          </main>
-        </div>
-        <ChatWidget />
-      </body>
-    </html>
-  )
+  return <ClientLayout>{children}</ClientLayout>
 }

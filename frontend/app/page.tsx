@@ -125,29 +125,58 @@ const FEATURES = [
 ]
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS)
-  const [loading, setLoading] = useState(true)
-  const [isDemoMode, setIsDemoMode] = useState(false)
+  const [stats, setStats] = useState<DashboardStats>(DEMO_STATS)
+  const [loading, setLoading] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(true)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
     const result = { ...EMPTY_STATS }
 
     try {
-      const responses = await Promise.allSettled([
-        fetch('/api/scripts').then(r => r.json()),
-        fetch('/api/shots?stats=true').then(r => r.json()),
-        fetch('/api/budget?action=forecast').then(r => r.json()),
-        fetch('/api/schedule?stats=true').then(r => r.json()),
-        fetch('/api/locations?stats=true').then(r => r.json()),
-        fetch('/api/censor?stats=true').then(r => r.json()),
-        fetch('/api/storyboard?stats=true').then(r => r.json()),
+      // Helper function to safely fetch and parse JSON
+      const safeFetch = async (url: string) => {
+        try {
+          console.log(`[Dashboard] Fetching ${url}...`)
+          const res = await fetch(url)
+          console.log(`[Dashboard] ${url} responded with status ${res.status}`)
+          if (!res.ok) {
+            console.warn(`[Dashboard] ${url} returned ${res.status}`)
+            return null
+          }
+          const data = await res.json()
+          console.log(`[Dashboard] ${url} data:`, data ? 'has data' : 'no data')
+          return data
+        } catch (e) {
+          console.warn(`[Dashboard] Failed to fetch ${url}:`, e)
+          return null
+        }
+      }
+
+      const [scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData] = await Promise.all([
+        safeFetch('/api/scripts'),
+        safeFetch('/api/shots?stats=true'),
+        safeFetch('/api/budget?action=forecast'),
+        safeFetch('/api/schedule?stats=true'),
+        safeFetch('/api/locations?stats=true'),
+        safeFetch('/api/censor?stats=true'),
+        safeFetch('/api/storyboard?stats=true'),
       ])
 
-      if (responses[0].status === 'fulfilled') {
-        const d = responses[0].value
-        const scripts = d.scripts || []
-        const characters = d.characters || []
+      console.log('[Dashboard] Data received:', { scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData })
+
+      // If all data is null, use demo mode
+      if (!scriptsData && !shotsData && !budgetData && !scheduleData && !locationsData && !censorData && !storyboardData) {
+        console.log('[Dashboard] All API calls failed, using demo data')
+        setStats(DEMO_STATS)
+        setIsDemoMode(true)
+        setLoading(false)
+        return
+      }
+
+      if (scriptsData) {
+        const scripts = scriptsData.scripts || []
+        const characters = scriptsData.characters || []
         result.scripts.total = scripts.length
         result.scripts.scenes = scripts.reduce(
           (n: number, s: { scenes?: unknown[] }) => n + (s.scenes?.length || 0), 0
@@ -155,44 +184,38 @@ export default function Dashboard() {
         result.scripts.characters = characters.length
       }
 
-      if (responses[1].status === 'fulfilled') {
-        const d = responses[1].value
-        result.shots.total = d.totalShots || 0
-        result.shots.missingFields = d.missingFields || 0
-        result.shots.runtimeMin = Math.round((d.totalDurationSec || 0) / 60)
+      if (shotsData) {
+        result.shots.total = shotsData.totalShots || 0
+        result.shots.missingFields = shotsData.missingFields || 0
+        result.shots.runtimeMin = Math.round((shotsData.totalDurationSec || 0) / 60)
       }
 
-      if (responses[2].status === 'fulfilled') {
-        const d = responses[2].value
-        result.budget.planned = d.totalPlanned || 0
-        result.budget.actual = d.totalActual || 0
-        result.budget.variance = d.variance || 0
+      if (budgetData) {
+        result.budget.planned = budgetData.totalPlanned || 0
+        result.budget.actual = budgetData.totalActual || 0
+        result.budget.variance = budgetData.variance || 0
       }
 
-      if (responses[3].status === 'fulfilled') {
-        const d = responses[3].value
-        const days = d.days || []
+      if (scheduleData) {
+        const days = scheduleData.days || []
         result.schedule.days = days.length
         result.schedule.scenes = days.reduce((n: number, day: { scenes?: unknown[] }) => n + (day.scenes?.length || 0), 0)
       }
 
-      if (responses[4].status === 'fulfilled') {
-        const d = responses[4].value
-        const scenes = d.scenes || []
+      if (locationsData) {
+        const scenes = locationsData.scenes || []
         result.locations.scenes = scenes.length
         result.locations.candidates = scenes.reduce((n: number, s: { candidates?: unknown[] }) => n + (s.candidates?.length || 0), 0)
       }
 
-      if (responses[5].status === 'fulfilled') {
-        const d = responses[5].value
-        result.censor.certificate = d.predictedCertificate || '--'
-        result.censor.score = d.sensitivityScore || 0
+      if (censorData) {
+        result.censor.certificate = censorData.predictedCertificate || '--'
+        result.censor.score = censorData.sensitivityScore || 0
       }
 
-      if (responses[6].status === 'fulfilled') {
-        const d = responses[6].value
-        result.storyboard.frames = d.totalFrames || 0
-        const scenes = d.scenes || []
+      if (storyboardData) {
+        result.storyboard.frames = storyboardData.totalFrames || 0
+        const scenes = storyboardData.scenes || []
         result.storyboard.approved = scenes.reduce(
           (n: number, s: { frames?: { isApproved?: boolean }[] }) =>
             n + (s.frames?.filter((f: { isApproved?: boolean }) => f.isApproved).length || 0),
@@ -201,9 +224,15 @@ export default function Dashboard() {
       }
 
       setStats(result)
+      console.log('[Dashboard] Final stats:', result)
+      if (Object.values(result).every(v => 
+        typeof v === 'object' && Object.values(v).every(x => x === 0 || x === '--')
+      )) {
+        console.error('[Dashboard] WARNING: All stats are still zeros!')
+      }
     } catch (err) {
       // Use demo data when database is not connected
-      console.log('[Dashboard] Using demo data - database not connected')
+      console.log('[Dashboard] Using demo data - database not connected', err)
       setStats(DEMO_STATS)
       setIsDemoMode(true)
     } finally {

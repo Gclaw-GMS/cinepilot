@@ -87,9 +87,7 @@ export async function GET(req: NextRequest) {
   const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID
 
   try {
-    // Try database first
-    await prisma.$connect()
-    
+    // Prisma Client automatically manages connections in Next.js API routes
     const where: Record<string, unknown> = { projectId }
     if (category && category !== 'all') where.category = category
 
@@ -125,8 +123,6 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ notes: filtered, isDemoMode: true })
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
@@ -152,8 +148,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await prisma.$connect()
-    
     const created = await prisma.note.create({
       data: {
         title,
@@ -186,8 +180,6 @@ export async function POST(req: NextRequest) {
     demoNotes.set(projectId, notes)
     
     return NextResponse.json({ note: newNote, isDemoMode: true })
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
@@ -201,8 +193,6 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    await prisma.$connect()
-    
     const updated = await prisma.note.update({
       where: { id },
       data: {
@@ -247,8 +237,6 @@ export async function PUT(req: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Note not found' }, { status: 404 })
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
@@ -263,8 +251,6 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    await prisma.$connect()
-    
     await prisma.note.delete({
       where: { id },
     })
@@ -277,7 +263,5 @@ export async function DELETE(req: NextRequest) {
     demoNotes.set(projectId, filtered)
     
     return NextResponse.json({ success: true, isDemoMode: true })
-  } finally {
-    await prisma.$disconnect()
   }
 }

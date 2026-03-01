@@ -15,7 +15,8 @@ import {
   CheckCircle,
   XCircle,
   Search,
-  Keyboard
+  Keyboard,
+  X
 } from 'lucide-react'
 
 interface DOODRow {
@@ -647,44 +648,66 @@ export default function DOODPage() {
 
       {/* Keyboard Help Modal */}
       {showKeyboardHelp && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1a1a1a] border border-gray-700 rounded-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Keyboard className="w-5 h-5 text-cyan-400" />
-                Keyboard Shortcuts
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-cyan-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-cyan-500/10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-cyan-500/20">
+                  <Keyboard className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                  Keyboard Shortcuts
+                </span>
               </h3>
               <button
                 onClick={() => setShowKeyboardHelp(false)}
-                className="text-gray-400 hover:text-white"
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {[
-                { keys: ['↑', '↓'], desc: 'Navigate rows' },
-                { keys: ['Home'], desc: 'Go to first row' },
-                { keys: ['End'], desc: 'Go to last row' },
-                { keys: ['Esc'], desc: 'Clear selection' },
-                { keys: ['C'], desc: 'Toggle calendar/list view' },
-                { keys: ['F'], desc: 'Focus search' },
-                { keys: ['?'], desc: 'Toggle this help' },
+                { keys: ['↑', '↓'], desc: 'Navigate rows', category: 'Navigation' },
+                { keys: ['Home'], desc: 'Go to first row', category: 'Navigation' },
+                { keys: ['End'], desc: 'Go to last row', category: 'Navigation' },
+                { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
+                { keys: ['C'], desc: 'Toggle calendar/list view', category: 'View' },
+                { keys: ['F'], desc: 'Focus search', category: 'Search' },
+                { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
               ].map((shortcut, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {shortcut.keys.map((key, i) => (
-                      <kbd key={i} className="px-2 py-1 bg-gray-800 rounded text-xs font-mono">
-                        {key}
-                      </kbd>
-                    ))}
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider w-16">
+                      {shortcut.category}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {shortcut.keys.map((key, i) => (
+                        <kbd 
+                          key={i} 
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-cyan-300 shadow-sm"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
                   </div>
-                  <span className="text-gray-400 text-sm">{shortcut.desc}</span>
+                  <span className="text-slate-300 text-sm">{shortcut.desc}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
-              Press <kbd className="px-1.5 py-0.5 bg-gray-800 rounded">?</kbd> to toggle help
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Quick reference for power users</span>
+                <span className="flex items-center gap-2">
+                  Press 
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-cyan-400">?</kbd> 
+                  anytime to toggle
+                </span>
+              </div>
             </div>
           </div>
         </div>

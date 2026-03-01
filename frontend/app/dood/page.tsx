@@ -16,8 +16,13 @@ import {
   XCircle,
   Search,
   Keyboard,
-  X
+  X,
+  BarChart3,
+  Workflow
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+} from 'recharts'
 
 interface DOODRow {
   characterId: string
@@ -187,7 +192,38 @@ export default function DOODPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  const handleExport = async (format: 'csv' | 'pdf') => {
+  const handleExport = async (format: 'csv' | 'pdf' | 'json') => {
+    if (format === 'json') {
+      const exportData = {
+        project: selectedProject,
+        generatedAt: new Date().toISOString(),
+        stats: stats,
+        report: report.map(r => ({
+          character: r.character,
+          tamilName: r.characterTamil,
+          actor: r.actorName,
+          isMainCast: r.isMain,
+          totalDays: r.total_days,
+          workingDays: r.days,
+          percentageOfShoot: r.percentage
+        })),
+        heatmap: heatmapData,
+        summary: {
+          peakDay: heatmapData.sort((a, b) => b.count - a.count)[0]?.day || 0,
+          peakCount: heatmapData.sort((a, b) => b.count - a.count)[0]?.count || 0,
+          avgCallsPerDay: Math.round(heatmapData.reduce((s, d) => s + d.count, 0) / Math.max(heatmapData.length, 1) * 10) / 10
+        }
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dood-export-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      return
+    }
+    
     if (format === 'csv') {
       // CSV Export
       const headers = ['Character', 'Tamil Name', 'Actor', 'Total Days', 'Days', 'Percentage']
@@ -380,11 +416,52 @@ export default function DOODPage() {
     return data
   }, [report, totalShootingDays])
 
+  // Bar chart data for actor calls per day
+  const actorCallsChartData = useMemo(() => {
+    return heatmapData.map(d => ({
+      day: `D${d.day}`,
+      calls: d.count,
+      actors: d.actors
+    }))
+  }, [heatmapData])
+
   // Render heatmap view
   const renderHeatmap = () => {
     const maxCount = Math.max(...heatmapData.map(d => d.count), 1)
+    const sortedDays = [...heatmapData].sort((a, b) => b.count - a.count)
+    
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
+        {/* Bar Chart Visualization */}
+        <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
+          <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-cyan-400" />
+            Actor Calls Per Day - Distribution
+          </h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={actorCallsChartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={true} vertical={false} />
+                <XAxis type="number" stroke="#6b7280" fontSize={11} />
+                <YAxis type="category" dataKey="day" stroke="#6b7280" fontSize={11} width={40} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  formatter={(value: number) => [`${value} actors`, 'Calls']}
+                />
+                <Bar dataKey="calls" radius={[0, 4, 4, 0]} barSize={20}>
+                  {actorCallsChartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.calls === maxCount ? '#06b6d4' : entry.calls > maxCount * 0.7 ? '#0891b2' : '#164e63'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Grid Heatmap */}
         <div className="grid grid-cols-[100px_1fr] gap-4">
           <div></div>
           <div className="flex">
@@ -427,20 +504,54 @@ export default function DOODPage() {
           )
         })}
         
-        {/* Day Summary */}
+        {/* Day Summary with better visualization */}
         <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-400 mb-3">Peak Call Days (Top 5)</h4>
-          <div className="flex gap-2">
-            {[...heatmapData]
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 5)
-              .map(d => (
-                <div key={d.day} className="flex-1 p-2 bg-gray-700/50 rounded text-center">
+          <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-cyan-400" />
+            Peak Call Days Analysis
+          </h4>
+          
+          {/* Top 5 Peak Days as Cards */}
+          <div className="grid grid-cols-5 gap-2 mb-4">
+            {sortedDays.slice(0, 5).map((d, idx) => (
+              <div 
+                key={d.day} 
+                className={`p-3 rounded-lg text-center ${
+                  idx === 0 
+                    ? 'bg-gradient-to-br from-cyan-500/30 to-cyan-600/10 border border-cyan-500/30' 
+                    : 'bg-gray-700/50'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  {idx === 0 && <span className="text-xs">🔥</span>}
                   <div className="text-lg font-bold text-cyan-400">Day {d.day}</div>
-                  <div className="text-xs text-gray-500">{d.count} actors</div>
                 </div>
-              ))
-            }
+                <div className="text-xs text-gray-500">{d.count} actors</div>
+                <div className="text-[10px] text-gray-600 mt-1 truncate">{d.actors.slice(0, 2).join(', ')}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Distribution Stats */}
+          <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-700">
+            <div className="text-center">
+              <div className="text-lg font-bold text-white">
+                {Math.round(sortedDays.reduce((s, d) => s + d.count, 0) / Math.max(sortedDays.length, 1) * 10) / 10}
+              </div>
+              <div className="text-xs text-gray-500">Avg Calls/Day</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-white">
+                {sortedDays[0]?.count || 0}
+              </div>
+              <div className="text-xs text-gray-500">Peak Day Calls</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-white">
+                {sortedDays.filter(d => d.count >= stats.totalCharacters * 0.5).length} days
+              </div>
+              <div className="text-xs text-gray-500">Heavy Call Days</div>
+            </div>
           </div>
         </div>
       </div>
@@ -794,6 +905,14 @@ export default function DOODPage() {
             >
               <Download className="w-4 h-4" />
               CSV
+            </button>
+            <button
+              onClick={() => handleExport('json')}
+              className="flex items-center gap-2 px-3 py-1.5 bg-purple-400/10 hover:bg-purple-400/20 text-purple-400 rounded-lg text-sm transition-colors"
+              title="Export as JSON"
+            >
+              <FileText className="w-4 h-4" />
+              JSON
             </button>
             <button
               onClick={() => handleExport('pdf')}

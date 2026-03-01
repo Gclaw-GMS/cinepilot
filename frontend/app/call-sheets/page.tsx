@@ -71,6 +71,7 @@ export default function CallSheetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -311,7 +312,11 @@ export default function CallSheetsPage() {
         throw new Error(data.error ?? 'Failed to fetch call sheets')
       }
       const data = await res.json()
-      setCallSheets(data)
+      // Handle both array response and object response with callSheets property
+      const sheets = data.callSheets ?? data
+      setCallSheets(Array.isArray(sheets) ? sheets : [])
+      // Detect demo mode from API response
+      setIsDemoMode(!!data.isDemoMode)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
@@ -509,6 +514,12 @@ export default function CallSheetsPage() {
             </p>
           </div>
         </div>
+        {isDemoMode && (
+          <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+            <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+            Demo Data
+          </span>
+        )}
         <div className="flex items-center gap-2">
           {selected && !isEditing && (
             <>

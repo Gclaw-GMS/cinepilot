@@ -100,3 +100,24 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id } = body;
+
+    if (typeof id !== 'string' || !id.trim()) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    await prisma.notification.delete({
+      where: { id: id.trim() },
+    });
+
+    return NextResponse.json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    console.error('[DELETE /api/notifications]', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

@@ -61,7 +61,7 @@ export default function DOODPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [refreshing, setRefreshing] = useState(false)
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+  const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'heatmap'>('calendar')
   const [filterMain, setFilterMain] = useState<'all' | 'main' | 'supporting'>('all')
   const [sortBy, setSortBy] = useState<'days' | 'name' | 'percentage'>('days')
   const [searchQuery, setSearchQuery] = useState('')
@@ -362,6 +362,83 @@ export default function DOODPage() {
     )
   }
 
+  // Generate heatmap data - actor count per day
+  const heatmapData = useMemo(() => {
+    const data: { day: number; count: number; actors: string[] }[] = []
+    for (let d = 1; d <= totalShootingDays; d++) {
+      const actorsOnDay = report.filter(r => r.days.includes(d)).map(r => r.character)
+      data.push({ day: d, count: actorsOnDay.length, actors: actorsOnDay })
+    }
+    return data
+  }, [report, totalShootingDays])
+
+  // Render heatmap view
+  const renderHeatmap = () => {
+    const maxCount = Math.max(...heatmapData.map(d => d.count), 1)
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-[100px_1fr] gap-4">
+          <div></div>
+          <div className="flex">
+            {heatmapData.slice(0, 10).map(d => (
+              <div key={d.day} className="flex-1 text-center text-xs text-gray-500">
+                D{d.day}
+              </div>
+            ))}
+          </div>
+        </div>
+        {['Main Cast', 'Supporting Cast'].map(castType => {
+          const isMain = castType === 'Main Cast'
+          const filteredActors = report.filter(r => r.isMain === isMain)
+          return (
+            <div key={castType} className="grid grid-cols-[100px_1fr] gap-4 items-center">
+              <div className="text-sm font-medium text-gray-400">{castType}</div>
+              <div className="flex">
+                {heatmapData.slice(0, 10).map(d => {
+                  const actorsOnDay = filteredActors.filter(r => r.days.includes(d.day))
+                  const intensity = actorsOnDay.length / Math.max(filteredActors.length, 1)
+                  const bgColor = intensity > 0.5 
+                    ? 'bg-cyan-500' 
+                    : intensity > 0.25 
+                      ? 'bg-cyan-700' 
+                      : 'bg-cyan-900/50'
+                  return (
+                    <div 
+                      key={d.day} 
+                      className={`flex-1 h-10 ${bgColor} rounded mx-0.5 flex items-end justify-center pb-1`}
+                      title={`Day ${d.day}: ${actorsOnDay.map(a => a.character).join(', ')}`}
+                    >
+                      {actorsOnDay.length > 0 && (
+                        <span className="text-xs text-cyan-200">{actorsOnDay.length}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+        
+        {/* Day Summary */}
+        <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-400 mb-3">Peak Call Days (Top 5)</h4>
+          <div className="flex gap-2">
+            {[...heatmapData]
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5)
+              .map(d => (
+                <div key={d.day} className="flex-1 p-2 bg-gray-700/50 rounded text-center">
+                  <div className="text-lg font-bold text-cyan-400">Day {d.day}</div>
+                  <div className="text-xs text-gray-500">{d.count} actors</div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Stats cards
   const statCards = [
     { 
@@ -483,6 +560,16 @@ export default function DOODPage() {
               }`}
             >
               Calendar
+            </button>
+            <button
+              onClick={() => setViewMode('heatmap')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                viewMode === 'heatmap' 
+                  ? 'bg-cyan-400 text-black' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Heatmap
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -754,6 +841,26 @@ export default function DOODPage() {
                   <td className="p-4">
                     {viewMode === 'calendar' ? (
                       renderCalendar(row.days)
+                    ) : viewMode === 'heatmap' ? (
+                      <div className="flex flex-wrap gap-1">
+                        {row.days.map(d => {
+                          const dayData = heatmapData.find(hd => hd.day === d)
+                          const intensity = dayData ? dayData.count / Math.max(stats.totalCharacters, 1) : 0
+                          const bgColor = intensity > 0.5 
+                            ? 'bg-cyan-500' 
+                            : intensity > 0.25 
+                              ? 'bg-cyan-700' 
+                              : 'bg-cyan-900'
+                          return (
+                            <span 
+                              key={d}
+                              className={`px-2 py-0.5 ${bgColor} text-white rounded text-xs`}
+                            >
+                              D{d}
+                            </span>
+                          )
+                        })}
+                      </div>
                     ) : (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {row.days.length > 0 ? row.days.map(d => (
@@ -774,6 +881,17 @@ export default function DOODPage() {
             </tbody>
           </table>
         </div>
+        
+        {/* Heatmap View Panel */}
+        {viewMode === 'heatmap' && (
+          <div className="p-6 border-t border-gray-800">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-cyan-400" />
+              Actor Call Density Heatmap
+            </h3>
+            {renderHeatmap()}
+          </div>
+        )}
       </div>
 
       {/* Legend & Info */}

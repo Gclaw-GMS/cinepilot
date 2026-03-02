@@ -101,7 +101,7 @@ export default function DubbingPage() {
       if (!res.ok) throw new Error('Failed to load dubbed versions')
       const data = await res.json()
       setDubbedVersions(data.scripts || [])
-      setIsDemoMode(!!data.isDemo)
+      setIsDemoMode(!!data.isDemoMode)
     } catch {
       setDubbedVersions([])
     }

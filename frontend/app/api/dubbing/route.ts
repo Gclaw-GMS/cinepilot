@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
         console.log('[dubbing API] Using demo data - database not connected');
         return NextResponse.json({ 
           scripts: DEMO_DUBBED_VERSIONS,
-          isDemo: true 
+          isDemoMode: true 
         });
       }
       throw dbError;
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         language: targetLanguage,
         scenesTranslated: DEMO_TRANSLATED_SCENES.length,
         totalOriginalScenes: 5,
-        isDemo: true,
+        isDemoMode: true,
         translatedScenes: DEMO_TRANSLATED_SCENES,
         message: 'Generated using demo data - database not connected'
       });

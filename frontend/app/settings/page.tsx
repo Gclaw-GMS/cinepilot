@@ -10,6 +10,8 @@ import {
   Database,
   Save,
   Check,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -277,6 +279,59 @@ export default function SettingsPage() {
                 checked={(get('analyticsEnabled') as boolean) ?? false}
                 onChange={(v) => set('analyticsEnabled', v)}
               />
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Download className="h-4 w-4" />
+              Export / Import
+            </h2>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  const data = { settings: local, exportedAt: new Date().toISOString() };
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `cinepilot-settings-${new Date().toISOString().split('T')[0]}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+              <label className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm cursor-pointer transition-colors">
+                <Upload className="h-4 w-4" />
+                Import
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      try {
+                        const data = JSON.parse(ev.target?.result as string);
+                        if (data.settings && typeof data.settings === 'object') {
+                          setLocal((prev) => ({ ...prev, ...data.settings }));
+                          alert('Settings imported successfully! Click Save to apply.');
+                        } else {
+                          alert('Invalid settings file format.');
+                        }
+                      } catch {
+                        alert('Failed to parse settings file.');
+                      }
+                    };
+                    reader.readAsText(file);
+                  }}
+                />
+              </label>
             </div>
           </section>
         </div>

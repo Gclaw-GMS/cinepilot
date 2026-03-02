@@ -13,6 +13,7 @@ interface AnalysisRequest {
   is_outdoor?: boolean;
   is_night_shoots?: boolean;
   budget_total?: number;
+  scenes?: any[];
 }
 
 // Mock analysis data for demo purposes
@@ -362,6 +363,94 @@ function generateLocationAnalysis(data: AnalysisRequest) {
   };
 }
 
+// VFX Requirements Analysis
+function generateVFXAnalysis(data: AnalysisRequest) {
+  const scenes = data.scenes || [];
+  const sceneCount = scenes.length || 45;
+  
+  // Analyze scenes for VFX potential
+  const vfxIndicators = {
+    fantasy: ['dream', 'magical', 'fantasy', 'illusion', 'surreal', 'morph', 'floating'],
+    action: ['chase', 'explosion', 'fire', 'crash', 'stunt', 'fight', 'battle'],
+    crowd: ['crowd', 'festival', 'mass', 'thousands', 'extras', 'public'],
+    composite: ['green screen', 'blue screen', 'background', 'sky', 'plate'],
+    beauty: ['beauty', 'retouch', 'enhance', 'clean', 'grade', 'color'],
+    lighting: ['light', 'glow', 'diya', 'fireworks', 'laser', 'neon'],
+    prosthetic: ['creature', 'makeup', 'aging', 'wound', 'blood', 'monster'],
+    destruction: ['explosion', 'crash', 'destroy', 'ruin', 'debris', 'fire'],
+  };
+  
+  const complexityCosts: Record<string, number> = {
+    fantasy: 8500000,
+    action: 6200000,
+    crowd: 4500000,
+    composite: 2800000,
+    beauty: 1200000,
+    lighting: 800000,
+    prosthetic: 5500000,
+    destruction: 4800000,
+  };
+  
+  // Generate VFX scenes from the data or create demo scenes
+  const vfxScenes = scenes.length > 0 ? scenes.map((scene: any, idx: number) => {
+    const sceneText = `${scene.headingRaw || ''} ${scene.description || ''}`.toLowerCase();
+    let vfxType = 'composite';
+    let complexity = 'moderate';
+    
+    for (const [type, keywords] of Object.entries(vfxIndicators)) {
+      if (keywords.some(k => sceneText.includes(k))) {
+        vfxType = type;
+        complexity = ['fantasy', 'crowd', 'destruction'].includes(type) ? 'high' : 
+                    ['action', 'prosthetic'].includes(type) ? 'medium' : 'low';
+        break;
+      }
+    }
+    
+    return {
+      scene_number: scene.sceneNumber || idx + 1,
+      location: scene.location || 'Studio',
+      vfx_type: vfxType,
+      complexity,
+      estimated_cost: complexityCosts[vfxType] || 2000000,
+    };
+  }) : [
+    { scene_number: 12, location: 'EXT. Temple Festival', vfx_type: 'crowd', complexity: 'high', estimated_cost: 4500000 },
+    { scene_number: 25, location: 'EXT. Highway', vfx_type: 'action', complexity: 'high', estimated_cost: 6200000 },
+    { scene_number: 31, location: 'INT. Dream World', vfx_type: 'fantasy', complexity: 'high', estimated_cost: 8500000 },
+    { scene_number: 38, location: 'EXT. Swiss Alps', vfx_type: 'composite', complexity: 'moderate', estimated_cost: 2800000 },
+    { scene_number: 45, location: 'EXT. Warehouse', vfx_type: 'destruction', complexity: 'high', estimated_cost: 4800000 },
+    { scene_number: 52, location: 'EXT. City Rooftop', vfx_type: 'beauty', complexity: 'low', estimated_cost: 1200000 },
+  ];
+  
+  const vfxScenesCount = vfxScenes.length;
+  const totalCost = vfxScenes.reduce((sum: number, s: any) => sum + (s.estimated_cost || 0), 0);
+  const highComplexityCount = vfxScenes.filter((s: any) => s.complexity === 'high').length;
+  
+  const recommendations = [
+    `Schedule VFX-intensive scenes early to allow post-production time`,
+    `${highComplexityCount} high-complexity shots require additional pre-visualization`,
+    `Consider virtual production techniques for fantasy sequences`,
+    `Budget for 15% contingency on VFX due to revision potential`,
+  ];
+  
+  if (vfxScenesCount > 10) {
+    recommendations.push('High VFX volume - consider batching similar shots');
+  }
+  
+  return {
+    total_scenes: sceneCount,
+    vfx_scenes_count: vfxScenesCount,
+    estimated_total_cost: totalCost,
+    complexity_breakdown: {
+      high: highComplexityCount,
+      medium: vfxScenes.filter((s: any) => s.complexity === 'medium').length,
+      low: vfxScenes.filter((s: any) => s.complexity === 'low').length,
+    },
+    vfx_scenes: vfxScenes,
+    recommendations,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: AnalysisRequest = await req.json();
@@ -401,6 +490,9 @@ export async function POST(req: NextRequest) {
       case 'location-breakdown':
         result = generateLocationAnalysis(body);
         break;
+      case 'vfx-analysis':
+        result = generateVFXAnalysis(body);
+        break;
       default:
         return NextResponse.json(
           { error: `Unknown action: ${action}` },
@@ -408,10 +500,13 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    const isDbConnected = await checkDbConnection();
+    
     return NextResponse.json({
       success: true,
       action,
       result,
+      isDemoMode: !isDbConnected,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -423,10 +518,24 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Helper to check if database is connected
+async function checkDbConnection(): Promise<boolean> {
+  try {
+    const { prisma } = await import('@/lib/db');
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET() {
   // Return available AI capabilities
+  const isDbConnected = await checkDbConnection();
+  
   return NextResponse.json({
     available: true,
+    isDemoMode: !isDbConnected,
     features: [
       { id: 'script-analyzer', name: 'Script Intelligence', description: 'Deep analysis of your script' },
       { id: 'budget-forecast', name: 'Budget Forecast', description: 'Predict production costs' },

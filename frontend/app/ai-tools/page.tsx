@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   Brain, Sparkles, FileText, Clapperboard, DollarSign,
   Calendar, AlertTriangle, MessageSquare, Wand2, Search,
@@ -132,8 +132,21 @@ export default function AIToolsPage() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const currentFeature = AI_FEATURES.find(f => f.id === selectedFeature)
+
+  // Check demo mode on mount
+  useEffect(() => {
+    fetch('/api/ai')
+      .then(res => res.json())
+      .then(data => {
+        if (data.isDemoMode) {
+          setIsDemoMode(true)
+        }
+      })
+      .catch(() => setIsDemoMode(true))
+  }, [])
 
   const runAnalysis = async (featureId: string) => {
     const feature = AI_FEATURES.find(f => f.id === featureId)
@@ -165,6 +178,12 @@ export default function AIToolsPage() {
       }
 
       const data = await response.json()
+      
+      // Check for demo mode
+      if (data.isDemoMode) {
+        setIsDemoMode(true)
+      }
+      
       setResult(data)
 
       // Add to history
@@ -223,7 +242,14 @@ export default function AIToolsPage() {
                 <Brain className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold">AI Production Tools</h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-xl font-semibold">AI Production Tools</h1>
+                  {isDemoMode && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-full border border-amber-500/30">
+                      Demo
+                    </span>
+                  )}
+                </div>
                 <p className="text-slate-500 text-sm">Advanced AI-powered analysis for film production</p>
               </div>
             </div>
@@ -262,6 +288,16 @@ export default function AIToolsPage() {
           </div>
         </div>
       </header>
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div className="mx-8 mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <p className="text-amber-400 text-sm flex items-center gap-2">
+            <Info className="w-4 h-4" />
+            Running in demo mode with simulated AI results. Connect your database for real AI-powered analysis.
+          </p>
+        </div>
+      )}
 
       <div className="p-8">
         {/* Stats Row */}

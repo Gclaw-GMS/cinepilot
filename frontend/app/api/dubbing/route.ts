@@ -27,12 +27,12 @@ function isPrismaError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('prisma');
 }
 
-async function getProjectForScript(scriptId: string): Promise<string> {
+async function getProjectForScript(scriptId: string): Promise<string | null> {
   const script = await prisma.script.findUnique({
     where: { id: scriptId },
     select: { projectId: true },
   });
-  if (!script) throw new Error(`Script ${scriptId} not found`);
+  if (!script) return null;
   return script.projectId;
 }
 
@@ -47,6 +47,16 @@ export async function GET(req: NextRequest) {
     // Try database first
     try {
       const projectId = await getProjectForScript(scriptId);
+      
+      // If script not found in database, use demo data
+      if (!projectId) {
+        console.log('[dubbing API] Script not found, using demo data');
+        return NextResponse.json({ 
+          scripts: DEMO_DUBBED_VERSIONS,
+          translatedScenes: DEMO_TRANSLATED_SCENES,
+          isDemoMode: true 
+        });
+      }
 
       const dubbedScripts = await prisma.script.findMany({
         where: {
@@ -68,6 +78,7 @@ export async function GET(req: NextRequest) {
         console.log('[dubbing API] Using demo data - database not connected');
         return NextResponse.json({ 
           scripts: DEMO_DUBBED_VERSIONS,
+          translatedScenes: DEMO_TRANSLATED_SCENES,
           isDemoMode: true 
         });
       }

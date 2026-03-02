@@ -576,8 +576,18 @@ export default function ScriptsPage() {
               )}
             </>
           ) : (
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No quality analysis yet. Upload a script to get AI quality scoring.
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center">
+              {activeScript ? (
+                <div className="space-y-2">
+                  <p className="text-gray-400">No quality analysis yet.</p>
+                  <p className="text-sm text-gray-500">Click "Run Analysis" above to analyze your screenplay.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-gray-400">No script uploaded yet.</p>
+                  <p className="text-sm text-gray-500">Upload a script first, then run quality analysis.</p>
+                </div>
+              )}
             </div>
           )}
         </div>

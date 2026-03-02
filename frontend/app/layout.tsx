@@ -3,6 +3,9 @@ import type { Metadata } from 'next'
 import Sidebar from './sidebar'
 import ChatWidget from './components/ChatWidget'
 
+// Force dynamic rendering for all pages to ensure fresh data
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'CinePilot - AI-Powered Pre-Production',
   description: 'AI-powered pre-production platform for Tamil & Indian Cinema',

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { 
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
-  Printer, Download, RefreshCw
+  Printer, Download, RefreshCw, AlertCircle
 } from 'lucide-react'
 
 type CallSheetContent = {
@@ -61,6 +61,7 @@ export default function CallSheetsPage() {
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -83,6 +84,8 @@ export default function CallSheetsPage() {
       }
       const data = await res.json()
       setCallSheets(data)
+      // Check if we're in demo mode (demo data has 'demo-' prefixed IDs)
+      setIsDemoMode(data.some((s: CallSheet) => s.id.startsWith('demo-')))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
@@ -332,7 +335,14 @@ export default function CallSheetsPage() {
             <FileText className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Call Sheets</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">Call Sheets</h1>
+              {isDemoMode && (
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                  Demo Mode
+                </span>
+              )}
+            </div>
             <p className="text-slate-400 text-sm mt-0.5">
               Generate and manage daily call sheets
             </p>
@@ -361,6 +371,13 @@ export default function CallSheetsPage() {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {isDemoMode && (
+        <div className="mx-6 mt-4 flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          Preview mode — Connect a PostgreSQL database to save call sheets permanently
         </div>
       )}
 

@@ -32,6 +32,232 @@ export type CallSheetContent = {
   weather?: string;
 };
 
+// Demo data for when database is not connected
+const DEMO_CALL_SHEETS = [
+  {
+    id: 'demo-1',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 1 - Courtroom Opening',
+    date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'First day of principal photography. Important scenes.',
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '05:30',
+      wrapTime: '19:00',
+      location: 'Chennai Film Studios - Stage 1',
+      locationAddress: 'Plot 45, Film Nagar, Chennai - 600033',
+      scenes: ['1A', '1B', '2', '3', '4'],
+      weather: 'Indoor - A/C',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '05:30' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '05:30' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '06:00' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '06:00' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '05:30' },
+        { name: 'Bala', role: 'Light Assistant', department: 'Lighting', callTime: '06:00' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '06:00' },
+        { name: 'Arjun', role: 'Production Head', department: 'Production', callTime: '05:00' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '06:00' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '06:30' },
+        { name: 'Suresh', role: 'Art Director', department: 'Art', callTime: '05:30' },
+        { name: 'Karthik', role: 'Set Assistant', department: 'Art', callTime: '06:00' },
+      ],
+    },
+  },
+  {
+    id: 'demo-2',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 2 - Courtroom Drama',
+    date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'Major courtroom confrontation scenes.',
+    createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '06:00',
+      wrapTime: '20:00',
+      location: 'Chennai Film Studios - Stage 3',
+      locationAddress: 'Plot 45, Film Nagar, Chennai - 600033',
+      scenes: ['10', '11', '12', '13', '14'],
+      weather: 'Indoor - A/C',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '06:00' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '06:00' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '06:30' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '06:30' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '06:00' },
+        { name: 'Bala', role: 'Light Assistant', department: 'Lighting', callTime: '06:30' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '06:30' },
+        { name: 'Arjun', role: 'Production Head', department: 'Production', callTime: '05:30' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '06:30' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '07:00' },
+        { name: 'Suresh', role: 'Art Director', department: 'Art', callTime: '06:00' },
+      ],
+    },
+  },
+  {
+    id: 'demo-3',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 3 - Flashback Sequence',
+    date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'Flashback scenes - mood lighting required.',
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '07:00',
+      wrapTime: '21:00',
+      location: 'Mahabalipuram Beach',
+      locationAddress: 'Mahabalipuram, Kanchipuram District',
+      scenes: ['20', '21', '22', '23'],
+      weather: 'Clear, 28°C',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '07:00' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '07:00' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '07:30' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '07:30' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '06:00' },
+        { name: 'Bala', role: 'Light Assistant', department: 'Lighting', callTime: '06:30' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '07:30' },
+        { name: 'Arjun', role: 'Production Head', department: 'Production', callTime: '06:30' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '07:00' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '07:00' },
+        { name: 'Suresh', role: 'Art Director', department: 'Art', callTime: '06:00' },
+        { name: 'Stunt Coordinator', role: 'Stunts', department: 'Stunts', callTime: '07:00' },
+      ],
+    },
+  },
+  {
+    id: 'demo-4',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 4 - Romantic Track',
+    date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'Romantic scenes between lead actors.',
+    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '06:00',
+      wrapTime: '19:30',
+      location: 'Leela Palace Hotel',
+      locationAddress: 'No. 49, GM Street, Chennai - 600002',
+      scenes: ['30', '31', '32'],
+      weather: 'Indoor - A/C',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '06:00' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '06:00' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '06:30' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '06:30' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '05:30' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '06:30' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '05:30' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '06:00' },
+      ],
+    },
+  },
+  {
+    id: 'demo-5',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 5 - Action Sequence',
+    date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'Action sequence - stunts involved. Safety measures in place.',
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '05:00',
+      wrapTime: '22:00',
+      location: 'Anna Nagar - Open Road',
+      locationAddress: 'Anna Nagar, Chennai - 600040',
+      scenes: ['40', '41', '42', '43', '44'],
+      weather: 'Night shoot',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '05:00' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '05:00' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '05:30' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '05:30' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '04:00' },
+        { name: 'Bala', role: 'Light Assistant', department: 'Lighting', callTime: '04:30' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '05:30' },
+        { name: 'Arjun', role: 'Production Head', department: 'Production', callTime: '04:30' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '05:00' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '05:00' },
+        { name: 'Stunt Coordinator', role: 'Stunts', department: 'Stunts', callTime: '04:30' },
+        { name: 'Safety Officer', role: 'Safety', department: 'Production', callTime: '04:30' },
+        { name: 'Ambulance', role: 'Medical', department: 'Production', callTime: '05:00' },
+      ],
+    },
+  },
+  {
+    id: 'demo-6',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 6 - Climax Courtroom',
+    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'Final courtroom climax. All crew required.',
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '05:30',
+      wrapTime: '23:00',
+      location: 'Chennai High Court - Set',
+      locationAddress: 'Studio Set - Film Nagar',
+      scenes: ['50', '51', '52', '53', '54', '55'],
+      weather: 'Indoor - A/C',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '05:30' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '05:30' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '06:00' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '06:00' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '05:00' },
+        { name: 'Bala', role: 'Light Assistant', department: 'Lighting', callTime: '05:30' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '06:00' },
+        { name: 'Arjun', role: 'Production Head', department: 'Production', callTime: '05:00' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '05:30' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '06:00' },
+        { name: 'Suresh', role: 'Art Director', department: 'Art', callTime: '05:00' },
+        { name: 'Karthik', role: 'Set Assistant', department: 'Art', callTime: '05:30' },
+      ],
+    },
+  },
+  {
+    id: 'demo-7',
+    projectId: 'default-project',
+    shootingDayId: null,
+    title: 'Day 7 - Rain Song',
+    date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: 'Rain song sequence. Water tanks ready.',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    shootingDay: null,
+    content: {
+      callTime: '18:00',
+      wrapTime: '03:00',
+      location: 'EPR Beach Resort',
+      locationAddress: 'East Coast Road, Chennai',
+      scenes: ['60', '61', '62'],
+      weather: 'Night with rain',
+      crewCalls: [
+        { name: 'Raj Kapoor', role: 'Director', department: 'Direction', callTime: '18:00' },
+        { name: 'Vikram Sarathy', role: 'DOP', department: 'Camera', callTime: '18:00' },
+        { name: 'Anand', role: 'Cameraman', department: 'Camera', callTime: '18:30' },
+        { name: 'Kumar', role: 'Focus Puller', department: 'Camera', callTime: '18:30' },
+        { name: 'Ravi', role: 'Gaffer', department: 'Lighting', callTime: '17:00' },
+        { name: 'Bala', role: 'Light Assistant', department: 'Lighting', callTime: '17:30' },
+        { name: 'Prakash', role: 'Sound Engineer', department: 'Sound', callTime: '18:30' },
+        { name: 'Meena', role: 'Makeup Artist', department: 'Makeup', callTime: '17:30' },
+        { name: 'Lakshmi', role: 'Costume Designer', department: 'Costume', callTime: '17:30' },
+        { name: 'Water Tank Unit', role: 'Water', department: 'Art', callTime: '17:00' },
+      ],
+    },
+  },
+];
+
+// In-memory store for demo mode (non-persistent)
+let demoCallSheets = [...DEMO_CALL_SHEETS];
+let demoNextId = DEMO_CALL_SHEETS.length + 1;
+
 export async function GET() {
   try {
     const projectId = await ensureDefaultProject();
@@ -42,9 +268,9 @@ export async function GET() {
     });
     return NextResponse.json(callSheets);
   } catch (error) {
-    console.error('[GET /api/call-sheets]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Fall back to demo data
+    console.log('[GET /api/call-sheets] Using demo data - database not connected');
+    return NextResponse.json(demoCallSheets);
   }
 }
 
@@ -153,9 +379,33 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(callSheet);
   } catch (error) {
-    console.error('[POST /api/call-sheets]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Demo mode: create a new call sheet in demo data
+    console.log('[POST /api/call-sheets] Using demo data - database not connected');
+    
+    const { date, title, content, notes } = await req.json();
+    
+    const newDemoSheet = {
+      id: `demo-${demoNextId++}`,
+      projectId: 'default-project',
+      shootingDayId: null,
+      title: title ?? 'New Call Sheet',
+      date: date ?? new Date().toISOString(),
+      notes: notes ?? null,
+      createdAt: new Date().toISOString(),
+      shootingDay: null,
+      content: content ?? {
+        callTime: '06:00',
+        wrapTime: '19:00',
+        location: '',
+        locationAddress: '',
+        scenes: [],
+        crewCalls: [],
+        weather: '',
+      },
+    };
+    
+    demoCallSheets = [newDemoSheet, ...demoCallSheets];
+    return NextResponse.json(newDemoSheet);
   }
 }
 
@@ -193,9 +443,25 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(callSheet);
   } catch (error) {
-    console.error('[PATCH /api/call-sheets]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Demo mode: update in-memory demo data
+    console.log('[PATCH /api/call-sheets] Using demo data - database not connected');
+    
+    const { id, title, date, content, notes } = await req.json();
+    
+    const index = demoCallSheets.findIndex(s => s.id === id);
+    if (index === -1) {
+      return NextResponse.json({ error: 'Call sheet not found' }, { status: 404 });
+    }
+    
+    demoCallSheets[index] = {
+      ...demoCallSheets[index],
+      title: title ?? demoCallSheets[index].title,
+      date: date ?? demoCallSheets[index].date,
+      content: content ?? demoCallSheets[index].content,
+      notes: notes ?? demoCallSheets[index].notes,
+    };
+    
+    return NextResponse.json(demoCallSheets[index]);
   }
 }
 
@@ -214,9 +480,22 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[DELETE /api/call-sheets]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Demo mode: remove from in-memory demo data
+    console.log('[DELETE /api/call-sheets] Using demo data - database not connected');
+    
+    const { id } = await req.json();
+    
+    if (typeof id !== 'string' || !id.trim()) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+    
+    const index = demoCallSheets.findIndex(s => s.id === id.trim());
+    if (index === -1) {
+      return NextResponse.json({ error: 'Call sheet not found' }, { status: 404 });
+    }
+    
+    demoCallSheets = demoCallSheets.filter(s => s.id !== id.trim());
+    
+    return NextResponse.json({ success: true });
   }
 }
-

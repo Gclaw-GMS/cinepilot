@@ -125,9 +125,9 @@ const FEATURES = [
 ]
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>(DEMO_STATS)
-  const [loading, setLoading] = useState(false)
-  const [isDemoMode, setIsDemoMode] = useState(true)
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS)
+  const [loading, setLoading] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)

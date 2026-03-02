@@ -1054,3 +1054,22 @@ model TimelineEvent {
   @@index([status])
   @@map("timeline_events")
 }
+
+model TravelExpense {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  category    String   // Flight, Train, Bus, Taxi, Auto, Hotel, Stay, Per Diem, Daily Allowance
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  date        DateTime @db.Date
+  vendor      String?
+  status      String   @default("pending") // pending, approved, rejected, reimbursed
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([category])
+  @@index([status])
+  @@map("travel_expenses")
+}

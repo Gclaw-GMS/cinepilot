@@ -83,10 +83,10 @@ export default function NotesPage() {
       const res = await fetch(`/api/notes?${params}`)
       if (!res.ok) throw new Error('Failed to fetch notes')
       const data = await res.json()
-      setNotes(data)
-      // Detect demo mode by checking if notes have demo IDs
-      const isDemo = data.length > 0 && data.every((n: Note) => String(n.id).startsWith('demo-'))
-      setIsDemoMode(isDemo)
+      // API returns { notes: [...], isDemoMode: true/false }
+      setNotes(data.notes || data)
+      // Use isDemoMode from API response
+      setIsDemoMode(data.isDemoMode === true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
       setIsDemoMode(true)

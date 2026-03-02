@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
-    return NextResponse.json(filtered, { status: 200 })
+    return NextResponse.json({ notes: filtered, isDemoMode: true }, { status: 200 })
   }
 
   try {
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     await prisma.$disconnect()
 
-    return NextResponse.json(notes, { status: 200 })
+    return NextResponse.json({ notes, isDemoMode: false }, { status: 200 })
   } catch (error) {
     console.error('[GET /api/notes] Database error:', error)
     
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
-    return NextResponse.json(filtered, { status: 200 })
+    return NextResponse.json({ notes: filtered, isDemoMode: true }, { status: 200 })
   }
 }
 
@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
         isPinned,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        isDemoMode: true,
       }
       return NextResponse.json(newNote, { status: 201 })
     }
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.$disconnect()
 
-    return NextResponse.json(newNote, { status: 201 })
+    return NextResponse.json({ ...newNote, isDemoMode: false }, { status: 201 })
   } catch (error) {
     console.error('[POST /api/notes]', error)
     return NextResponse.json({ error: 'Failed to create note' }, { status: 500 })
@@ -149,6 +150,7 @@ export async function PUT(req: NextRequest) {
         author: author || 'User',
         isPinned: isPinned || false,
         updatedAt: new Date().toISOString(),
+        isDemoMode: true,
       }
       return NextResponse.json(updatedNote)
     }
@@ -168,7 +170,7 @@ export async function PUT(req: NextRequest) {
 
     await prisma.$disconnect()
 
-    return NextResponse.json(updatedNote)
+    return NextResponse.json({ ...updatedNote, isDemoMode: false })
   } catch (error) {
     console.error('[PUT /api/notes]', error)
     return NextResponse.json({ error: 'Failed to update note' }, { status: 500 })
@@ -188,7 +190,7 @@ export async function DELETE(req: NextRequest) {
 
   if (!isDbConnected) {
     // Demo mode - just return success
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, isDemoMode: true })
   }
 
   try {
@@ -200,7 +202,7 @@ export async function DELETE(req: NextRequest) {
 
     await prisma.$disconnect()
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, isDemoMode: false })
   } catch (error) {
     console.error('[DELETE /api/notes]', error)
     return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 })

@@ -74,13 +74,23 @@ export default function DubbingPage() {
           // No scripts in DB, use demo
           setScripts(DEMO_SCRIPTS)
           setIsDemoMode(true)
+          // Auto-select first demo script
+          if (DEMO_SCRIPTS.length > 0) {
+            setSelectedScriptId(DEMO_SCRIPTS[0].id)
+          }
         } else {
           setScripts(list)
+          // Auto-select first script
+          setSelectedScriptId(list[0].id)
         }
       } catch {
         // API error, use demo data
         setScripts(DEMO_SCRIPTS)
         setIsDemoMode(true)
+        // Auto-select first demo script
+        if (DEMO_SCRIPTS.length > 0) {
+          setSelectedScriptId(DEMO_SCRIPTS[0].id)
+        }
       } finally {
         setLoadingScripts(false)
       }

@@ -110,16 +110,26 @@ export default function VfxPage() {
         const list = Array.isArray(data) ? data : data.scripts || [];
         if (list.length > 0) {
           setScripts(list);
+          // Auto-select first script if available
+          setSelectedScript(list[0].id);
         } else {
           // Use demo scripts if no real scripts exist
           setScripts(DEMO_SCRIPTS);
           setIsUsingDemo(true);
+          // Auto-select first demo script
+          if (DEMO_SCRIPTS.length > 0) {
+            setSelectedScript(DEMO_SCRIPTS[0].id);
+          }
         }
       })
       .catch(() => {
         // Fallback to demo scripts on error
         setScripts(DEMO_SCRIPTS);
         setIsUsingDemo(true);
+        // Auto-select first demo script
+        if (DEMO_SCRIPTS.length > 0) {
+          setSelectedScript(DEMO_SCRIPTS[0].id);
+        }
       });
   }, []);
 

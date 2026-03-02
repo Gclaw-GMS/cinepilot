@@ -242,6 +242,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Shot fields filled' });
     }
 
+    if (action === 'importCSV' && body.shots && body.scriptId) {
+      // Import shots from CSV data
+      const { shots: importedShots, scriptId: importScriptId } = body;
+      
+      let importedCount = 0;
+      
+      for (const shot of importedShots) {
+        try {
+          // Find or create scene if needed
+          let sceneId = shot.sceneId;
+          
+          if (!sceneId && shot.sceneNumber) {
+            // Try to find existing scene by scene number
+            const scene = await prisma.scene.findFirst({
+              where: { 
+                scriptId: importScriptId,
+                sceneNumber: String(shot.sceneNumber)
+              },
+              select: { id: true }
+            });
+            if (scene) {
+              sceneId = scene.id;
+            }
+          }
+          
+          if (sceneId) {
+            await prisma.shot.create({
+              data: {
+                sceneId,
+                shotIndex: shot.shotIndex || 1,
+                beatIndex: shot.beatIndex || 1,
+                shotText: shot.shotText || '',
+                shotSize: shot.shotSize,
+                cameraAngle: shot.cameraAngle,
+                cameraMovement: shot.cameraMovement,
+                focalLengthMm: shot.focalLengthMm,
+                lensType: shot.lensType,
+                keyStyle: shot.keyStyle,
+                colorTemp: shot.colorTemp,
+                durationEstSec: shot.durationEstSec,
+                isLocked: false,
+                userEdited: true,
+              }
+            });
+            importedCount++;
+          }
+        } catch (e) {
+          console.warn('Failed to import shot:', shot, e);
+        }
+      }
+      
+      return NextResponse.json({ 
+        message: `Imported ${importedCount} shots`,
+        importedCount 
+      });
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
     console.error('[POST /api/shots]', error);

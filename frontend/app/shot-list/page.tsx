@@ -373,7 +373,7 @@ export default function ShotHubPage() {
       }
       
       // Parse CSV - skip header row
-      const importedShots: Partial<ShotData>[] = []
+      const importedShots: { shotIndex: number; beatIndex: number; sceneNumber: string; shotText: string; shotSize: string | null; cameraAngle: string | null; cameraMovement: string | null; focalLengthMm: number | null; durationEstSec: number | null }[] = []
       
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
@@ -381,6 +381,7 @@ export default function ShotHubPage() {
           importedShots.push({
             shotIndex: parseInt(cols[0]) || i,
             beatIndex: 1,
+            sceneNumber: cols[1] || '', // Scene number from CSV
             shotText: cols[2] || '',
             shotSize: cols[3] || null,
             cameraAngle: cols[4] || null,
@@ -392,9 +393,26 @@ export default function ShotHubPage() {
       }
       
       if (importedShots.length > 0) {
-        setSuccess(`Imported ${importedShots.length} shots from CSV!`)
-        // Note: Full import would require API integration
-        // For now, just show success message
+        // Actually import via API
+        try {
+          const res = await fetch('/api/shots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              action: 'importCSV', 
+              scriptId,
+              shots: importedShots 
+            }),
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Import failed')
+          setSuccess(`Successfully imported ${importedShots.length} shots from CSV!`)
+          // Refresh shots after import
+          if (scriptId) await fetchShots(scriptId)
+        } catch (importErr: any) {
+          // If API fails, at least show what was parsed
+          setError(`API import failed: ${importErr.message}. Parsed ${importedShots.length} shots locally.`)
+        }
       } else {
         setError('No valid shots found in CSV')
       }

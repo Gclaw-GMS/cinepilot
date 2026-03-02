@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
   id: string
@@ -58,6 +59,7 @@ export default function DubbingPage() {
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<TranslatedScene[]>([])
   const [loadingScripts, setLoadingScripts] = useState(true)
+  const [loadingVersions, setLoadingVersions] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function DubbingPage() {
 
   const loadDubbedVersions = useCallback(async (scriptId: string) => {
     if (!scriptId) return
+    setLoadingVersions(true)
     try {
       const res = await fetch(`/api/dubbing?scriptId=${scriptId}`)
       if (!res.ok) throw new Error('Failed to load dubbed versions')
@@ -114,6 +117,8 @@ export default function DubbingPage() {
       // Use demo data on error
       setDubbedVersions(DEMO_DUBBED_VERSIONS)
       setIsDemoMode(true)
+    } finally {
+      setLoadingVersions(false)
     }
   }, [])
 
@@ -190,6 +195,23 @@ export default function DubbingPage() {
     english: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   }
 
+  const LANGUAGE_COLORS: Record<string, string> = {
+    telugu: '#eab308',
+    hindi: '#f97316',
+    malayalam: '#14b8a6',
+    kannada: '#f43f5e',
+    english: '#3b82f6',
+  }
+
+  // Compute language distribution for chart
+  const languageDistribution = useMemo(() => {
+    const counts: Record<string, number> = {}
+    dubbedVersions.forEach(dub => {
+      counts[dub.language] = (counts[dub.language] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  }, [dubbedVersions])
+
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -251,6 +273,42 @@ export default function DubbingPage() {
             <p className="text-2xl font-semibold text-white">{preview.length}</p>
           </div>
         </div>
+
+        {/* Language Distribution Chart */}
+        {dubbedVersions.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Globe className="w-5 h-5 text-indigo-400" />
+              Language Distribution
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={languageDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {languageDistribution.map((entry, index) => (
+                      <Cell key={entry.name} fill={LANGUAGE_COLORS[entry.name]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value} versions`, '']}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
@@ -319,7 +377,18 @@ export default function DubbingPage() {
         </div>
 
         {/* Existing Dubbed Versions */}
-        {dubbedVersions.length > 0 && (
+        {loadingVersions ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Languages className="w-5 h-5 text-indigo-400" />
+              Dubbed Versions
+            </h2>
+            <div className="flex items-center gap-3 text-slate-400">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Loading dubbed versions...</span>
+            </div>
+          </div>
+        ) : dubbedVersions.length > 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               <Languages className="w-5 h-5 text-indigo-400" />
@@ -351,6 +420,14 @@ export default function DubbingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        ) : !loadingVersions && dubbedVersions.length === 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Languages className="w-5 h-5 text-indigo-400" />
+              Dubbed Versions
+            </h2>
+            <p className="text-slate-400 text-sm">No dubbed versions yet. Generate one above.</p>
           </div>
         )}
 

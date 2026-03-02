@@ -451,6 +451,123 @@ function generateVFXAnalysis(data: AnalysisRequest) {
   };
 }
 
+// Scene Suggestions for Production Assistant
+function generateSceneSuggestions(data: AnalysisRequest) {
+  const context = data.text || '';
+  const sceneCount = data.scene_count || 45;
+  
+  // Analyze context and generate relevant suggestions
+  const suggestions: Array<{
+    type: string;
+    suggestion: string;
+    reason?: string;
+    scene_type?: string;
+    location_suggestion?: string;
+    time_suggestion?: string;
+  }> = [];
+  
+  // Generate context-aware suggestions
+  const contextLower = context.toLowerCase();
+  
+  // Romance-related suggestions
+  if (contextLower.includes('romance') || contextLower.includes('love') || contextLower.includes('romantic')) {
+    suggestions.push({
+      type: 'conflict',
+      suggestion: 'Introduce an external conflict during the romantic sequence',
+      reason: 'Heightens tension and engages audience better',
+      scene_type: 'Romance-Thriller'
+    });
+    suggestions.push({
+      type: 'expansion',
+      suggestion: 'Add a flashback sequence to show the origin of the relationship',
+      reason: 'Adds emotional depth and backstory',
+      scene_type: 'Romance'
+    });
+  }
+  
+  // Action-related suggestions
+  if (contextLower.includes('action') || contextLower.includes('fight') || contextLower.includes('chase')) {
+    suggestions.push({
+      type: 'location_expansion',
+      suggestion: 'Consider a wide establishing shot before the action sequence',
+      reason: 'Provides spatial context and enhances scale',
+      location_suggestion: 'Open ground/warehouse',
+      time_suggestion: 'Golden hour'
+    });
+    suggestions.push({
+      type: 'expansion',
+      suggestion: 'Add reaction shots from bystanders to increase stakes',
+      reason: 'Creates sense of danger and real-world impact',
+      scene_type: 'Action'
+    });
+  }
+  
+  // Drama-related suggestions
+  if (contextLower.includes('drama') || contextLower.includes('emotional') || contextLower.includes('family')) {
+    suggestions.push({
+      type: 'expansion',
+      suggestion: 'Consider adding a reaction shot after the pivotal dialogue',
+      reason: 'This would enhance emotional impact and give editors more options',
+      scene_type: 'Drama'
+    });
+    suggestions.push({
+      type: 'time_addition',
+      suggestion: 'Add a time jump to show consequences of the emotional event',
+      reason: 'Creates narrative progression and emotional resonance',
+      time_suggestion: 'Next morning'
+    });
+  }
+  
+  // Comedy-related suggestions
+  if (contextLower.includes('comedy') || contextLower.includes('funny') || contextLower.includes('humor')) {
+    suggestions.push({
+      type: 'expansion',
+      suggestion: 'Include a reaction shot from a bystander for comedic timing',
+      reason: 'Enhances the comedic beat and audience engagement',
+      scene_type: 'Comedy'
+    });
+  }
+  
+  // Default suggestions if no specific context
+  if (suggestions.length === 0) {
+    suggestions.push({
+      type: 'expansion',
+      suggestion: 'Consider adding a reaction shot after the pivotal dialogue',
+      reason: 'This would enhance emotional impact and give editors more options',
+      scene_type: 'Drama'
+    });
+    suggestions.push({
+      type: 'location_expansion',
+      suggestion: 'The sequence could benefit from additional establishing shots',
+      reason: 'Multi-location coverage adds production value',
+      location_suggestion: 'Outdoor location',
+      time_suggestion: 'Sunrise/Sunset'
+    });
+    suggestions.push({
+      type: 'conflict',
+      suggestion: 'Introduce an external conflict to increase tension',
+      reason: 'Heightens drama and keeps audience engaged',
+      scene_type: 'General'
+    });
+  }
+  
+  // Add scene-count based suggestion
+  if (sceneCount > 50) {
+    suggestions.push({
+      type: 'expansion',
+      suggestion: 'Consider combining some dialogue-heavy scenes to improve pacing',
+      reason: `With ${sceneCount} scenes, pacing optimization is recommended`,
+      scene_type: 'Structure'
+    });
+  }
+  
+  return {
+    suggestions: suggestions.slice(0, 5), // Return max 5 suggestions
+    context_analyzed: context || 'general',
+    scene_count: sceneCount,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: AnalysisRequest = await req.json();
@@ -492,6 +609,9 @@ export async function POST(req: NextRequest) {
         break;
       case 'vfx-analysis':
         result = generateVFXAnalysis(body);
+        break;
+      case 'scene_suggestions':
+        result = generateSceneSuggestions(body);
         break;
       default:
         return NextResponse.json(

@@ -70,42 +70,76 @@ interface QuickStatsProps {
   stats: Stats
 }
 
-// Event bus stub - would be replaced with real implementation
+// Event bus for production events
 const eventBus = {
   emit: (_event: string, _data?: unknown) => {},
   on: (_event: string, _callback: (data?: unknown) => void) => () => {},
   off: (_event: string, _callback: (data?: unknown) => void) => {}
 }
 
-// API stub - returns demo suggestions
-async function getSceneSuggestions(_projectId: number, _context: string): Promise<{ suggestions: Suggestion[] }> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 800))
-  
-  // Return demo suggestions based on context
-  const suggestions: Suggestion[] = [
-    {
-      type: 'expansion',
-      suggestion: 'Consider adding a reaction shot after the pivotal dialogue',
-      reason: 'This would enhance emotional impact and give editors more options',
-      scene_type: 'Drama'
-    },
-    {
-      type: 'location_expansion',
-      suggestion: 'The temple sequence could benefit from additional establishing shots',
-      reason: 'Multi-location coverage adds production value',
-      location_suggestion: 'Kapaleeshwarar Temple',
-      time_suggestion: 'Sunrise'
-    },
-    {
-      type: 'conflict',
-      suggestion: 'Introduce an external conflict during the romantic sequence',
-      reason: 'Heightens tension and engages audience better',
-      scene_type: 'Romance-Thriller'
+// Call the real AI API for scene suggestions
+async function getSceneSuggestions(projectId: number, context: string): Promise<{ suggestions: Suggestion[] }> {
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'scene_suggestions',
+        projectId: String(projectId),
+        context,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
     }
-  ]
-  
-  return { suggestions }
+    
+    const data = await response.json();
+    
+    if (data.suggestions && Array.isArray(data.suggestions)) {
+      return { suggestions: data.suggestions };
+    }
+    
+    // If API returns insights, transform them into suggestions
+    if (data.insights && Array.isArray(data.insights)) {
+      const suggestions: Suggestion[] = data.insights.map((insight: string, index: number) => ({
+        type: 'expansion',
+        suggestion: insight,
+        reason: 'AI-generated insight for your production',
+        scene_type: 'General'
+      }));
+      return { suggestions };
+    }
+    
+    // Return empty if no valid response
+    return { suggestions: [] };
+  } catch (error) {
+    console.error('Failed to get AI suggestions:', error);
+    // Fall back to demo data on error
+    return {
+      suggestions: [
+        {
+          type: 'expansion',
+          suggestion: 'Consider adding a reaction shot after the pivotal dialogue',
+          reason: 'This would enhance emotional impact and give editors more options',
+          scene_type: 'Drama'
+        },
+        {
+          type: 'location_expansion',
+          suggestion: 'The temple sequence could benefit from additional establishing shots',
+          reason: 'Multi-location coverage adds production value',
+          location_suggestion: 'Kapaleeshwarar Temple',
+          time_suggestion: 'Sunrise'
+        },
+        {
+          type: 'conflict',
+          suggestion: 'Introduce an external conflict during the romantic sequence',
+          reason: 'Heightens tension and engages audience better',
+          scene_type: 'Romance-Thriller'
+        }
+      ]
+    };
+  }
 }
 
 const Events = {

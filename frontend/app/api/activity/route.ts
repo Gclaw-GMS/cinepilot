@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Helper to check DB connection
+async function checkDbConnection(): Promise<boolean> {
+  try {
+    const { prisma } = await import('@/lib/db');
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Demo activity data
 const DEMO_ACTIVITY = [
   { id: 1, projectId: DEFAULT_PROJECT_ID, activityType: 'note_created', description: 'New todo note added', userEmail: 'director@cinepilot.ai', metadata: {}, createdAt: new Date().toISOString() },
@@ -22,6 +33,10 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type');
   const stats = req.nextUrl.searchParams.get('stats');
 
+  // Check if database is connected
+  const isDbConnected = await checkDbConnection();
+  const isDemoMode = !isDbConnected;
+
   // Handle stats request
   if (stats === 'true') {
     const now = new Date();
@@ -39,6 +54,7 @@ export async function GET(req: NextRequest) {
       today: today.length,
       thisWeek: thisWeek.length,
       byType,
+      isDemoMode,
     });
   }
 
@@ -47,7 +63,7 @@ export async function GET(req: NextRequest) {
   if (type && type !== 'all') {
     filtered = activityStore.filter(a => a.activityType === type);
   }
-  return NextResponse.json(filtered.slice(0, limit));
+  return NextResponse.json({ activities: filtered.slice(0, limit), isDemoMode });
 }
 
 // POST /api/activity - Log new activity
@@ -60,6 +76,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Activity type is required' }, { status: 400 });
     }
 
+    // Check if database is connected
+    const isDbConnected = await checkDbConnection();
+    const isDemoMode = !isDbConnected;
+
     const newActivity = {
       id: Date.now(),
       projectId,
@@ -71,7 +91,7 @@ export async function POST(req: NextRequest) {
     };
     
     activityStore.unshift(newActivity);
-    return NextResponse.json(newActivity, { status: 201 });
+    return NextResponse.json({ ...newActivity, isDemoMode }, { status: 201 });
   } catch (error) {
     console.error('[POST /api/activity]', error);
     return NextResponse.json({ error: 'Failed to create activity' }, { status: 500 });

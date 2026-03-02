@@ -99,18 +99,23 @@ export async function GET(req: NextRequest) {
       ],
     })
 
-    // Format response
-    const formattedNotes = notes.map(note => ({
-      id: note.id,
-      title: note.title,
-      content: note.content,
-      category: note.category,
-      tags: note.tags as string[],
-      createdAt: note.createdAt.toISOString(),
-      updatedAt: note.updatedAt.toISOString(),
-      isPinned: note.isPinned,
-      createdBy: note.createdBy || undefined,
-    }))
+    // Format response - handle both old format (author) and new format (title)
+    const formattedNotes = notes.map(note => {
+      // If title is missing but content exists, derive title from content first line
+      const title = note.title || (note.content ? note.content.split('\n')[0].slice(0, 50) : 'Untitled Note')
+      
+      return {
+        id: note.id,
+        title: title,
+        content: note.content,
+        category: note.category,
+        tags: note.tags as string[] || [],
+        createdAt: note.createdAt.toISOString(),
+        updatedAt: note.updatedAt.toISOString(),
+        isPinned: note.isPinned,
+        createdBy: note.createdBy || (note as unknown as { author?: string }).author || undefined,
+      }
+    })
 
     return NextResponse.json({ notes: formattedNotes })
   } catch {

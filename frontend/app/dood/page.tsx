@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { 
   Calendar, 
@@ -10,8 +10,18 @@ import {
   Download, 
   RefreshCw,
   AlertCircle,
-  FileText
+  FileText,
+  BarChart3,
+  PieChart,
+  Share2,
+  Filter,
+  Eye,
+  List
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart as RePieChart, Pie, Cell
+} from 'recharts'
 
 interface DOODRow {
   characterId: string
@@ -29,6 +39,8 @@ interface DOODStats {
   totalShootingDays: number
   totalCalls: number
   avgDaysPerActor: number
+  mainCastDays: number
+  supportingCastDays: number
 }
 
 const DEMO_DOOD: DOODRow[] = [
@@ -44,6 +56,34 @@ const DEMO_STATS: DOODStats = {
   totalShootingDays: 20,
   totalCalls: 51,
   avgDaysPerActor: 10.2,
+  mainCastDays: 35,
+  supportingCastDays: 16,
+}
+
+const CHART_COLORS = {
+  primary: '#06b6d4',
+  secondary: '#8b5cf6',
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  muted: '#6b7280',
+}
+
+const CATEGORY_COLORS = ['#06b6d4', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
+
+// Get percentage color based on value
+const getPercentageColor = (percentage: number): string => {
+  if (percentage >= 70) return 'text-emerald-400'
+  if (percentage >= 50) return 'text-cyan-400'
+  if (percentage >= 30) return 'text-amber-400'
+  return 'text-orange-400'
+}
+
+const getPercentageGradient = (percentage: number): string => {
+  if (percentage >= 70) return 'from-emerald-500 to-emerald-400'
+  if (percentage >= 50) return 'from-cyan-500 to-cyan-400'
+  if (percentage >= 30) return 'from-amber-500 to-amber-400'
+  return 'from-orange-500 to-orange-400'
 }
 
 export default function DOODPage() {
@@ -54,7 +94,8 @@ export default function DOODPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [refreshing, setRefreshing] = useState(false)
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+  const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'analytics'>('analytics')
+  const [filterRole, setFilterRole] = useState<'all' | 'main' | 'supporting'>('all')
 
   const loadDOOD = useCallback(async () => {
     setLoading(true)
@@ -66,7 +107,6 @@ export default function DOODPage() {
       }
       const data = await res.json()
       
-      // Check for demo mode
       if (data.isDemoMode) {
         setIsDemoMode(true)
       }
@@ -75,7 +115,6 @@ export default function DOODPage() {
         setReport(data.report)
         setStats(data.stats)
       } else {
-        // Use demo data if no real data
         setReport(DEMO_DOOD)
         setStats(DEMO_STATS)
         setIsDemoMode(true)
@@ -92,6 +131,31 @@ export default function DOODPage() {
   useEffect(() => {
     loadDOOD()
   }, [loadDOOD])
+
+  // Filter report based on role
+  const filteredReport = useMemo(() => {
+    if (filterRole === 'all') return report
+    if (filterRole === 'main') return report.filter(r => r.isMain)
+    return report.filter(r => !r.isMain)
+  }, [report, filterRole])
+
+  // Chart data
+  const pieChartData = useMemo(() => {
+    const mainCount = report.filter(r => r.isMain).length
+    const supportingCount = report.filter(r => !r.isMain).length
+    return [
+      { name: 'Main Cast', value: mainCount, color: CHART_COLORS.primary },
+      { name: 'Supporting', value: supportingCount, color: CHART_COLORS.secondary },
+    ]
+  }, [report])
+
+  const barChartData = useMemo(() => {
+    return report.slice(0, 8).map(r => ({
+      name: r.character.length > 10 ? r.character.slice(0, 10) + '...' : r.character,
+      days: r.total_days,
+      fullName: r.character,
+    }))
+  }, [report])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -111,17 +175,17 @@ export default function DOODPage() {
     setRefreshing(false)
   }
 
-  const handleExport = (format: 'csv' | 'pdf') => {
-    // Generate export
+  const handleExport = (format: 'csv' | 'json') => {
     if (format === 'csv') {
-      const headers = ['Character', 'Tamil Name', 'Actor', 'Total Days', 'Days', 'Percentage']
+      const headers = ['Character', 'Tamil Name', 'Actor', 'Total Days', 'Days', 'Percentage', 'Role']
       const rows = report.map(r => [
         r.character,
         r.characterTamil,
         r.actorName || '',
         r.total_days,
         r.days.join(', '),
-        `${r.percentage}%`
+        `${r.percentage}%`,
+        r.isMain ? 'Main' : 'Supporting'
       ])
       const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
@@ -130,6 +194,21 @@ export default function DOODPage() {
       a.href = url
       a.download = `dood-report-${new Date().toISOString().split('T')[0]}.csv`
       a.click()
+      URL.revokeObjectURL(url)
+    } else if (format === 'json') {
+      const jsonData = {
+        report: report,
+        stats: stats,
+        generatedAt: new Date().toISOString(),
+        projectId: selectedProject
+      }
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dood-report-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
     }
   }
 
@@ -161,6 +240,113 @@ export default function DOODPage() {
     )
   }
 
+  // Render analytics view
+  const renderAnalytics = () => (
+    <div className="space-y-6">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Days by Character - Bar Chart */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-cyan-400" />
+            Days per Character
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barChartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={11} />
+                <YAxis 
+                  type="category" 
+                  dataKey="name" 
+                  stroke="#64748b" 
+                  fontSize={11} 
+                  width={80}
+                  tickFormatter={(value) => value.length > 8 ? `${value.slice(0,8)}...` : value}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: '1px solid #334155', 
+                    borderRadius: '8px',
+                    color: '#f1f5f9'
+                  }}
+                  formatter={(value: number) => [`${value} days`, 'Days']}
+                />
+                <Bar dataKey="days" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Cast Distribution - Pie Chart */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+            <PieChart className="w-4 h-4 text-purple-400" />
+            Cast Distribution
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie
+                  data={pieChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                  nameKey="name"
+                  label={({ name, value }) => `${name}: ${value}`}
+                  labelLine={true}
+                >
+                  {pieChartData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: '1px solid #334155', 
+                    borderRadius: '8px',
+                    color: '#f1f5f9'
+                  }}
+                />
+                <Legend 
+                  formatter={(value) => <span className="text-slate-400 text-xs">{value}</span>}
+                />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-cyan-400">{stats.mainCastDays}</div>
+          <div className="text-xs text-slate-500 mt-1">Main Cast Days</div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-purple-400">{stats.supportingCastDays}</div>
+          <div className="text-xs text-slate-500 mt-1">Supporting Days</div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-emerald-400">
+            {report.filter(r => r.percentage >= 50).length}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">Heavy Shoot Days</div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-amber-400">
+            {Math.max(...report.map(r => r.days.length), 0) - Math.min(...report.map(r => r.days.length), 0)}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">Day Range Spread</div>
+        </div>
+      </div>
+    </div>
+  )
+
   // Stats cards
   const statCards = [
     { 
@@ -168,28 +354,32 @@ export default function DOODPage() {
       value: stats.totalCharacters, 
       icon: Users, 
       color: 'text-cyan-400',
-      bg: 'bg-cyan-400/10'
+      bg: 'bg-cyan-400/10',
+      subtext: `${report.filter(r => r.isMain).length} main, ${report.filter(r => !r.isMain).length} supporting`
     },
     { 
       label: 'Shooting Days', 
       value: stats.totalShootingDays, 
       icon: Calendar, 
-      color: 'text-green-400',
-      bg: 'bg-green-400/10'
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-400/10',
+      subtext: `${totalShootingDays} days scheduled`
     },
     { 
       label: 'Total Calls', 
       value: stats.totalCalls, 
       icon: Clock, 
       color: 'text-purple-400',
-      bg: 'bg-purple-400/10'
+      bg: 'bg-purple-400/10',
+      subtext: 'Actor day calls'
     },
     { 
       label: 'Avg Days/Actor', 
       value: stats.avgDaysPerActor, 
       icon: TrendingUp, 
-      color: 'text-yellow-400',
-      bg: 'bg-yellow-400/10'
+      color: 'text-amber-400',
+      bg: 'bg-amber-400/10',
+      subtext: 'Per actor average'
     },
   ]
 
@@ -207,9 +397,9 @@ export default function DOODPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+          <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white">
             ←
           </Link>
           <div>
@@ -217,57 +407,96 @@ export default function DOODPage() {
               📊 Day Out of Days (DOOD)
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              Track actor availability across the shooting schedule
+              Track actor availability and call days across the production schedule
             </p>
           </div>
         </div>
         
-        {/* Demo Mode Banner */}
-        {isDemoMode && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/50 rounded-lg">
-            <AlertCircle className="w-4 h-4 text-amber-400" />
-            <span className="text-amber-400 text-sm font-medium">Demo Data</span>
-          </div>
-        )}
-        
+        {/* Status Indicators */}
         <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex bg-gray-800 rounded-lg p-1">
+          {isDemoMode && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/50 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-amber-400" />
+              <span className="text-amber-400 text-sm font-medium">Demo Data</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/50 rounded-lg">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+            <span className="text-emerald-400 text-sm font-medium">API Connected</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls Row */}
+      <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          {/* View Mode Toggle */}
+          <div className="flex bg-slate-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
+                viewMode === 'analytics' 
+                  ? 'bg-cyan-400 text-black' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
                 viewMode === 'calendar' 
                   ? 'bg-cyan-400 text-black' 
                   : 'text-gray-400 hover:text-white'
               }`}
             >
+              <Calendar className="w-4 h-4" />
               Calendar
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
                 viewMode === 'list' 
                   ? 'bg-cyan-400 text-black' 
                   : 'text-gray-400 hover:text-white'
               }`}
             >
+              <List className="w-4 h-4" />
               List
             </button>
           </div>
 
+          {/* Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <select
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value as any)}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            >
+              <option value="all">All Cast</option>
+              <option value="main">Main Cast Only</option>
+              <option value="supporting">Supporting Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
+            title="Refresh Data"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
           
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+            className="px-4 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
           >
             <option value="default-project">இதயத்தின் ஒலி</option>
             <option value="project-2">Veera's Journey</option>
@@ -290,11 +519,11 @@ export default function DOODPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((stat, idx) => (
           <div 
             key={idx}
-            className="bg-cinepilot-card border border-cinepilot-border rounded-xl p-4 hover:border-gray-600 transition-colors"
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors"
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">{stat.label}</span>
@@ -303,137 +532,145 @@ export default function DOODPage() {
               </div>
             </div>
             <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+            <div className="text-xs text-gray-600 mt-1">{stat.subtext}</div>
           </div>
         ))}
       </div>
 
-      {/* Main Content */}
-      <div className="bg-cinepilot-card border border-cinepilot-border rounded-xl overflow-hidden">
-        {/* Table Header */}
-        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-cyan-400" />
-            <h2 className="font-semibold">Cast Schedule</h2>
-            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-              {report.length} actors
-            </span>
-          </div>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleExport('csv')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              CSV
-            </button>
-            <button
-              onClick={() => handleExport('pdf')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-400 rounded-lg text-sm transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Export Report
-            </button>
-          </div>
-        </div>
+      {/* Analytics View */}
+      {viewMode === 'analytics' && renderAnalytics()}
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-900/50">
-              <tr>
-                <th className="text-left p-4 font-medium text-gray-400 w-16">#</th>
-                <th className="text-left p-4 font-medium text-gray-400">Character</th>
-                <th className="text-center p-4 font-medium text-gray-400 w-24">Total Days</th>
-                <th className="text-center p-4 font-medium text-gray-400 w-32">% of Shoot</th>
-                <th className="text-left p-4 font-medium text-gray-400">
-                  {viewMode === 'calendar' ? 'Shooting Calendar' : 'Working Days'}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {report.map((row, idx) => (
-                <tr 
-                  key={row.characterId} 
-                  className="hover:bg-gray-800/30 transition-colors"
-                >
-                  <td className="p-4">
-                    <span className="text-gray-500 text-sm">{idx + 1}</span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                        row.isMain 
-                          ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-black' 
-                          : 'bg-gray-700 text-gray-300'
-                      }`}>
-                        {row.character[0]}
+      {/* Main Content - Table View */}
+      {(viewMode === 'calendar' || viewMode === 'list') && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          {/* Table Header */}
+          <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-cyan-400" />
+              <h2 className="font-semibold">Cast Schedule</h2>
+              <span className="text-xs text-gray-500 bg-slate-800 px-2 py-0.5 rounded-full">
+                {filteredReport.length} actors
+              </span>
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleExport('csv')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </button>
+              <button
+                onClick={() => handleExport('json')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+              >
+                <Share2 className="w-4 h-4" />
+                JSON
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50">
+                <tr>
+                  <th className="text-left p-4 font-medium text-gray-400 w-16">#</th>
+                  <th className="text-left p-4 font-medium text-gray-400">Character</th>
+                  <th className="text-center p-4 font-medium text-gray-400 w-24">Total Days</th>
+                  <th className="text-center p-4 font-medium text-gray-400 w-32">% of Shoot</th>
+                  <th className="text-left p-4 font-medium text-gray-400">
+                    {viewMode === 'calendar' ? 'Shooting Calendar' : 'Working Days'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredReport.map((row, idx) => (
+                  <tr 
+                    key={row.characterId} 
+                    className="hover:bg-slate-800/30 transition-colors"
+                  >
+                    <td className="p-4">
+                      <span className="text-gray-500 text-sm">{idx + 1}</span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                          row.isMain 
+                            ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-black' 
+                            : 'bg-gradient-to-br from-purple-400 to-purple-600 text-white'
+                        }`}>
+                          {row.character[0]}
+                        </div>
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            {row.character}
+                            {row.isMain && (
+                              <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-1.5 py-0.5 rounded">
+                                MAIN
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {row.characterTamil} • {row.actorName || 'TBA'}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {row.character}
-                          {row.isMain && (
-                            <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-1.5 py-0.5 rounded">
-                              MAIN
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`text-2xl font-bold ${getPercentageColor(row.percentage)}`}>
+                        {row.total_days}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full bg-gradient-to-r ${getPercentageGradient(row.percentage)} rounded-full transition-all duration-500`}
+                            style={{ width: `${row.percentage}%` }}
+                          />
+                        </div>
+                        <span className={`text-sm font-medium ${getPercentageColor(row.percentage)} w-12 text-right`}>
+                          {row.percentage}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      {viewMode === 'calendar' ? (
+                        renderCalendar(row.days)
+                      ) : (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {row.days.length > 0 ? row.days.map(d => (
+                            <span 
+                              key={d}
+                              className="px-2 py-0.5 bg-cyan-400/20 text-cyan-400 rounded text-xs"
+                            >
+                              Day {d}
                             </span>
+                          )) : (
+                            <span className="text-gray-500 text-sm">No calls</span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {row.characterTamil} • {row.actorName || 'TBA'}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className="text-cyan-400 font-bold text-xl">{row.total_days}</span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-500"
-                          style={{ width: `${row.percentage}%` }}
-                        />
-                      </div>
-                      <span className="text-sm text-gray-400 w-12 text-right">
-                        {row.percentage}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    {viewMode === 'calendar' ? (
-                      renderCalendar(row.days)
-                    ) : (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {row.days.length > 0 ? row.days.map(d => (
-                          <span 
-                            key={d}
-                            className="px-2 py-0.5 bg-cyan-400/20 text-cyan-400 rounded text-xs"
-                          >
-                            Day {d}
-                          </span>
-                        )) : (
-                          <span className="text-gray-500 text-sm">No calls</span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Legend & Info */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex gap-6 text-sm text-gray-500">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-cyan-400 rounded"></div>
             <span>Working Day</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-gray-800 rounded"></div>
+            <div className="w-4 h-4 bg-slate-800 rounded"></div>
             <span>Off Day</span>
           </div>
         </div>

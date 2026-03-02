@@ -232,6 +232,9 @@ export default function MissionControl() {
               <p className="text-2xl font-mono font-bold text-cyan-400">
                 {time.toLocaleTimeString('en-US', { hour12: false })}
               </p>
+              <p className="text-xs text-slate-600 font-mono">
+                {time.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-right">

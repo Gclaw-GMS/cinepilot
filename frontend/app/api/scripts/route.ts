@@ -312,6 +312,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const projectId = (formData.get('projectId') as string) || DEFAULT_PROJECT_ID;
+    const notes = formData.get('notes') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -321,7 +322,7 @@ export async function POST(req: NextRequest) {
     const filename = file.name;
     const mimeType = file.type || 'application/octet-stream';
 
-    const upload = await uploadScript(projectId, buffer, filename, mimeType);
+    const upload = await uploadScript(projectId, buffer, filename, mimeType, notes);
 
     if (upload.status === 'analyzed') {
       return NextResponse.json({

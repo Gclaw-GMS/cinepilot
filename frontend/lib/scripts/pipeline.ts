@@ -59,7 +59,8 @@ export async function uploadScript(
   projectId: string,
   file: Buffer,
   filename: string,
-  mimeType: string
+  mimeType: string,
+  notes?: string | null
 ): Promise<UploadResult> {
   const format = detectFormat(filename, mimeType);
   if (!format) {
@@ -116,6 +117,7 @@ export async function uploadScript(
       scriptId: script.id,
       versionNumber,
       rawTextHash: contentHash,
+      changeNote: notes || null,
     },
   });
 

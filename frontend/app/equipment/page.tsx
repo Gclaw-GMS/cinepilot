@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2 } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface EquipmentRental {
@@ -102,9 +102,11 @@ export default function EquipmentPage() {
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
     category: 'camera',
+    status: 'available',
     dateStart: '',
     dateEnd: '',
     dailyRate: '',
@@ -236,22 +238,34 @@ export default function EquipmentPage() {
     setSaving(true)
     
     try {
-      const res = await fetch('/api/equipment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
+      let res
+      if (editingId) {
+        // Update existing equipment
+        res = await fetch('/api/equipment', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingId, ...form }),
+        })
+      } else {
+        // Create new equipment
+        res = await fetch('/api/equipment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+      }
       
       if (res.ok) {
         setModalOpen(false)
-        setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+        setEditingId(null)
+        setForm({ name: '', category: 'camera', status: 'available', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
         await fetchEquipment()
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to add equipment')
+        setError(data.error || (editingId ? 'Failed to update equipment' : 'Failed to add equipment'))
       }
     } catch (err) {
-      setError('Failed to add equipment')
+      setError(editingId ? 'Failed to update equipment' : 'Failed to add equipment')
     } finally {
       setSaving(false)
     }
@@ -492,12 +506,34 @@ export default function EquipmentPage() {
                 <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
                 <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
               </div>
-              <button
-                onClick={() => handleDelete(eq.id)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={() => {
+                    setEditingId(eq.id)
+                    setForm({
+                      name: eq.name,
+                      category: eq.category,
+                      status: eq.status,
+                      dateStart: eq.dateStart,
+                      dateEnd: eq.dateEnd,
+                      dailyRate: eq.dailyRate.toString(),
+                      vendor: eq.vendor || '',
+                      notes: eq.notes || '',
+                    })
+                    setModalOpen(true)
+                  }}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
+                  title="Edit equipment"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(eq.id)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
             <div className="flex items-center gap-2 mb-4">
@@ -535,14 +571,18 @@ export default function EquipmentPage() {
         )}
       </div>
 
-      {/* Add Modal */}
+      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Add Equipment</h2>
+              <h2 className="text-xl font-semibold">{editingId ? 'Edit Equipment' : 'Add Equipment'}</h2>
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false)
+                  setEditingId(null)
+                  setForm({ name: '', category: 'camera', status: 'available', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+                }}
                 className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
@@ -562,18 +602,33 @@ export default function EquipmentPage() {
                 />
               </div>
               
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Category *</label>
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
-                  required
-                >
-                  {CATEGORIES.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.label}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1.5">Category *</label>
+                  <select
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                    required
+                  >
+                    {CATEGORIES.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1.5">Status</label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="available">Available</option>
+                    <option value="in-use">In Use</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="returned">Returned</option>
+                  </select>
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -635,7 +690,11 @@ export default function EquipmentPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => {
+                    setModalOpen(false)
+                    setEditingId(null)
+                    setForm({ name: '', category: 'camera', status: 'available', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+                  }}
                   className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
                 >
                   Cancel
@@ -645,8 +704,8 @@ export default function EquipmentPage() {
                   disabled={saving}
                   className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Add Equipment
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editingId ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  {editingId ? 'Update Equipment' : 'Add Equipment'}
                 </button>
               </div>
             </form>

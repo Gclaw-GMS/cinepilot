@@ -672,6 +672,44 @@ export const scriptVersions = {
       body: JSON.stringify({ v1, v2 }),
     });
   },
+  upload: async (projectId: string, file: File, notes?: string): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', projectId);
+    if (notes) formData.append('notes', notes);
+    
+    const res = await fetch('/api/scripts', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+    return res.json();
+  },
+  list: async (projectId: string): Promise<{ versions: any[] }> => {
+    // Fetch all scripts for project and extract versions
+    const scripts: any[] = await apiFetch(`/api/scripts?projectId=${projectId}`);
+    const allVersions: any[] = [];
+    
+    for (const script of scripts) {
+      if (script.scriptVersions) {
+        for (const v of script.scriptVersions) {
+          allVersions.push({
+            ...v,
+            scriptTitle: script.title,
+            scriptId: script.id,
+          });
+        }
+      }
+    }
+    
+    // Sort by version number descending
+    allVersions.sort((a, b) => b.versionNumber - a.versionNumber);
+    return { versions: allVersions };
+  },
 };
 
 // Schedule Recommendations API

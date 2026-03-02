@@ -176,11 +176,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH /api/equipment - update equipment rental
-export async function PATCH(req: NextRequest) {
+// PUT /api/equipment - update equipment rental
+export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, name, category, dateStart, dateEnd, dailyRate, vendor, notes } = body;
+    const { id, name, category, status, dateStart, dateEnd, dailyRate, vendor, notes } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -197,6 +197,7 @@ export async function PATCH(req: NextRequest) {
     if (dailyRate) updateData.dailyRate = Number(dailyRate);
     if (vendor !== undefined) updateData.vendor = vendor;
     if (notes !== undefined) updateData.notes = notes;
+    // Note: status is handled automatically based on dates in GET, but we accept it for completeness
 
     const rental = await prisma.equipmentRental.update({
       where: { id },
@@ -205,12 +206,17 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ rental });
   } catch (error) {
-    console.error('[PATCH /api/equipment]', error);
+    console.error('[PUT /api/equipment]', error);
     return NextResponse.json(
       { error: 'Failed to update equipment rental' },
       { status: 500 }
     );
   }
+}
+
+// PATCH /api/equipment - update equipment rental (alias for PUT)
+export async function PATCH(req: NextRequest) {
+  return PUT(req);
 }
 
 // DELETE /api/equipment - delete equipment rental

@@ -51,7 +51,8 @@ export async function uploadScript(
   projectId: string,
   buffer: Buffer,
   filename: string,
-  mimeType: string
+  mimeType: string,
+  notes?: string | null
 ): Promise<UploadResult> {
   const content = buffer.toString('utf-8')
   const contentHash = hash(content)
@@ -84,7 +85,8 @@ export async function uploadScript(
         create: {
           versionNumber: 1,
           rawTextHash: contentHash,
-          extractionScore: null
+          extractionScore: null,
+          changeNote: notes || null
         }
       }
     }

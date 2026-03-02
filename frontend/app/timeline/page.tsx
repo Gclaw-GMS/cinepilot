@@ -610,6 +610,129 @@ export default function TimelinePage() {
             <div className="text-sm text-slate-400">Team assignments</div>
           </motion.button>
         </div>
+
+        {/* Enhanced Milestone Tracker */}
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Target className="w-5 h-5 text-purple-400" />
+              Milestone Tracker
+            </h3>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-slate-400">Overall Progress:</span>
+              <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.round((stats.completed / Math.max(stats.total, 1)) * 100)}%` }}
+                />
+              </div>
+              <span className="text-green-400 font-medium">{Math.round((stats.completed / Math.max(stats.total, 1)) * 100)}%</span>
+            </div>
+          </div>
+          
+          {/* Milestone Timeline Visualization */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="relative">
+              {/* Timeline Line */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-700"></div>
+              
+              {/* Milestones */}
+              <div className="space-y-6">
+                {[
+                  { name: 'Script Lock', date: '2026-01-05', phase: 'Pre-Production', status: 'completed', progress: 100 },
+                  { name: 'Casting Complete', date: '2026-01-10', phase: 'Pre-Production', status: 'completed', progress: 100 },
+                  { name: 'Location Scout Done', date: '2026-01-15', phase: 'Pre-Production', status: 'completed', progress: 100 },
+                  { name: '50% Shoot Days', date: '2026-01-31', phase: 'Production', status: 'in_progress', progress: 40 },
+                  { name: 'Pack-Up', date: '2026-02-10', phase: 'Production', status: 'pending', progress: 0 },
+                  { name: 'Rough Cut', date: '2026-02-25', phase: 'Post-Production', status: 'pending', progress: 0 },
+                  { name: 'Final Delivery', date: '2026-03-15', phase: 'Post-Production', status: 'pending', progress: 0 },
+                ].map((milestone, idx) => (
+                  <div key={idx} className="relative flex items-start gap-4 pl-2">
+                    {/* Status Indicator */}
+                    <div className={`
+                      relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2
+                      ${milestone.status === 'completed' ? 'bg-green-500/20 border-green-500' : 
+                        milestone.status === 'in_progress' ? 'bg-yellow-500/20 border-yellow-500' : 
+                        'bg-slate-800 border-slate-600'}
+                    `}>
+                      {milestone.status === 'completed' ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : milestone.status === 'in_progress' ? (
+                        <Zap className="w-5 h-5 text-yellow-400" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-slate-500" />
+                      )}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 hover:border-slate-600/50 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <h4 className="font-medium text-white">{milestone.name}</h4>
+                          <p className="text-sm text-slate-400">{milestone.phase}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-slate-300">{milestone.date}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  milestone.status === 'completed' ? 'bg-green-500' :
+                                  milestone.status === 'in_progress' ? 'bg-yellow-500' : 'bg-slate-600'
+                                }`}
+                                style={{ width: `${milestone.progress}%` }}
+                              />
+                            </div>
+                            <span className={`text-xs font-medium ${
+                              milestone.status === 'completed' ? 'text-green-400' :
+                              milestone.status === 'in_progress' ? 'text-yellow-400' : 'text-slate-500'
+                            }`}>{milestone.progress}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Production Metrics Summary */}
+        <div className="mt-8 grid grid-cols-4 gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Pre-Production</span>
+              <Target className="w-4 h-4 text-blue-400" />
+            </div>
+            <div className="text-2xl font-semibold text-blue-400">100%</div>
+            <div className="text-xs text-slate-500 mt-1">3/3 milestones</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Production</span>
+              <Film className="w-4 h-4 text-purple-400" />
+            </div>
+            <div className="text-2xl font-semibold text-purple-400">40%</div>
+            <div className="text-xs text-slate-500 mt-1">1/3 milestones</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Post-Production</span>
+              <Clock className="w-4 h-4 text-orange-400" />
+            </div>
+            <div className="text-2xl font-semibold text-orange-400">0%</div>
+            <div className="text-xs text-slate-500 mt-1">0/2 milestones</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Days Remaining</span>
+              <Calendar className="w-4 h-4 text-green-400" />
+            </div>
+            <div className="text-2xl font-semibold text-green-400">42</div>
+            <div className="text-xs text-slate-500 mt-1">Until delivery</div>
+          </div>
+        </div>
       </main>
     </div>
   );

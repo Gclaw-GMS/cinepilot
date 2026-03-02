@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
         confidence: analysis.confidence,
         highRiskCount: analysis._count.sceneFlags,
         suggestionCount: analysis._count.suggestions,
+        isDemoMode: false,
       });
     }
 

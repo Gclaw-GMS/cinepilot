@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   StickyNote,
   Plus,
@@ -22,7 +22,19 @@ import {
   FileText,
   Clock,
   ChevronDown,
+  BarChart3,
 } from 'lucide-react'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from 'recharts'
 
 interface Note {
   id: string
@@ -103,6 +115,24 @@ export default function NotesPage() {
     note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     note.author.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  // Compute chart data for notes distribution
+  const categoryChartData = useMemo(() => {
+    const categoryMap = new Map<string, { name: string; count: number; color: string }>()
+    
+    CATEGORIES.filter(c => c.key !== 'all').forEach(cat => {
+      categoryMap.set(cat.key, { name: cat.label, count: 0, color: cat.color })
+    })
+    
+    notes.forEach(note => {
+      const cat = categoryMap.get(note.category)
+      if (cat) cat.count++
+    })
+    
+    return Array.from(categoryMap.values())
+      .filter(item => item.count > 0)
+      .sort((a, b) => b.count - a.count)
+  }, [notes])
 
   const pinnedNotes = filteredNotes.filter(n => n.isPinned)
   const unpinnedNotes = filteredNotes.filter(n => !n.isPinned)
@@ -362,6 +392,45 @@ export default function NotesPage() {
             />
           </div>
         </div>
+
+        {/* Notes Distribution Chart */}
+        {notes.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-4 h-4 text-slate-400" />
+              <h3 className="text-sm font-medium text-slate-300">Notes Distribution</h3>
+            </div>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categoryChartData} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    width={80}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    labelStyle={{ color: '#f1f5f9' }}
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {categoryChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Notes Grid */}
         {loading ? (

@@ -115,8 +115,8 @@ export default function ContinuityPage() {
       if (res.ok && data.warnings) {
         setWarnings(data.warnings);
         setSummary(data.summary || calculateSummary(data.warnings));
-        setIsDemoMode(!!data.isDemo);
-      } else if (!res.ok && data.isDemo !== false) {
+        setIsDemoMode(data.isDemoMode === true);
+      } else if (!res.ok && data.isDemoMode !== false) {
         // Use demo data
         setWarnings(DEMO_WARNINGS);
         setSummary(DEMO_SUMMARY);

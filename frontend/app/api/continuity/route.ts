@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     console.log('[GET /api/continuity] Using demo data - database not connected');
     return NextResponse.json({
       warnings: DEMO_WARNINGS,
-      isDemo: true
+      isDemoMode: true
     });
   } finally {
     await prisma.$disconnect().catch(() => {});
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
         plotHoles: DEMO_WARNINGS.filter(w => w.warningType === 'plot_hole').length,
         total: DEMO_WARNINGS.length,
       },
-      isDemo: true,
+      isDemoMode: true,
       message: 'Demo mode - AI analysis simulated'
     });
   }

@@ -6,8 +6,13 @@ import {
   Calendar, AlertTriangle, MessageSquare, Wand2, Search,
   Play, ArrowRight, TrendingUp, Target, Zap, CheckCircle,
   AlertCircle, Info, Loader2, X, ChevronDown, BarChart3,
-  Clock, Users, MapPin, Sun, Moon, Film
+  Clock, Users, MapPin, Sun, Moon, Film, Download, Copy,
+  Lightbulb, Gauge
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer
+} from 'recharts'
 
 // Feature definitions with detailed configs
 const AI_FEATURES = [
@@ -100,6 +105,13 @@ interface HistoryItem {
   result: any
 }
 
+// Severity colors for risk display
+const SEVERITY_COLORS: Record<string, string> = {
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#10b981',
+}
+
 const COLOR_MAP: Record<string, { bg: string; border: string; text: string; light: string }> = {
   indigo: { bg: 'bg-indigo-600', border: 'border-indigo-500', text: 'text-indigo-400', light: 'bg-indigo-500/10' },
   emerald: { bg: 'bg-emerald-600', border: 'border-emerald-500', text: 'text-emerald-400', light: 'bg-emerald-500/10' },
@@ -119,6 +131,7 @@ export default function AIToolsPage() {
   const [inputText, setInputText] = useState('')
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const currentFeature = AI_FEATURES.find(f => f.id === selectedFeature)
 
@@ -178,6 +191,27 @@ export default function AIToolsPage() {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   }
 
+  const handleCopy = () => {
+    if (result) {
+      navigator.clipboard.writeText(JSON.stringify(result.result || result, null, 2))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const handleExport = () => {
+    if (result) {
+      const dataStr = JSON.stringify(result.result || result, null, 2)
+      const blob = new Blob([dataStr], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${selectedFeature}_${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -193,18 +227,38 @@ export default function AIToolsPage() {
                 <p className="text-slate-500 text-sm">Advanced AI-powered analysis for film production</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                showHistory ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              History
-              {history.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">{history.length}</span>
+            <div className="flex items-center gap-3">
+              {result && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                  >
+                    {copied ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={handleExport}
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                </div>
               )}
-            </button>
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  showHistory ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                History
+                {history.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">{history.length}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -226,7 +280,7 @@ export default function AIToolsPage() {
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-4">
                   {currentFeature && <currentFeature.icon className={`w-5 h-5 ${COLOR_MAP[currentFeature.color]?.text}`} />}
-                  <h3 className="font-semibold">Input</h3>
+                  <h3 className="font-semibold">Input Parameters</h3>
                 </div>
                 <textarea
                   value={inputText}
@@ -234,7 +288,13 @@ export default function AIToolsPage() {
                   placeholder={currentFeature?.inputPlaceholder || 'Enter your input...'}
                   className="w-full h-32 bg-slate-800 border border-slate-700 rounded-lg p-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 />
-                <p className="text-slate-500 text-xs mt-2">Leave empty to use demo data for analysis</p>
+                <div className="flex items-center justify-between mt-3">
+                  <p className="text-slate-500 text-xs">Leave empty to use demo data for analysis</p>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Gauge className="w-3 h-3" />
+                    Auto-detected: 47 scenes, 12 locations, 28 days
+                  </div>
+                </div>
               </div>
             )}
 
@@ -346,6 +406,185 @@ export default function AIToolsPage() {
   )
 }
 
+// Budget Result Component with Pie Chart
+function BudgetResult({ result, colors }: { result: any; colors: any }) {
+  const budgetData = result.breakdown ? [
+    { name: 'Production', value: result.breakdown.production?.percentage || 0, amount: result.breakdown.production?.amount || 0 },
+    { name: 'Post', value: result.breakdown.postProduction?.percentage || 0, amount: result.breakdown.postProduction?.amount || 0 },
+    { name: 'Talent', value: result.breakdown.talent?.percentage || 0, amount: result.breakdown.talent?.amount || 0 },
+  ] : []
+  const budgetColors = ['#6366f1', '#8b5cf6', '#10b981']
+
+  return (
+    <div className="space-y-6">
+      {result.estimatedTotal && (
+        <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl p-4 border border-emerald-500/20">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Estimated Total Budget</div>
+          <div className="text-3xl font-bold text-emerald-400">
+            ₹{(result.estimatedTotal / 10000000).toFixed(2)} Cr
+          </div>
+          <div className="flex items-center gap-4 mt-2 text-xs">
+            <span className="text-slate-400">
+              Contingency: <span className="text-amber-400">₹{((result.contingencies?.recommended || 0) / 100000).toFixed(0)}L</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {budgetData.length > 0 && (
+        <div>
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Budget Distribution</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={budgetData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={4} dataKey="value" nameKey="name">
+                  {budgetData.map((entry, index) => (<Cell key={`cell-${index}`} fill={budgetColors[index % budgetColors.length]} />))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {budgetData.map((item, i) => (
+              <div key={item.name} className="text-center">
+                <div className="text-lg font-semibold text-slate-200">₹{(item.amount / 10000000).toFixed(1)}Cr</div>
+                <div className="text-xs text-slate-500">{item.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result.recommendations && result.recommendations.length > 0 && (
+        <div>
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Lightbulb className="w-3 h-3 text-amber-400" /> Budget Recommendations
+          </h4>
+          <ul className="space-y-2">
+            {result.recommendations.map((rec: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-slate-300 bg-slate-800/50 p-2 rounded-lg">
+                <div className="w-5 h-5 rounded bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-amber-400 text-xs font-bold">{i + 1}</span>
+                </div>
+                {rec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Risk Result Component
+function RiskResult({ result, colors }: { result: any; colors: any }) {
+  return (
+    <div className="space-y-6">
+      {result.riskScore && (
+        <div className="bg-gradient-to-r from-rose-500/10 to-orange-500/10 rounded-xl p-4 border border-rose-500/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Risk Score</div>
+              <div className={`text-3xl font-bold ${result.riskScore > 50 ? 'text-red-400' : result.riskScore > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {result.riskScore}/100
+              </div>
+            </div>
+            <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${result.riskScore > 50 ? 'bg-red-500/20 text-red-400' : result.riskScore > 25 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              {result.riskScore > 50 ? 'High Risk' : result.riskScore > 25 ? 'Medium Risk' : 'Low Risk'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <AlertTriangle className="w-3 h-3 text-rose-400" /> Identified Risks
+        </h4>
+        <div className="space-y-2">
+          {result.risks.map((risk: any, i: number) => (
+            <div key={i} className="bg-slate-800/50 rounded-lg p-3 border-l-2" style={{ borderColor: SEVERITY_COLORS[risk.severity] || '#6b7280' }}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-slate-200">{risk.category}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${risk.severity === 'high' ? 'bg-red-500/20 text-red-400' : risk.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                  {risk.severity}
+                </span>
+              </div>
+              <p className="text-sm text-slate-400">{risk.description}</p>
+              <div className="mt-2 text-xs text-slate-500">
+                <span className="text-cyan-400">Mitigation:</span> {risk.mitigation}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {result.overallAssessment && (
+        <div className="bg-slate-800/50 rounded-lg p-3">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Assessment</div>
+          <p className="text-sm text-slate-300">{result.overallAssessment}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Schedule Result Component with Bar Chart
+function ScheduleResult({ result, colors }: { result: any; colors: any }) {
+  const scheduleData = result.schedule?.map((item: any) => ({ phase: item.phase, scenes: item.scenes })) || []
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-cyan-400">{result.suggestedDays}</div>
+          <div className="text-xs text-slate-500">Suggested Days</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-slate-400">{result.currentDays}</div>
+          <div className="text-xs text-slate-500">Current Days</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-emerald-400">{result.savings}</div>
+          <div className="text-xs text-slate-500">Days Saved</div>
+        </div>
+      </div>
+
+      {scheduleData.length > 0 && (
+        <div>
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Schedule Phases</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={scheduleData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={10} />
+                <YAxis type="category" dataKey="phase" stroke="#64748b" fontSize={10} width={80} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                <Bar dataKey="scenes" fill={colors?.chart || '#6366f1'} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {result.recommendations && (
+        <div>
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Target className="w-3 h-3 text-cyan-400" /> Schedule Tips
+          </h4>
+          <ul className="space-y-2">
+            {result.recommendations.map((rec: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
+                <CheckCircle className={`w-4 h-4 ${colors?.text} shrink-0 mt-0.5`} />
+                {rec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StatCard({ title, value, color, icon }: { title: string; value: string | number; color: string; icon: React.ReactNode }) {
   const colors = COLOR_MAP[color] || COLOR_MAP.indigo
 
@@ -368,13 +607,82 @@ function ResultPanel({ result, feature, onClose }: { result: any; feature?: type
   if (!result) return null
 
   const colors = feature ? COLOR_MAP[feature.color] : COLOR_MAP.indigo
+  const r = result.result || result
 
-  // Different display based on feature type
-  const renderContent = () => {
-    if (result.summary) {
-      return (
-        <div className="space-y-6">
-          {/* Summary */}
+  // Budget forecast - use specialized component
+  if (r.breakdown) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className={`px-4 py-3 ${colors.light} border-b border-slate-800 flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            {feature && <feature.icon className={`w-5 h-5 ${colors.text}`} />}
+            <span className="font-semibold text-slate-200">{feature?.name || 'Budget Forecast'}</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4">
+          <BudgetResult result={r} colors={colors} />
+        </div>
+      </div>
+    )
+  }
+
+  // Risk detection - use specialized component
+  if (r.risks) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className={`px-4 py-3 ${colors.light} border-b border-slate-800 flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            {feature && <feature.icon className={`w-5 h-5 ${colors.text}`} />}
+            <span className="font-semibold text-slate-200">{feature?.name || 'Risk Detection'}</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4">
+          <RiskResult result={r} colors={colors} />
+        </div>
+      </div>
+    )
+  }
+
+  // Schedule optimization - use specialized component
+  if (r.schedule) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className={`px-4 py-3 ${colors.light} border-b border-slate-800 flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            {feature && <feature.icon className={`w-5 h-5 ${colors.text}`} />}
+            <span className="font-semibold text-slate-200">{feature?.name || 'Schedule Optimizer'}</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4">
+          <ScheduleResult result={r} colors={colors} />
+        </div>
+      </div>
+    )
+  }
+
+  // Default: Script analysis display
+  if (result.summary) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className={`px-4 py-3 ${colors.light} border-b border-slate-800 flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            {feature && <feature.icon className={`w-5 h-5 ${colors.text}`} />}
+            <span className="font-semibold text-slate-200">{feature?.name || 'Analysis Result'}</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+        <div className="p-4 space-y-6">
           <div>
             <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Summary</h4>
             <p className="text-slate-200">{result.summary}</p>
@@ -456,33 +764,26 @@ function ResultPanel({ result, feature, onClose }: { result: any; feature?: type
             </div>
           )}
         </div>
-      )
-    }
-
-    // Fallback for other result types
-    return (
-      <pre className="text-sm text-slate-300 whitespace-pre-wrap">
-        {JSON.stringify(result, null, 2)}
-      </pre>
+      </div>
     )
   }
 
+  // Fallback for unknown result types
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-      <div className={`px-4 py-3 ${colors?.light} border-b border-slate-800 flex items-center justify-between`}>
+      <div className={`px-4 py-3 ${colors.light} border-b border-slate-800 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          {feature && <feature.icon className={`w-5 h-5 ${colors?.text}`} />}
+          {feature && <feature.icon className={`w-5 h-5 ${colors.text}`} />}
           <span className="font-semibold text-slate-200">{feature?.name || 'Analysis Result'}</span>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-slate-800 rounded transition-colors"
-        >
+        <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors">
           <X className="w-4 h-4 text-slate-500" />
         </button>
       </div>
       <div className="p-4">
-        {renderContent()}
+        <pre className="text-sm text-slate-300 whitespace-pre-wrap">
+          {JSON.stringify(result, null, 2)}
+        </pre>
       </div>
     </div>
   )

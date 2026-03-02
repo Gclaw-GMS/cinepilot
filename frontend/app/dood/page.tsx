@@ -382,7 +382,7 @@ export default function DOODPage() {
 
   // Generate calendar grid
   const renderCalendar = (days: number[], isCompact = false) => {
-    const size = isCompact ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-xs'
+    const size = isCompact ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-xs sm:w-5 sm:h-5 sm:text-[10px]'
     return (
       <div className={`flex flex-wrap gap-1 mt-2 ${isCompact ? 'gap-0.5' : ''}`}>
         {Array.from({ length: Math.max(totalShootingDays, 1) }, (_, i) => {
@@ -391,7 +391,7 @@ export default function DOODPage() {
           return (
             <div
               key={dayNum}
-              className={`${size} rounded flex items-center justify-center transition-all ${
+              className={`${size} rounded flex items-center justify-center transition-all hover:scale-110 ${
                 isWorking
                   ? 'bg-cyan-400 text-black font-semibold shadow-md shadow-cyan-400/30'
                   : 'bg-gray-800/60 text-gray-600'
@@ -636,6 +636,31 @@ export default function DOODPage() {
     )
   }
 
+  // Empty state when no data
+  if (!report || report.length === 0) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-gray-500" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">No Actors Scheduled</h3>
+          <p className="text-gray-400 mb-6">
+            Add characters to your script to start tracking their shooting days. 
+            The DOOD report will show actor availability across the production schedule.
+          </p>
+          <Link 
+            href="/scripts"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg font-medium transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+            Go to Script Breakdown
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -825,19 +850,20 @@ export default function DOODPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((stat, idx) => (
           <div 
             key={idx}
             className="bg-cinepilot-card border border-cinepilot-border rounded-xl p-4 hover:border-gray-600 transition-colors"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wide">{stat.label}</span>
-              <div className={`p-2 rounded-lg ${stat.bg}`}>
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
+              <span className="text-xs text-gray-500 uppercase tracking-wide hidden sm:inline">{stat.label}</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wide sm:hidden">{stat.label.split(' ')[0]}</span>
+              <div className={`p-1.5 sm:p-2 rounded-lg ${stat.bg}`}>
+                <stat.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${stat.color}`} />
               </div>
             </div>
-            <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+            <div className={`text-2xl sm:text-3xl font-bold ${stat.color}`}>{stat.value}</div>
           </div>
         ))}
       </div>
@@ -855,16 +881,16 @@ export default function DOODPage() {
           </div>
           
           {/* Filter & Sort Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
             {/* Search Input */}
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search character..."
-                className="pl-9 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm w-40 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400"
+                placeholder="Search..."
+                className="pl-9 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm w-full sm:w-40 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400"
               />
               {searchQuery && (
                 <button
@@ -876,63 +902,67 @@ export default function DOODPage() {
               )}
             </div>
             
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-500" />
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-500" />
+                <select
+                  value={filterMain}
+                  onChange={(e) => setFilterMain(e.target.value as typeof filterMain)}
+                  className="px-2 py-1.5 sm:px-3 sm:py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+                >
+                  <option value="all">All Cast</option>
+                  <option value="main">Main Cast</option>
+                  <option value="supporting">Supporting</option>
+                </select>
+              </div>
+              
               <select
-                value={filterMain}
-                onChange={(e) => setFilterMain(e.target.value as typeof filterMain)}
-                className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="px-2 py-1.5 sm:px-3 sm:py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm"
               >
-                <option value="all">All Cast</option>
-                <option value="main">Main Cast</option>
-                <option value="supporting">Supporting</option>
+                <option value="days">Sort by Days</option>
+                <option value="name">Sort by Name</option>
+                <option value="percentage">Sort by %</option>
               </select>
             </div>
             
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm"
-            >
-              <option value="days">Sort by Days</option>
-              <option value="name">Sort by Name</option>
-              <option value="percentage">Sort by %</option>
-            </select>
-            
-            <button
-              onClick={() => handleExport('csv')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              CSV
-            </button>
-            <button
-              onClick={() => handleExport('json')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-purple-400/10 hover:bg-purple-400/20 text-purple-400 rounded-lg text-sm transition-colors"
-              title="Export as JSON"
-            >
-              <FileText className="w-4 h-4" />
-              JSON
-            </button>
-            <button
-              onClick={() => handleExport('pdf')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-400 rounded-lg text-sm transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Export Report
-            </button>
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+              <button
+                onClick={() => handleExport('csv')}
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+              <button
+                onClick={() => handleExport('json')}
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-purple-400/10 hover:bg-purple-400/20 text-purple-400 rounded-lg text-sm transition-colors"
+                title="Export as JSON"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">JSON</span>
+              </button>
+              <button
+                onClick={() => handleExport('pdf')}
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-400 rounded-lg text-sm transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Export Report</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead className="bg-gray-900/50">
               <tr>
-                <th className="text-left p-4 font-medium text-gray-400 w-16">#</th>
+                <th className="text-left p-4 font-medium text-gray-400 w-12 sm:w-16">#</th>
                 <th className="text-left p-4 font-medium text-gray-400">Character</th>
-                <th className="text-center p-4 font-medium text-gray-400 w-24">Total Days</th>
-                <th className="text-center p-4 font-medium text-gray-400 w-32">% of Shoot</th>
+                <th className="text-center p-4 font-medium text-gray-400 w-16 sm:w-24 hidden sm:table-cell">Total Days</th>
+                <th className="text-center p-4 font-medium text-gray-400 w-24 sm:w-32 hidden md:table-cell">% of Shoot</th>
                 <th className="text-left p-4 font-medium text-gray-400">
                   {viewMode === 'calendar' ? 'Shooting Calendar' : 'Working Days'}
                 </th>
@@ -953,48 +983,48 @@ export default function DOODPage() {
                     <span className="text-gray-500 text-sm">{idx + 1}</span>
                   </td>
                   <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold shrink-0 ${
                         row.isMain 
                           ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-black' 
                           : 'bg-gray-700 text-gray-300'
                       }`}>
                         {row.character[0]}
                       </div>
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {row.character}
+                      <div className="min-w-0">
+                        <div className="font-medium flex items-center gap-2 flex-wrap">
+                          <span className="truncate">{row.character}</span>
                           {row.isMain && (
-                            <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-1.5 py-0.5 rounded shrink-0">
                               MAIN
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-500 hidden sm:block">
                           {row.characterTamil} • {row.actorName || 'TBA'}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 text-center">
-                    <span className="text-cyan-400 font-bold text-xl">{row.total_days}</span>
+                  <td className="p-4 text-center hidden sm:table-cell">
+                    <span className="text-cyan-400 font-bold text-lg sm:text-xl">{row.total_days}</span>
                   </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+                  <td className="p-4 hidden md:table-cell">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 sm:h-3 bg-gray-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-500"
                           style={{ width: `${row.percentage}%` }}
                         />
                       </div>
-                      <span className="text-sm text-gray-400 w-12 text-right">
+                      <span className="text-sm text-gray-400 w-10 sm:w-12 text-right">
                         {row.percentage}%
                       </span>
                     </div>
                   </td>
                   <td className="p-4">
                     {viewMode === 'calendar' ? (
-                      renderCalendar(row.days)
+                      renderCalendar(row.days, true)
                     ) : viewMode === 'heatmap' ? (
                       <div className="flex flex-wrap gap-1">
                         {row.days.map(d => {
@@ -1008,7 +1038,7 @@ export default function DOODPage() {
                           return (
                             <span 
                               key={d}
-                              className={`px-2 py-0.5 ${bgColor} text-white rounded text-xs`}
+                              className={`px-1.5 py-0.5 sm:px-2 sm:py-0.5 ${bgColor} text-white rounded text-[10px] sm:text-xs`}
                             >
                               D{d}
                             </span>
@@ -1020,7 +1050,7 @@ export default function DOODPage() {
                         {row.days.length > 0 ? row.days.map(d => (
                           <span 
                             key={d}
-                            className="px-2 py-0.5 bg-cyan-400/20 text-cyan-400 rounded text-xs"
+                            className="px-1.5 py-0.5 sm:px-2 sm:py-0.5 bg-cyan-400/20 text-cyan-400 rounded text-[10px] sm:text-xs"
                           >
                             Day {d}
                           </span>

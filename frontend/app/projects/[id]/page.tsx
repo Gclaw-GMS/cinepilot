@@ -62,6 +62,7 @@ export default function ProjectDetailPage() {
   const [crew, setCrew] = useState<CrewMember[]>([])
   const [activeTab, setActiveTab] = useState('scenes')
   const [loading, setLoading] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
     loadProjectData()
@@ -84,6 +85,7 @@ export default function ProjectDetailPage() {
       setLocations(locationsData.locations || [])
       setCharacters(charactersData.characters || [])
       setCrew(crewData.crew || [])
+      setIsDemoMode(false)
     } catch (e) {
       // Use demo data
       setProject(DEMO_PROJECT)
@@ -91,6 +93,7 @@ export default function ProjectDetailPage() {
       setLocations(DEMO_LOCATIONS)
       setCharacters(DEMO_CHARACTERS)
       setCrew(DEMO_CREW)
+      setIsDemoMode(true)
     }
     setLoading(false)
   }
@@ -155,6 +158,16 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="p-6">
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div className="mx-4 mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <p className="text-amber-400 text-sm flex items-center gap-2">
+            <span>ℹ️</span>
+            Running in demo mode with sample project data. Connect your database for your own projects.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link 
@@ -169,6 +182,11 @@ export default function ProjectDetailPage() {
             <span className={`px-2 py-1 text-xs rounded ${statusColors[project.status] || 'bg-gray-700'}`}>
               {project.status}
             </span>
+            {isDemoMode && (
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-full border border-amber-500/30">
+                Demo
+              </span>
+            )}
           </div>
           <p className="text-gray-400 text-sm mt-1">{project.description}</p>
         </div>

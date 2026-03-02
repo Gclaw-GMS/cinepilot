@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
   if (!dbConnected) {
     return NextResponse.json({ 
       sentiments: demoSentiments,
-      isDemo: true 
+      isDemoMode: true 
     })
   }
 
@@ -160,17 +160,17 @@ export async function GET(request: NextRequest) {
     if (sentiments.length === 0) {
       return NextResponse.json({ 
         sentiments: demoSentiments,
-        isDemo: true 
+        isDemoMode: true 
       })
     }
 
-    return NextResponse.json({ sentiments, isDemo: false })
+    return NextResponse.json({ sentiments, isDemoMode: false })
   } catch (error) {
     console.error('Error fetching sentiments:', error)
     // Fallback to demo data on error
     return NextResponse.json({ 
       sentiments: demoSentiments,
-      isDemo: true,
+      isDemoMode: true,
       error: 'Using demo data due to server error' 
     })
   }
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ 
       sentiment: newDemoSentiment,
-      isDemo: true 
+      isDemoMode: true 
     })
   }
 
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ sentiment, isDemo: false })
+    return NextResponse.json({ sentiment, isDemoMode: false })
   } catch (error) {
     console.error('Error creating sentiment:', error)
     return NextResponse.json({ error: 'Failed to create sentiment analysis' }, { status: 500 })
@@ -263,14 +263,14 @@ export async function PATCH(request: NextRequest) {
         }
         return NextResponse.json({ 
           sentiment: demoSentiments[index],
-          isDemo: true 
+          isDemoMode: true 
         })
       }
     }
     
     return NextResponse.json({ 
       sentiment: { id: 'demo-update', status: 'completed' },
-      isDemo: true 
+      isDemoMode: true 
     })
   }
 
@@ -309,7 +309,7 @@ export async function DELETE(request: NextRequest) {
       demoSentiments = demoSentiments.filter(s => s.id !== id)
     }
     
-    return NextResponse.json({ success: true, isDemo: true })
+    return NextResponse.json({ success: true, isDemoMode: true })
   }
 
   try {

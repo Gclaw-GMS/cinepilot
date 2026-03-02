@@ -263,7 +263,7 @@ export async function GET(req: NextRequest) {
         characters: DEMO_CHARACTERS,
         props: DEMO_PROPS,
         analyses: DEMO_ANALYSES,
-        isDemo: true,
+        isDemoMode: true,
       });
     }
 
@@ -300,7 +300,7 @@ export async function GET(req: NextRequest) {
       characters: DEMO_CHARACTERS,
       props: DEMO_PROPS,
       analyses: DEMO_ANALYSES,
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 }

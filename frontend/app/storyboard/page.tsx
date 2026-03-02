@@ -83,7 +83,7 @@ export default function StoryboardPage() {
       setScenes(data.scenes || [])
       setTotalFrames(data.totalFrames || 0)
       // Detect demo mode from API response
-      setIsDemoMode(data.isDemo === true)
+      setIsDemoMode(data.isDemoMode === true)
     } catch (err) {
       console.error('Failed to load frames:', err)
     } finally {

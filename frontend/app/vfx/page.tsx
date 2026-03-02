@@ -170,7 +170,7 @@ export default function VfxPage() {
         setVfxProps(data.props || []);
         setSummary(data.summary || null);
         // Check for isDemo flag in response body (new API format)
-        setIsDemoMode(data.isDemo === true);
+        setIsDemoMode(data.isDemoMode === true);
       }
     } catch (err) {
       // Use demo data on error

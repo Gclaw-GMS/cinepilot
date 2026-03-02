@@ -24,7 +24,7 @@ const DEMO_STATS = {
   confidence: 'high',
   highRiskCount: 6,
   suggestionCount: 4,
-  isDemo: true,
+  isDemoMode: true,
 };
 
 // GET /api/censor — get latest analysis for dashboard
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     if (!analysis) {
       return NextResponse.json({ 
         analysis: DEMO_ANALYSIS,
-        isDemo: true,
+        isDemoMode: true,
       });
     }
 
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json({ 
       analysis: DEMO_ANALYSIS,
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 }
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
           message: 'Analysis complete (Demo Mode): predicted UA 13+',
           predictedCertificate: 'UA 13+',
           sensitivityScore: 69,
-          isDemo: true,
+          isDemoMode: true,
         });
       }
     }

@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ...DEMO_VFX_DATA,
       summary,
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
         totalWarnings: vfxWarnings.length,
         complexityBreakdown,
       },
-      isDemo: false,
+      isDemoMode: false,
     });
   } catch (error) {
     console.error('[GET /api/vfx]', error);
@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ...DEMO_VFX_DATA,
       summary,
-      isDemo: true,
+      isDemoMode: true,
       error: 'Using demo data due to database error',
     });
   }
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
         warningsCreated: DEMO_VFX_DATA.vfxWarnings.length,
       },
       message: 'VFX analysis complete (Demo Mode)',
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 
@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
         vfxNotesCreated: createdNotes.length,
         warningsCreated: createdWarnings.length,
       },
-      isDemo: false,
+      isDemoMode: false,
     });
   } catch (error) {
     console.error('[POST /api/vfx]', error);
@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
         warningsCreated: DEMO_VFX_DATA.vfxWarnings.length,
       },
       message: 'VFX analysis complete (Demo Mode - fallback)',
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 }

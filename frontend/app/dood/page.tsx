@@ -90,7 +90,7 @@ export default function DOODPage() {
       const data = await res.json()
       
       // Check if API returned demo data
-      setIsDemoMode(data.isDemo === true)
+      setIsDemoMode(data.isDemoMode === true)
       
       if (data.report && data.report.length > 0) {
         setReport(data.report)

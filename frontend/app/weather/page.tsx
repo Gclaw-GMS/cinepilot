@@ -73,7 +73,7 @@ interface WeatherData {
   };
   forecast: WeatherDay[];
   lastUpdated: string;
-  isDemo?: boolean;
+  isDemoMode?: boolean;
 }
 
 const LOCATIONS: { name: string; lat: number; lng: number; state?: string }[] = [
@@ -183,7 +183,7 @@ export default function WeatherPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-semibold tracking-tight">Weather Forecast</h1>
-                  {weatherData?.isDemo && (
+                  {weatherData?.isDemoMode && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
                       Demo Data
                     </span>

@@ -106,7 +106,7 @@ export default function CensorBoardPage() {
       const data = await res.json()
       if (data.analysis) {
         setAnalysis(data.analysis)
-        setIsDemoMode(false)
+        setIsDemoMode(data.isDemoMode === true)
       } else {
         // Use demo data when no database analysis exists
         setAnalysis(DEMO_ANALYSIS)

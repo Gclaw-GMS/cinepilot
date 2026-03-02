@@ -21,7 +21,7 @@ const DEMO_DOOD = {
     totalCalls: 85,
     avgDaysPerActor: 10.6,
   },
-  isDemo: true,
+  isDemoMode: true,
 };
 
 // GET /api/dood — get Day Out of Days report

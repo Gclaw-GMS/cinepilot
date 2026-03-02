@@ -123,7 +123,7 @@ export default function EquipmentPage() {
       
       if (res.ok) {
         // Check if API indicates demo mode
-        if (data.isDemo) {
+        if (data.isDemoMode) {
           setIsDemoMode(true)
         }
         setEquipment(data.rentals || [])

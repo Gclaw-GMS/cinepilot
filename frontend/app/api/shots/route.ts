@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
             headingRaw: s.headingRaw,
             shotCount: s._count.shots,
           })),
-          isDemo: true,
+          isDemoMode: true,
         });
       }
       
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
           totalDuration: Math.round(totalDuration),
           missingFields,
         },
-        isDemo: true,
+        isDemoMode: true,
       });
     }
 
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
             headingRaw: s.headingRaw,
             shotCount: s._count.shots,
           })),
-          isDemo: true,
+          isDemoMode: true,
         });
       }
       
@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
           totalDuration: Math.round(totalDuration),
           missingFields,
         },
-        isDemo: true,
+        isDemoMode: true,
       });
     }
 
@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
         totalDuration: Math.round(totalDuration),
         missingFields,
       },
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 }

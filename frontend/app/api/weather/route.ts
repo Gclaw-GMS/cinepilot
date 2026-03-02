@@ -58,7 +58,7 @@ export interface WeatherResponse {
   };
   forecast: WeatherForecastDay[];
   lastUpdated: string;
-  isDemo?: boolean;
+  isDemoMode?: boolean;
   error?: string;
 }
 
@@ -280,7 +280,7 @@ export async function GET(req: NextRequest) {
       locationDetails: { lat: latNum, lng: lngNum },
       forecast,
       lastUpdated: new Date().toISOString(),
-      isDemo: true,
+      isDemoMode: true,
     } satisfies WeatherResponse);
   }
 
@@ -297,7 +297,7 @@ export async function GET(req: NextRequest) {
         locationDetails: { lat: latNum, lng: lngNum },
         forecast,
         lastUpdated: new Date().toISOString(),
-        isDemo: true,
+        isDemoMode: true,
         error: 'API call failed, using demo data',
       } satisfies WeatherResponse);
     }
@@ -461,7 +461,7 @@ export async function GET(req: NextRequest) {
       locationDetails: { lat: latNum, lng: lngNum },
       forecast,
       lastUpdated: new Date().toISOString(),
-      isDemo: true,
+      isDemoMode: true,
       error: 'Using demo data - API call failed',
     } satisfies WeatherResponse);
   }

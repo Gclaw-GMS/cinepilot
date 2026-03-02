@@ -163,7 +163,7 @@ export default function ShotHubPage() {
       const sceneList = data.scenes || []
       
       // Check if using demo data
-      setIsDemoMode(data.isDemo === true)
+      setIsDemoMode(data.isDemoMode === true)
       
       // Calculate detailed stats
       const bySize: Record<string, number> = {}

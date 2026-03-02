@@ -80,9 +80,9 @@ export default function AudienceSentimentPage() {
     try {
       const res = await fetch(`/api/audience-sentiment?projectId=${DEMO_PROJECT_ID}`)
       const data = await res.json()
-      if (data.error && !data.isDemo) throw new Error(data.error)
+      if (data.error && !data.isDemoMode) throw new Error(data.error)
       setAnalyses(data.sentiments || [])
-      setIsDemoMode(!!data.isDemo)
+      setIsDemoMode(data.isDemoMode === true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {

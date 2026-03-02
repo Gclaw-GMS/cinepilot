@@ -166,7 +166,7 @@ export default function MissionControl() {
       if (!res.ok) throw new Error('Failed to fetch')
       const json = await res.json()
       setData(json)
-      setIsDemoMode(json.isDemo === true)
+      setIsDemoMode(json.isDemoMode === true)
       setError(null)
     } catch (err) {
       console.error('Mission control fetch error:', err)

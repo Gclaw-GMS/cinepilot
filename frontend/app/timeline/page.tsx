@@ -75,7 +75,7 @@ export default function TimelinePage() {
       const timelineData = await timelineRes.json();
       
       // Check if we're in demo mode
-      if (timelineData.isDemo) {
+      if (timelineData.isDemoMode) {
         setStats(DEMO_STATS);
         setIsDemoMode(true);
       } else {

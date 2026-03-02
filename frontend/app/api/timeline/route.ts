@@ -27,7 +27,7 @@ const DEMO_TIMELINE = {
     { week: 'Week 5', budget: 4600000, scenes: 4, completed: 1 },
     { week: 'Week 6', budget: 3200000, scenes: 3, completed: 0 },
   ],
-  isDemo: true,
+  isDemoMode: true,
 };
 
 // GET /api/timeline — get production timeline data

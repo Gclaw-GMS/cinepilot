@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
           totalHours,
           totalScenes,
         },
-        isDemo: true,
+        isDemoMode: true,
       });
     }
     
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
         totalHours,
         totalScenes,
       },
-      isDemo: true,
+      isDemoMode: true,
     });
   }
   
@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
           totalHours: Math.round(totalHours * 10) / 10,
           totalScenes,
         },
-        isDemo: false,
+        isDemoMode: false,
       });
     }
 
@@ -214,7 +214,7 @@ export async function GET(req: NextRequest) {
         totalHours: Math.round(totalHours * 10) / 10,
         totalScenes,
       },
-      isDemo: false,
+      isDemoMode: false,
     });
   } catch (error) {
     console.error('[GET /api/schedule]', error);
@@ -241,7 +241,7 @@ export async function GET(req: NextRequest) {
           totalHours,
           totalScenes,
         },
-        isDemo: true,
+        isDemoMode: true,
       });
     }
     
@@ -253,7 +253,7 @@ export async function GET(req: NextRequest) {
         totalHours,
         totalScenes,
       },
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 }
@@ -277,14 +277,14 @@ export async function POST(req: NextRequest) {
           scenes: d.dayScenes.length,
           location: d.location.name,
         })),
-        isDemo: true,
+        isDemoMode: true,
       });
     }
 
     return NextResponse.json({
       message: 'Schedule saved (Demo Mode)',
       shootingDays: DEMO_SCHEDULE.shootingDays,
-      isDemo: true,
+      isDemoMode: true,
     });
   }
   
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest) {
           scheduledDate: new Date(new Date(start).getTime() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           scenes: Math.min(4, scenes.length - i * 4),
         })),
-        isDemo: false,
+        isDemoMode: false,
       });
     }
 
@@ -338,7 +338,7 @@ export async function POST(req: NextRequest) {
         });
       }
       
-      return NextResponse.json({ message: 'Schedule saved', isDemo: false });
+      return NextResponse.json({ message: 'Schedule saved', isDemoMode: false });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -361,7 +361,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({
       message: 'Day updated (Demo Mode)',
       day: { id, ...updates },
-      isDemo: true,
+      isDemoMode: true,
     });
   }
   
@@ -381,7 +381,7 @@ export async function PATCH(req: NextRequest) {
       },
     });
     
-    return NextResponse.json({ day, isDemo: false });
+    return NextResponse.json({ day, isDemoMode: false });
   } catch (error) {
     console.error('[PATCH /api/schedule]', error);
     return NextResponse.json({ error: 'Failed to update day' }, { status: 500 });

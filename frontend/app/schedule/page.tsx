@@ -109,7 +109,14 @@ export default function SchedulePage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Schedule Engine</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">Schedule Engine</h1>
+            {isDemoMode && (
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                DEMO
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm mt-0.5">AI-powered shooting schedule with TFPC compliance</p>
         </div>
         <div className="flex items-center gap-3">
@@ -132,6 +139,15 @@ export default function SchedulePage() {
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="text-red-500">Dismiss</button>
+        </div>
+      )}
+
+      {isDemoMode && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+          <div className="flex items-center gap-2 text-amber-400 text-sm">
+            <span>ℹ️</span>
+            <span>Showing demo data. Connect your database for real schedule data.</span>
+          </div>
         </div>
       )}
 

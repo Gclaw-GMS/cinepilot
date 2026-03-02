@@ -3,13 +3,15 @@ import { prisma } from '@/lib/db'
 
 const DEFAULT_PROJECT_ID = 'default-project'
 
-// Demo notes data for fallback
+// Demo notes data for fallback - using string IDs consistently
 const DEMO_NOTES = [
-  { id: 'demo-1', projectId: DEFAULT_PROJECT_ID, content: 'Remember to get location permits for Temple shoot', category: 'todo', author: 'Director', isPinned: true, createdAt: new Date().toISOString() },
-  { id: 'demo-2', projectId: DEFAULT_PROJECT_ID, content: 'Vijay confirmed for lead role! 🎬', category: 'decision', author: 'Producer', isPinned: false, createdAt: new Date(Date.now() - 86400000).toISOString() },
-  { id: 'demo-3', projectId: DEFAULT_PROJECT_ID, content: 'Consider adding a flashback sequence in second act', category: 'idea', author: 'Writer', isPinned: false, createdAt: new Date(Date.now() - 172800000).toISOString() },
-  { id: 'demo-4', projectId: DEFAULT_PROJECT_ID, content: 'Night shoot at Marina Beach needs extra security', category: 'feedback', author: 'Line Producer', isPinned: false, createdAt: new Date(Date.now() - 259200000).toISOString() },
-  { id: 'demo-5', projectId: DEFAULT_PROJECT_ID, content: 'Budget meeting scheduled for Monday 2PM', category: 'general', author: 'Producer', isPinned: false, createdAt: new Date(Date.now() - 345600000).toISOString() },
+  { id: 'demo-1', projectId: DEFAULT_PROJECT_ID, content: '🎬 Scene 12 temple fight needs stunt coordinator approval - high priority', category: 'todo', author: 'Director', isPinned: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 'demo-2', projectId: DEFAULT_PROJECT_ID, content: 'Vijay confirmed for lead role! First schedule starts March 15th 🎬', category: 'decision', author: 'Producer', isPinned: false, createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'demo-3', projectId: DEFAULT_PROJECT_ID, content: 'Consider adding a flashback sequence in second act - mirrors the opening scene', category: 'idea', author: 'Writer', isPinned: false, createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: 'demo-4', projectId: DEFAULT_PROJECT_ID, content: 'Night shoot at Marina Beach needs extra security + noise permits from local authorities', category: 'feedback', author: 'Line Producer', isPinned: false, createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 259200000).toISOString() },
+  { id: 'demo-5', projectId: DEFAULT_PROJECT_ID, content: 'Budget review meeting scheduled for Monday 2PM - bring revised costume estimates', category: 'general', author: 'Producer', isPinned: false, createdAt: new Date(Date.now() - 345600000).toISOString(), updatedAt: new Date(Date.now() - 345600000).toISOString() },
+  { id: 'demo-6', projectId: DEFAULT_PROJECT_ID, content: 'Need to finalize location contracts for Chennai Temple by end of week', category: 'todo', author: 'Production Manager', isPinned: false, createdAt: new Date(Date.now() - 432000000).toISOString(), updatedAt: new Date(Date.now() - 432000000).toISOString() },
+  { id: 'demo-7', projectId: DEFAULT_PROJECT_ID, content: 'VFX supervisor suggested green screen for the transformation scene - cost effective', category: 'idea', author: 'VFX Lead', isPinned: false, createdAt: new Date(Date.now() - 518400000).toISOString(), updatedAt: new Date(Date.now() - 518400000).toISOString() },
 ]
 
 // Helper function to check database connection

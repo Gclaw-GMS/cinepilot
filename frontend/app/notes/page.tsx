@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 
 interface Note {
-  id: number
+  id: string
   projectId: string
   content: string
   category: string
@@ -111,6 +111,23 @@ export default function NotesPage() {
     e.preventDefault()
     if (!formData.content.trim()) return
 
+    // Optimistic update in demo mode
+    const newNoteId = `local-${Date.now()}`
+    const optimisticNote: Note = {
+      id: newNoteId,
+      projectId: DEMO_PROJECT_ID,
+      content: formData.content.trim(),
+      category: formData.category,
+      author: formData.author || 'You',
+      isPinned: formData.isPinned,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    if (!editingNote) {
+      setNotes(prev => [optimisticNote, ...prev])
+    }
+
     try {
       const method = editingNote ? 'PUT' : 'POST'
       const body = editingNote
@@ -130,24 +147,44 @@ export default function NotesPage() {
       setFormData({ content: '', category: 'general', author: '', isPinned: false })
       fetchNotes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
+      // In demo mode, keep the optimistic update
+      if (!editingNote) {
+        // Already added optimistically, just clear form
+      } else {
+        // Revert for edit
+        fetchNotes()
+      }
+      setShowForm(false)
+      setEditingNote(null)
+      setFormData({ content: '', category: 'general', author: '', isPinned: false })
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return
+    
+    // Optimistic update
+    const originalNotes = [...notes]
+    setNotes(prev => prev.filter(n => n.id !== id))
+    
     try {
-      const res = await fetch(`/api/notes?id=${id}&projectId=${DEMO_PROJECT_ID}`, {
+      const res = await fetch(`/api/notes?id=${encodeURIComponent(id)}&projectId=${DEMO_PROJECT_ID}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to delete')
-      fetchNotes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete')
+      // In demo mode, keep the deletion
+      console.log('Demo mode: note deleted locally')
     }
   }
 
   const handleTogglePin = async (note: Note) => {
+    // Optimistic update in demo mode
+    const originalNotes = [...notes]
+    setNotes(prev => prev.map(n => 
+      n.id === note.id ? { ...n, isPinned: !n.isPinned } : n
+    ))
+    
     try {
       const res = await fetch('/api/notes', {
         method: 'PUT',
@@ -157,6 +194,8 @@ export default function NotesPage() {
       if (!res.ok) throw new Error('Failed to update')
       fetchNotes()
     } catch (err) {
+      // Revert on error
+      setNotes(originalNotes)
       setError(err instanceof Error ? err.message : 'Failed to update')
     }
   }

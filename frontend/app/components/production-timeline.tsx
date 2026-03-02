@@ -96,6 +96,8 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [selectedTask, setSelectedTask] = useState<GanttTask | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -191,6 +193,39 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
 
     return result;
   }, [shootingDays, scripts]);
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (tasks.length === 0) return;
+    
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedTaskIndex(prev => {
+        if (e.key === 'ArrowDown') {
+          return prev < tasks.length - 1 ? prev + 1 : 0;
+        } else {
+          return prev > 0 ? prev - 1 : tasks.length - 1;
+        }
+      });
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (focusedTaskIndex >= 0 && focusedTaskIndex < tasks.length) {
+        setSelectedTask(tasks[focusedTaskIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setSelectedTask(null);
+      setFocusedTaskIndex(-1);
+    } else if (e.key === '+' || e.key === '=') {
+      setZoomLevel(z => Math.min(2, z + 0.25));
+    } else if (e.key === '-') {
+      setZoomLevel(z => Math.max(0.5, z - 0.25));
+    }
+  }, [tasks, focusedTaskIndex]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -335,6 +370,26 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+          
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+            <button
+              onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}
+              className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-xs text-slate-500 w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+            <button
+              onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.25))}
+              className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+          
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('month')}
@@ -353,6 +408,11 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
               Week
             </button>
           </div>
+          
+          {/* Keyboard Shortcut Hint */}
+          <span className="text-xs text-slate-600" title="Use arrow keys to navigate tasks">
+            ⌨️ ←→
+          </span>
         </div>
       </div>
 
@@ -468,8 +528,15 @@ export default function ProductionTimeline({ projectId = 'default-project' }: Pr
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className="relative h-14 flex items-center group cursor-pointer"
-                      onClick={() => setSelectedTask(task)}
+                      className={`relative h-14 flex items-center group cursor-pointer transition-all ${
+                        focusedTaskIndex === idx 
+                          ? 'bg-purple-500/20 -mx-2 px-2 rounded-lg ring-2 ring-purple-500' 
+                          : 'hover:bg-slate-800/50'
+                      }`}
+                      onClick={() => {
+                        setSelectedTask(task);
+                        setFocusedTaskIndex(idx);
+                      }}
                     >
                       {/* Task Label */}
                       <div className="w-40 shrink-0 px-2 pr-4 z-10">

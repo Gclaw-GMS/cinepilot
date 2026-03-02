@@ -42,6 +42,12 @@ interface TaskManagerProps {
   projectId?: string
 }
 
+interface Toast {
+  id: string
+  message: string
+  type: 'success' | 'error' | 'info'
+}
+
 const DEMO_TASKS: Task[] = [
   { id: 'demo-1', projectId: 'default-project', title: 'Confirm venue for song shoot', description: 'Need to book Studio B for the romantic song sequence', status: 'in_progress', priority: 'high', assignee: 'Line Producer', dueDate: '2026-03-05', createdAt: new Date().toISOString() },
   { id: 'demo-2', projectId: 'default-project', title: 'Get insurance approval', description: 'Production insurance for outdoor shoots including beach and temple locations', status: 'pending', priority: 'medium', assignee: 'Producer', dueDate: '2026-03-10', createdAt: new Date(Date.now() - 86400000).toISOString() },
@@ -74,6 +80,20 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
   const [filterPriority, setFilterPriority] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  // Toast helper functions
+  const showToast = useCallback((message: string, type: Toast['type'] = 'info') => {
+    const id = `toast-${Date.now()}`
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 3000)
+  }, [])
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -91,9 +111,12 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
       if (!res.ok) throw new Error('Failed to fetch tasks')
       const data = await res.json()
       
-      if (data && data.length > 0) {
-        setTasks(data)
-        setIsDemoMode(false)
+      // Handle both array response and { data: [...] } format
+      const taskList = Array.isArray(data) ? data : (data.data || [])
+      
+      if (taskList.length > 0) {
+        setTasks(taskList)
+        setIsDemoMode(data.isDemoMode === true)
       } else {
         setTasks(DEMO_TASKS)
         setIsDemoMode(true)
@@ -132,8 +155,10 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTask),
       })
+      showToast('Task created successfully', 'success')
     } catch {
       // Continue with local state even if API fails
+      showToast('Task created (offline mode)', 'info')
     }
 
     setTasks(prev => [...prev, newTask])
@@ -150,11 +175,12 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
     setTasks(updatedTasks)
 
     try {
-      await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
+      await fetch(`/api/tasks?id=${encodeURIComponent(String(task.id))}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
+      showToast(`Task marked as ${newStatus === 'completed' ? 'completed' : 'pending'}`, 'success')
     } catch {
       // Continue with local state even if API fails
     }
@@ -166,9 +192,11 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
     setTasks(prev => prev.filter(t => t.id !== taskId))
     
     try {
-      await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+      await fetch(`/api/tasks?id=${encodeURIComponent(String(taskId))}`, { method: 'DELETE' })
+      showToast('Task deleted', 'success')
     } catch {
       // Continue with local state even if API fails
+      showToast('Task deleted (offline mode)', 'info')
     }
   }
 
@@ -201,13 +229,15 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
     setTasks(prev => prev.map(t => t.id === editingTask.id ? updatedTask : t))
     
     try {
-      await fetch(`/api/tasks/${editingTask.id}`, {
-        method: 'PATCH',
+      await fetch(`/api/tasks?id=${encodeURIComponent(String(editingTask.id))}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedTask),
       })
+      showToast('Task updated successfully', 'success')
     } catch {
       // Continue with local state even if API fails
+      showToast('Task updated (offline mode)', 'info')
     }
 
     setFormData({ title: '', description: '', priority: 'medium', assignee: '', dueDate: '' })
@@ -582,6 +612,28 @@ export default function TaskManager({ projectId = 'default-project' }: TaskManag
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border backdrop-blur-sm animate-in slide-in-from-right ${
+              toast.type === 'success' ? 'bg-emerald-500/90 border-emerald-400 text-white' :
+              toast.type === 'error' ? 'bg-red-500/90 border-red-400 text-white' :
+              'bg-slate-700/90 border-slate-600 text-white'
+            }`}
+          >
+            {toast.type === 'success' && <Check className="w-4 h-4" />}
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4" />}
+            {toast.type === 'info' && <AlertCircle className="w-4 h-4" />}
+            <span className="text-sm font-medium">{toast.message}</span>
+            <button onClick={() => removeToast(toast.id)} className="ml-2 hover:opacity-70">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

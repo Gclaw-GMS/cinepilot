@@ -117,6 +117,48 @@ export default function TimelinePage() {
     setRefreshing(false);
   };
 
+  // Export timeline to CSV
+  const handleExportTimeline = () => {
+    const timelineData = [
+      { Phase: 'Pre-Production', Status: 'Completed', Progress: '100%', Start: '2026-01-01', End: '2026-01-20', Scenes: 47 },
+      { Phase: 'Principal Photography', Status: 'In Progress', Progress: '40%', Start: '2026-01-21', End: '2026-02-10', Scenes: 47 },
+      { Phase: 'Post-Production', Status: 'Pending', Progress: '0%', Start: '2026-02-11', End: '2026-03-15', Scenes: 0 },
+    ];
+    
+    const milestonesData = [
+      { Milestone: 'Script Lock', Date: '2026-01-05', Status: 'Completed', Phase: 'Pre-Production' },
+      { Milestone: 'Casting Complete', Date: '2026-01-10', Status: 'Completed', Phase: 'Pre-Production' },
+      { Milestone: 'Location Scout Done', Date: '2026-01-15', Status: 'Completed', Phase: 'Pre-Production' },
+      { Milestone: '50% Shoot Days', Date: '2026-01-31', Status: 'In Progress', Phase: 'Production' },
+      { Milestone: 'Pack-Up', Date: '2026-02-10', Status: 'Pending', Phase: 'Production' },
+      { Milestone: 'Rough Cut', Date: '2026-02-25', Status: 'Pending', Phase: 'Post-Production' },
+      { Milestone: 'Final Delivery', Date: '2026-03-15', Status: 'Pending', Phase: 'Post-Production' },
+    ];
+
+    // Export phases
+    const phaseHeaders = Object.keys(timelineData[0]);
+    const phaseRows = timelineData.map(row => Object.values(row).join(','));
+    const phaseCsv = [phaseHeaders.join(','), ...phaseRows].join('\n');
+    
+    // Export milestones
+    const milestoneHeaders = Object.keys(milestonesData[0]);
+    const milestoneRows = milestonesData.map(row => Object.values(row).join(','));
+    const milestoneCsv = [milestoneHeaders.join(','), ...milestoneRows].join('\n');
+
+    // Create combined CSV
+    const combinedCsv = `PRODUCTION TIMELINE EXPORT\nGenerated: ${new Date().toISOString()}\n\nPHASES\n${phaseCsv}\n\nMILESTONES\n${milestoneCsv}`;
+    
+    const blob = new Blob([combinedCsv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `timeline-export-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const projectOptions = DEMO_PROJECTS;
 
   return (
@@ -436,7 +478,10 @@ export default function TimelinePage() {
             </div>
 
             {/* Export */}
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm">
+            <button 
+              onClick={handleExportTimeline}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+            >
               <Download className="w-4 h-4" />
               Export
             </button>
@@ -540,7 +585,8 @@ export default function TimelinePage() {
           <motion.button 
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="bg-slate-900 hover:bg-slate-800 p-4 rounded-xl border border-slate-800 transition-colors text-left"
+            onClick={handleExportTimeline}
+            className="bg-slate-900 hover:bg-slate-800 p-4 rounded-xl border border-slate-800 transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-green-500/20">
@@ -548,7 +594,7 @@ export default function TimelinePage() {
               </div>
               <div className="font-medium text-white">Export Timeline</div>
             </div>
-            <div className="text-sm text-slate-400">PDF/Image export</div>
+            <div className="text-sm text-slate-400">CSV export</div>
           </motion.button>
           <motion.button 
             whileHover={{ scale: 1.02 }}

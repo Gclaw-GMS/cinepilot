@@ -5,8 +5,13 @@ import { useScriptManager, Script, Scene, Character, Analysis } from '@/app/hook
 import ScriptComparison from '@/components/ScriptComparison'
 import {
   FileText, Upload, Trash2, Check, AlertTriangle, Sparkles,
-  Users, RefreshCw, X, Search, ChevronDown, ChevronRight
+  Users, RefreshCw, X, Search, ChevronDown, ChevronRight,
+  Film, Clock, AlertOctagon, TrendingUp
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend, AreaChart, Area
+} from 'recharts'
 
 type ActiveTab = 'upload' | 'scenes' | 'characters' | 'quality' | 'warnings' | 'compare'
 
@@ -65,6 +70,83 @@ export default function ScriptsPage() {
       c.aliases?.some(a => a.toLowerCase().includes(q))
     )
   }, [characters, searchQuery])
+
+  // Chart data computed from scenes
+  const chartData = useMemo(() => {
+    // INT/EXT breakdown
+    const intExtCount = scenes.reduce((acc, scene) => {
+      const key = scene.intExt || 'UNKNOWN'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const intExtData = Object.entries(intExtCount).map(([name, value]) => ({
+      name, value,
+      color: name === 'INT' ? '#6366f1' : name === 'EXT' ? '#22c55e' : '#94a3b8'
+    }))
+
+    // Time of day breakdown
+    const timeOfDayCount = scenes.reduce((acc, scene) => {
+      const key = scene.timeOfDay || 'UNSPECIFIED'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const timeOfDayData = Object.entries(timeOfDayCount).map(([name, value]) => ({
+      name: name.length > 10 ? name.slice(0, 10) + '...' : name, value
+    }))
+
+    // Character frequency (top 10)
+    const charFrequency = characters.map(char => ({
+      name: char.name.length > 12 ? char.name.slice(0, 12) + '...' : char.name,
+      fullName: char.name,
+      appearances: char.sceneCharacters?.length || 0
+    })).sort((a, b) => b.appearances - a.appearances).slice(0, 10)
+
+    // Location breakdown
+    const locationCount = scenes.reduce((acc, scene) => {
+      const loc = scene.location || 'Unknown'
+      // Group similar locations
+      const group = loc.toLowerCase().includes('house') ? 'House' :
+                    loc.toLowerCase().includes('street') ? 'Street' :
+                    loc.toLowerCase().includes('office') ? 'Office' :
+                    loc.toLowerCase().includes('restaurant') ? 'Restaurant' :
+                    loc.toLowerCase().includes('car') || loc.toLowerCase().includes('vehicle') ? 'Vehicle' :
+                    loc.length > 15 ? 'Other' : loc
+      acc[group] = (acc[group] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const locationData = Object.entries(locationCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8)
+
+    // Warnings by type
+    const warningTypes = allWarnings.reduce((acc, w) => {
+      const key = w.warningType || 'Other'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const warningData = Object.entries(warningTypes).map(([name, value]) => ({
+      name, value
+    }))
+
+    return { intExtData, timeOfDayData, charFrequency, locationData, warningData }
+  }, [scenes, characters, allWarnings])
+
+  // Stats for header
+  const stats = useMemo(() => ({
+    totalScenes: scenes.length,
+    totalCharacters: characters.length,
+    totalWarnings: allWarnings.length,
+    totalVfx: allVfx.length,
+    intScenes: scenes.filter(s => s.intExt === 'INT').length,
+    extScenes: scenes.filter(s => s.intExt === 'EXT').length,
+    dayScenes: scenes.filter(s => s.timeOfDay?.includes('DAY')).length,
+    nightScenes: scenes.filter(s => s.timeOfDay?.includes('NIGHT')).length,
+  }), [scenes, characters, allWarnings, allVfx])
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -229,6 +311,54 @@ export default function ScriptsPage() {
           <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-300">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      {scenes.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <Film className="w-4 h-4" />
+              <span className="text-xs">Scenes</span>
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.totalScenes}</p>
+          </div>
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <Users className="w-4 h-4" />
+              <span className="text-xs">Characters</span>
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.totalCharacters}</p>
+          </div>
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <AlertOctagon className="w-4 h-4" />
+              <span className="text-xs">Warnings</span>
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.totalWarnings}</p>
+          </div>
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-xs">INT</span>
+            </div>
+            <p className="text-2xl font-bold text-indigo-400">{stats.intScenes}</p>
+          </div>
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-xs">EXT</span>
+            </div>
+            <p className="text-2xl font-bold text-green-400">{stats.extScenes}</p>
+          </div>
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <Clock className="w-4 h-4" />
+              <span className="text-xs">Day/Night</span>
+            </div>
+            <p className="text-2xl font-bold text-amber-400">{stats.dayScenes}/{stats.nightScenes}</p>
+          </div>
         </div>
       )}
 
@@ -403,6 +533,78 @@ export default function ScriptsPage() {
             </span>
           </div>
 
+          {/* Scene Charts */}
+          {scenes.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {/* INT/EXT Pie Chart */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Scene Types (INT/EXT)</h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData.intExtData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={4}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {chartData.intExtData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Time of Day Bar Chart */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Time of Day</h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.timeOfDayData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                      <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Location Distribution */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Top Locations</h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.locationData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis type="number" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} width={60} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                      <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
           {filteredScenes.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
               {scenes.length === 0 ? (
@@ -454,6 +656,28 @@ export default function ScriptsPage() {
             </span>
           </div>
 
+          {/* Character Frequency Chart */}
+          {characters.length > 0 && chartData.charFrequency.length > 0 && (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Character Screen Time (Top 10)</h3>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.charFrequency} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis type="number" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} width={80} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#9ca3af' }}
+                      formatter={(value, name, props) => [value + ' scenes', props.payload.fullName]}
+                    />
+                    <Bar dataKey="appearances" fill="#ec4899" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
           {filteredCharacters.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -498,6 +722,27 @@ export default function ScriptsPage() {
       {/* Warnings Tab */}
       {activeTab === 'warnings' && (
         <div className="space-y-4">
+          {/* Warnings Chart */}
+          {allWarnings.length > 0 && chartData.warningData.length > 0 && (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Warnings by Type</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.warningData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                    <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#9ca3af' }}
+                    />
+                    <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
           {allWarnings.length === 0 && allVfx.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
               <Check className="w-12 h-12 mx-auto mb-3 text-green-500" />

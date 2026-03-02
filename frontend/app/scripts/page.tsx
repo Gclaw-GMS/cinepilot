@@ -66,6 +66,8 @@ export default function ScriptsPage() {
   const [sceneFilter, setSceneFilter] = useState('')
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
   const [selectedScene, setSelectedScene] = useState<SceneData | null>(null)
+  const [runningAnalysis, setRunningAnalysis] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState('')
 
   const fetchData = useCallback(async () => {
     try {
@@ -134,6 +136,36 @@ export default function ScriptsPage() {
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const runQualityAnalysis = async () => {
+    if (!activeScript) {
+      setError('No script available to analyze')
+      return
+    }
+    setRunningAnalysis(true)
+    setAnalysisProgress('Running quality analysis...')
+    setError(null)
+
+    try {
+      const res = await fetch('/api/scripts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptId: activeScript.id })
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Analysis failed')
+
+      setAnalysisProgress('Quality analysis complete!')
+      await fetchData()
+      setActiveTab('quality')
+    } catch (e: any) {
+      setError(e.message || 'Quality analysis failed')
+    } finally {
+      setRunningAnalysis(false)
+      setTimeout(() => setAnalysisProgress(''), 3000)
     }
   }
 
@@ -475,6 +507,39 @@ export default function ScriptsPage() {
       {/* Quality Tab */}
       {activeTab === 'quality' && (
         <div className="space-y-6">
+          {/* Run Analysis Button */}
+          {activeScript && (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-200">AI Quality Analysis</h3>
+                <p className="text-sm text-gray-500">Analyze screenplay structure, formatting, and dialogue quality</p>
+              </div>
+              <button
+                onClick={runQualityAnalysis}
+                disabled={runningAnalysis}
+                className="px-4 py-2 bg-cinepilot-accent hover:bg-cinepilot-accent/80 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium text-sm flex items-center gap-2 transition-colors"
+              >
+                {runningAnalysis ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Run Analysis
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+          {analysisProgress && (
+            <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-3 text-green-400 text-sm">
+              {analysisProgress}
+            </div>
+          )}
           {qualityAnalysis?.result ? (
             <>
               <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">

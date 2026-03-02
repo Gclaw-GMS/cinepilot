@@ -96,6 +96,7 @@ export async function GET(req: NextRequest) {
         available: rentalsWithStatus.filter(r => r.status === 'available').length,
         inUse: rentalsWithStatus.filter(r => r.status === 'in-use').length,
       },
+      isDemoMode: false,
     });
   } catch (error) {
     console.error('[GET /api/equipment]', error);
@@ -132,7 +133,7 @@ export async function GET(req: NextRequest) {
         available: rentalsWithStatus.filter(r => r.status === 'available').length,
         inUse: rentalsWithStatus.filter(r => r.status === 'in-use').length,
       },
-      isDemo: true,
+      isDemoMode: true,
     });
   }
 }

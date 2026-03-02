@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
     if (!hasRealData) {
       return NextResponse.json({
         ...DEMO_MISSION_CONTROL,
-        isDemo: true,
+        isDemoMode: true,
       });
     }
 
@@ -240,14 +240,14 @@ export async function GET(req: NextRequest) {
         totalLocations: locations.length,
         totalShootingDays,
       },
-      isDemo: false,
+      isDemoMode: false,
     });
   } catch (error) {
     console.error('[GET /api/mission-control]', error);
     // Return demo data when database is not connected
     return NextResponse.json({
       ...DEMO_MISSION_CONTROL,
-      isDemo: true,
+      isDemoMode: true,
       error: 'Using demo data - database not connected',
     });
   } finally {

@@ -111,10 +111,10 @@ export async function GET(req: NextRequest) {
           headingRaw: s.heading,
           frames: s.frames.map(f => ({ id: f.id, isApproved: f.isApproved })),
         })),
-        isDemo: true,
+        isDemoMode: true,
       });
     }
-    return NextResponse.json({ scenes: demoScenes, totalFrames: DEMO_FRAMES.length, isDemo: true });
+    return NextResponse.json({ scenes: demoScenes, totalFrames: DEMO_FRAMES.length, isDemoMode: true });
   }
 
   try {
@@ -198,7 +198,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ scenes, totalFrames: frames.length });
+    return NextResponse.json({ scenes, totalFrames: frames.length, isDemoMode: false });
   } catch (err: unknown) {
     console.error('[API/storyboard] GET error:', err);
     // Return demo data on error
@@ -212,10 +212,10 @@ export async function GET(req: NextRequest) {
           headingRaw: s.heading,
           frames: s.frames.map(f => ({ id: f.id, isApproved: f.isApproved })),
         })),
-        isDemo: true,
+        isDemoMode: true,
       });
     }
-    return NextResponse.json({ scenes: demoScenes, totalFrames: DEMO_FRAMES.length, isDemo: true });
+    return NextResponse.json({ scenes: demoScenes, totalFrames: DEMO_FRAMES.length, isDemoMode: true });
   }
 }
 

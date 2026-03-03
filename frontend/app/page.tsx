@@ -227,6 +227,8 @@ export default function Dashboard() {
         setIsDemoMode(false)
       } else {
         console.log('[Dashboard] Using demo mode - no real data found')
+        // Fall back to demo data when no real data is available
+        setStats(DEMO_STATS)
         setIsDemoMode(true)
       }
     } catch (err) {

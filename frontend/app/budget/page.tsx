@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { Download } from 'lucide-react'
 
 interface BudgetItemData {
   id: string
@@ -259,6 +260,33 @@ export default function BudgetPage() {
     { key: 'forecast', label: 'Forecast' },
   ]
 
+  // Export budget to CSV
+  const handleExportCSV = () => {
+    if (items.length === 0) return
+    
+    const headers = ['Category', 'Subcategory', 'Description', 'Quantity', 'Unit', 'Rate', 'Total', 'Actual Cost', 'Notes']
+    const rows = items.map(item => [
+      item.category,
+      item.subcategory || '',
+      item.description || '',
+      item.quantity || '',
+      item.unit || '',
+      item.rate || '',
+      item.total || '',
+      item.actualCost || '',
+      item.notes || ''
+    ])
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budget-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return <div className="p-6 flex items-center justify-center min-h-[60vh]"><div className="text-gray-400 animate-pulse">Loading budget...</div></div>
   }
@@ -280,6 +308,12 @@ export default function BudgetPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {items.length > 0 && (
+            <button onClick={handleExportCSV} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium text-sm flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+          )}
           <select value={region} onChange={e => setRegion(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>

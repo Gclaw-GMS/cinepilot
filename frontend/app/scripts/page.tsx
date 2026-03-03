@@ -189,6 +189,43 @@ export default function ScriptsPage() {
     }
   }
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      // Arrow keys for scene navigation
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault()
+        const currentIndex = filteredScenes.findIndex(s => s.id === selectedScene?.id)
+        if (currentIndex < filteredScenes.length - 1) {
+          setSelectedScene(filteredScenes[currentIndex + 1])
+        }
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault()
+        const currentIndex = filteredScenes.findIndex(s => s.id === selectedScene?.id)
+        if (currentIndex > 0) {
+          setSelectedScene(filteredScenes[currentIndex - 1])
+        }
+      } else if (e.key === 'Escape') {
+        setSelectedScene(null)
+      } else if (e.key === '1' && e.altKey) {
+        setActiveTab('scenes')
+      } else if (e.key === '2' && e.altKey) {
+        setActiveTab('characters')
+      } else if (e.key === '3' && e.altKey) {
+        setActiveTab('warnings')
+      } else if (e.key === 'f' && e.ctrlKey) {
+        e.preventDefault()
+        document.getElementById('scene-search')?.focus()
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [filteredScenes, selectedScene])
+  
   // Export script data
   const handleExport = () => {
     if (!activeScript) return
@@ -249,6 +286,9 @@ export default function ScriptsPage() {
             {activeScript
               ? `${activeScript.title} (v${activeScript.version}) — ${scenes.length} scenes • ${characters.length} characters`
               : 'Upload and analyze your screenplay'}
+          </p>
+          <p className="text-gray-600 text-xs mt-1">
+            <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">↑↓</kbd> or <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">jk</kbd> navigate scenes • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Esc</kbd> close • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Ctrl+F</kbd> search
           </p>
         </div>
         

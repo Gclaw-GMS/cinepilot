@@ -416,16 +416,17 @@ export default function DOODPage() {
         
         {/* Status Indicators */}
         <div className="flex items-center gap-3">
-          {isDemoMode && (
+          {isDemoMode ? (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/50 rounded-lg">
               <AlertCircle className="w-4 h-4 text-amber-400" />
               <span className="text-amber-400 text-sm font-medium">Demo Data</span>
             </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/50 rounded-lg">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <span className="text-emerald-400 text-sm font-medium">API Connected</span>
+            </div>
           )}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/50 rounded-lg">
-            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-            <span className="text-emerald-400 text-sm font-medium">API Connected</span>
-          </div>
         </div>
       </div>
 

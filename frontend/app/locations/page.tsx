@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { 
   MapPin, Search, Filter, Download, RefreshCw, Globe, 
   Building2, Waves, TreePine, Home, Camera, ChevronRight,
   AlertTriangle, CheckCircle, Loader2, Star, Navigation,
-  Calendar, Clock, Users, Zap, BarChart3
+  Calendar, Clock, Users, Zap, BarChart3, Keyboard, X
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -130,6 +130,9 @@ export default function LocationsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [refreshing, setRefreshing] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
+  const filteredScenesRef = useRef<SceneWithIntent[]>([])
 
   const stats = calculateStats(scenes)
 
@@ -284,6 +287,77 @@ export default function LocationsPage() {
     URL.revokeObjectURL(url)
   }
 
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if user is typing in an input
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    const maxIndex = filteredScenesRef.current.length - 1
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedRowIndex(prev => Math.min(prev + 1, maxIndex))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedRowIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedRowIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedRowIndex(maxIndex)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedRowIndex >= 0 && filteredScenesRef.current[selectedRowIndex]) {
+          handleSelectScene(filteredScenesRef.current[selectedRowIndex].id)
+        }
+        break
+      case 'Escape':
+        setSelectedSceneId(null)
+        setSelectedRowIndex(-1)
+        setCandidates([])
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 's':
+        if (!e.ctrlKey && !e.metaKey && selectedSceneId) {
+          e.preventDefault()
+          handleScout()
+        }
+        break
+      case 'r':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          handleRefresh()
+        }
+        break
+      case 'f':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          const searchInput = document.querySelector('input[placeholder="Search scenes..."]') as HTMLInputElement
+          searchInput?.focus()
+        }
+        break
+    }
+  }, [selectedRowIndex, selectedSceneId])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
   const selectedScene = scenes.find(s => s.id === selectedSceneId)
   
   // Filter scenes
@@ -297,6 +371,19 @@ export default function LocationsPage() {
       (filterType === 'int' && s.intExt !== 'EXT')
     return matchesSearch && matchesFilter
   })
+
+  // Update filtered scenes ref
+  useEffect(() => {
+    filteredScenesRef.current = filteredScenes
+  }, [filteredScenes])
+
+  // Sync selected row with scene selection
+  useEffect(() => {
+    if (selectedSceneId && filteredScenes.length > 0) {
+      const idx = filteredScenes.findIndex(s => s.id === selectedSceneId)
+      if (idx >= 0) setSelectedRowIndex(idx)
+    }
+  }, [selectedSceneId, filteredScenes])
 
   const extScenes = filteredScenes.filter(s => s.intExt === 'EXT')
   const intScenes = filteredScenes.filter(s => s.intExt !== 'EXT')
@@ -342,6 +429,22 @@ export default function LocationsPage() {
           </div>
         </div>
         
+        <div className="flex items-center gap-2">
+          {/* Keyboard shortcut hint */}
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-300 bg-gray-800/50 hover:bg-gray-800 rounded transition-colors"
+          >
+            <Keyboard className="w-3 h-3" />
+            Shortcuts
+          </button>
+          {selectedRowIndex >= 0 && (
+            <span className="text-xs text-emerald-400">
+              Row {selectedRowIndex + 1} of {filteredScenes.length}
+            </span>
+          )}
+        </div>
+        
         <div className="flex items-center gap-3">
           <button
             onClick={handleRefresh}
@@ -360,6 +463,75 @@ export default function LocationsPage() {
           </button>
         </div>
       </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-emerald-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-emerald-500/10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/20">
+                  <Keyboard className="w-5 h-5 text-emerald-400" />
+                </div>
+                <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                  Keyboard Shortcuts
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { keys: ['↑', '↓'], desc: 'Navigate scenes', category: 'Navigation' },
+                { keys: ['Home'], desc: 'Go to first scene', category: 'Navigation' },
+                { keys: ['End'], desc: 'Go to last scene', category: 'Navigation' },
+                { keys: ['Enter'], desc: 'Select scene', category: 'Selection' },
+                { keys: ['Esc'], desc: 'Clear selection', category: 'Selection' },
+                { keys: ['S'], desc: 'Scout locations for selected', category: 'Actions' },
+                { keys: ['R'], desc: 'Refresh data', category: 'Actions' },
+                { keys: ['F'], desc: 'Focus search', category: 'Search' },
+                { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+              ].map((shortcut, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider w-20">
+                      {shortcut.category}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {shortcut.keys.map((key, i) => (
+                        <kbd 
+                          key={i} 
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-emerald-300 shadow-sm"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Quick reference for power users</span>
+                <span className="flex items-center gap-2">
+                  Press 
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-emerald-400">?</kbd> 
+                  anytime to toggle
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -562,14 +734,18 @@ export default function LocationsPage() {
                 <div className="p-2">
                   <h3 className="text-[10px] font-medium text-amber-400 mb-2 uppercase px-2">Exterior Scenes</h3>
                   <div className="space-y-1">
-                    {extScenes.map(scene => (
-                      <SceneButton 
-                        key={scene.id} 
-                        scene={scene} 
-                        selected={selectedSceneId === scene.id} 
-                        onClick={handleSelectScene} 
-                      />
-                    ))}
+                    {extScenes.map((scene, idx) => {
+                      const actualIndex = filteredScenes.findIndex(s => s.id === scene.id)
+                      return (
+                        <SceneButton 
+                          key={scene.id} 
+                          scene={scene} 
+                          selected={selectedSceneId === scene.id} 
+                          onClick={handleSelectScene}
+                          isRowSelected={actualIndex === selectedRowIndex}
+                        />
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -577,14 +753,18 @@ export default function LocationsPage() {
                 <div className="p-2">
                   <h3 className="text-[10px] font-medium text-blue-400 mb-2 uppercase px-2">Interior Scenes</h3>
                   <div className="space-y-1">
-                    {intScenes.map(scene => (
-                      <SceneButton 
-                        key={scene.id} 
-                        scene={scene} 
-                        selected={selectedSceneId === scene.id} 
-                        onClick={handleSelectScene} 
-                      />
-                    ))}
+                    {intScenes.map((scene, idx) => {
+                      const actualIndex = filteredScenes.findIndex(s => s.id === scene.id)
+                      return (
+                        <SceneButton 
+                          key={scene.id} 
+                          scene={scene} 
+                          selected={selectedSceneId === scene.id} 
+                          onClick={handleSelectScene}
+                          isRowSelected={actualIndex === selectedRowIndex}
+                        />
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -736,10 +916,12 @@ function SceneButton({
   scene,
   selected,
   onClick,
+  isRowSelected,
 }: {
   scene: SceneWithIntent
   selected: boolean
   onClick: (id: string) => void
+  isRowSelected?: boolean
 }) {
   const candidateCount = scene.locationIntents?.[0]?._count?.candidates || 0
 
@@ -749,7 +931,9 @@ function SceneButton({
       className={`w-full text-left px-3 py-2 rounded transition-colors ${
         selected
           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-          : 'hover:bg-gray-700/50 text-gray-400'
+          : isRowSelected
+            ? 'bg-emerald-500/10 border-l-2 border-l-emerald-400'
+            : 'hover:bg-gray-700/50 text-gray-400'
       }`}
     >
       <div className="flex justify-between items-center">

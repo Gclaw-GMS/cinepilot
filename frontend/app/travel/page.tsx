@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useEffect as useEffectKeyboard } from 'react'
 import {
   Plane,
   Train,
@@ -117,6 +117,33 @@ export default function TravelExpensesPage() {
   useEffect(() => {
     fetchExpenses()
   }, [fetchExpenses])
+
+  // Keyboard shortcuts
+  useEffectKeyboard(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + N to open new expense form
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        if (!showForm) {
+          resetForm()
+        }
+      }
+      // Escape to close modals
+      if (e.key === 'Escape') {
+        if (showForm) {
+          resetForm()
+        }
+      }
+      // Ctrl/Cmd + S to save when form is open
+      if ((e.ctrlKey || e.metaKey) && e.key === 's' && showForm) {
+        e.preventDefault()
+        const form = document.querySelector('form')
+        if (form) form.dispatchEvent(new Event('submit', { bubbles: true }))
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showForm])
 
   // CSV Export function
   const exportToCSV = () => {
@@ -267,6 +294,7 @@ export default function TravelExpensesPage() {
             >
               <Plus className="w-4 h-4" />
               Add Expense
+              <span className="ml-1 text-xs text-indigo-300 opacity-75">⌘N</span>
             </button>
           </div>
         </div>
@@ -681,13 +709,13 @@ export default function TravelExpensesPage() {
                   onClick={resetForm}
                   className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
                 >
-                  Cancel
+                  Cancel <span className="text-xs text-slate-500 ml-1">Esc</span>
                 </button>
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {editingId ? 'Save Changes' : 'Add Expense'}
+                  {editingId ? 'Save Changes' : 'Add Expense'} <span className="text-xs text-indigo-300 opacity-75 ml-1">⌘S</span>
                 </button>
               </div>
             </form>

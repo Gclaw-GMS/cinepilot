@@ -23,6 +23,7 @@ import {
   Clock,
   ChevronDown,
   BarChart3,
+  Download,
 } from 'lucide-react'
 import {
   PieChart,
@@ -111,6 +112,29 @@ export default function NotesPage() {
     fetchNotes()
   }, [fetchNotes])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + N = New note
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        openNewForm()
+      }
+      // Ctrl/Cmd + E = Export JSON
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault()
+        handleExport('json')
+      }
+      // Escape = Close modal
+      if (e.key === 'Escape' && showForm) {
+        setShowForm(false)
+        setEditingNote(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showForm])
+
   const filteredNotes = notes.filter(note =>
     note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     note.author.toLowerCase().includes(searchQuery.toLowerCase())
@@ -136,6 +160,46 @@ export default function NotesPage() {
 
   const pinnedNotes = filteredNotes.filter(n => n.isPinned)
   const unpinnedNotes = filteredNotes.filter(n => !n.isPinned)
+
+  // Export handlers
+  const handleExport = (format: 'json' | 'csv') => {
+    if (notes.length === 0) return
+    
+    let content: string
+    let filename: string
+    let mimeType: string
+
+    if (format === 'json') {
+      content = JSON.stringify(notes, null, 2)
+      filename = `notes_export_${new Date().toISOString().split('T')[0]}.json`
+      mimeType = 'application/json'
+    } else {
+      // CSV export
+      const headers = ['ID', 'Content', 'Category', 'Author', 'Pinned', 'Created At', 'Updated At']
+      const rows = notes.map(note => [
+        note.id,
+        `"${note.content.replace(/"/g, '""')}"`,
+        note.category,
+        note.author,
+        note.isPinned ? 'Yes' : 'No',
+        note.createdAt,
+        note.updatedAt || '',
+      ])
+      content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+      filename = `notes_export_${new Date().toISOString().split('T')[0]}.csv`
+      mimeType = 'text/csv'
+    }
+
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -341,13 +405,38 @@ export default function NotesPage() {
                 <p className="text-slate-500 text-sm mt-1">Capture ideas, decisions, and to-dos</p>
               </div>
             </div>
-            <button
-              onClick={openNewForm}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Note
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openNewForm}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Note
+              </button>
+              {notes.length > 0 && (
+                <div className="relative group">
+                  <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors">
+                    <Download className="w-4 h-4" />
+                    Export
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  <div className="absolute right-0 mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                    <button
+                      onClick={() => handleExport('json')}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg"
+                    >
+                      📄 Export JSON
+                    </button>
+                    <button
+                      onClick={() => handleExport('csv')}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg"
+                    >
+                      📊 Export CSV
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

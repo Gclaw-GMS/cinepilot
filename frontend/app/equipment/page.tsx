@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2 } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2, CheckCircle } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface EquipmentRental {
@@ -114,6 +114,7 @@ export default function EquipmentPage() {
     notes: '',
   })
   const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true)
@@ -259,10 +260,14 @@ export default function EquipmentPage() {
         setModalOpen(false)
         setEditingId(null)
         setForm({ name: '', category: 'camera', status: 'available', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+        setToast({ type: 'success', message: editingId ? 'Equipment updated successfully' : 'Equipment added successfully' })
+        setTimeout(() => setToast(null), 3000)
         await fetchEquipment()
       } else {
         const data = await res.json()
         setError(data.error || (editingId ? 'Failed to update equipment' : 'Failed to add equipment'))
+        setToast({ type: 'error', message: data.error || (editingId ? 'Failed to update equipment' : 'Failed to add equipment') })
+        setTimeout(() => setToast(null), 5000)
       }
     } catch (err) {
       setError(editingId ? 'Failed to update equipment' : 'Failed to add equipment')
@@ -277,10 +282,17 @@ export default function EquipmentPage() {
     try {
       const res = await fetch(`/api/equipment?id=${id}`, { method: 'DELETE' })
       if (res.ok) {
+        setToast({ type: 'success', message: 'Equipment removed successfully' })
+        setTimeout(() => setToast(null), 3000)
         await fetchEquipment()
+      } else {
+        setToast({ type: 'error', message: 'Failed to remove equipment' })
+        setTimeout(() => setToast(null), 5000)
       }
     } catch (err) {
       console.error('Failed to delete equipment:', err)
+      setToast({ type: 'error', message: 'Failed to remove equipment' })
+      setTimeout(() => setToast(null), 5000)
     }
   }
 
@@ -360,6 +372,21 @@ export default function EquipmentPage() {
         <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 mb-6 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-5 py-3 rounded-xl text-sm shadow-xl border ${
+          toast.type === 'success' 
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+            : 'bg-red-500/10 border-red-500/20 text-red-400'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span className="text-sm font-medium">{toast.message}</span>
         </div>
       )}
 

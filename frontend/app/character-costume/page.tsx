@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   User, Shirt, Palette, Sparkles, Plus, Edit2, Trash2, 
   Users, Calendar, Download, Filter, Search, Loader2,
   Image, MessageSquare, TrendingUp, Save, X, Copy,
   Palette as PaletteIcon, Crown, Heart, Zap, Shield, Star,
-  DollarSign
+  DollarSign, Keyboard, FileText
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -96,6 +96,10 @@ export default function CharacterCostumePage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const tableRef = useRef<HTMLDivElement>(null)
+  const filteredLengthRef = useRef(0)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -236,6 +240,134 @@ export default function CharacterCostumePage() {
     return matchesSearch && matchesRole
   })
 
+  // Update ref for keyboard navigation
+  filteredLengthRef.current = filteredCharacters.length
+
+  // Export functions
+  const handleExportCSV = () => {
+    const headers = ['Name', 'Age', 'Gender', 'Role', 'Appearance', 'Personality', 'Costume Style', 'Fabrics', 'Budget', 'Designer', 'Description']
+    const rows = characters.map(char => [
+      char.name,
+      char.age,
+      char.gender,
+      char.role,
+      char.appearance.join('; '),
+      char.personality.join('; '),
+      char.costumeStyle.join('; '),
+      char.fabrics.join('; '),
+      char.estimatedBudget || 0,
+      char.designer || '',
+      char.description.replace(/,/g, ';')
+    ])
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `character-costumes-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportJSON = () => {
+    const exportData = {
+      projectId: DEMO_PROJECT_ID,
+      exportedAt: new Date().toISOString(),
+      summary: summary,
+      characters: characters.map(char => ({
+        name: char.name,
+        age: char.age,
+        gender: char.gender,
+        role: char.role,
+        appearance: char.appearance,
+        personality: char.personality,
+        costumeStyle: char.costumeStyle,
+        fabrics: char.fabrics,
+        colorPalette: char.colorPalette,
+        estimatedBudget: char.estimatedBudget,
+        designer: char.designer,
+        description: char.description,
+        costumeNotes: char.costumeNotes
+      })),
+      charts: {
+        byRole: roleData,
+        byAge: ageData
+      }
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `character-costumes-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    const maxIndex = filteredLengthRef.current - 1
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev => Math.min(prev + 1, maxIndex))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedIndex(maxIndex)
+        break
+      case 'Escape':
+        setSelectedIndex(-1)
+        setSelectedCharacter(null)
+        break
+      case 'Enter':
+        if (selectedIndex >= 0 && selectedIndex < filteredCharacters.length) {
+          e.preventDefault()
+          setSelectedCharacter(filteredCharacters[selectedIndex])
+        }
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'n':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          resetForm()
+          setEditingId(null)
+          setShowForm(true)
+        }
+        break
+      case 'f':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          const searchInput = document.querySelector('input[placeholder="Search characters..."]') as HTMLInputElement
+          searchInput?.focus()
+        }
+        break
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
   const roleData = summary ? Object.entries(summary.byRole).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value
@@ -264,13 +396,40 @@ export default function CharacterCostumePage() {
             </h1>
             <p className="text-slate-400 mt-1">Design and track character costumes for your film</p>
           </div>
-          <button
-            onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Character
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export Buttons */}
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg transition-colors text-sm"
+              title="Export as CSV"
+            >
+              <Download className="w-4 h-4" />
+              CSV
+            </button>
+            <button
+              onClick={handleExportJSON}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg transition-colors text-sm"
+              title="Export as JSON"
+            >
+              <FileText className="w-4 h-4" />
+              JSON
+            </button>
+            {/* Keyboard Help */}
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded transition-colors"
+            >
+              <Keyboard className="w-3 h-3" />
+              ⌨
+            </button>
+            <button
+              onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Character
+            </button>
+          </div>
         </div>
 
         {/* Demo Mode Banner */}
@@ -280,6 +439,81 @@ export default function CharacterCostumePage() {
             <p className="text-sm text-amber-400">
               <span className="font-medium">Demo Mode</span> — Using sample characters. Connect a database to save your own.
             </p>
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts Indicator */}
+        {selectedIndex >= 0 && (
+          <div className="mb-4 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-sm text-purple-400">
+            Row {selectedIndex + 1} of {filteredCharacters.length} selected • Press <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-xs">Enter</kbd> to view details
+          </div>
+        )}
+
+        {/* Keyboard Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-purple-500/10">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <Keyboard className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    Keyboard Shortcuts
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { keys: ['↑', '↓'], desc: 'Navigate characters', category: 'Navigation' },
+                  { keys: ['Home'], desc: 'Go to first', category: 'Navigation' },
+                  { keys: ['End'], desc: 'Go to last', category: 'Navigation' },
+                  { keys: ['Enter'], desc: 'View character details', category: 'Action' },
+                  { keys: ['Esc'], desc: 'Clear selection / Close', category: 'Action' },
+                  { keys: ['N'], desc: 'New character', category: 'Create' },
+                  { keys: ['F'], desc: 'Focus search', category: 'Search' },
+                  { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+                ].map((shortcut, idx) => (
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-500 uppercase tracking-wider w-16">
+                        {shortcut.category}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {shortcut.keys.map((key, i) => (
+                          <kbd 
+                            key={i} 
+                            className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-purple-300 shadow-sm"
+                          >
+                            {key}
+                          </kbd>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Quick reference for power users</span>
+                  <span className="flex items-center gap-2">
+                    Press 
+                    <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-purple-400">?</kbd> 
+                    anytime to toggle
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -333,7 +567,7 @@ export default function CharacterCostumePage() {
 
         {/* Charts */}
         {characters.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
               <h3 className="text-lg font-semibold text-white mb-4">Characters by Role</h3>
               <ResponsiveContainer width="100%" height={200}>
@@ -367,6 +601,37 @@ export default function CharacterCostumePage() {
                   <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+            {/* Fabric Distribution Chart */}
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Fabric Usage Distribution</h3>
+              {(() => {
+                const fabricCount: Record<string, number> = {}
+                characters.forEach(char => {
+                  char.fabrics.forEach(fabric => {
+                    fabricCount[fabric] = (fabricCount[fabric] || 0) + 1
+                  })
+                })
+                const fabricData = Object.entries(fabricCount)
+                  .map(([name, value]) => ({ name, value }))
+                  .sort((a, b) => b.value - a.value)
+                  .slice(0, 6)
+                return fabricData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={fabricData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
+                      <XAxis type="number" stroke="#9ca3af" fontSize={12} />
+                      <YAxis type="category" dataKey="name" stroke="#9ca3af" fontSize={10} width={70} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-slate-500 text-sm">
+                    No fabric data yet
+                  </div>
+                )
+              })()}
             </div>
           </div>
         )}
@@ -414,14 +679,18 @@ export default function CharacterCostumePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCharacters.map((char) => (
+            {filteredCharacters.map((char, idx) => (
               <div
                 key={char.id}
-                className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden hover:border-purple-500/50 transition-colors"
+                className={`bg-slate-800/50 rounded-xl border overflow-hidden transition-colors cursor-pointer ${
+                  selectedIndex === idx 
+                    ? 'border-purple-400 bg-purple-500/10' 
+                    : 'border-slate-700 hover:border-purple-500/50'
+                }`}
               >
                 <div 
-                  className="p-4 cursor-pointer"
-                  onClick={() => setSelectedCharacter(char)}
+                  className="p-4"
+                  onClick={() => { setSelectedCharacter(char); setSelectedIndex(idx) }}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>

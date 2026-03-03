@@ -28,6 +28,7 @@ import {
   StickyNote,
   Download,
   UsersRound,
+  Folder,
 } from 'lucide-react'
 
 type NavItem = {
@@ -46,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Core',
     items: [
+      { href: '/projects', icon: Folder, label: 'Projects' },
       { href: '/', icon: Home, label: 'Dashboard' },
       { href: '/mission-control', icon: BarChart3, label: 'Mission Control', badge: 'NEW' },
       { href: '/scripts', icon: FileText, label: 'Script Breakdown' },

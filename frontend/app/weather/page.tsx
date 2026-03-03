@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Cloud,
   Sun,
@@ -47,6 +47,19 @@ interface WeatherDay {
   icon: string;
   recommendation: string;
   productionScore: number;
+}
+
+interface ScheduledDay {
+  id: string;
+  dayNumber: number;
+  scheduledDate: string | null;
+  location?: { name: string } | null;
+  dayScenes: { scene: { sceneNumber: string; headingRaw: string | null } }[];
+}
+
+interface ScheduleData {
+  shootingDays?: ScheduledDay[];
+  days?: ScheduledDay[];
 }
 
 interface WeatherData {
@@ -155,9 +168,31 @@ function getScoreLabel(score: number): { label: string; color: string; bg: strin
 export default function WeatherPage() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'forecast' | 'analytics'>('forecast');
+  const [viewMode, setViewMode] = useState<'forecast' | 'analytics' | 'schedule'>('forecast');
+
+  // Fetch schedule data for integration
+  const fetchScheduleData = useCallback(async () => {
+    setScheduleLoading(true);
+    try {
+      const res = await fetch('/api/schedule');
+      const data = await res.json();
+      if (data.days) {
+        setScheduleData(data);
+      }
+    } catch (e) {
+      console.warn('Could not fetch schedule data:', e);
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchScheduleData();
+  }, [fetchScheduleData]);
 
   const fetchWeather = useCallback(async (location: Location) => {
     setSelectedLocation(location);
@@ -315,6 +350,17 @@ export default function WeatherPage() {
                     }`}
                   >
                     Analytics
+                  </button>
+                  <button
+                    onClick={() => setViewMode('schedule')}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      viewMode === 'schedule'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Schedule
                   </button>
                 </div>
                 <button
@@ -726,6 +772,223 @@ export default function WeatherPage() {
                   </div>
                 </div>
               )
+            )}
+
+            {/* Schedule Integration View */}
+            {viewMode === 'schedule' && weatherData && (
+              <div className="space-y-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-400" />
+                    Schedule-Weather Integration
+                  </h3>
+                  <p className="text-sm text-slate-400 mb-6">
+                    See how your scheduled shooting days align with weather conditions
+                  </p>
+
+                  {scheduleLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                      <span className="ml-2 text-slate-400">Loading schedule...</span>
+                    </div>
+                  ) : (scheduleData?.shootingDays || scheduleData?.days) && (scheduleData?.shootingDays || scheduleData?.days)!.length > 0 ? (
+                    <div className="space-y-4">
+                      {(scheduleData.shootingDays || scheduleData.days || []).map((day) => {
+                        const scheduledDate = day.scheduledDate;
+                        const scheduledDateStr = scheduledDate ? scheduledDate.split('T')[0] : null;
+                        const matchingWeather = scheduledDateStr
+                          ? weatherData.forecast.find(
+                              (w) => w.date === scheduledDateStr
+                            )
+                          : null;
+
+                        const scoreInfo = matchingWeather
+                          ? getScoreLabel(matchingWeather.productionScore)
+                          : null;
+
+                        return (
+                          <div
+                            key={day.id}
+                            className={`p-4 rounded-lg border ${
+                              !scheduledDate
+                                ? 'border-slate-700 bg-slate-800/50'
+                                : matchingWeather
+                                ? matchingWeather.productionScore >= 80
+                                  ? 'border-emerald-500/50 bg-emerald-500/10'
+                                  : matchingWeather.productionScore >= 60
+                                    ? 'border-blue-500/50 bg-blue-500/10'
+                                    : matchingWeather.productionScore >= 40
+                                      ? 'border-amber-500/50 bg-amber-500/10'
+                                      : 'border-red-500/50 bg-red-500/10'
+                                : 'border-slate-700 bg-slate-800/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-slate-800">
+                                  <span className="text-lg font-bold text-white">
+                                    {day.dayNumber}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-white">
+                                    Day {day.dayNumber}
+                                    {!scheduledDate && (
+                                      <span className="ml-2 text-xs text-slate-500">
+                                        (No date set)
+                                      </span>
+                                    )}
+                                  </p>
+                                  {scheduledDate && (
+                                    <p className="text-sm text-slate-400">
+                                      {new Date(scheduledDateStr!).toLocaleDateString(
+                                        'en-IN',
+                                        {
+                                          weekday: 'long',
+                                          month: 'short',
+                                          day: 'numeric',
+                                        }
+                                      )}
+                                    </p>
+                                  )}
+                                  {day.location?.name && (
+                                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                      <MapPin className="w-3 h-3" />
+                                      {day.location.name}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4">
+                                {scheduledDate && matchingWeather ? (
+                                  <>
+                                    <div className="text-right">
+                                      <p className="text-sm text-slate-400">
+                                        {matchingWeather.condition}
+                                      </p>
+                                      <p className="text-xs text-slate-500">
+                                        {matchingWeather.tempHigh}°/{matchingWeather.tempLow}°
+                                      </p>
+                                    </div>
+                                    <div
+                                      className={`px-3 py-2 rounded-lg ${scoreInfo?.bg}`}
+                                    >
+                                      <p className={`text-lg font-bold ${scoreInfo?.color}`}>
+                                        {matchingWeather.productionScore}
+                                      </p>
+                                      <p className="text-xs text-slate-400">Score</p>
+                                    </div>
+                                  </>
+                                ) : scheduledDate ? (
+                                  <div className="text-right">
+                                    <p className="text-sm text-amber-400">
+                                      No forecast available
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                      Date outside 5-day range
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="text-right">
+                                    <p className="text-sm text-slate-500">
+                                      Schedule a date to see weather
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {matchingWeather && (
+                              <div className="mt-3 pt-3 border-t border-slate-700">
+                                <p className="text-xs text-slate-400">
+                                  {matchingWeather.recommendation}
+                                </p>
+                              </div>
+                            )}
+
+                            {day.dayScenes.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-700">
+                                <p className="text-xs text-slate-500 mb-2">
+                                  {day.dayScenes.length} scene(s) scheduled
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {day.dayScenes.slice(0, 3).map((ds, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="text-xs px-2 py-1 bg-slate-800 rounded text-slate-400"
+                                    >
+                                      {ds.scene.sceneNumber}
+                                    </span>
+                                  ))}
+                                  {day.dayScenes.length > 3 && (
+                                    <span className="text-xs px-2 py-1 text-slate-500">
+                                      +{day.dayScenes.length - 3} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-slate-500">
+                      <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No shooting schedule found</p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        Create a shooting schedule to see weather integration
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Weather impact summary for schedule */}
+                {(scheduleData?.shootingDays || scheduleData?.days) && (scheduleData?.shootingDays || scheduleData?.days)!.length > 0 && weatherData.forecast && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 uppercase">Scheduled Days</p>
+                      <p className="text-2xl font-bold text-white mt-1">
+                        {(scheduleData.shootingDays || scheduleData.days || []).filter(d => d.scheduledDate).length}
+                      </p>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 uppercase">Optimal Weather</p>
+                      <p className="text-2xl font-bold text-emerald-400 mt-1">
+                        {(scheduleData.shootingDays || scheduleData.days || []).filter(d => {
+                          const weather = d.scheduledDate 
+                            ? weatherData.forecast.find(w => w.date === d.scheduledDate?.split('T')[0])
+                            : null;
+                          return weather && weather.productionScore >= 80;
+                        }).length}
+                      </p>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 uppercase">Caution Needed</p>
+                      <p className="text-2xl font-bold text-amber-400 mt-1">
+                        {(scheduleData.shootingDays || scheduleData.days || []).filter(d => {
+                          const weather = d.scheduledDate 
+                            ? weatherData.forecast.find(w => w.date === d.scheduledDate?.split('T')[0])
+                            : null;
+                          return weather && weather.productionScore >= 40 && weather.productionScore < 80;
+                        }).length}
+                      </p>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                      <p className="text-xs text-slate-500 uppercase">Poor Conditions</p>
+                      <p className="text-2xl font-bold text-red-400 mt-1">
+                        {(scheduleData.shootingDays || scheduleData.days || []).filter(d => {
+                          const weather = d.scheduledDate 
+                            ? weatherData.forecast.find(w => w.date === d.scheduledDate?.split('T')[0])
+                            : null;
+                          return weather && weather.productionScore < 40;
+                        }).length}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

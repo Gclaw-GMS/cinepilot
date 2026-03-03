@@ -38,6 +38,7 @@ interface MissionControlData {
     totalLocations: number
     totalShootingDays: number
   }
+  _demo?: boolean
 }
 
 // Fallback data when API fails
@@ -141,6 +142,7 @@ export default function MissionControl() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [time, setTime] = useState(new Date())
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -148,6 +150,7 @@ export default function MissionControl() {
       if (!res.ok) throw new Error('Failed to fetch')
       const json = await res.json()
       setData(json)
+      setIsDemoMode(json._demo === true)
       setError(null)
     } catch (err) {
       console.error('Mission control fetch error:', err)
@@ -219,9 +222,16 @@ export default function MissionControl() {
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 animate-ping" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                MISSION CONTROL
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                  MISSION CONTROL
+                </h1>
+                {isDemoMode && (
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                    Demo
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-400 font-mono">CINE PILOT PRODUCTION HUD</p>
             </div>
           </div>

@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
-  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2,
+  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, Plus, X
 } from 'lucide-react'
 
 const PALETTE = {
@@ -129,6 +129,21 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>(DEMO_STATS)
   const [loading, setLoading] = useState(true)
   const [isDemoMode, setIsDemoMode] = useState(true)
+  
+  // New Project modal state
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const [creatingProject, setCreatingProject] = useState(false)
+  const [projectFormData, setProjectFormData] = useState({
+    name: '',
+    title: '',
+    description: '',
+    language: 'tamil',
+    genre: '',
+    budget: '',
+    status: 'planning',
+  })
+  const [projectError, setProjectError] = useState<string | null>(null)
+  const [projectSuccess, setProjectSuccess] = useState<string | null>(null)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -241,6 +256,58 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Create new project handler
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setProjectError(null)
+    setProjectSuccess(null)
+    setCreatingProject(true)
+    
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: projectFormData.name || projectFormData.title,
+          title: projectFormData.title,
+          description: projectFormData.description,
+          language: projectFormData.language,
+          genre: projectFormData.genre,
+          budget: projectFormData.budget ? parseInt(projectFormData.budget) : null,
+          status: projectFormData.status,
+        }),
+      })
+      
+      if (!res.ok) {
+        throw new Error('Failed to create project')
+      }
+      
+      const newProject = await res.json()
+      setProjectSuccess(`Project "${newProject.name || newProject.title}" created successfully!`)
+      setProjectFormData({
+        name: '',
+        title: '',
+        description: '',
+        language: 'tamil',
+        genre: '',
+        budget: '',
+        status: 'planning',
+      })
+      
+      // Close modal after success
+      setTimeout(() => {
+        setShowNewProjectModal(false)
+        setProjectSuccess(null)
+        // Refresh stats to reflect new project
+        fetchStats()
+      }, 1500)
+    } catch (err) {
+      setProjectError(err instanceof Error ? err.message : 'Failed to create project')
+    } finally {
+      setCreatingProject(false)
+    }
+  }
+
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
@@ -284,6 +351,13 @@ export default function Dashboard() {
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               Refresh
+            </button>
+            <button
+              onClick={() => setShowNewProjectModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Project
             </button>
           </div>
         </div>
@@ -400,6 +474,153 @@ export default function Dashboard() {
           />
         </div>
       </main>
+
+      {/* New Project Modal */}
+      {showNewProjectModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewProjectModal(false)
+          }}
+        >  <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <h2 className="text-xl font-semibold text-white">Create New Project</h2>
+              <button
+                onClick={() => setShowNewProjectModal(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateProject} className="p-6 space-y-4">
+              {projectError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-3 text-sm">
+                  {projectError}
+                </div>
+              )}
+              {projectSuccess && (
+                <div className="bg-green-500/10 border border-green-500/20 text-green-400 rounded-lg px-4 py-3 text-sm">
+                  {projectSuccess}
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Project Name *</label>
+                  <input
+                    type="text"
+                    value={projectFormData.name}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g., Kaadhal Vartham"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Title (Tamil)</label>
+                  <input
+                    type="text"
+                    value={projectFormData.title}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, title: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    placeholder="காதல் வர்த்தம்"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Description</label>
+                <textarea
+                  value={projectFormData.description}
+                  onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 h-20 resize-none"
+                  placeholder="Brief description of the film..."
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Language</label>
+                  <select
+                    value={projectFormData.language}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, language: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="tamil">Tamil</option>
+                    <option value="telugu">Telugu</option>
+                    <option value="hindi">Hindi</option>
+                    <option value="malayalam">Malayalam</option>
+                    <option value="kannada">Kannada</option>
+                    <option value="english">English</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Genre</label>
+                  <input
+                    type="text"
+                    value={projectFormData.genre}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, genre: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g., Romance, Action"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Budget (INR)</label>
+                  <input
+                    type="number"
+                    value={projectFormData.budget}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, budget: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g., 15000000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Status</label>
+                  <select
+                    value={projectFormData.status}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, status: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="planning">Planning</option>
+                    <option value="pre_production">Pre-Production</option>
+                    <option value="production">In Production</option>
+                    <option value="post_production">Post-Production</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowNewProjectModal(false)}
+                  className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingProject}
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors flex items-center gap-2"
+                >
+                  {creatingProject ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Project'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

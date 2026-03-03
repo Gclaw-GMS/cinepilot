@@ -16,7 +16,7 @@ interface ScriptVersion {
 }
 
 interface ScriptUploaderProps {
-  projectId: number
+  projectId: string
   onUploadComplete?: (version: ScriptVersion) => void
 }
 

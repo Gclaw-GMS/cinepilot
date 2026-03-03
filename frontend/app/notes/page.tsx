@@ -82,6 +82,10 @@ export default function NotesPage() {
     author: '',
     isPinned: false,
   })
+  
+  // Undo deletion state
+  const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [recentlyDeleted, setRecentlyDeleted] = useState<Note | null>(null)
 
   const fetchNotes = useCallback(async () => {
     setLoading(true)
@@ -257,18 +261,45 @@ export default function NotesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return
     
-    // Optimistic update
-    const originalNotes = [...notes]
-    setNotes(prev => prev.filter(n => n.id !== id))
+    // Find the note being deleted for undo
+    const noteToDelete = notes.find(n => n.id === id)
+    if (!noteToDelete) return
     
-    try {
-      const res = await fetch(`/api/notes?id=${encodeURIComponent(id)}&projectId=${DEMO_PROJECT_ID}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) throw new Error('Failed to delete')
-    } catch (err) {
-      // In demo mode, keep the deletion
-      console.log('Demo mode: note deleted locally')
+    // Clear any existing undo timeout
+    if (undoTimeout) {
+      clearTimeout(undoTimeout)
+    }
+    
+    // Optimistic update - remove note
+    setNotes(prev => prev.filter(n => n.id !== id))
+    setRecentlyDeleted(noteToDelete)
+    
+    // Set up undo timeout (5 seconds)
+    const timeout = setTimeout(async () => {
+      // Actually delete from API after undo period
+      try {
+        const res = await fetch(`/api/notes?id=${encodeURIComponent(id)}&projectId=${DEMO_PROJECT_ID}`, {
+          method: 'DELETE',
+        })
+        if (!res.ok) throw new Error('Failed to delete')
+      } catch (err) {
+        console.log('Demo mode: note deleted locally')
+      }
+      setRecentlyDeleted(null)
+    }, 5000)
+    
+    setUndoTimeout(timeout)
+  }
+  
+  // Undo deletion - restore the note
+  const handleUndoDelete = () => {
+    if (undoTimeout) {
+      clearTimeout(undoTimeout)
+      setUndoTimeout(null)
+    }
+    if (recentlyDeleted) {
+      setNotes(prev => [recentlyDeleted, ...prev])
+      setRecentlyDeleted(null)
     }
   }
 
@@ -385,6 +416,21 @@ export default function NotesPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      {/* Undo Toast Notification */}
+      {recentlyDeleted && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-4 px-5 py-3 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl animate-[bounce_0.5s_ease-in-out]">
+            <span className="text-sm text-slate-200">Note deleted</span>
+            <button
+              onClick={handleUndoDelete}
+              className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="bg-slate-900/50 backdrop-blur border-b border-slate-800 sticky top-0 z-10">
         <div className="px-8 py-5">

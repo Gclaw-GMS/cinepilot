@@ -338,6 +338,33 @@ export default function SchedulePage() {
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
+          <button
+            onClick={() => {
+              if (!shootingDays?.length) return
+              const headers = ['Day', 'Date', 'Call Time', 'Location', 'Scenes', 'Est. Hours']
+              const rows = shootingDays.map((d: ShootingDayData) => [
+                `Day ${d.dayNumber}`,
+                d.scheduledDate || 'TBD',
+                d.callTime || '--',
+                d.dayScenes?.[0]?.scene?.location || '--',
+                d.dayScenes?.length || 0,
+                d.estimatedHours || '--'
+              ])
+              const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+              const blob = new Blob([csv], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `schedule-${new Date().toISOString().split('T')[0]}.csv`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            disabled={!shootingDays?.length}
+            className="flex items-center gap-2 px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-600/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
         </div>
       </div>
 

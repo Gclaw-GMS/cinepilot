@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   CheckCircle,
   RotateCcw,
+  Download,
+  FileText,
 } from 'lucide-react';
 import {
   BarChart,
@@ -236,6 +238,65 @@ export default function CrewPage() {
     if (num >= 100000) return `₹${(num / 100000).toFixed(1)} L`;
     return `₹${num.toLocaleString('en-IN')}`;
   };
+
+  // Export crew to CSV
+  const handleExportCSV = () => {
+    if (filtered.length === 0) return
+    
+    const headers = ['Name', 'Role', 'Department', 'Phone', 'Email', 'Daily Rate', 'Notes']
+    const rows = filtered.map(c => [
+      c.name,
+      c.role || '',
+      c.department || '',
+      c.phone || '',
+      c.email || '',
+      c.dailyRate || '',
+      c.notes || ''
+    ])
+    
+    const csv = [headers, ...rows].map(row => 
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n')
+    
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `crew-export-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Export crew to JSON
+  const handleExportJSON = () => {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      totalCrew: filtered.length,
+      summary: {
+        totalDailyRate: formatINR(totalDailyRate),
+        totalMonthlyRate: formatINR(totalMonthlyRate),
+        avgDailyRate: formatINR(avgDailyRate),
+        departments: departments
+      },
+      crew: filtered.map(c => ({
+        name: c.name,
+        role: c.role,
+        department: c.department,
+        phone: c.phone,
+        email: c.email,
+        dailyRate: c.dailyRate,
+        notes: c.notes
+      }))
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `crew-export-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // Department statistics
   const deptStats = useMemo(() => {
@@ -670,6 +731,24 @@ export default function CrewPage() {
             <option value="rate">Sort by Rate</option>
             <option value="department">Sort by Department</option>
           </select>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportCSV}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              CSV
+            </button>
+            <button
+              onClick={handleExportJSON}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              JSON
+            </button>
+          </div>
         </div>
       </div>
 

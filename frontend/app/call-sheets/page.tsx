@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { 
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
-  Printer, Download, RefreshCw, AlertCircle
+  Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+} from 'recharts'
 
 type CallSheetContent = {
   callTime?: string
@@ -322,6 +325,89 @@ export default function CallSheetsPage() {
     }
   }
 
+  // Computed stats from all call sheets
+  const stats = useMemo(() => {
+    if (callSheets.length === 0) return null
+    
+    const totalSheets = callSheets.length
+    const totalCrewCalls = callSheets.reduce((sum, sheet) => 
+      sum + (sheet.content?.crewCalls?.length || 0), 0
+    )
+    const totalScenes = callSheets.reduce((sum, sheet) => 
+      sum + (sheet.content?.scenes?.length || 0), 0
+    )
+    
+    // Crew by department
+    const deptCounts: Record<string, number> = {}
+    callSheets.forEach(sheet => {
+      sheet.content?.crewCalls?.forEach(crew => {
+        const dept = crew.department || 'Other'
+        deptCounts[dept] = (deptCounts[dept] || 0) + 1
+      })
+    })
+    
+    const deptData = Object.entries(deptCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+    
+    // Call time distribution
+    const callTimeBuckets: Record<string, number> = { '05:00': 0, '05:30': 0, '06:00': 0, '06:30': 0, '07:00': 0, '07:30+': 0 }
+    callSheets.forEach(sheet => {
+      const time = sheet.content?.callTime || '06:00'
+      if (time <= '05:30') callTimeBuckets['05:30']++
+      else if (time <= '06:00') callTimeBuckets['06:00']++
+      else if (time <= '06:30') callTimeBuckets['06:30']++
+      else if (time <= '07:00') callTimeBuckets['07:00']++
+      else callTimeBuckets['07:30+']++
+    })
+    
+    const callTimeData = Object.entries(callTimeBuckets)
+      .filter(([_, v]) => v > 0)
+      .map(([time, count]) => ({ time, count }))
+    
+    // Unique locations
+    const locations = [...new Set(callSheets.map(s => s.content?.location).filter(Boolean))]
+    
+    return {
+      totalSheets,
+      totalCrewCalls,
+      totalScenes,
+      avgCrewPerSheet: totalSheets > 0 ? Math.round(totalCrewCalls / totalSheets) : 0,
+      deptData,
+      callTimeData,
+      locations: locations.length,
+    }
+  }, [callSheets])
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    if (!selected) return
+    const crew = selected.content?.crewCalls || []
+    const rows = [['Role', 'Name', 'Department', 'Call Time']]
+    crew.forEach(c => {
+      rows.push([c.role || '', c.name || '', c.department || '', c.callTime || selected.content?.callTime || ''])
+    })
+    const csv = rows.map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `callsheet-${selected.date?.split('T')[0] || 'export'}.csv`
+    a.click()
+  }
+
+  // Group crew by department for display
+  const crewByDepartment = useMemo(() => {
+    if (!selected?.content?.crewCalls) return {}
+    const grouped: Record<string, typeof selected.content.crewCalls> = {}
+    selected.content.crewCalls.forEach(crew => {
+      const dept = crew.department || 'Other'
+      if (!grouped[dept]) grouped[dept] = []
+      grouped[dept].push(crew)
+    })
+    return grouped
+  }, [selected])
+
   // Print functionality
   const handlePrint = () => {
     window.print()
@@ -378,6 +464,98 @@ export default function CallSheetsPage() {
         <div className="mx-6 mt-4 flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
           Preview mode — Connect a PostgreSQL database to save call sheets permanently
+        </div>
+      )}
+
+      {/* Stats Dashboard */}
+      {stats && (
+        <div className="mx-6 mt-4 grid grid-cols-4 gap-4">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs font-medium">Total Sheets</p>
+                <p className="text-2xl font-bold text-white">{stats.totalSheets}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs font-medium">Total Crew Calls</p>
+                <p className="text-2xl font-bold text-white">{stats.totalCrewCalls}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                <Film className="w-5 h-5 text-violet-400" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs font-medium">Total Scenes</p>
+                <p className="text-2xl font-bold text-white">{stats.totalScenes}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs font-medium">Locations Used</p>
+                <p className="text-2xl font-bold text-white">{stats.locations}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Charts Row */}
+      {stats && stats.deptData.length > 0 && (
+        <div className="mx-6 mt-4 grid grid-cols-2 gap-4">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-cyan-400" />
+              Crew by Department
+            </h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={stats.deptData.slice(0, 6)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis type="number" stroke="#94a3b8" fontSize={11} />
+                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} width={70} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f8fafc' }}
+                />
+                <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-cyan-400" />
+              Call Time Distribution
+            </h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={stats.callTimeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f8fafc' }}
+                />
+                <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
@@ -480,6 +658,13 @@ export default function CallSheetsPage() {
                         title="Print"
                       >
                         <Printer className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleExportCSV}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
+                        title="Export CSV"
+                      >
+                        <Download className="w-4 h-4" />
                       </button>
                       <button
                         onClick={startEditing}
@@ -728,66 +913,80 @@ export default function CallSheetsPage() {
                       </thead>
                       <tbody>
                         {(isEditing ? editForm.crewCalls : selected.content?.crewCalls)?.length ?? 0 > 0 ? (
-                          (isEditing ? editForm.crewCalls : selected.content?.crewCalls)?.map((c, i) => (
-                            <tr key={i} className="border-b border-gray-200">
-                              {isEditing ? (
-                                <>
-                                  <td className="p-2">
-                                    <input
-                                      type="text"
-                                      value={c.role}
-                                      onChange={(e) => updateCrewCall(i, 'role', e.target.value)}
-                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm"
-                                    />
+                          isEditing ? (
+                            // Edit mode - show flat list
+                            (editForm.crewCalls || []).map((c, i) => (
+                              <tr key={i} className="border-b border-gray-200">
+                                <td className="p-2">
+                                  <input
+                                    type="text"
+                                    value={c.role}
+                                    onChange={(e) => updateCrewCall(i, 'role', e.target.value)}
+                                    className="w-full px-1 py-0.5 border border-gray-300 text-sm"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <input
+                                    type="text"
+                                    value={c.name}
+                                    onChange={(e) => updateCrewCall(i, 'name', e.target.value)}
+                                    className="w-full px-1 py-0.5 border border-gray-300 text-sm"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <select
+                                    value={c.department || ''}
+                                    onChange={(e) => updateCrewCall(i, 'department', e.target.value)}
+                                    className="w-full px-1 py-0.5 border border-gray-300 text-sm"
+                                  >
+                                    <option value="">—</option>
+                                    {DEPARTMENTS.map(d => (
+                                      <option key={d} value={d}>{d}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="p-2">
+                                  <input
+                                    type="time"
+                                    value={c.callTime || ''}
+                                    onChange={(e) => updateCrewCall(i, 'callTime', e.target.value)}
+                                    className="w-full px-1 py-0.5 border border-gray-300 text-sm text-right"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <button
+                                    onClick={() => removeCrewCall(i)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            // View mode - show grouped by department
+                            Object.entries(crewByDepartment).map(([dept, crewList]) => (
+                              <tbody key={dept}>
+                                <tr className="bg-gray-100">
+                                  <td colSpan={3} className="p-2 font-bold text-sm text-gray-700">
+                                    {dept}
                                   </td>
-                                  <td className="p-2">
-                                    <input
-                                      type="text"
-                                      value={c.name}
-                                      onChange={(e) => updateCrewCall(i, 'name', e.target.value)}
-                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm"
-                                    />
+                                  <td className="p-2 text-right text-xs text-gray-500">
+                                    {crewList.length} crew
                                   </td>
-                                  <td className="p-2">
-                                    <select
-                                      value={c.department || ''}
-                                      onChange={(e) => updateCrewCall(i, 'department', e.target.value)}
-                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm"
-                                    >
-                                      <option value="">—</option>
-                                      {DEPARTMENTS.map(d => (
-                                        <option key={d} value={d}>{d}</option>
-                                      ))}
-                                    </select>
-                                  </td>
-                                  <td className="p-2">
-                                    <input
-                                      type="time"
-                                      value={c.callTime || ''}
-                                      onChange={(e) => updateCrewCall(i, 'callTime', e.target.value)}
-                                      className="w-full px-1 py-0.5 border border-gray-300 text-sm text-right"
-                                    />
-                                  </td>
-                                  <td className="p-2">
-                                    <button
-                                      onClick={() => removeCrewCall(i)}
-                                      className="text-red-500 hover:text-red-700"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </td>
-                                </>
-                              ) : (
-                                <>
-                                  <td className="p-2">{c.role}</td>
-                                  <td className="p-2">{c.name}</td>
-                                  <td className="p-2 text-right font-bold">
-                                    {c.callTime ?? selected.content?.callTime ?? 'TBD'}
-                                  </td>
-                                </>
-                              )}
-                            </tr>
-                          ))
+                                </tr>
+                                {crewList.map((c, i) => (
+                                  <tr key={`${dept}-${i}`} className="border-b border-gray-200">
+                                    <td className="p-2">{c.role}</td>
+                                    <td className="p-2">{c.name}</td>
+                                    <td className="p-2 text-right font-bold">
+                                      {c.callTime ?? selected.content?.callTime ?? 'TBD'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            ))
+                          )
                         ) : (
                           <tr>
                             <td colSpan={isEditing ? 5 : 3} className="p-4 text-gray-500 text-center">

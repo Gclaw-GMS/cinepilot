@@ -508,37 +508,49 @@ export const collaboration = {
 
 // WhatsApp Notifications API
 export const whatsappReal = {
-  send: async (data: any): Promise<any> => {
+  send: async (recipient: string, message: string, useWacli?: boolean): Promise<any> => {
     return apiFetch('/api/whatsapp/send', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ recipient, message, useWacli }),
     });
+  },
+  batchSend: async (messages: { recipient: string; message: string }[]): Promise<any> => {
+    // Send each message individually (in production, use WhatsApp Business API)
+    const results = [];
+    for (const msg of messages) {
+      const result = await apiFetch('/api/whatsapp/send', {
+        method: 'POST',
+        body: JSON.stringify(msg),
+      });
+      results.push(result);
+    }
+    return { results, success: true };
   },
 };
 
 export const whatsappEnhanced = {
-  send: async (data: any): Promise<any> => {
+  send: async (recipient: string, message: string, useWacli?: boolean): Promise<any> => {
     return apiFetch('/api/whatsapp/send', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ recipient, message, useWacli }),
     });
   },
   getTemplates: async (): Promise<any[]> => {
     return apiFetch('/api/whatsapp/templates');
   },
-  scheduleReminder: async (data: any): Promise<any> => {
+  scheduleReminder: async (data: { recipient: string; message: string; scheduledTime: string }): Promise<any> => {
     return apiFetch('/api/whatsapp/schedule', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
-  sendLocationUpdate: async (data: any): Promise<any> => {
+  sendLocationUpdate: async (data: { recipient: string; locationName: string; address?: string; coordinates?: { lat: string; lng: string }; additionalInfo?: string }): Promise<any> => {
     return apiFetch('/api/whatsapp/location', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
-  sendCastCall: async (data: any): Promise<any> => {
+  sendCastCall: async (data: { recipient: string; projectName: string; role: string; auditionDate?: string; auditionTime?: string; location?: string; contactPhone?: string; description?: string }): Promise<any> => {
     return apiFetch('/api/whatsapp/cast-call', {
       method: 'POST',
       body: JSON.stringify(data),

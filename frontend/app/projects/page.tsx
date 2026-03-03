@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { 
   Plus, Search, Filter, MoreHorizontal, Trash2, Edit2, 
   Eye, Calendar, DollarSign, Video, FileText, Users,
-  Clock, ArrowRight, Loader2, FolderOpen
+  Clock, ArrowRight, Loader2, FolderOpen, X, Save, Check
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -170,6 +171,7 @@ function StatsCard({ title, value, subtext, color }: { title: string; value: str
 }
 
 export default function ProjectsPage() {
+  const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -177,6 +179,21 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  
+  // New project modal state
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const [creatingProject, setCreatingProject] = useState(false)
+  const [projectFormData, setProjectFormData] = useState({
+    name: '',
+    title: '',
+    description: '',
+    language: 'tamil',
+    genre: '',
+    budget: '',
+    status: 'planning',
+  })
+  const [projectError, setProjectError] = useState<string | null>(null)
+  const [projectSuccess, setProjectSuccess] = useState<string | null>(null)
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
@@ -215,6 +232,85 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
+
+  // Create new project handler
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setProjectError(null)
+    setProjectSuccess(null)
+    setCreatingProject(true)
+
+    try {
+      const projectData = {
+        name: projectFormData.name.trim() || projectFormData.title.trim(),
+        title: projectFormData.title.trim(),
+        description: projectFormData.description.trim() || null,
+        language: projectFormData.language,
+        genre: projectFormData.genre.trim() || null,
+        budget: projectFormData.budget ? parseFloat(projectFormData.budget) : null,
+        status: projectFormData.status,
+      }
+
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(projectData),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create project')
+      }
+
+      // If in demo mode, add to local list
+      if (isDemoMode) {
+        const newProject: Project = {
+          id: `demo-${Date.now()}`,
+          ...projectData,
+          budget: projectData.budget || 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          _count: { scripts: 0, scenes: 0, characters: 0, shots: 0 }
+        }
+        setProjects([newProject, ...projects])
+      }
+
+      setProjectSuccess('Project created successfully!')
+      setShowNewProjectModal(false)
+      setProjectFormData({
+        name: '',
+        title: '',
+        description: '',
+        language: 'tamil',
+        genre: '',
+        budget: '',
+        status: 'planning',
+      })
+      
+      // Refresh projects from API
+      fetchProjects()
+    } catch (err) {
+      setProjectError(err instanceof Error ? err.message : 'Failed to create project')
+    } finally {
+      setCreatingProject(false)
+    }
+  }
+
+  const closeModal = () => {
+    setShowNewProjectModal(false)
+    setProjectError(null)
+    setProjectSuccess(null)
+    setProjectFormData({
+      name: '',
+      title: '',
+      description: '',
+      language: 'tamil',
+      genre: '',
+      budget: '',
+      status: 'planning',
+    })
+  }
 
   // Filter projects
   const filteredProjects = projects.filter(p => {
@@ -271,7 +367,10 @@ export default function ProjectsPage() {
               </div>
               <p className="text-slate-500 text-sm mt-1">Manage your film productions</p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors">
+            <button 
+              onClick={() => setShowNewProjectModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors"
+            >
               <Plus className="w-4 h-4" />
               New Project
             </button>
@@ -356,7 +455,10 @@ export default function ProjectsPage() {
             </div>
             <h3 className="text-lg font-medium text-slate-300 mb-2">No projects found</h3>
             <p className="text-slate-500 mb-6">Try adjusting your search or filters</p>
-            <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+            <button 
+              onClick={() => setShowNewProjectModal(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+            >
               <Plus className="w-4 h-4" />
               Create your first project
             </button>
@@ -395,6 +497,154 @@ export default function ProjectsPage() {
           </div>
         )}
       </main>
+
+      {/* New Project Modal */}
+      {showNewProjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <h2 className="text-xl font-semibold">Create New Project</h2>
+              <button 
+                onClick={closeModal}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateProject} className="p-6 space-y-4">
+              {projectError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                  {projectError}
+                </div>
+              )}
+              
+              {projectSuccess && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400 text-sm flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  {projectSuccess}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm text-slate-400 mb-1">Project Name *</label>
+                  <input
+                    type="text"
+                    value={projectFormData.name}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, name: e.target.value }))}
+                    required
+                    placeholder="e.g., Kaadhal Vartham"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm text-slate-400 mb-1">Title (Optional)</label>
+                  <input
+                    type="text"
+                    value={projectFormData.title}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, title: e.target.value }))}
+                    placeholder="Display title if different"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm text-slate-400 mb-1">Description</label>
+                  <textarea
+                    value={projectFormData.description}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, description: e.target.value }))}
+                    rows={3}
+                    placeholder="Brief description of the film..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Language</label>
+                  <select
+                    value={projectFormData.language}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, language: e.target.value }))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="tamil">Tamil</option>
+                    <option value="hindi">Hindi</option>
+                    <option value="telugu">Telugu</option>
+                    <option value="malayalam">Malayalam</option>
+                    <option value="kannada">Kannada</option>
+                    <option value="english">English</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Genre</label>
+                  <input
+                    type="text"
+                    value={projectFormData.genre}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, genre: e.target.value }))}
+                    placeholder="e.g., Romance, Action"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Budget (₹)</label>
+                  <input
+                    type="number"
+                    value={projectFormData.budget}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, budget: e.target.value }))}
+                    placeholder="15000000"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Status</label>
+                  <select
+                    value={projectFormData.status}
+                    onChange={(e) => setProjectFormData(f => ({ ...f, status: e.target.value }))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="planning">Planning</option>
+                    <option value="pre_production">Pre-Production</option>
+                    <option value="production">In Production</option>
+                    <option value="post_production">Post-Production</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={creatingProject}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+                >
+                  {creatingProject ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Create Project
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

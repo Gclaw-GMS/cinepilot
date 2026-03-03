@@ -29,6 +29,7 @@ import {
   Download,
   UsersRound,
   Folder,
+  CheckSquare,
 } from 'lucide-react'
 
 type NavItem = {
@@ -77,6 +78,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Team',
     items: [
       { href: '/crew', icon: Users, label: 'Crew' },
+      { href: '/tasks', icon: CheckSquare, label: 'Tasks' },
       { href: '/collaboration', icon: UsersRound, label: 'Collaboration' },
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
       { href: '/dood', icon: Calendar, label: 'DOOD' },

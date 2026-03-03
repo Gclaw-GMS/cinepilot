@@ -1,0 +1,764 @@
+'use client'
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  CheckSquare,
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  User,
+  Tag,
+  Loader2,
+  AlertCircle,
+  X,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  ArrowUp,
+  ArrowDown,
+  MoreHorizontal,
+  Trash2,
+  Edit2,
+  Flag,
+  Bell,
+  BarChart3,
+  PieChart,
+  RefreshCw,
+  Target,
+  TrendingUp,
+  CalendarDays,
+  ListChecks,
+  LayoutGrid
+} from 'lucide-react'
+import {
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts'
+
+const PRIORITY_COLORS: Record<string, { bg: string; text: string; border: string; color: string }> = {
+  high: { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700/50', color: '#ef4444' },
+  medium: { bg: 'bg-amber-900/30', text: 'text-amber-400', border: 'border-amber-700/50', color: '#f59e0b' },
+  low: { bg: 'bg-slate-700/50', text: 'text-slate-400', border: 'border-slate-600', color: '#64748b' },
+}
+
+const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; color: string }> = {
+  pending: { bg: 'bg-slate-700/50', text: 'text-slate-400', border: 'border-slate-600', color: '#64748b' },
+  'in_progress': { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-700/50', color: '#3b82f6' },
+  completed: { bg: 'bg-emerald-900/30', text: 'text-emerald-400', border: 'border-emerald-700/50', color: '#10b981' },
+  blocked: { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700/50', color: '#ef4444' },
+}
+
+interface Task {
+  id: string
+  projectId: string
+  title: string
+  description?: string
+  status: string
+  priority: string
+  assignee?: string
+  dueDate?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+interface TaskStats {
+  total: number
+  pending: number
+  inProgress: number
+  completed: number
+  blocked: number
+  overdue: number
+  highPriority: number
+}
+
+type ViewMode = 'list' | 'board' | 'calendar'
+type FilterStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'blocked'
+type FilterPriority = 'all' | 'high' | 'medium' | 'low'
+
+export default function TasksPage() {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
+  const [filterPriority, setFilterPriority] = useState<FilterPriority>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'pending',
+    priority: 'medium',
+    assignee: '',
+    dueDate: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Fetch tasks
+  const fetchTasks = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/tasks?projectId=default-project')
+      const data = await res.json()
+      setTasks(data.data || [])
+      setIsDemoMode(data.isDemoMode === true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchTasks()
+  }, [fetchTasks])
+
+  // Calculate stats
+  const stats = useMemo((): TaskStats => {
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    
+    return {
+      total: tasks.length,
+      pending: tasks.filter(t => t.status === 'pending').length,
+      inProgress: tasks.filter(t => t.status === 'in_progress').length,
+      completed: tasks.filter(t => t.status === 'completed').length,
+      blocked: tasks.filter(t => t.status === 'blocked').length,
+      overdue: tasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'completed').length,
+      highPriority: tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length,
+    }
+  }, [tasks])
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const matchesStatus = filterStatus === 'all' || task.status === filterStatus
+      const matchesPriority = filterPriority === 'all' || task.priority === filterPriority
+      const matchesSearch = !searchQuery || 
+        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.assignee?.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchesStatus && matchesPriority && matchesSearch
+    })
+  }, [tasks, filterStatus, filterPriority, searchQuery])
+
+  // Handle form submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.title.trim()) return
+
+    setSubmitting(true)
+    try {
+      const method = editingTask ? 'PUT' : 'POST'
+      const url = editingTask ? `/api/tasks?id=${editingTask.id}` : '/api/tasks'
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          projectId: 'default-project',
+        }),
+      })
+      
+      if (!res.ok) throw new Error('Failed to save task')
+      
+      const data = await res.json()
+      
+      if (editingTask) {
+        setTasks(prev => prev.map(t => t.id === editingTask.id ? data.data : t))
+      } else {
+        setTasks(prev => [...prev, data.data])
+      }
+      
+      setShowForm(false)
+      setEditingTask(null)
+      setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save task')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Handle status change
+  const handleStatusChange = async (taskId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      
+      if (!res.ok) throw new Error('Failed to update status')
+      
+      const data = await res.json()
+      setTasks(prev => prev.map(t => t.id === taskId ? data.data : t))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update status')
+    }
+  }
+
+  // Handle delete
+  const handleDelete = async (taskId: string) => {
+    if (!confirm('Delete this task?')) return
+    
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete task')
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete task')
+    }
+  }
+
+  // Open edit form
+  const openEditForm = (task: Task) => {
+    setEditingTask(task)
+    setFormData({
+      title: task.title,
+      description: task.description || '',
+      status: task.status,
+      priority: task.priority,
+      assignee: task.assignee || '',
+      dueDate: task.dueDate || '',
+    })
+    setShowForm(true)
+  }
+
+  // Chart data
+  const statusChartData = [
+    { name: 'Pending', value: stats.pending, color: '#64748b' },
+    { name: 'In Progress', value: stats.inProgress, color: '#3b82f6' },
+    { name: 'Completed', value: stats.completed, color: '#10b981' },
+    { name: 'Blocked', value: stats.blocked, color: '#ef4444' },
+  ].filter(d => d.value > 0)
+
+  const priorityChartData = [
+    { name: 'High', value: tasks.filter(t => t.priority === 'high').length, color: '#ef4444' },
+    { name: 'Medium', value: tasks.filter(t => t.priority === 'medium').length, color: '#f59e0b' },
+    { name: 'Low', value: tasks.filter(t => t.priority === 'low').length, color: '#64748b' },
+  ]
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  const getDaysUntilDue = (dueDate: string) => {
+    const today = new Date()
+    const due = new Date(dueDate)
+    const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    return diff
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-white">Task Manager</h1>
+              {isDemoMode && (
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                  Demo Mode
+                </span>
+              )}
+            </div>
+            <p className="text-slate-400 text-sm mt-1">Track production tasks and deadlines</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchTasks()}
+              disabled={refreshing}
+              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Task
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+          <StatCard label="Total" value={stats.total} icon={<ListChecks className="w-4 h-4" />} color="indigo" />
+          <StatCard label="Pending" value={stats.pending} icon={<Clock className="w-4 h-4" />} color="slate" />
+          <StatCard label="In Progress" value={stats.inProgress} icon={<TrendingUp className="w-4 h-4" />} color="blue" />
+          <StatCard label="Completed" value={stats.completed} icon={<CheckCircle className="w-4 h-4" />} color="emerald" />
+          <StatCard label="Overdue" value={stats.overdue} icon={<AlertCircle className="w-4 h-4" />} color="red" />
+          <StatCard label="High Priority" value={stats.highPriority} icon={<Flag className="w-4 h-4" />} color="amber" />
+        </div>
+
+        {/* Charts */}
+        {tasks.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Status Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-medium text-slate-400 mb-4">Task Status Distribution</h3>
+              <div className="h-48 flex items-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {statusChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      itemStyle={{ color: '#94a3b8' }}
+                    />
+                    <Legend formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Priority Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-medium text-slate-400 mb-4">Priority Breakdown</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={priorityChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
+                    <YAxis stroke="#64748b" fontSize={11} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      itemStyle={{ color: '#94a3b8' }}
+                    />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      {priorityChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="blocked">Blocked</option>
+            </select>
+
+            {/* Priority Filter */}
+            <select
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+            >
+              <option value="all">All Priority</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            {/* View Mode Toggle */}
+            <div className="flex bg-slate-800 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="List View"
+              >
+                <ListChecks className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('board')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Board View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Calendar View"
+              >
+                <CalendarDays className="w-4 h-4" />
+              </button>
+            </div>
+
+            <span className="text-sm text-slate-500">
+              {filteredTasks.length} of {tasks.length} tasks
+            </span>
+          </div>
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-4 text-red-400 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {error}
+            </span>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-300">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Task List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+            <span className="ml-3 text-slate-400">Loading tasks...</span>
+          </div>
+        ) : filteredTasks.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+            <CheckSquare className="w-12 h-12 mx-auto mb-3 text-slate-600" />
+            <p className="text-slate-400 text-lg">No tasks found</p>
+            <p className="text-slate-500 text-sm mt-1">Create your first task to get started</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
+            >
+              Create Task
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onStatusChange={handleStatusChange}
+                onEdit={() => openEditForm(task)}
+                onDelete={() => handleDelete(task.id)}
+                formatDate={formatDate}
+                getDaysUntilDue={getDaysUntilDue}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Task Form Modal */}
+        {showForm && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) { setShowForm(false); setEditingTask(null) }
+            }}
+          >
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl">
+              <div className="flex items-center justify-between p-6 border-b border-slate-800">
+                <h2 className="text-xl font-semibold text-white">
+                  {editingTask ? 'Edit Task' : 'Create New Task'}
+                </h2>
+                <button
+                  onClick={() => { setShowForm(false); setEditingTask(null) }}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Title *</label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    placeholder="Task title"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 h-20 resize-none"
+                    placeholder="Task description..."
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="blocked">Blocked</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Priority</label>
+                    <select
+                      value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Assignee</label>
+                    <input
+                      type="text"
+                      value={formData.assignee}
+                      onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      placeholder="Assign to..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Due Date</label>
+                    <input
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForm(false); setEditingTask(null) }}
+                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !formData.title.trim()}
+                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors flex items-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      editingTask ? 'Update Task' : 'Create Task'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Task Card Component
+function TaskCard({ 
+  task, 
+  onStatusChange, 
+  onEdit, 
+  onDelete,
+  formatDate,
+  getDaysUntilDue
+}: { 
+  task: Task
+  onStatusChange: (id: string, status: string) => void
+  onEdit: () => void
+  onDelete: () => void
+  formatDate: (date: string) => string
+  getDaysUntilDue: (date: string) => number
+}) {
+  const [showMenu, setShowMenu] = useState(false)
+  const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS.pending
+  const priorityStyle = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.low
+  
+  const isOverdue = task.dueDate && getDaysUntilDue(task.dueDate) < 0 && task.status !== 'completed'
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
+      <div className="flex items-start gap-4">
+        {/* Status Checkbox */}
+        <button
+          onClick={() => onStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed')}
+          className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+            task.status === 'completed' 
+              ? 'bg-emerald-500 border-emerald-500' 
+              : 'border-slate-600 hover:border-indigo-500'
+          }`}
+        >
+          {task.status === 'completed' && <CheckCircle className="w-3 h-3 text-white" />}
+        </button>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className={`font-medium ${task.status === 'completed' ? 'text-slate-500 line-through' : 'text-white'}`}>
+                {task.title}
+              </h3>
+              {task.description && (
+                <p className="text-sm text-slate-400 mt-1 line-clamp-2">{task.description}</p>
+              )}
+            </div>
+            
+            {/* Priority Badge */}
+            <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${priorityStyle.bg} ${priorityStyle.text} ${priorityStyle.border} border`}>
+              {task.priority}
+            </span>
+          </div>
+
+          {/* Meta Info */}
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            {/* Status */}
+            <select
+              value={task.status}
+              onChange={(e) => onStatusChange(task.id, e.target.value)}
+              className={`text-xs px-2 py-1 rounded border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border} border cursor-pointer`}
+            >
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="blocked">Blocked</option>
+            </select>
+
+            {/* Assignee */}
+            {task.assignee && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <User className="w-3 h-3" />
+                {task.assignee}
+              </span>
+            )}
+
+            {/* Due Date */}
+            {task.dueDate && (
+              <span className={`flex items-center gap-1 text-xs ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
+                <Calendar className="w-3 h-3" />
+                {formatDate(task.dueDate)}
+                {isOverdue && <AlertCircle className="w-3 h-3" />}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 py-1 min-w-[120px]">
+                <button
+                  onClick={() => { onEdit(); setShowMenu(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => { onDelete(); setShowMenu(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-slate-700"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Stat Card Component
+function StatCard({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
+  const colorClasses: Record<string, string> = {
+    indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
+    slate: 'bg-slate-700/50 border-slate-600 text-slate-400',
+    blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
+    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+    red: 'bg-red-500/10 border-red-500/20 text-red-400',
+    amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+  }
+  
+  return (
+    <div className={`p-4 rounded-xl border ${colorClasses[color] || colorClasses.slate}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-slate-400 uppercase tracking-wider">{label}</p>
+          <p className="text-2xl font-semibold mt-1">{value}</p>
+        </div>
+        <div className="p-2 rounded-lg bg-slate-800/50">
+          {icon}
+        </div>
+      </div>
+    </div>
+  )
+}

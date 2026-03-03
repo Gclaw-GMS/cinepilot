@@ -144,6 +144,61 @@ export default function CallSheetsPage() {
     window.print()
   }
 
+  // ICS Export function - generates calendar file
+  const handleExportICS = () => {
+    if (!selected || !selected.content) return
+    
+    const formatDate = (d: string) => {
+      try {
+        return new Date(d).toISOString().split('T')[0].replace(/-/g, '')
+      } catch {
+        return d.replace(/-/g, '')
+      }
+    }
+    
+    const callTime = selected.content.callTime || '06:00'
+    const [hours, minutes] = callTime.split(':').map(Number)
+    const startDate = new Date(selected.date)
+    startDate.setHours(hours, minutes, 0, 0)
+    
+    const wrapTime = selected.content.wrapTime || '19:00'
+    const [wrapHours, wrapMinutes] = wrapTime.split(':').map(Number)
+    const endDate = new Date(selected.date)
+    endDate.setHours(wrapHours, wrapMinutes, 0, 0)
+    
+    const formatICSDate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    
+    const location = selected.content.location || 'TBD'
+    const scenes = (selected.content.scenes || []).join(', ')
+    const crewCalls = (selected.content.crewCalls || []).map(c => `${c.callTime || callTime} - ${c.role}: ${c.name}`).join('\\n')
+    
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//CinePilot//Call Sheet//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:call-sheet-${selected.id}@cinepilot.ai`,
+      `DTSTAMP:${formatICSDate(new Date())}`,
+      `DTSTART:${formatICSDate(startDate)}`,
+      `DTEND:${formatICSDate(endDate)}`,
+      `SUMMARY:🎬 ${selected.title || 'Call Sheet'} - Day ${selected.date}`,
+      `LOCATION:${location}`,
+      `DESCRIPTION:Scenes: ${scenes}\\n\\nCrew Calls:\\n${crewCalls}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n')
+    
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `call-sheet-${selected.date}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // PDF Export function - generates clean HTML for printing/PDF
   const handleExportPDF = () => {
     if (!selected) return
@@ -535,7 +590,14 @@ export default function CallSheetsPage() {
                 className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium"
               >
                 <Download className="h-4 w-4" />
-                Export
+                PDF
+              </button>
+              <button
+                onClick={handleExportICS}
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium"
+              >
+                <Calendar className="h-4 w-4" />
+                ICS
               </button>
               <button
                 onClick={() => window.print()}

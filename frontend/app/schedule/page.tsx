@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { 
-  Calendar, 
-  Clock, 
-  Play, 
-  Pause, 
-  RotateCcw, 
+import {
+  Calendar,
+  Clock,
+  Play,
+  Pause,
+  RotateCcw,
   Loader2,
   Sparkles,
   ChevronDown,
@@ -28,11 +28,53 @@ import {
   Settings,
   RefreshCw
 } from 'lucide-react'
-import { 
+import {
   AreaChart, Area, BarChart, Bar, 
   PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts'
+
+// Helper to generate ICS calendar file
+function generateICS(shootingDays: ShootingDayData[]): string {
+  const events = shootingDays.map(day => {
+    const date = day.scheduledDate || new Date().toISOString().split('T')[0]
+    const callTime = day.callTime || '06:00'
+    const [hours, minutes] = callTime.split(':').map(Number)
+    
+    const startDate = new Date(date)
+    startDate.setHours(hours, minutes, 0, 0)
+    
+    const endDate = new Date(startDate)
+    endDate.setHours(endDate.getHours() + parseFloat(day.estimatedHours || '10'))
+    
+    const formatICSDate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    
+    const location = day.dayScenes?.[0]?.scene?.location || 'TBD'
+    const scenes = day.dayScenes?.map(ds => ds.scene.sceneNumber).join(', ') || ''
+    
+    return [
+      'BEGIN:VEVENT',
+      `UID:cinepilot-day${day.dayNumber}-${date}@cinepilot.ai`,
+      `DTSTAMP:${formatICSDate(new Date())}`,
+      `DTSTART:${formatICSDate(startDate)}`,
+      `DTEND:${formatICSDate(endDate)}`,
+      `SUMMARY:Shooting Day ${day.dayNumber}${day.notes ? ` - ${day.notes}` : ''}`,
+      `LOCATION:${location}`,
+      `DESCRIPTION:Call Time: ${callTime}\\nEstimated Hours: ${day.estimatedHours || '10'}\\nScenes: ${scenes}`,
+      'END:VEVENT',
+    ].join('\r\n')
+  })
+  
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CinePilot//Shooting Schedule//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    ...events,
+    'END:VCALENDAR',
+  ].join('\r\n')
+}
 
 // ============================================================================
 // TYPES
@@ -183,7 +225,7 @@ function StatCard({ title, value, subtitle, icon, color }: { title: string; valu
 function StatusBadge({ status }: { status: string }) {
   const colors = STATUS_COLORS[status] || STATUS_COLORS.pending
   const label = status === 'in_progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)
-  
+
   return (
     <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
       {label}
@@ -217,7 +259,7 @@ export default function SchedulePage() {
     try {
       const res = await fetch('/api/schedule')
       const data = await res.json()
-      
+
       if (data.shootingDays && data.shootingDays.length > 0) {
         setShootingDays(data.shootingDays)
         setVersions(data.versions || [])
@@ -262,7 +304,7 @@ export default function SchedulePage() {
   }
 
   const formatDate = (d: string | null) => {
-    if (!d) return '—'
+    if (!d) return '-'
     return new Date(d).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
@@ -277,7 +319,7 @@ export default function SchedulePage() {
     { name: 'Night', value: stats.nightScenes, fill: CHART_COLORS.info },
   ], [stats])
 
-  const dailyScenesData = useMemo(() => 
+  const dailyScenesData = useMemo(() =>
     shootingDays.map(day => ({
       day: `Day ${day.dayNumber}`,
       scenes: day.dayScenes.length,
@@ -329,7 +371,7 @@ export default function SchedulePage() {
             <p className="text-slate-500 text-sm mt-1">AI-powered shooting schedule with TFPC compliance</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <button
             onClick={fetchData}
@@ -363,7 +405,25 @@ export default function SchedulePage() {
             className="flex items-center gap-2 px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-600/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors"
           >
             <Download className="w-4 h-4" />
-            Export
+            CSV
+          </button>
+          <button
+            onClick={() => {
+              if (!shootingDays?.length) return
+              const icsContent = generateICS(shootingDays)
+              const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `shooting-schedule-${new Date().toISOString().split('T')[0]}.ics`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            disabled={!shootingDays?.length}
+            className="flex items-center gap-2 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors"
+          >
+            <Calendar className="w-4 h-4" />
+            ICS
           </button>
         </div>
       </div>
@@ -383,7 +443,7 @@ export default function SchedulePage() {
           <div className="flex-1">
             <p className="font-medium">Using Demo Data</p>
             <p className="text-sm text-amber-200/70 mt-1">
-              Database is not connected. Showing sample schedule data for demonstration. 
+              Database is not connected. Showing sample schedule data for demonstration.
               Connect a PostgreSQL database to see your actual production data.
             </p>
           </div>
@@ -402,11 +462,11 @@ export default function SchedulePage() {
               className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <label className="text-sm text-slate-400">Optimization:</label>
-            <select 
-              value={mode} 
+            <select
+              value={mode}
               onChange={e => setMode(e.target.value)}
               className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             >
@@ -415,9 +475,9 @@ export default function SchedulePage() {
               ))}
             </select>
           </div>
-          
-          <button 
-            onClick={handleOptimize} 
+
+          <button
+            onClick={handleOptimize}
             disabled={optimizing}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-all"
           >
@@ -433,15 +493,15 @@ export default function SchedulePage() {
               </>
             )}
           </button>
-          
+
           <div className="ml-auto flex items-center gap-1 bg-slate-800 rounded-lg p-1">
             {(['schedule', 'versions', 'analytics'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === tab 
-                    ? 'bg-indigo-600 text-white' 
+                  activeTab === tab
+                    ? 'bg-indigo-600 text-white'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -454,30 +514,30 @@ export default function SchedulePage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard 
-          title="Total Days" 
-          value={stats.totalDays} 
+        <StatCard
+          title="Total Days"
+          value={stats.totalDays}
           subtitle="shooting days"
           icon={<Calendar className="w-5 h-5 text-indigo-400" />}
           color="text-indigo-400"
         />
-        <StatCard 
-          title="Total Hours" 
+        <StatCard
+          title="Total Hours"
           value={stats.totalHours}
           subtitle={`${stats.avgHoursPerDay.toFixed(1)} avg/day`}
           icon={<Clock className="w-5 h-5 text-amber-400" />}
           color="text-amber-400"
         />
-        <StatCard 
-          title="Total Scenes" 
+        <StatCard
+          title="Total Scenes"
           value={stats.totalScenes}
           subtitle={`${stats.avgScenesPerDay.toFixed(1)} avg/day`}
           icon={<Film className="w-5 h-5 text-emerald-400" />}
           color="text-emerald-400"
         />
-        <StatCard 
-          title="Score" 
-          value={versions.find(v => v.isActive)?.score || '—'}
+        <StatCard
+          title="Score"
+          value={versions.find(v => v.isActive)?.score || '-'}
           subtitle="optimization score"
           icon={<Target className="w-5 h-5 text-purple-400" />}
           color="text-purple-400"
@@ -492,7 +552,7 @@ export default function SchedulePage() {
               <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">No Schedule Generated</h3>
               <p className="text-slate-400 mb-4">Click "Optimize Schedule" to generate a shooting schedule from your script.</p>
-              <button 
+              <button
                 onClick={handleOptimize}
                 disabled={optimizing}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
@@ -503,19 +563,19 @@ export default function SchedulePage() {
             </div>
           ) : (
             shootingDays.map((day) => (
-              <div 
-                key={day.id} 
+              <div
+                key={day.id}
                 className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
               >
                 {/* Day Header */}
-                <div 
+                <div
                   className="p-4 flex items-center justify-between cursor-pointer"
                   onClick={() => setExpandedDay(expandedDay === day.id ? null : day.id)}
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                      day.status === 'completed' 
-                        ? 'bg-emerald-500/20 text-emerald-400' 
+                      day.status === 'completed'
+                        ? 'bg-emerald-500/20 text-emerald-400'
                         : day.status === 'in_progress'
                         ? 'bg-purple-500/20 text-purple-400'
                         : 'bg-slate-800 text-slate-400'
@@ -530,11 +590,11 @@ export default function SchedulePage() {
                       <div className="flex items-center gap-3 text-sm text-slate-500 mt-0.5">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
-                          {day.callTime || '—'} call
+                          {day.callTime || '-'} call
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
-                          {day.estimatedHours || '—'} hrs
+                          {day.estimatedHours || '-'} hrs
                         </span>
                         <span className="flex items-center gap-1">
                           <Film className="w-3.5 h-3.5" />
@@ -543,20 +603,20 @@ export default function SchedulePage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {day.notes && (
                     <p className="text-sm text-slate-500 italic truncate max-w-md">{day.notes}</p>
                   )}
-                  
+
                   <div className="flex items-center gap-2">
                     {day.dayScenes.length > 0 && (
                       <div className="flex -space-x-2">
                         {day.dayScenes.slice(0, 3).map((ds) => (
-                          <div 
+                          <div
                             key={ds.id}
                             className={`w-8 h-8 rounded-lg border-2 border-slate-900 flex items-center justify-center text-xs font-medium ${
-                              ds.scene.intExt === 'EXT' 
-                                ? 'bg-purple-500/20 text-purple-400' 
+                              ds.scene.intExt === 'EXT'
+                                ? 'bg-purple-500/20 text-purple-400'
                                 : 'bg-blue-500/20 text-blue-400'
                             }`}
                           >
@@ -577,13 +637,13 @@ export default function SchedulePage() {
                     )}
                   </div>
                 </div>
-                
+
                 {/* Expanded Scenes */}
                 {expandedDay === day.id && day.dayScenes.length > 0 && (
                   <div className="border-t border-slate-800 p-4 bg-slate-800/30">
                     <div className="grid gap-2">
                       {day.dayScenes.map((ds, idx) => (
-                        <div 
+                        <div
                           key={ds.id}
                           className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg"
                         >
@@ -594,8 +654,8 @@ export default function SchedulePage() {
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-sm text-indigo-400">{ds.scene.sceneNumber}</span>
                               <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase ${
-                                ds.scene.intExt === 'EXT' 
-                                  ? 'bg-purple-500/20 text-purple-400' 
+                                ds.scene.intExt === 'EXT'
+                                  ? 'bg-purple-500/20 text-purple-400'
                                   : 'bg-blue-500/20 text-blue-400'
                               }`}>
                                 {ds.scene.intExt}
@@ -607,7 +667,7 @@ export default function SchedulePage() {
                                   ? 'bg-amber-500/20 text-amber-400'
                                   : 'bg-slate-700 text-slate-400'
                               }`}>
-                                {ds.scene.timeOfDay || '—'}
+                                {ds.scene.timeOfDay || '-'}
                               </span>
                             </div>
                             <p className="text-sm text-slate-400 truncate mt-0.5">{ds.scene.headingRaw}</p>
@@ -621,7 +681,7 @@ export default function SchedulePage() {
                             )}
                             <span className="flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5" />
-                              {ds.estimatedMinutes || '—'} min
+                              {ds.estimatedMinutes || '-'} min
                             </span>
                           </div>
                         </div>
@@ -640,11 +700,11 @@ export default function SchedulePage() {
           <h3 className="text-lg font-semibold mb-4">Schedule Versions</h3>
           <div className="space-y-3">
             {versions.map((version) => (
-              <div 
+              <div
                 key={version.id}
                 className={`p-4 rounded-xl border ${
-                  version.isActive 
-                    ? 'bg-indigo-500/10 border-indigo-500/30' 
+                  version.isActive
+                    ? 'bg-indigo-500/10 border-indigo-500/30'
                     : 'bg-slate-800 border-slate-700'
                 }`}
               >
@@ -668,8 +728,8 @@ export default function SchedulePage() {
                       <p className="text-xs text-slate-500">score</p>
                     </div>
                     <span className="text-sm text-slate-500">
-                      {new Date(version.createdAt).toLocaleDateString('en-IN', { 
-                        month: 'short', 
+                      {new Date(version.createdAt).toLocaleDateString('en-IN', {
+                        month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
@@ -704,7 +764,7 @@ export default function SchedulePage() {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   />
                   <Legend formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>} />
@@ -732,7 +792,7 @@ export default function SchedulePage() {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   />
                   <Legend formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>} />
@@ -750,7 +810,7 @@ export default function SchedulePage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
                   <YAxis stroke="#64748b" fontSize={12} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   />
                   <Bar dataKey="scenes" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} name="Scenes" />
@@ -768,7 +828,7 @@ export default function SchedulePage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
                   <XAxis type="number" stroke="#64748b" fontSize={12} />
                   <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={11} width={120} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   />
                   <Bar dataKey="scenes" fill={CHART_COLORS.success} radius={[0, 4, 4, 0]} name="Scenes" />

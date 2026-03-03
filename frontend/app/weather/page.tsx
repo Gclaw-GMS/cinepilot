@@ -110,6 +110,47 @@ function getConditionColor(condition: string, iconCode: number): string {
   return 'from-blue-400 to-indigo-500';
 }
 
+// Calculate production score based on weather conditions (0-100)
+function getProductionScore(day: WeatherDay): number {
+  let score = 100;
+  
+  // Precipitation impact
+  if (day.precipitationChance > 60) score -= 40;
+  else if (day.precipitationChance > 30) score -= 20;
+  else if (day.precipitationChance > 10) score -= 5;
+  
+  // Wind impact
+  if (day.windSpeed > 30) score -= 20;
+  else if (day.windSpeed > 20) score -= 10;
+  else if (day.windSpeed > 10) score -= 5;
+  
+  // Humidity impact
+  if (day.humidity > 85) score -= 15;
+  else if (day.humidity > 75) score -= 8;
+  
+  // Temperature impact (extreme temps not ideal)
+  if (day.tempHigh > 40 || day.tempHigh < 15) score -= 15;
+  else if (day.tempHigh > 35 || day.tempHigh < 20) score -= 5;
+  
+  // Visibility impact
+  if (day.visibility < 5000) score -= 20;
+  else if (day.visibility < 8000) score -= 10;
+  
+  // UV impact (for outdoor shooting)
+  if (day.uvIndex >= 10) score -= 10;
+  else if (day.uvIndex >= 8) score -= 5;
+  
+  return Math.max(0, Math.min(100, score));
+}
+
+function getScoreColor(score: number): { bg: string; text: string; label: string } {
+  if (score >= 80) return { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Excellent' };
+  if (score >= 60) return { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Good' };
+  if (score >= 40) return { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Fair' };
+  if (score >= 20) return { bg: 'bg-orange-500/20', text: 'text-orange-400', label: 'Poor' };
+  return { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Avoid' };
+}
+
 export default function WeatherPage() {
   const [selectedLocation, setSelectedLocation] = useState<(typeof LOCATIONS)[0] | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -538,6 +579,7 @@ export default function WeatherPage() {
                       <th className="pb-3 font-medium">Humidity</th>
                       <th className="pb-3 font-medium">Wind</th>
                       <th className="pb-3 font-medium">Rain %</th>
+                      <th className="pb-3 font-medium">Score</th>
                       <th className="pb-3 font-medium">Shooting</th>
                     </tr>
                   </thead>
@@ -570,6 +612,23 @@ export default function WeatherPage() {
                           }`}>
                             {day.precipitationChance}%
                           </span>
+                        </td>
+                        <td className="py-3">
+                          {(() => {
+                            const score = getProductionScore(day);
+                            const colors = getScoreColor(score);
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="w-12 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full ${colors.bg.replace('/20', '')}`} 
+                                    style={{ width: `${score}%`, backgroundColor: score >= 80 ? '#10b981' : score >= 60 ? '#22c55e' : score >= 40 ? '#f59e0b' : score >= 20 ? '#f97316' : '#ef4444' }}
+                                  />
+                                </div>
+                                <span className={`text-sm font-medium ${colors.text}`}>{score}</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="py-3">
                           <span className={`flex items-center gap-1 text-xs ${

@@ -26,6 +26,8 @@ import {
   Utensils,
   Shirt,
   StickyNote,
+  Download,
+  UsersRound,
 } from 'lucide-react'
 
 type NavItem = {
@@ -73,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Team',
     items: [
       { href: '/crew', icon: Users, label: 'Crew' },
+      { href: '/collaboration', icon: UsersRound, label: 'Collaboration' },
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
       { href: '/dood', icon: Calendar, label: 'DOOD' },
       { href: '/notes', icon: StickyNote, label: 'Notes' },
@@ -88,6 +91,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'System',
     items: [
+      { href: '/exports', icon: Download, label: 'Export Center' },
       { href: '/weather', icon: Cloud, label: 'Weather' },
       { href: '/notifications', icon: Bell, label: 'Notifications' },
       { href: '/settings', icon: Settings, label: 'Settings' },

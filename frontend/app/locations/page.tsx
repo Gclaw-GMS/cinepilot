@@ -1,13 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { 
   MapPin, Search, Filter, Download, RefreshCw, Globe, 
   Building2, Waves, TreePine, Home, Camera, ChevronRight,
   AlertTriangle, CheckCircle, Loader2, Star, Navigation,
-  Calendar, Clock, Users, Zap
+  Calendar, Clock, Users, Zap, BarChart3
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
 
 interface SceneWithIntent {
   id: string
@@ -128,6 +132,47 @@ export default function LocationsPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
 
   const stats = calculateStats(scenes)
+
+  // Compute chart data for location analytics
+  const chartData = useMemo(() => {
+    // INT/EXT breakdown
+    const intExtData = [
+      { name: 'EXT', value: stats.extScenes, color: '#f59e0b' },
+      { name: 'INT', value: stats.intScenes, color: '#3b82f6' },
+    ].filter(d => d.value > 0)
+
+    // Time of day breakdown
+    const timeOfDayCount: Record<string, number> = {}
+    scenes.forEach(scene => {
+      const tod = scene.timeOfDay || 'Unknown'
+      timeOfDayCount[tod] = (timeOfDayCount[tod] || 0) + 1
+    })
+    const timeOfDayData = Object.entries(timeOfDayCount).map(([name, value]) => ({
+      name, value, color: name === 'DAY' ? '#fbbf24' : name === 'NIGHT' ? '#6366f1' : '#8b5cf6'
+    }))
+
+    // Terrain type breakdown
+    const terrainCount: Record<string, number> = {}
+    scenes.forEach(scene => {
+      const terrain = scene.locationIntents?.[0]?.terrainType || 'unknown'
+      const key = terrain.charAt(0).toUpperCase() + terrain.slice(1)
+      terrainCount[key] = (terrainCount[key] || 0) + 1
+    })
+    const terrainData = Object.entries(terrainCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+
+    // Candidates per scene (top 5)
+    const candidatesPerScene = scenes
+      .map(s => ({
+        name: `S${s.sceneNumber}`,
+        candidates: s.locationIntents?.[0]?._count?.candidates || 0
+      }))
+      .filter(s => s.candidates > 0)
+      .slice(0, 5)
+
+    return { intExtData, timeOfDayData, terrainData, candidatesPerScene }
+  }, [scenes, stats.extScenes, stats.intScenes])
 
   const fetchScenes = useCallback(async () => {
     try {
@@ -378,6 +423,89 @@ export default function LocationsPage() {
           <div className="text-3xl font-bold text-cyan-400">{stats.avgScore || '--'}</div>
         </div>
       </div>
+
+      {/* Location Analytics Charts */}
+      {scenes.length > 0 && (
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {/* INT/EXT Pie Chart */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              Scene Types
+            </h3>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData.intExtData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={35}
+                    outerRadius={60}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {chartData.intExtData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                  <Legend 
+                    formatter={(value) => <span className="text-gray-400 text-xs">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Time of Day Bar Chart */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-400" />
+              Time of Day
+            </h3>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.timeOfDayData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                  <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                  <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Candidates Per Scene */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-purple-400" />
+              Candidates by Scene
+            </h3>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.candidatesPerScene} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={true} vertical={false} />
+                  <XAxis type="number" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 10 }} width={35} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                  <Bar dataKey="candidates" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="grid grid-cols-3 gap-6">

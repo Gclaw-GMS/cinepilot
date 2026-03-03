@@ -612,8 +612,9 @@ export default function DOODPage() {
       label: 'Total Calls', 
       value: stats.totalCalls, 
       icon: Clock, 
-      color: 'text-purple-400',
-      bg: 'bg-purple-400/10'
+      color: stats.totalCalls === 0 ? 'text-amber-400' : 'text-purple-400',
+      bg: stats.totalCalls === 0 ? 'bg-amber-400/10' : 'bg-purple-400/10',
+      warning: stats.totalCalls === 0 ? 'Characters not linked' : undefined
     },
     { 
       label: 'Avg Days/Actor', 
@@ -694,6 +695,9 @@ export default function DOODPage() {
       </div>
     )
   }
+
+  // Special state: characters exist but no linked scenes (totalCalls === 0)
+  const hasUnlinkedCalls = stats.totalCalls === 0 && report.length > 0
 
   return (
     <div className="p-6 space-y-6">
@@ -793,11 +797,11 @@ export default function DOODPage() {
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="flex-1">
               <h3 className="font-medium text-amber-400 mb-1">
-                Characters Not Linked to Scenes
+                Characters Not Linked to Shooting Days
               </h3>
               <p className="text-sm text-gray-400 mb-3">
-                Your {report.length} characters exist but aren't linked to any scenes. 
-                Run script analysis to extract and link characters from your screenplay.
+                Your {report.length} characters exist but aren't linked to any shooting days. 
+                This usually means script characters haven't been linked to scenes in the schedule.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -806,14 +810,21 @@ export default function DOODPage() {
                   className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  Extract & Link Characters
+                  Re-run Script Analysis
                 </button>
                 <Link
-                  href="/scripts"
+                  href="/schedule"
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                 >
+                  <Calendar className="w-4 h-4" />
+                  View Schedule
+                </Link>
+                <Link
+                  href="/scripts"
+                  className="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
                   <FileText className="w-4 h-4" />
-                  Go to Script Breakdown
+                  Script Breakdown
                 </Link>
                 <button
                   onClick={() => setShowLinkGuide(false)}
@@ -821,6 +832,11 @@ export default function DOODPage() {
                 >
                   Dismiss
                 </button>
+              </div>
+              <div className="mt-3 pt-3 border-t border-amber-500/20">
+                <p className="text-xs text-gray-500">
+                  💡 Tip: Go to Script Breakdown to manually link characters to scenes, then sync with the schedule.
+                </p>
               </div>
             </div>
           </div>
@@ -929,7 +945,9 @@ export default function DOODPage() {
         {statCards.map((stat, idx) => (
           <div 
             key={idx}
-            className="bg-cinepilot-card border border-cinepilot-border rounded-xl p-4 hover:border-gray-600 transition-colors"
+            className={`bg-cinepilot-card border rounded-xl p-4 hover:border-gray-600 transition-colors ${
+              stat.warning ? 'border-amber-500/30' : 'border-cinepilot-border'
+            }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide hidden sm:inline">{stat.label}</span>
@@ -939,6 +957,12 @@ export default function DOODPage() {
               </div>
             </div>
             <div className={`text-2xl sm:text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+            {stat.warning && (
+              <div className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {stat.warning}
+              </div>
+            )}
           </div>
         ))}
       </div>

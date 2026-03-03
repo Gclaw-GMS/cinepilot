@@ -16,7 +16,8 @@ import {
   Share2,
   Filter,
   Eye,
-  List
+  List,
+  Film
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -404,7 +405,8 @@ export default function DOODPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              📊 Day Out of Days (DOOD)
+              <Film className="w-6 h-6 text-cyan-400" />
+              Day Out of Days (DOOD)
             </h1>
             <p className="text-gray-500 text-sm mt-1">
               Track actor availability and call days across the production schedule

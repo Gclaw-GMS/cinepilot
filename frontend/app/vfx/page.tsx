@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -14,6 +14,7 @@ type VfxNote = {
   description: string;
   vfxType: string;
   confidence: number;
+  estimatedDuration?: number;
   scene: { sceneNumber: string; headingRaw: string | null; sceneIndex: number };
 };
 
@@ -37,7 +38,27 @@ type Summary = {
   totalNotes: number;
   totalWarnings: number;
   complexityBreakdown: { simple: number; moderate: number; complex: number };
+  estimatedTotalCost: number;
+  estimatedTotalDuration: number;
 };
+
+// VFX Cost estimation constants (in INR per second)
+const VFX_COST_PER_SECOND = {
+  simple: 5000,
+  moderate: 15000,
+  complex: 45000,
+};
+
+const VFX_CATEGORIES = [
+  { key: 'cgi', label: 'CGI', color: '#8b5cf6' },
+  { key: 'compositing', label: 'Compositing', color: '#06b6d4' },
+  { key: 'wire_removal', label: 'Wire Removal', color: '#10b981' },
+  { key: 'matte_painting', label: 'Matte Painting', color: '#ef4444' },
+  { key: 'simulation', label: 'Simulation', color: '#ec4899' },
+  { key: 'enhancement', label: 'Enhancement', color: '#64748b' },
+  { key: 'explicit', label: 'Explicit VFX', color: '#f97316' },
+  { key: 'implied', label: 'Implied VFX', color: '#84cc16' },
+];
 
 // Demo data for when no real data exists
 const DEMO_VFX_NOTES: VfxNote[] = [
@@ -62,10 +83,12 @@ const DEMO_VFX_PROPS: VfxProp[] = [
 ];
 
 const DEMO_SUMMARY: Summary = {
-  totalScenes: 6,
-  totalNotes: 7,
-  totalWarnings: 3,
-  complexityBreakdown: { simple: 2, moderate: 2, complex: 3 },
+  totalScenes: 7,
+  totalNotes: 9,
+  totalWarnings: 4,
+  complexityBreakdown: { simple: 3, moderate: 3, complex: 3 },
+  estimatedTotalCost: 6765000,
+  estimatedTotalDuration: 225,
 };
 
 const DEMO_SCRIPTS: Script[] = [
@@ -91,6 +114,27 @@ function getComplexityStyle(complexity: string) {
   return COMPLEXITY_STYLES[complexity] || COMPLEXITY_STYLES.simple;
 }
 
+function getVfxCategoryColor(vfxType: string): string {
+  const category = VFX_CATEGORIES.find(c => c.key === vfxType);
+  return category?.color || '#64748b';
+}
+
+function formatCurrency(amount: number): string {
+  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`;
+  if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+  if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}K`;
+  return `₹${amount}`;
+}
+
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
 export default function VfxPage() {
   const [scripts, setScripts] = useState<Script[]>([]);
   const [selectedScript, setSelectedScript] = useState('');
@@ -102,6 +146,7 @@ export default function VfxPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [isUsingDemo, setIsUsingDemo] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost'>('overview');
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -133,6 +178,32 @@ export default function VfxPage() {
       });
   }, []);
 
+  // Calculate cost and duration from VFX notes
+  const calculateSummaryCost = useCallback((notes: VfxNote[], warnings: VfxWarning[]) => {
+    const complexityBreakdown = { simple: 0, moderate: 0, complex: 0 };
+    let totalCost = 0;
+    let totalDuration = 0;
+
+    for (const note of notes) {
+      const complexity = getComplexity(note.confidence);
+      complexityBreakdown[complexity as keyof typeof complexityBreakdown]++;
+      const costPerSec = VFX_COST_PER_SECOND[complexity as keyof typeof VFX_COST_PER_SECOND];
+      totalCost += costPerSec * (note.estimatedDuration || 30);
+      totalDuration += note.estimatedDuration || 30;
+    }
+
+    const sceneSet = new Set(notes.map(n => n.scene.sceneNumber));
+
+    return {
+      totalScenes: sceneSet.size,
+      totalNotes: notes.length,
+      totalWarnings: warnings.length,
+      complexityBreakdown,
+      estimatedTotalCost: totalCost,
+      estimatedTotalDuration: totalDuration,
+    };
+  }, []);
+
   const fetchVfxData = useCallback(async (scriptId: string) => {
     if (!scriptId) return;
     setLoading(true);
@@ -147,7 +218,7 @@ export default function VfxPage() {
         setVfxNotes(data.vfxNotes || []);
         setVfxWarnings(data.vfxWarnings || []);
         setVfxProps(data.props || []);
-        setSummary(data.summary || null);
+        setSummary(calculateSummaryCost(data.vfxNotes || [], data.vfxWarnings || []));
         setIsUsingDemo(false);
       } else {
         // Load demo data when no real data exists
@@ -333,7 +404,7 @@ export default function VfxPage() {
         {/* Summary Stats */}
         {summary && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Film className="w-4 h-4 text-purple-400" />
@@ -347,6 +418,20 @@ export default function VfxPage() {
                   <span className="text-xs text-slate-400">VFX Notes</span>
                 </div>
                 <div className="text-2xl font-bold">{summary.totalNotes}</div>
+              </div>
+              <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-900/20 border border-emerald-500/30 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs text-emerald-300">Est. Budget</span>
+                </div>
+                <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.estimatedTotalCost)}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs text-slate-400">Est. Duration</span>
+                </div>
+                <div className="text-2xl font-bold">{formatDuration(summary.estimatedTotalDuration)}</div>
               </div>
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -368,6 +453,40 @@ export default function VfxPage() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex gap-2 border-b border-slate-800 pb-px">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+                  activeTab === 'overview'
+                    ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('scenes')}
+                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+                  activeTab === 'scenes'
+                    ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Scenes
+              </button>
+              <button
+                onClick={() => setActiveTab('cost')}
+                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+                  activeTab === 'cost'
+                    ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Cost Analysis
+              </button>
             </div>
 
             {/* Visualization Charts */}
@@ -456,8 +575,8 @@ export default function VfxPage() {
           </div>
         )}
 
-        {/* Scene-by-scene breakdown */}
-        {sortedScenes.length > 0 && (
+        {/* Tab Content */}
+        {sortedScenes.length > 0 && activeTab === 'overview' && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Film className="w-5 h-5 text-purple-400" />
@@ -539,6 +658,108 @@ export default function VfxPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Cost Analysis Tab */}
+        {sortedScenes.length > 0 && activeTab === 'cost' && summary && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-900/10 border border-emerald-500/30 rounded-xl p-6">
+                <div className="text-sm text-emerald-400 mb-2">Total Estimated Cost</div>
+                <div className="text-4xl font-bold text-emerald-400">{formatCurrency(summary.estimatedTotalCost)}</div>
+                <div className="text-sm text-emerald-400/60 mt-2">Based on complexity analysis</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <div className="text-sm text-slate-400 mb-2">Average Cost per Shot</div>
+                <div className="text-4xl font-bold text-white">{formatCurrency(Math.round(summary.estimatedTotalCost / summary.totalNotes))}</div>
+                <div className="text-sm text-slate-500 mt-2">Per VFX shot</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <div className="text-sm text-slate-400 mb-2">Estimated Duration</div>
+                <div className="text-4xl font-bold text-white">{formatDuration(summary.estimatedTotalDuration)}</div>
+                <div className="text-sm text-slate-500 mt-2">Render time</div>
+              </div>
+            </div>
+
+            {/* Cost by Scene Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4">Cost by Scene</h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={sortedScenes.map(([sceneNum, group]) => {
+                      const cost = group.notes.reduce((sum, n) => {
+                        const comp = getComplexity(n.confidence);
+                        return sum + VFX_COST_PER_SECOND[comp as keyof typeof VFX_COST_PER_SECOND] * (n.estimatedDuration || 30);
+                      }, 0);
+                      return { scene: `S${sceneNum}`, cost: cost / 100000 };
+                    })}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="scene" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `₹${v}L`} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      formatter={(value: number) => [formatCurrency(value * 100000), 'Cost']}
+                    />
+                    <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Cost Breakdown Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4">Detailed Cost Breakdown</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Scene</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Shots</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Complexity</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Est. Duration</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Est. Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedScenes.map(([sceneNum, group]) => {
+                      const maxConf = Math.max(...group.notes.map(n => n.confidence), 0);
+                      const complexity = getComplexity(maxConf);
+                      const compStyle = getComplexityStyle(complexity);
+                      const totalDuration = group.notes.reduce((sum, n) => sum + (n.estimatedDuration || 30), 0);
+                      const totalCost = group.notes.reduce((sum, n) => {
+                        const comp = getComplexity(n.confidence);
+                        return sum + VFX_COST_PER_SECOND[comp as keyof typeof VFX_COST_PER_SECOND] * (n.estimatedDuration || 30);
+                      }, 0);
+
+                      return (
+                        <tr key={sceneNum} className="border-b border-slate-800">
+                          <td className="py-3 px-4 text-sm">Scene {sceneNum}</td>
+                          <td className="py-3 px-4 text-sm text-slate-400">{group.notes.length}</td>
+                          <td className="py-3 px-4">
+                            <span className={`text-xs px-2 py-1 rounded-full ${compStyle.bg} ${compStyle.text}`}>{complexity}</span>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-slate-400 text-right">{formatDuration(totalDuration)}</td>
+                          <td className="py-3 px-4 text-sm text-emerald-400 text-right font-medium">{formatCurrency(totalCost)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-800/50">
+                      <td className="py-4 px-4 font-semibold">Total</td>
+                      <td className="py-4 px-4 text-slate-400">{summary.totalNotes} shots</td>
+                      <td className="py-4 px-4"></td>
+                      <td className="py-4 px-4 text-slate-400 text-right">{formatDuration(summary.estimatedTotalDuration)}</td>
+                      <td className="py-4 px-4 text-emerald-400 text-right font-bold text-lg">{formatCurrency(summary.estimatedTotalCost)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>

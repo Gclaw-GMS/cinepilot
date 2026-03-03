@@ -73,8 +73,11 @@ export default function DOODPage() {
   const [sortBy, setSortBy] = useState<'days' | 'name' | 'percentage'>('days')
   const [searchQuery, setSearchQuery] = useState('')
   const [isDataLoaded, setIsDataLoaded] = useState(false)
+  const [hasUnlinkedCharacters, setHasUnlinkedCharacters] = useState(false)
+  const [hasAnyData, setHasAnyData] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showLinkGuide, setShowLinkGuide] = useState(false)
   const tableRef = useRef<HTMLDivElement>(null)
   const filteredReportLength = useRef(0)
 
@@ -92,10 +95,18 @@ export default function DOODPage() {
       // Check if API returned demo data
       setIsDemoMode(data.isDemoMode === true)
       
+      // Check for unlinked characters state
+      setHasUnlinkedCharacters(data.hasUnlinkedCharacters === true)
+      setHasAnyData(data.hasAnyData === true)
+      
       if (data.report && data.report.length > 0) {
         setReport(data.report)
         setStats(data.stats)
         setIsDataLoaded(true)
+        // Show link guide if characters exist but aren't linked
+        if (data.hasUnlinkedCharacters) {
+          setShowLinkGuide(true)
+        }
       } else {
         // Use demo data if no real data
         setReport(DEMO_DOOD)
@@ -131,6 +142,29 @@ export default function DOODPage() {
       await loadDOOD()
     } catch (e) {
       console.warn('Refresh failed, using cached data')
+    }
+    setRefreshing(false)
+  }
+
+  const handleExtractCharacters = async () => {
+    setRefreshing(true)
+    try {
+      // Call the scripts API to run character extraction
+      const res = await fetch('/api/scripts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'analyze', 
+          projectId: selectedProject 
+        })
+      })
+      const data = await res.json()
+      console.log('Character extraction result:', data)
+      // Reload DOOD after extraction
+      await loadDOOD()
+      setShowLinkGuide(false)
+    } catch (e) {
+      console.warn('Character extraction failed:', e)
     }
     setRefreshing(false)
   }
@@ -751,6 +785,47 @@ export default function DOODPage() {
           </select>
         </div>
       </div>
+
+      {/* Unlinked Characters Warning Banner */}
+      {showLinkGuide && hasUnlinkedCharacters && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-medium text-amber-400 mb-1">
+                Characters Not Linked to Scenes
+              </h3>
+              <p className="text-sm text-gray-400 mb-3">
+                Your {report.length} characters exist but aren't linked to any scenes. 
+                Run script analysis to extract and link characters from your screenplay.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleExtractCharacters}
+                  disabled={refreshing}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Extract & Link Characters
+                </button>
+                <Link
+                  href="/scripts"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Go to Script Breakdown
+                </Link>
+                <button
+                  onClick={() => setShowLinkGuide(false)}
+                  className="px-3 py-2 text-gray-500 hover:text-gray-400 text-sm transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (

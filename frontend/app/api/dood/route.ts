@@ -122,6 +122,12 @@ export async function GET(req: NextRequest) {
       ? Math.round((totalCalls / report.length) * 10) / 10 
       : 0;
 
+    // Check if characters exist but have no scene links (broken state)
+    const hasUnlinkedCharacters = characters.length > 0 && totalCalls === 0 && shootingDays.length > 0;
+    
+    // Check if there's any data at all
+    const hasAnyData = characters.length > 0 || shootingDays.length > 0;
+    
     return NextResponse.json({
       report,
       stats: {
@@ -130,6 +136,11 @@ export async function GET(req: NextRequest) {
         totalCalls,
         avgDaysPerActor,
       },
+      hasUnlinkedCharacters,
+      hasAnyData,
+      message: hasUnlinkedCharacters 
+        ? 'Characters exist but are not linked to scenes. Run script analysis to link characters.'
+        : undefined,
     });
   } catch (error) {
     console.error('[GET /api/dood]', error);

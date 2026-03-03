@@ -305,10 +305,57 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/scripts — upload + process script
+// POST /api/scripts — upload + process script OR run analysis actions
 export async function POST(req: NextRequest) {
   try {
     await ensureDefaultProject();
+    
+    // Check content type to determine if it's JSON or form data
+    const contentType = req.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      // Handle JSON requests for actions like 'analyze'
+      const body = await req.json();
+      const { action, projectId = DEFAULT_PROJECT_ID } = body;
+      
+      if (action === 'analyze') {
+        // Run character extraction on existing scripts
+        const scripts = await prisma.script.findMany({
+          where: { projectId, isActive: true },
+          include: { scenes: true }
+        });
+        
+        if (scripts.length === 0) {
+          return NextResponse.json({ 
+            error: 'No scripts found. Upload a script first.' 
+          }, { status: 404 });
+        }
+        
+        // Run canonicalization to link characters to scenes
+        await runCanonicalization(projectId);
+        
+        // Get updated character count
+        const characters = await prisma.character.findMany({
+          where: { projectId }
+        });
+        
+        const sceneCharacters = await prisma.sceneCharacter.findMany({
+          where: { 
+            characterId: { in: characters.map(c => c.id) }
+          }
+        });
+        
+        return NextResponse.json({
+          message: `Character extraction complete. ${characters.length} characters linked across ${sceneCharacters.length} scene appearances.`,
+          charactersFound: characters.length,
+          sceneLinksCreated: sceneCharacters.length,
+        });
+      }
+      
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+    
+    // Handle form data for file uploads
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const projectId = (formData.get('projectId') as string) || DEFAULT_PROJECT_ID;

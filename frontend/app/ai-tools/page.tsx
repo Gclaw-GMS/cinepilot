@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
+  Tooltip, ResponsiveContainer, LineChart, Line, Legend, AreaChart, Area
 } from 'recharts'
 
 // Feature definitions with detailed configs
@@ -442,7 +442,7 @@ export default function AIToolsPage() {
   )
 }
 
-// Budget Result Component with Pie Chart
+// Budget Result Component with Enhanced Charts
 function BudgetResult({ result, colors }: { result: any; colors: any }) {
   const budgetData = result.breakdown ? [
     { name: 'Production', value: result.breakdown.production?.percentage || 0, amount: result.breakdown.production?.amount || 0 },
@@ -451,43 +451,162 @@ function BudgetResult({ result, colors }: { result: any; colors: any }) {
   ] : []
   const budgetColors = ['#6366f1', '#8b5cf6', '#10b981']
 
+  // Enhanced breakdown with items
+  const productionItems = result.breakdown?.production?.items || []
+  const postItems = result.breakdown?.postProduction?.items || []
+
   return (
     <div className="space-y-6">
+      {/* Main Budget Display */}
       {result.estimatedTotal && (
-        <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl p-4 border border-emerald-500/20">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Estimated Total Budget</div>
-          <div className="text-3xl font-bold text-emerald-400">
-            ₹{(result.estimatedTotal / 10000000).toFixed(2)} Cr
+        <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl p-5 border border-emerald-500/20">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Estimated Total Budget</div>
+              <div className="text-4xl font-bold text-emerald-400">
+                ₹{(result.estimatedTotal / 10000000).toFixed(2)} Cr
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Contingency (10%)</div>
+              <div className="text-xl font-semibold text-amber-400">
+                ₹{((result.contingencies?.recommended || 0) / 100000).toFixed(0)}L
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4 mt-2 text-xs">
-            <span className="text-slate-400">
-              Contingency: <span className="text-amber-400">₹{((result.contingencies?.recommended || 0) / 100000).toFixed(0)}L</span>
-            </span>
+          {/* Budget Progress Bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Budget Allocation</span>
+              <span>100%</span>
+            </div>
+            <div className="h-3 bg-slate-800 rounded-full overflow-hidden flex">
+              {budgetData.map((item, i) => (
+                <div 
+                  key={item.name}
+                  className="h-full transition-all duration-500"
+                  style={{ 
+                    width: `${item.value}%`,
+                    backgroundColor: budgetColors[i]
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between mt-2">
+              {budgetData.map((item, i) => (
+                <div key={item.name} className="flex items-center gap-1 text-xs">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: budgetColors[i] }} />
+                  <span className="text-slate-400">{item.name}: {item.value}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
+      {/* Pie Chart and Bar Chart Side by Side */}
       {budgetData.length > 0 && (
-        <div>
-          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Budget Distribution</h4>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={budgetData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={4} dataKey="value" nameKey="name">
-                  {budgetData.map((entry, index) => (<Cell key={`cell-${index}`} fill={budgetColors[index % budgetColors.length]} />))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Pie Chart */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Distribution</h4>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={budgetData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={35} 
+                    outerRadius={60} 
+                    paddingAngle={4} 
+                    dataKey="value" 
+                    nameKey="name"
+                  >
+                    {budgetData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={budgetColors[index % budgetColors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value}%`, 'Percentage']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Legend */}
+            <div className="space-y-1 mt-2">
+              {budgetData.map((item, i) => (
+                <div key={item.name} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: budgetColors[i] }} />
+                    <span className="text-slate-300">{item.name}</span>
+                  </div>
+                  <span className="text-slate-400">₹{(item.amount / 100000).toFixed(0)}L</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            {budgetData.map((item, i) => (
-              <div key={item.name} className="text-center">
-                <div className="text-lg font-semibold text-slate-200">₹{(item.amount / 10000000).toFixed(1)}Cr</div>
-                <div className="text-xs text-slate-500">{item.name}</div>
+
+          {/* Bar Chart */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">By Amount (Lakhs)</h4>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={budgetData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={10} tickFormatter={(v) => `₹${v}L`} />
+                  <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={10} width={60} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`₹${(value / 100000).toFixed(0)}L`, 'Amount']}
+                  />
+                  <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                    {budgetData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={budgetColors[index % budgetColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed Breakdown */}
+      {(productionItems.length > 0 || postItems.length > 0) && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <BarChart3 className="w-3 h-3 text-cyan-400" /> Detailed Breakdown
+          </h4>
+          
+          {productionItems.length > 0 && (
+            <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+              <div className="text-xs font-medium text-indigo-400 mb-2">Production Costs</div>
+              <div className="space-y-2">
+                {productionItems.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300">{item.name}</span>
+                    <span className="text-slate-400">₹{(item.amount / 100000).toFixed(1)}L</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {postItems.length > 0 && (
+            <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+              <div className="text-xs font-medium text-violet-400 mb-2">Post-Production</div>
+              <div className="space-y-2">
+                {postItems.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300">{item.name}</span>
+                    <span className="text-slate-400">₹{(item.amount / 100000).toFixed(1)}L</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -512,21 +631,119 @@ function BudgetResult({ result, colors }: { result: any; colors: any }) {
   )
 }
 
-// Risk Result Component
+// Risk Result Component with Enhanced Visualizations
 function RiskResult({ result, colors }: { result: any; colors: any }) {
+  // Calculate risk distribution for chart
+  const riskDistribution = result.risks ? [
+    { name: 'High', value: result.risks.filter((r: any) => r.severity === 'high').length, color: '#ef4444' },
+    { name: 'Medium', value: result.risks.filter((r: any) => r.severity === 'medium').length, color: '#f59e0b' },
+    { name: 'Low', value: result.risks.filter((r: any) => r.severity === 'low').length, color: '#10b981' },
+  ] : []
+
+  // Probability data for visualization
+  const probabilityData = result.risks?.map((risk: any) => ({
+    category: risk.category,
+    probability: Math.round((risk.probability || 0) * 100),
+    severity: risk.severity
+  })) || []
+
   return (
     <div className="space-y-6">
       {result.riskScore && (
-        <div className="bg-gradient-to-r from-rose-500/10 to-orange-500/10 rounded-xl p-4 border border-rose-500/20">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-r from-rose-500/10 to-orange-500/10 rounded-xl p-5 border border-rose-500/20">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Risk Score</div>
-              <div className={`text-3xl font-bold ${result.riskScore > 50 ? 'text-red-400' : result.riskScore > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <div className={`text-4xl font-bold ${result.riskScore > 50 ? 'text-red-400' : result.riskScore > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
                 {result.riskScore}/100
               </div>
             </div>
-            <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${result.riskScore > 50 ? 'bg-red-500/20 text-red-400' : result.riskScore > 25 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-              {result.riskScore > 50 ? 'High Risk' : result.riskScore > 25 ? 'Medium Risk' : 'Low Risk'}
+            <div className={`px-4 py-2 rounded-lg text-sm font-bold ${result.riskScore > 50 ? 'bg-red-500/20 text-red-400' : result.riskScore > 25 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              {result.riskScore > 50 ? '🔴 High Risk' : result.riskScore > 25 ? '🟡 Medium Risk' : '🟢 Low Risk'}
+            </div>
+          </div>
+          {/* Risk Score Bar */}
+          <div className="mt-3">
+            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 ${
+                  result.riskScore > 50 ? 'bg-gradient-to-r from-red-500 to-red-400' : 
+                  result.riskScore > 25 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 
+                  'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                }`}
+                style={{ width: `${result.riskScore}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <span>0</span>
+              <span>25</span>
+              <span>50</span>
+              <span>75</span>
+              <span>100</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Risk Distribution Chart */}
+      {riskDistribution.length > 0 && riskDistribution.some(r => r.value > 0) && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Severity Distribution</h4>
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={riskDistribution.filter(r => r.value > 0)} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={25} 
+                    outerRadius={50} 
+                    paddingAngle={4} 
+                    dataKey="value" 
+                    nameKey="name"
+                  >
+                    {riskDistribution.filter(r => r.value > 0).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex justify-center gap-3 mt-2">
+              {riskDistribution.map((item, i) => (
+                <div key={item.name} className="flex items-center gap-1 text-xs">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-slate-400">{item.name}: {item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Probability Chart */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+            <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Risk Probability</h4>
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={probabilityData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={10} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                  <YAxis type="category" dataKey="category" stroke="#64748b" fontSize={9} width={60} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value}%`, 'Probability']}
+                  />
+                  <Bar dataKey="probability" radius={[0, 4, 4, 0]}>
+                    {probabilityData.map((entry: { severity: string }, index: number) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.severity === 'high' ? '#ef4444' : entry.severity === 'medium' ? '#f59e0b' : '#10b981'} 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
@@ -540,14 +757,19 @@ function RiskResult({ result, colors }: { result: any; colors: any }) {
           {result.risks.map((risk: any, i: number) => (
             <div key={i} className="bg-slate-800/50 rounded-lg p-3 border-l-2" style={{ borderColor: SEVERITY_COLORS[risk.severity] || '#6b7280' }}>
               <div className="flex items-center justify-between mb-1">
-                <span className="font-medium text-slate-200">{risk.category}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-slate-200">{risk.category}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${risk.probability ? 'bg-slate-700 text-slate-400' : ''}`}>
+                    {risk.probability ? `${Math.round(risk.probability * 100)}%` : ''}
+                  </span>
+                </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${risk.severity === 'high' ? 'bg-red-500/20 text-red-400' : risk.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                   {risk.severity}
                 </span>
               </div>
               <p className="text-sm text-slate-400">{risk.description}</p>
-              <div className="mt-2 text-xs text-slate-500">
-                <span className="text-cyan-400">Mitigation:</span> {risk.mitigation}
+              <div className="mt-2 text-xs text-slate-500 bg-slate-900/50 p-2 rounded">
+                <span className="text-cyan-400 font-medium">Mitigation:</span> {risk.mitigation}
               </div>
             </div>
           ))}
@@ -555,8 +777,8 @@ function RiskResult({ result, colors }: { result: any; colors: any }) {
       </div>
 
       {result.overallAssessment && (
-        <div className="bg-slate-800/50 rounded-lg p-3">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Assessment</div>
+        <div className="bg-slate-800/50 rounded-lg p-4">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Overall Assessment</div>
           <p className="text-sm text-slate-300">{result.overallAssessment}</p>
         </div>
       )}
@@ -564,31 +786,65 @@ function RiskResult({ result, colors }: { result: any; colors: any }) {
   )
 }
 
-// Schedule Result Component with Bar Chart
+// Schedule Result Component with Enhanced Charts
 function ScheduleResult({ result, colors }: { result: any; colors: any }) {
-  const scheduleData = result.schedule?.map((item: any) => ({ phase: item.phase, scenes: item.scenes })) || []
+  const scheduleData = result.schedule?.map((item: any) => ({ phase: item.phase, scenes: item.scenes, focus: item.focus })) || []
+
+  // Calculate efficiency metrics
+  const efficiency = result.currentDays > 0 ? Math.round((1 - result.suggestedDays / result.currentDays) * 100) : 0
 
   return (
     <div className="space-y-6">
+      {/* Key Metrics */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-cyan-400">{result.suggestedDays}</div>
-          <div className="text-xs text-slate-500">Suggested Days</div>
+        <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 rounded-xl p-4 text-center border border-cyan-500/30">
+          <div className="text-3xl font-bold text-cyan-400">{result.suggestedDays}</div>
+          <div className="text-xs text-slate-400 mt-1">Suggested Days</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-slate-400">{result.currentDays}</div>
-          <div className="text-xs text-slate-500">Current Days</div>
+        <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+          <div className="text-3xl font-bold text-slate-300">{result.currentDays}</div>
+          <div className="text-xs text-slate-400 mt-1">Current Days</div>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-emerald-400">{result.savings}</div>
-          <div className="text-xs text-slate-500">Days Saved</div>
+        <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-xl p-4 text-center border border-emerald-500/30">
+          <div className={`text-3xl font-bold ${result.savings > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+            {result.savings > 0 ? `+${result.savings}` : result.savings}
+          </div>
+          <div className="text-xs text-slate-400 mt-1">Days Saved</div>
         </div>
       </div>
 
+      {/* Efficiency Bar */}
+      <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-slate-400">Schedule Efficiency</span>
+          <span className={`text-sm font-bold ${efficiency > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {efficiency > 0 ? `${efficiency}% more efficient` : 'Current plan'}
+          </span>
+        </div>
+        <div className="h-4 bg-slate-800 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
+            style={{ width: `${Math.min(100, Math.max(0, 100 - efficiency))}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Schedule Strategy */}
+      {result.strategy && (
+        <div className="bg-indigo-500/10 rounded-xl p-4 border border-indigo-500/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Target className="w-4 h-4 text-indigo-400" />
+            <span className="text-sm font-medium text-indigo-300">Optimization Strategy</span>
+          </div>
+          <p className="text-sm text-slate-300">{result.strategy.description}</p>
+        </div>
+      )}
+
+      {/* Schedule Phases Chart */}
       {scheduleData.length > 0 && (
         <div>
           <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Schedule Phases</h4>
-          <div className="h-48">
+          <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={scheduleData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />

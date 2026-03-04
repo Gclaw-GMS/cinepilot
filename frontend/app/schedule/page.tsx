@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   Calendar,
@@ -26,7 +26,8 @@ import {
   Zap,
   DollarSign,
   Settings,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, 
@@ -247,6 +248,8 @@ export default function SchedulePage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'schedule' | 'versions' | 'analytics'>('schedule')
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(-1)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -283,6 +286,75 @@ export default function SchedulePage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    const maxIndex = shootingDays.length - 1
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedDayIndex(prev => Math.min(prev + 1, maxIndex))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedDayIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Enter':
+        if (selectedDayIndex >= 0 && shootingDays[selectedDayIndex]) {
+          setExpandedDay(prev => prev === shootingDays[selectedDayIndex].id ? null : shootingDays[selectedDayIndex].id)
+        }
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedDayIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedDayIndex(maxIndex)
+        break
+      case 'Escape':
+        setSelectedDayIndex(-1)
+        setExpandedDay(null)
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'o':
+        if (!e.ctrlKey && !e.metaKey) {
+          handleOptimize()
+        }
+        break
+      case '1':
+        if (!e.ctrlKey && !e.metaKey) {
+          setActiveTab('schedule')
+        }
+        break
+      case '2':
+        if (!e.ctrlKey && !e.metaKey) {
+          setActiveTab('versions')
+        }
+        break
+      case '3':
+        if (!e.ctrlKey && !e.metaKey) {
+          setActiveTab('analytics')
+        }
+        break
+    }
+  }, [shootingDays, selectedDayIndex])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const handleOptimize = async () => {
     setOptimizing(true)
@@ -508,9 +580,61 @@ export default function SchedulePage() {
                 {tab === 'schedule' && '📅'} {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="ml-2 px-2 py-1 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded transition-colors"
+              title="Keyboard shortcuts"
+            >
+              ⌨️
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Help */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-slate-300">
+                <span>Navigate days</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">↑ / ↓</kbd>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Select first/last</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">Home / End</kbd>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Expand/collapse day</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">Enter</kbd>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Close expanded</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">Esc</kbd>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Optimize schedule</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">O</kbd>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Switch tabs</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">1 / 2 / 3</kbd>
+              </div>
+              <div className="flex justify-between text-slate-300">
+                <span>Show help</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs">Shift + ?</kbd>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-4">Press ? to toggle this help dialog</p>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -562,10 +686,14 @@ export default function SchedulePage() {
               </button>
             </div>
           ) : (
-            shootingDays.map((day) => (
+            shootingDays.map((day, idx) => (
               <div
                 key={day.id}
-                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
+                className={`bg-slate-900 border rounded-xl overflow-hidden hover:border-slate-700 transition-all ${
+                  selectedDayIndex === idx 
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/30' 
+                    : 'border-slate-800'
+                }`}
               >
                 {/* Day Header */}
                 <div

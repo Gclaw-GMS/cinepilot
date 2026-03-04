@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   CheckSquare,
   Plus,
@@ -29,7 +29,8 @@ import {
   TrendingUp,
   CalendarDays,
   ListChecks,
-  LayoutGrid
+  LayoutGrid,
+  Keyboard
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -106,6 +107,8 @@ export default function TasksPage() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
@@ -126,6 +129,87 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks()
   }, [fetchTasks])
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if user is typing in an input
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    // Get the current filtered count from DOM
+    const taskCards = document.querySelectorAll('[data-task-card]')
+    const maxIndex = taskCards.length - 1
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedRowIndex(prev => Math.min(prev + 1, maxIndex))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedRowIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedRowIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedRowIndex(maxIndex)
+        break
+      case 'Escape':
+        setSelectedRowIndex(-1)
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'n':
+      case 'N':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setEditingTask(null)
+          setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' })
+          setShowForm(true)
+        }
+        break
+      case 'f':
+      case 'F':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          const searchInput = document.querySelector('input[placeholder="Search tasks..."]') as HTMLInputElement
+          searchInput?.focus()
+        }
+        break
+      case 'v':
+      case 'V':
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+          e.preventDefault()
+          setViewMode(prev => prev === 'list' ? 'board' : prev === 'board' ? 'calendar' : 'list')
+        }
+        break
+    }
+  }, [tasks.length])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  // Auto-scroll to selected task
+  useEffect(() => {
+    if (selectedRowIndex >= 0) {
+      const taskElements = document.querySelectorAll('[data-task-card]')
+      const selectedElement = taskElements[selectedRowIndex]
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }, [selectedRowIndex])
 
   // Calculate stats
   const stats = useMemo((): TaskStats => {
@@ -285,6 +369,14 @@ export default function TasksPage() {
           
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-slate-500 hover:text-slate-300 bg-slate-800/50 hover:bg-slate-800 rounded transition-colors"
+              title="Keyboard shortcuts"
+            >
+              <Keyboard className="w-3 h-3" />
+              <span className="hidden sm:inline">Shortcuts</span>
+            </button>
+            <button
               onClick={() => fetchTasks()}
               disabled={refreshing}
               className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 transition-colors disabled:opacity-50"
@@ -437,6 +529,11 @@ export default function TasksPage() {
             <span className="text-sm text-slate-500">
               {filteredTasks.length} of {tasks.length} tasks
             </span>
+            {selectedRowIndex >= 0 && (
+              <span className="text-sm text-indigo-400">
+                Row {selectedRowIndex + 1} selected
+              </span>
+            )}
           </div>
         </div>
 
@@ -473,7 +570,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredTasks.map((task) => (
+            {filteredTasks.map((task, index) => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -482,6 +579,7 @@ export default function TasksPage() {
                 onDelete={() => handleDelete(task.id)}
                 formatDate={formatDate}
                 getDaysUntilDue={getDaysUntilDue}
+                isSelected={selectedRowIndex === index}
               />
             ))}
           </div>
@@ -608,6 +706,74 @@ export default function TasksPage() {
             </div>
           </div>
         )}
+
+        {/* Keyboard Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-indigo-500/10">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-indigo-500/20">
+                    <Keyboard className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                    Keyboard Shortcuts
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { keys: ['↑', '↓'], desc: 'Navigate tasks', category: 'Navigation' },
+                  { keys: ['Home'], desc: 'Go to first task', category: 'Navigation' },
+                  { keys: ['End'], desc: 'Go to last task', category: 'Navigation' },
+                  { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
+                  { keys: ['N'], desc: 'New task', category: 'Actions' },
+                  { keys: ['F'], desc: 'Focus search', category: 'Actions' },
+                  { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
+                  { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+                ].map((shortcut, idx) => (
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-500 uppercase tracking-wider w-20">
+                        {shortcut.category}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {shortcut.keys.map((key, i) => (
+                          <kbd 
+                            key={i} 
+                            className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-indigo-300 shadow-sm"
+                          >
+                            {key}
+                          </kbd>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Quick reference for power users</span>
+                  <span className="flex items-center gap-2">
+                    Press 
+                    <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-indigo-400">?</kbd> 
+                    anytime to toggle
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -620,7 +786,8 @@ function TaskCard({
   onEdit, 
   onDelete,
   formatDate,
-  getDaysUntilDue
+  getDaysUntilDue,
+  isSelected
 }: { 
   task: Task
   onStatusChange: (id: string, status: string) => void
@@ -628,6 +795,7 @@ function TaskCard({
   onDelete: () => void
   formatDate: (date: string) => string
   getDaysUntilDue: (date: string) => number
+  isSelected?: boolean
 }) {
   const [showMenu, setShowMenu] = useState(false)
   const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS.pending
@@ -636,7 +804,14 @@ function TaskCard({
   const isOverdue = task.dueDate && getDaysUntilDue(task.dueDate) < 0 && task.status !== 'completed'
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
+    <div 
+      data-task-card 
+      className={`bg-slate-900 border rounded-xl p-4 transition-all ${
+        isSelected 
+          ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/10' 
+          : 'border-slate-800 hover:border-slate-700'
+      }`}
+    >
       <div className="flex items-start gap-4">
         {/* Status Checkbox */}
         <button

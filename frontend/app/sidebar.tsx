@@ -83,6 +83,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
       { href: '/dood', icon: Calendar, label: 'DOOD' },
       { href: '/notes', icon: StickyNote, label: 'Notes' },
+      { href: '/whatsapp', icon: MessageCircle, label: 'WhatsApp Broadcast', badge: 'NEW' },
     ],
   },
   {

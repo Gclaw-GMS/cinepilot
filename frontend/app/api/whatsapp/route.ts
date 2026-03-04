@@ -3,6 +3,17 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// In-memory message store for demo mode (resets on server restart)
+let sentMessages: Array<{
+  id: string
+  recipient: string
+  message: string
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
+  timestamp: string
+  useWacli: boolean
+  error?: string
+}> = []
+
 // Demo templates for WhatsApp messages
 const DEMO_TEMPLATES = [
   {
@@ -47,9 +58,6 @@ const DEMO_TEMPLATES = [
   },
 ];
 
-// Demo sent messages history
-let sentMessages: any[] = [];
-
 // Helper to check if we're in demo mode
 async function checkDbConnection(): Promise<boolean> {
   try {
@@ -90,7 +98,7 @@ export async function POST(req: NextRequest) {
       id: messageId,
       recipient,
       message,
-      status: 'sent',
+      status: 'sent' as const,
       timestamp: new Date().toISOString(),
       useWacli: useWacli ?? true,
     };
@@ -131,8 +139,40 @@ export async function GET(req: NextRequest) {
   
   // Get message history
   if (action === 'history') {
+    // Support filtering by status
+    const statusFilter = req.nextUrl.searchParams.get('status');
+    let filteredMessages = sentMessages;
+    if (statusFilter) {
+      filteredMessages = sentMessages.filter(m => m.status === statusFilter);
+    }
+    
     return NextResponse.json({
-      messages: sentMessages,
+      messages: filteredMessages,
+      total: sentMessages.length,
+      stats: {
+        sent: sentMessages.filter(m => m.status === 'sent').length,
+        delivered: sentMessages.filter(m => m.status === 'delivered').length,
+        read: sentMessages.filter(m => m.status === 'read').length,
+        failed: sentMessages.filter(m => m.status === 'failed').length,
+      },
+      isDemoMode: true,
+    });
+  }
+  
+  // Get status of a specific message
+  if (action === 'status') {
+    const messageId = req.nextUrl.searchParams.get('messageId');
+    if (!messageId) {
+      return NextResponse.json({ error: 'messageId required' }, { status: 400 });
+    }
+    const message = sentMessages.find(m => m.id === messageId);
+    if (!message) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
+    return NextResponse.json({
+      id: message.id,
+      status: message.status,
+      timestamp: message.timestamp,
       isDemoMode: true,
     });
   }
@@ -143,6 +183,11 @@ export async function GET(req: NextRequest) {
     provider: 'demo',
     phoneNumber: '+91 98765 43210',
     businessName: 'CinePilot Production',
+    messagesToday: sentMessages.filter(m => {
+      const msgDate = new Date(m.timestamp).toDateString();
+      const today = new Date().toDateString();
+      return msgDate === today;
+    }).length,
     isDemoMode: true,
   });
 }

@@ -146,6 +146,34 @@ export default function DOODPage() {
     setRefreshing(false)
   }
 
+  // Persist view preferences to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cinepilot_dood_view')
+      if (saved) {
+        try {
+          const prefs = JSON.parse(saved)
+          if (prefs.viewMode) setViewMode(prefs.viewMode)
+          if (prefs.filterMain) setFilterMain(prefs.filterMain)
+          if (prefs.sortBy) setSortBy(prefs.sortBy)
+        } catch (e) {
+          console.warn('Failed to parse saved DOOD preferences')
+        }
+      }
+    }
+  }, [])
+
+  // Save view preferences when they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cinepilot_dood_view', JSON.stringify({
+        viewMode,
+        filterMain,
+        sortBy
+      }))
+    }
+  }, [viewMode, filterMain, sortBy])
+
   const handleExtractCharacters = async () => {
     setRefreshing(true)
     try {

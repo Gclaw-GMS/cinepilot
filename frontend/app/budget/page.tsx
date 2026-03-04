@@ -296,7 +296,7 @@ export default function BudgetPage() {
   const handleAddExpense = async () => {
     if (!newExpense.description || !newExpense.amount) return
     try {
-      await fetch('/api/budget', {
+      const res = await fetch('/api/budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -306,9 +306,18 @@ export default function BudgetPage() {
           status: newExpense.status || 'pending'
         }),
       })
+      const data = await res.json()
+      
+      // In demo mode, manually add the expense to local state
+      if (data.isDemoMode && data.expense) {
+        setExpenses(prev => [data.expense, ...prev])
+      } else {
+        // In real mode, refetch from database
+        await fetchData()
+      }
+      
       setShowAddExpense(false)
       setNewExpense({ category: 'Production', description: '', amount: '', date: '', vendor: '', notes: '', status: 'pending' })
-      await fetchData()
     } catch (e: any) {
       setError(e.message)
     }
@@ -317,12 +326,19 @@ export default function BudgetPage() {
   const handleDeleteExpense = async (id: string) => {
     if (!confirm('Delete this expense?')) return
     try {
-      await fetch('/api/budget', {
+      const res = await fetch('/api/budget', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'deleteExpense', id }),
       })
-      await fetchData()
+      const data = await res.json()
+      
+      // In demo mode, manually remove from local state
+      if (data.isDemoMode) {
+        setExpenses(prev => prev.filter(e => e.id !== id))
+      } else {
+        await fetchData()
+      }
     } catch (e: any) {
       setError(e.message)
     }
@@ -330,12 +346,19 @@ export default function BudgetPage() {
 
   const handleUpdateExpenseStatus = async (id: string, status: string) => {
     try {
-      await fetch('/api/budget', {
+      const res = await fetch('/api/budget', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'updateExpenseStatus', id, status }),
       })
-      await fetchData()
+      const data = await res.json()
+      
+      // In demo mode, manually update local state
+      if (data.isDemoMode) {
+        setExpenses(prev => prev.map(e => e.id === id ? { ...e, status } : e))
+      } else {
+        await fetchData()
+      }
     } catch (e: any) {
       setError(e.message)
     }

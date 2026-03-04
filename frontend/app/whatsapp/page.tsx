@@ -93,18 +93,52 @@ export default function WhatsAppPage() {
     setSending(false)
   }
 
-  const handleSaveTemplate = () => {
+  const [savingTemplate, setSavingTemplate] = useState(false)
+
+  const handleSaveTemplate = async () => {
     if (!templateFormData.name || !templateFormData.content) return
-    const variableRegex = /\{(\w+)\}/g
-    const variables: string[] = []
-    let match
-    while ((match = variableRegex.exec(templateFormData.content)) !== null) { if (!variables.includes(match[1])) variables.push(match[1]) }
-    const newTemplate: WhatsAppTemplate = { id: editingTemplate?.id || `tpl-${Date.now()}`, name: templateFormData.name, category: templateFormData.category, content: templateFormData.content, variables, createdAt: editingTemplate?.createdAt || new Date().toISOString() }
-    if (editingTemplate) { setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? newTemplate : t)) } else { setTemplates(prev => [...prev, newTemplate]) }
+    setSavingTemplate(true)
+    try {
+      const res = await fetch('/api/whatsapp/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingTemplate?.id,
+          name: templateFormData.name,
+          category: templateFormData.category,
+          content: templateFormData.content
+        })
+      })
+      const data = await res.json()
+      if (data.success && data.template) {
+        if (editingTemplate) {
+          setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? data.template : t))
+        } else {
+          setTemplates(prev => [...prev, data.template])
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save template:', err)
+      // Fallback to local state
+      const variableRegex = /\{(\w+)\}/g
+      const variables: string[] = []
+      let match
+      while ((match = variableRegex.exec(templateFormData.content)) !== null) { if (!variables.includes(match[1])) variables.push(match[1]) }
+      const newTemplate: WhatsAppTemplate = { id: editingTemplate?.id || `tpl-${Date.now()}`, name: templateFormData.name, category: templateFormData.category, content: templateFormData.content, variables, createdAt: editingTemplate?.createdAt || new Date().toISOString() }
+      if (editingTemplate) { setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? newTemplate : t)) } else { setTemplates(prev => [...prev, newTemplate]) }
+    }
     setShowTemplateEditor(false); setEditingTemplate(null); setTemplateFormData({ name: '', category: 'schedule', content: '' })
+    setSavingTemplate(false)
   }
 
-  const handleDeleteTemplate = (id: string) => { setTemplates(prev => prev.filter(t => t.id !== id)) }
+  const handleDeleteTemplate = async (id: string) => {
+    try {
+      await fetch(`/api/whatsapp/templates?id=${id}`, { method: 'DELETE' })
+    } catch (err) {
+      console.error('Failed to delete template:', err)
+    }
+    setTemplates(prev => prev.filter(t => t.id !== id))
+  }
   const handleExportHistory = () => {
     const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), messages: messages.map(m => ({ recipient: m.recipient, message: m.message, status: m.status, timestamp: m.timestamp })) }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `whatsapp-history-${new Date().toISOString().split('T')[0]}.json`; a.click()
@@ -169,7 +203,7 @@ export default function WhatsAppPage() {
 
       {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>))}</div></div>)}
 
-      {showTemplateEditor && (<div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"><div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6"><div className="flex items-center justify-between mb-6"><h3 className="text-xl font-semibold text-white">{editingTemplate ? 'Edit' : 'New'} Template</h3><button onClick={() => setShowTemplateEditor(false)}><X className="w-5 h-5 text-gray-400" /></button></div><div className="space-y-4"><div><label className="block text-sm text-gray-400 mb-1">Name</label><input type="text" value={templateFormData.name} onChange={(e) => setTemplateFormData(p => ({...p, name: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><select value={templateFormData.category} onChange={(e) => setTemplateFormData(p => ({...p, category: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white"><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option><option value="update">Update</option></select></div><div><label className="block text-sm text-gray-400 mb-1">Content (use {'{var}'})</label><textarea value={templateFormData.content} onChange={(e) => setTemplateFormData(p => ({...p, content: e.target.value}))} rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white resize-none" /></div><button onClick={handleSaveTemplate} className="w-full py-3 bg-green-500 text-black font-semibold rounded-lg">Save Template</button></div></div></div>)}
+      {showTemplateEditor && (<div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"><div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6"><div className="flex items-center justify-between mb-6"><h3 className="text-xl font-semibold text-white">{editingTemplate ? 'Edit' : 'New'} Template</h3><button onClick={() => setShowTemplateEditor(false)}><X className="w-5 h-5 text-gray-400" /></button></div><div className="space-y-4"><div><label className="block text-sm text-gray-400 mb-1">Name</label><input type="text" value={templateFormData.name} onChange={(e) => setTemplateFormData(p => ({...p, name: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><select value={templateFormData.category} onChange={(e) => setTemplateFormData(p => ({...p, category: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white"><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option><option value="update">Update</option></select></div><div><label className="block text-sm text-gray-400 mb-1">Content (use {'{var}'})</label><textarea value={templateFormData.content} onChange={(e) => setTemplateFormData(p => ({...p, content: e.target.value}))} rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white resize-none" /></div><button onClick={handleSaveTemplate} disabled={savingTemplate} className="w-full py-3 bg-green-500 hover:bg-green-400 disabled:opacity-50 text-black font-semibold rounded-lg flex items-center justify-center gap-2">{savingTemplate ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Save Template</button></div></div></div>)}
     </div>
   )
 }

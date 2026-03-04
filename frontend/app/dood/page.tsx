@@ -487,6 +487,25 @@ export default function DOODPage() {
     }))
   }, [heatmapData])
 
+  // Calculate max consecutive days for any actor
+  const maxConsecutiveDays = useMemo(() => {
+    let max = 0
+    for (const row of report) {
+      const sortedDays = [...row.days].sort((a, b) => a - b)
+      let currentStreak = 1
+      for (let i = 1; i < sortedDays.length; i++) {
+        if (sortedDays[i] === sortedDays[i-1] + 1) {
+          currentStreak++
+        } else {
+          currentStreak = 1
+        }
+        max = Math.max(max, currentStreak)
+      }
+      max = Math.max(max, currentStreak)
+    }
+    return max
+  }, [report])
+
   // Render heatmap view
   const renderHeatmap = () => {
     const maxCount = Math.max(...heatmapData.map(d => d.count), 1)
@@ -650,6 +669,14 @@ export default function DOODPage() {
       icon: TrendingUp, 
       color: 'text-yellow-400',
       bg: 'bg-yellow-400/10'
+    },
+    { 
+      label: 'Max Consecutive', 
+      value: maxConsecutiveDays, 
+      icon: Workflow, 
+      color: 'text-orange-400',
+      bg: 'bg-orange-400/10',
+      subtitle: 'days in a row'
     },
   ]
 
@@ -985,6 +1012,9 @@ export default function DOODPage() {
               </div>
             </div>
             <div className={`text-2xl sm:text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+            {stat.subtitle && (
+              <div className="text-xs text-gray-500 mt-0.5">{stat.subtitle}</div>
+            )}
             {stat.warning && (
               <div className="text-xs text-amber-400 mt-1 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />

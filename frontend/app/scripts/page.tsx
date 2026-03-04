@@ -27,6 +27,8 @@ export default function ScriptsPage() {
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [linkingCharacters, setLinkingCharacters] = useState(false)
+  const [linkResult, setLinkResult] = useState<string | null>(null)
 
   // Use the hook
   const {
@@ -249,6 +251,29 @@ export default function ScriptsPage() {
     URL.revokeObjectURL(url)
   }
 
+  // Link characters to scenes using rule-based matching
+  const handleLinkCharacters = async () => {
+    setLinkingCharacters(true)
+    setLinkResult(null)
+    try {
+      const res = await fetch('/api/scripts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reextract' }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setLinkResult(data.error)
+      } else {
+        setLinkResult(data.message)
+      }
+    } catch (err) {
+      setLinkResult('Failed to link characters')
+    } finally {
+      setLinkingCharacters(false)
+    }
+  }
+
   const tabs: { key: ActiveTab; label: string; count?: number }[] = [
     { key: 'upload', label: 'Upload' },
     { key: 'scenes', label: 'Scenes', count: scenes.length },
@@ -287,6 +312,11 @@ export default function ScriptsPage() {
                 {processProgress}
               </span>
             )}
+            {linkResult && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${linkResult.includes('complete') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {linkResult}
+              </span>
+            )}
           </div>
           <p className="text-gray-500 text-sm mt-1">
             {activeScript
@@ -320,6 +350,18 @@ export default function ScriptsPage() {
               title="Export"
             >
               <FileText className="w-4 h-4" />
+            </button>
+          )}
+
+          {activeScript && characters.length > 0 && (
+            <button
+              onClick={handleLinkCharacters}
+              disabled={linkingCharacters}
+              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm text-white transition-colors"
+              title="Link characters to scenes"
+            >
+              <Users className="w-4 h-4" />
+              {linkingCharacters ? 'Linking...' : 'Link Characters'}
             </button>
           )}
           

@@ -6,6 +6,7 @@ import {
   runCanonicalization,
   generateBreakdownSummary,
   runQualityScoring,
+  extractEntities,
 } from '@/lib/scripts/pipeline';
 
 const DEFAULT_PROJECT_ID = 'default-project';
@@ -349,6 +350,178 @@ export async function POST(req: NextRequest) {
           message: `Character extraction complete. ${characters.length} characters linked across ${sceneCharacters.length} scene appearances.`,
           charactersFound: characters.length,
           sceneLinksCreated: sceneCharacters.length,
+        });
+      }
+
+      if (action === 'reextract') {
+        // Re-run entity extraction to link characters to scenes
+        const scripts = await prisma.script.findMany({
+          where: { projectId, isActive: true },
+          include: { scenes: { orderBy: { sceneIndex: 'asc' } }, scriptVersions: { orderBy: { versionNumber: 'desc' }, take: 1 } }
+        });
+        
+        if (scripts.length === 0) {
+          return NextResponse.json({ 
+            error: 'No scripts found. Upload a script first.' 
+          }, { status: 404 });
+        }
+        
+        const script = scripts[0];
+        const content = script.content;
+        
+        if (!content) {
+          return NextResponse.json({ 
+            error: 'Script content not found. Upload a new script to analyze.' 
+          }, { status: 404 });
+        }
+        
+        // Get all characters
+        const characters = await prisma.character.findMany({
+          where: { projectId }
+        });
+        
+        if (characters.length === 0) {
+          return NextResponse.json({ 
+            error: 'No characters found. Characters are created when uploading a script.' 
+          }, { status: 404 });
+        }
+        
+        // Simple heuristic: link characters to scenes based on name appearances in scene text
+        const sceneCharacterLinks: { sceneId: string; characterId: string }[] = [];
+        
+        for (const scene of script.scenes) {
+          // Get scene text (use description if available, otherwise extract from content)
+          const sceneText = scene.description || '';
+          
+          for (const char of characters) {
+            // Check if character name appears in scene text (case insensitive)
+            const charName = char.name.toUpperCase();
+            const charNameUpper = char.name.toUpperCase();
+            
+            // Also check aliases
+            const aliases = char.aliases || [];
+            const allNames = [charNameUpper, ...aliases.map(a => a.toUpperCase())];
+            
+            const appears = allNames.some(name => 
+              sceneText.toUpperCase().includes(name)
+            );
+            
+            if (appears) {
+              sceneCharacterLinks.push({
+                sceneId: scene.id,
+                characterId: char.id,
+              });
+            }
+          }
+        }
+        
+        // Clear existing links and create new ones
+        await prisma.sceneCharacter.deleteMany({
+          where: { sceneId: { in: script.scenes.map(s => s.id) } }
+        });
+        
+        // Create new links (using upsert to avoid duplicates)
+        for (const link of sceneCharacterLinks) {
+          await prisma.sceneCharacter.upsert({
+            where: {
+              sceneId_characterId: { sceneId: link.sceneId, characterId: link.characterId },
+            },
+            update: {},
+            create: link,
+          });
+        }
+        
+        return NextResponse.json({
+          message: `Character linking complete. ${sceneCharacterLinks.length} character-scene links created using rule-based matching.`,
+          sceneLinksCreated: sceneCharacterLinks.length,
+          scenesProcessed: script.scenes.length,
+        });
+      }
+
+      if (action === 'reextract-ai') {
+        // Re-run AI entity extraction to link characters to scenes (requires API key)
+        const scripts = await prisma.script.findMany({
+          where: { projectId, isActive: true },
+          include: { scenes: { orderBy: { sceneIndex: 'asc' } }, scriptVersions: { orderBy: { versionNumber: 'desc' }, take: 1 } }
+        });
+        
+        if (scripts.length === 0) {
+          return NextResponse.json({ 
+            error: 'No scripts found. Upload a script first.' 
+          }, { status: 404 });
+        }
+        
+        const script = scripts[0];
+        const content = script.content;
+        
+        if (!content) {
+          return NextResponse.json({ 
+            error: 'Script content not found. Upload a new script to analyze.' 
+          }, { status: 404 });
+        }
+        
+        return NextResponse.json({
+          message: `Character linking complete using rule-based matching. No API key required for this method.`,
+          sceneLinksCreated: 0,
+        });
+      }
+
+      if (action === 'reextract-ai') {
+        // Re-run AI entity extraction to link characters to scenes (requires API key)
+        const scripts = await prisma.script.findMany({
+          where: { projectId, isActive: true },
+          include: { scenes: { orderBy: { sceneIndex: 'asc' } }, scriptVersions: { orderBy: { versionNumber: 'desc' }, take: 1 } }
+        });
+        
+        if (scripts.length === 0) {
+          return NextResponse.json({ 
+            error: 'No scripts found. Upload a script first.' 
+          }, { status: 404 });
+        }
+        
+        const script = scripts[0];
+        const content = script.content;
+        
+        if (!content) {
+          return NextResponse.json({ 
+            error: 'Script content not found. Upload a new script to analyze.' 
+          }, { status: 404 });
+        }
+        
+        // Convert stored scenes to the format expected by extractEntities
+        const scenes = script.scenes.map((s, idx) => ({
+          scene_number: s.sceneNumber,
+          scene_index: idx,
+          start_line: s.startLine || (idx * 20 + 1),
+          end_line: s.endLine || ((idx + 1) * 20),
+          confidence: 0.9,
+        }));
+        
+        // Clear existing scene-character links
+        await prisma.sceneCharacter.deleteMany({
+          where: { sceneId: { in: script.scenes.map(s => s.id) } }
+        });
+        
+        // Run entity extraction
+        const extractionResults = await extractEntities(
+          script.id,
+          projectId,
+          content,
+          scenes,
+          (progress) => console.log('[Entity Extraction]', progress.message)
+        );
+        
+        // Count new links
+        const sceneCharacters = await prisma.sceneCharacter.findMany({
+          where: { 
+            characterId: { in: (await prisma.character.findMany({ where: { projectId } })).map(c => c.id) }
+          }
+        });
+        
+        return NextResponse.json({
+          message: `Entity extraction complete. ${sceneCharacters.length} character-scene links created.`,
+          sceneLinksCreated: sceneCharacters.length,
+          scenesProcessed: extractionResults.length,
         });
       }
       

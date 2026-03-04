@@ -18,6 +18,7 @@ import {
   UsersRound,
   AlertCircle,
   CheckCircle,
+  TrendingUp,
 } from 'lucide-react';
 import {
   BarChart,
@@ -173,8 +174,9 @@ export default function CrewPage() {
     }, 0);
     
     const avgDailyRate = total > 0 ? totalDailyRate / total : 0;
+    const projected30Day = totalDailyRate * 30; // 30-day production cost projection
     
-    return { total, deptCounts, totalDailyRate, avgDailyRate, departments: Object.keys(deptCounts).length };
+    return { total, deptCounts, totalDailyRate, avgDailyRate, projected30Day, departments: Object.keys(deptCounts).length };
   }, [crew]);
 
   const deptData = useMemo(() => {
@@ -362,7 +364,7 @@ export default function CrewPage() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-5 gap-4 mb-8">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-blue-500/20">
@@ -379,7 +381,7 @@ export default function CrewPage() {
               <div className="p-2 rounded-lg bg-emerald-500/20">
                 <DollarSign className="w-4 h-4 text-emerald-400" />
               </div>
-              <span className="text-sm text-slate-400">Daily Rate Total</span>
+              <span className="text-sm text-slate-400">Daily Rate</span>
             </div>
             <p className="text-3xl font-bold text-emerald-400">{formatINR(stats.totalDailyRate)}</p>
             <p className="text-xs text-slate-500 mt-1">Per day</p>
@@ -390,7 +392,7 @@ export default function CrewPage() {
               <div className="p-2 rounded-lg bg-purple-500/20">
                 <BarChart3 className="w-4 h-4 text-purple-400" />
               </div>
-              <span className="text-sm text-slate-400">Avg Daily Rate</span>
+              <span className="text-sm text-slate-400">Avg Rate</span>
             </div>
             <p className="text-3xl font-bold text-purple-400">{formatINR(stats.avgDailyRate)}</p>
             <p className="text-xs text-slate-500 mt-1">Per person</p>
@@ -405,6 +407,17 @@ export default function CrewPage() {
             </div>
             <p className="text-3xl font-bold text-orange-400">{stats.departments}</p>
             <p className="text-xs text-slate-500 mt-1">Active</p>
+          </div>
+
+          <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-amber-500/20">
+                <TrendingUp className="w-4 h-4 text-amber-400" />
+              </div>
+              <span className="text-sm text-amber-400">30-Day Projection</span>
+            </div>
+            <p className="text-2xl font-bold text-amber-400">{formatINR(stats.projected30Day)}</p>
+            <p className="text-xs text-slate-500 mt-1">Estimated total</p>
           </div>
         </div>
 

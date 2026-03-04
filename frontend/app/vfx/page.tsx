@@ -145,6 +145,7 @@ export default function VfxPage() {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isUsingDemo, setIsUsingDemo] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost'>('overview');
 
@@ -249,6 +250,7 @@ export default function VfxPage() {
     if (!selectedScript) return;
     setAnalyzing(true);
     setError('');
+    setSuccess('');
     try {
       const res = await fetch('/api/vfx', {
         method: 'POST',
@@ -258,6 +260,7 @@ export default function VfxPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
       await fetchVfxData(selectedScript);
+      setSuccess(`Analysis complete! Found ${data.notes?.length || 0} VFX shots in ${data.summary?.scenesAnalyzed || 0} scenes.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'VFX analysis failed');
     } finally {
@@ -398,6 +401,13 @@ export default function VfxPage() {
         {error && (
           <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-4 text-red-400 text-sm">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-emerald-900/20 border border-emerald-800/50 rounded-xl p-4 text-emerald-400 text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 shrink-0" />
+            {success}
           </div>
         )}
 

@@ -21,11 +21,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'scriptId is required' }, { status: 400 });
   }
 
+  let isDemoMode = false;
+  let warnings = DEMO_WARNINGS;
+
   try {
     // Try database first
     await prisma.$connect();
 
-    const warnings = await prisma.warning.findMany({
+    const dbWarnings = await prisma.warning.findMany({
       where: {
         scene: { scriptId },
         warningType: { in: ['continuity', 'plot_hole'] },
@@ -36,17 +39,34 @@ export async function GET(req: NextRequest) {
       orderBy: { severity: 'desc' },
     });
 
-    return NextResponse.json(warnings);
+    warnings = dbWarnings as typeof DEMO_WARNINGS;
+    isDemoMode = false;
   } catch (error) {
     // Return demo data when database is not connected
     console.log('[GET /api/continuity] Using demo data - database not connected');
-    return NextResponse.json({
-      warnings: DEMO_WARNINGS,
-      isDemoMode: true
-    });
+    isDemoMode = true;
   } finally {
     await prisma.$disconnect().catch(() => {});
   }
+
+  // Always return consistent format
+  return NextResponse.json({
+    warnings,
+    isDemoMode,
+    summary: {
+      total: warnings.length,
+      byType: {
+        continuity: warnings.filter(w => w.warningType === 'continuity').length,
+        plot_hole: warnings.filter(w => w.warningType === 'plot_hole').length,
+      },
+      bySeverity: {
+        critical: warnings.filter(w => w.severity === 'critical').length,
+        high: warnings.filter(w => w.severity === 'high').length,
+        medium: warnings.filter(w => w.severity === 'medium').length,
+        low: warnings.filter(w => w.severity === 'low').length,
+      },
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -179,25 +199,41 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       warnings: createdWarnings,
+      isDemoMode: false,
       summary: {
         continuityIssues: consistencyIssues.length,
         plotHoles: plotHoles.length,
         total: createdWarnings.length,
+        byType: {
+          continuity: consistencyIssues.length,
+          plot_hole: plotHoles.length,
+        },
+        bySeverity: {},
       },
     });
   } catch (error) {
     // Return demo analysis when database is not connected
     console.log('[POST /api/continuity] Using demo data - database not connected');
     
-    // Return demo warnings in demo mode
+    // Return demo warnings in demo mode with consistent format
     return NextResponse.json({
       warnings: DEMO_WARNINGS,
+      isDemoMode: true,
       summary: {
         continuityIssues: DEMO_WARNINGS.filter(w => w.warningType === 'continuity').length,
         plotHoles: DEMO_WARNINGS.filter(w => w.warningType === 'plot_hole').length,
         total: DEMO_WARNINGS.length,
+        byType: {
+          continuity: DEMO_WARNINGS.filter(w => w.warningType === 'continuity').length,
+          plot_hole: DEMO_WARNINGS.filter(w => w.warningType === 'plot_hole').length,
+        },
+        bySeverity: {
+          critical: DEMO_WARNINGS.filter(w => w.severity === 'critical').length,
+          high: DEMO_WARNINGS.filter(w => w.severity === 'high').length,
+          medium: DEMO_WARNINGS.filter(w => w.severity === 'medium').length,
+          low: DEMO_WARNINGS.filter(w => w.severity === 'low').length,
+        },
       },
-      isDemoMode: true,
       message: 'Demo mode - AI analysis simulated'
     });
   }

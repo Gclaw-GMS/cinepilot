@@ -40,7 +40,7 @@ interface ForecastData {
   categories: { category: string; planned: number; actual: number; forecast: number; status: string }[]
 }
 
-type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast'
+type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast' | 'compare'
 
 const REGIONS = ['Tamil Nadu', 'Chennai', 'Madurai', 'Ooty']
 const SCALES = [
@@ -326,7 +326,49 @@ export default function BudgetPage() {
     { key: 'breakdown', label: `Breakdown (${items.length})` },
     { key: 'expenses', label: `Expenses (${expenses.length})` },
     { key: 'forecast', label: 'Forecast' },
+    { key: 'compare', label: 'Compare' },
   ]
+
+  // Industry benchmark data for comparison (percentages by category)
+  const INDUSTRY_BENCHMARKS = {
+    micro: { // < 50L
+      'Production': 15, 'Art Department': 8, 'Costume': 5, 'Makeup & Hair': 4,
+      'Locations': 12, 'Post Production': 18, 'Music': 10, 'Cast': 8, 'Crew': 12, 'Contingency': 8
+    },
+    indie: { // 50L - 2Cr
+      'Production': 18, 'Art Department': 10, 'Costume': 6, 'Makeup & Hair': 5,
+      'Locations': 10, 'Post Production': 15, 'Music': 8, 'Cast': 12, 'Crew': 10, 'Contingency': 6
+    },
+    mid: { // 2-10Cr
+      'Production': 20, 'Art Department': 12, 'Costume': 7, 'Makeup & Hair': 5,
+      'Locations': 8, 'Post Production': 12, 'Music': 8, 'Cast': 15, 'Crew': 8, 'Contingency': 5
+    },
+    big: { // 10Cr+
+      'Production': 22, 'Art Department': 10, 'Costume': 5, 'Makeup & Hair': 4,
+      'Locations': 6, 'Post Production': 10, 'Music': 8, 'Cast': 25, 'Crew': 6, 'Contingency': 4
+    }
+  }
+
+  // Calculate actual percentages by category
+  const categoryPercentages = Object.fromEntries(
+    Object.entries(categoryGroups).map(([cat, catItems]) => [
+      cat, totalPlanned > 0 ? (catItems.reduce((s, i) => s + Number(i.total || 0), 0) / totalPlanned) * 100 : 0
+    ])
+  )
+
+  // Get comparison data for current scale
+  const getComparisonData = () => {
+    const benchmarks = INDUSTRY_BENCHMARKS[scale as keyof typeof INDUSTRY_BENCHMARKS] || INDUSTRY_BENCHMARKS.mid
+    const categories = Object.keys(benchmarks)
+    return categories.map(cat => ({
+      category: cat,
+      yourPercent: categoryPercentages[cat] || 0,
+      benchmarkPercent: benchmarks[cat as keyof typeof benchmarks] || 0,
+      difference: (categoryPercentages[cat] || 0) - (benchmarks[cat as keyof typeof benchmarks] || 0)
+    }))
+  }
+
+  const comparisonData = getComparisonData()
 
   // Export budget to CSV
   const handleExportCSV = () => {
@@ -739,6 +781,186 @@ export default function BudgetPage() {
                       }`}>{cat.status === 'on_track' ? 'On Track' : cat.status === 'warning' ? 'Warning' : 'Over Budget'}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Compare Tab */}
+      {activeTab === 'compare' && (
+        <div className="space-y-6">
+          {items.length === 0 ? (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
+              Generate a budget first to see comparison analysis.
+            </div>
+          ) : (
+            <>
+              {/* Scale Selector */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium text-gray-300 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Budget Scale Comparison
+                  </h3>
+                  <select 
+                    value={scale} 
+                    onChange={(e) => setScale(e.target.value)}
+                    className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm"
+                  >
+                    {SCALES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Compare your budget allocation against industry benchmarks for {SCALES.find(s => s.key === scale)?.label} productions.
+                </p>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Your Budget</div>
+                  <div className="text-2xl font-bold text-cinepilot-accent">{formatINR(totalPlanned)}</div>
+                </div>
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Est. Similar Scale</div>
+                  <div className="text-2xl font-bold text-purple-400">
+                    {scale === 'micro' ? '~25L' : scale === 'indie' ? '~1Cr' : scale === 'mid' ? '~5Cr' : '~20Cr'}
+                  </div>
+                </div>
+                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Budget Efficiency</div>
+                  <div className={`text-2xl font-bold ${
+                    totalPlanned > (scale === 'micro' ? 2500000 : scale === 'indie' ? 10000000 : scale === 'mid' ? 50000000 : 200000000) 
+                      ? 'text-yellow-400' : 'text-green-400'
+                  }`}>
+                    {totalPlanned > (scale === 'micro' ? 2500000 : scale === 'indie' ? 10000000 : scale === 'mid' ? 50000000 : 200000000) 
+                      ? 'Above Avg' : 'Efficient'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Comparison Chart */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 bg-gray-800/50 font-medium text-sm text-gray-300">
+                  Category Allocation vs Industry Benchmark
+                </div>
+                <div className="p-4">
+                  <div className="space-y-4">
+                    {comparisonData.map((item) => (
+                      <div key={item.category} className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">{item.category}</span>
+                          <div className="flex gap-4">
+                            <span className="text-cinepilot-accent">{item.yourPercent.toFixed(1)}%</span>
+                            <span className="text-gray-500">vs {item.benchmarkPercent}%</span>
+                            <span className={`font-medium ${
+                              item.difference > 2 ? 'text-red-400' : 
+                              item.difference < -2 ? 'text-green-400' : 
+                              'text-gray-400'
+                            }`}>
+                              {item.difference > 0 ? '+' : ''}{item.difference.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden">
+                          {/* Benchmark marker */}
+                          <div 
+                            className="absolute top-0 bottom-0 w-0.5 bg-white/50 z-10"
+                            style={{ left: `${Math.min(100, item.benchmarkPercent)}%` }}
+                            title={`Benchmark: ${item.benchmarkPercent}%`}
+                          />
+                          {/* Your allocation */}
+                          <div 
+                            className="absolute top-0 bottom-0 bg-gradient-to-r from-cinepilot-accent to-purple-500 rounded-full"
+                            style={{ width: `${Math.min(100, item.yourPercent)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="px-4 py-2 bg-gray-900/50 text-xs text-gray-500 flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-gradient-to-r from-cinepilot-accent to-purple-500 rounded-full"></div>
+                    <span>Your Budget %</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-white/50"></div>
+                    <span>Industry Benchmark</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Insights */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <h3 className="font-medium text-gray-300 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Insights & Recommendations
+                </h3>
+                <div className="space-y-2">
+                  {comparisonData
+                    .filter(item => Math.abs(item.difference) > 3)
+                    .map(item => (
+                      <div key={item.category} className={`flex items-start gap-2 text-sm p-2 rounded ${
+                        item.difference > 0 ? 'bg-red-900/20 text-red-300' : 'bg-green-900/20 text-green-300'
+                      }`}>
+                        {item.difference > 0 ? (
+                          <>
+                            <span className="text-red-400">↑</span>
+                            <span><strong>{item.category}</strong> is {item.difference.toFixed(1)}% higher than typical for this scale. Consider reviewing allocations.</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-green-400">↓</span>
+                            <span><strong>{item.category}</strong> is {Math.abs(item.difference).toFixed(1)}% lower than typical. Ensure adequate allocation.</span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  {comparisonData.filter(item => Math.abs(item.difference) > 3).length === 0 && (
+                    <div className="text-gray-500 text-sm p-2">
+                      Your budget allocation is well-aligned with industry benchmarks for this scale. ✓
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Scale Reference Table */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 bg-gray-800/50 font-medium text-sm text-gray-300">
+                  Industry Benchmark Reference ({SCALES.find(s => s.key === scale)?.label})
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-900/50">
+                      <tr>
+                        <th className="text-left p-3 text-gray-400 font-medium">Category</th>
+                        <th className="text-right p-3 text-gray-400 font-medium">Benchmark %</th>
+                        <th className="text-right p-3 text-gray-400 font-medium">Your %</th>
+                        <th className="text-right p-3 text-gray-400 font-medium">Difference</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {comparisonData.map(item => (
+                        <tr key={item.category} className="hover:bg-gray-800/30">
+                          <td className="p-3 text-gray-300">{item.category}</td>
+                          <td className="p-3 text-right text-gray-500">{item.benchmarkPercent}%</td>
+                          <td className="p-3 text-right text-cinepilot-accent">{item.yourPercent.toFixed(1)}%</td>
+                          <td className={`p-3 text-right font-medium ${
+                            item.difference > 0 ? 'text-red-400' : item.difference < 0 ? 'text-green-400' : 'text-gray-400'
+                          }`}>
+                            {item.difference > 0 ? '+' : ''}{item.difference.toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>

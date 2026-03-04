@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { Download, Keyboard, X } from 'lucide-react'
+import { Download, Keyboard, X, FileSpreadsheet, Printer } from 'lucide-react'
 
 interface BudgetItemData {
   id: string
@@ -444,10 +444,16 @@ export default function BudgetPage() {
         </div>
         <div className="flex items-center gap-3">
           {items.length > 0 && (
-            <button onClick={handleExportCSV} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium text-sm flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
+            <>
+              <button onClick={handleExportCSV} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium text-sm flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                CSV
+              </button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-medium text-sm flex items-center gap-2">
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+            </>
           )}
           <select value={region} onChange={e => setRegion(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}

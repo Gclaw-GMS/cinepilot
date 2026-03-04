@@ -205,3 +205,46 @@ a {
 a:hover {
   color: #818cf8;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide non-essential elements */
+  button,
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Reset colors for print */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Keep cards visible but with white background */
+  .bg-cinepilot-card,
+  .bg-gray-800,
+  .bg-gray-900 {
+    background: white !important;
+    border: 1px solid #ddd !important;
+  }
+  
+  /* Text colors */
+  .text-white,
+  .text-gray-300,
+  .text-gray-400 {
+    color: #333 !important;
+  }
+  
+  /* Prevent page breaks in tables */
+  table,
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+  
+  /* Ensure charts print */
+  .recharts-wrapper {
+    break-inside: avoid;
+  }
+}

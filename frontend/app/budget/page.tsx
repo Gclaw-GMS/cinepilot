@@ -2,7 +2,18 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { Download, Keyboard, X, FileSpreadsheet, Printer } from 'lucide-react'
+import { Download, Keyboard, X, FileSpreadsheet, Printer, Bell, AlertTriangle, TrendingUp } from 'lucide-react'
+
+// Budget Alert Interface
+interface BudgetAlert {
+  id: string
+  type: 'warning' | 'danger' | 'info'
+  category: string
+  message: string
+  planned: number
+  actual: number
+  percentage: number
+}
 
 interface BudgetItemData {
   id: string
@@ -354,6 +365,86 @@ export default function BudgetPage() {
     { key: 'compare', label: 'Compare' },
   ]
 
+  // Calculate budget alerts based on expenses vs planned
+  const budgetAlerts = useMemo((): BudgetAlert[] => {
+    if (!items.length || !expenses.length) return []
+    
+    const alerts: BudgetAlert[] = []
+    const categoryPlanned: Record<string, number> = {}
+    const categoryActual: Record<string, number> = {}
+    
+    // Calculate planned by category
+    items.forEach(item => {
+      categoryPlanned[item.category] = (categoryPlanned[item.category] || 0) + Number(item.total || 0)
+    })
+    
+    // Calculate actual by category
+    expenses.forEach(exp => {
+      categoryActual[exp.category] = (categoryActual[exp.category] || 0) + Number(exp.amount)
+    })
+    
+    // Generate alerts for each category
+    Object.keys(categoryPlanned).forEach(cat => {
+      const planned = categoryPlanned[cat] || 0
+      const actual = categoryActual[cat] || 0
+      if (planned > 0) {
+        const percentage = (actual / planned) * 100
+        if (percentage >= 100) {
+          alerts.push({
+            id: `over-${cat}`,
+            type: 'danger',
+            category: cat,
+            message: `${cat} budget EXCEEDED by ${((percentage - 100)).toFixed(0)}%`,
+            planned,
+            actual,
+            percentage
+          })
+        } else if (percentage >= 80) {
+          alerts.push({
+            id: `warning-${cat}`,
+            type: 'warning',
+            category: cat,
+            message: `${cat} at ${percentage.toFixed(0)}% of budget (${formatINR(actual)} / ${formatINR(planned)})`,
+            planned,
+            actual,
+            percentage
+          })
+        }
+      }
+    })
+    
+    // Overall budget alert
+    if (totalPlanned > 0 && totalActual > 0) {
+      const overallPct = (totalActual / totalPlanned) * 100
+      if (overallPct >= 90) {
+        alerts.unshift({
+          id: 'overall-danger',
+          type: 'danger',
+          category: 'OVERALL',
+          message: `Overall budget at ${overallPct.toFixed(0)}% - ${formatINR(totalActual)} spent of ${formatINR(totalPlanned)}`,
+          planned: totalPlanned,
+          actual: totalActual,
+          percentage: overallPct
+        })
+      } else if (overallPct >= 70) {
+        alerts.unshift({
+          id: 'overall-warning',
+          type: 'warning',
+          category: 'OVERALL',
+          message: `Overall budget at ${overallPct.toFixed(0)}% - ${formatINR(totalActual)} spent of ${formatINR(totalPlanned)}`,
+          planned: totalPlanned,
+          actual: totalActual,
+          percentage: overallPct
+        })
+      }
+    }
+    
+    return alerts.sort((a, b) => {
+      const order = { danger: 0, warning: 1, info: 2 }
+      return order[a.type] - order[b.type]
+    })
+  }, [items, expenses, totalPlanned, totalActual])
+
   // Industry benchmark data for comparison (percentages by category)
   const INDUSTRY_BENCHMARKS = {
     micro: { // < 50L
@@ -547,6 +638,50 @@ export default function BudgetPage() {
           <div className="text-2xl font-bold text-yellow-400">{forecast ? formatINR(forecast.eacTotal) : '—'}</div>
         </div>
       </div>
+
+      {/* Budget Alerts */}
+      {budgetAlerts.length > 0 && (
+        <div className="mb-6 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
+            <Bell className="w-4 h-4 text-amber-400" />
+            Budget Alerts ({budgetAlerts.length})
+          </div>
+          {budgetAlerts.map(alert => (
+            <div 
+              key={alert.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
+                alert.type === 'danger' 
+                  ? 'bg-red-900/20 border-red-700/50' 
+                  : 'bg-amber-900/20 border-amber-700/50'
+              }`}
+            >
+              {alert.type === 'danger' ? (
+                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+              ) : (
+                <TrendingUp className="w-5 h-5 text-amber-400 shrink-0" />
+              )}
+              <div className="flex-1">
+                <div className={`font-medium ${
+                  alert.type === 'danger' ? 'text-red-300' : 'text-amber-300'
+                }`}>
+                  {alert.category}
+                </div>
+                <div className="text-sm text-gray-400">{alert.message}</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className={`text-lg font-bold ${
+                  alert.type === 'danger' ? 'text-red-400' : 'text-amber-400'
+                }`}>
+                  {alert.percentage.toFixed(0)}%
+                </div>
+                <div className="text-xs text-gray-500">
+                  {formatINR(alert.actual)} / {formatINR(alert.planned)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex gap-1 mb-6 border-b border-gray-800 pb-px">

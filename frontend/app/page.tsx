@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
-  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2,
+  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, ListChecks,
 } from 'lucide-react'
 
 const PALETTE = {
@@ -29,6 +29,7 @@ interface DashboardStats {
   locations: { scenes: number; candidates: number }
   censor: { certificate: string; score: number }
   storyboard: { frames: number; approved: number }
+  tasks: { total: number; pending: number; inProgress: number; completed: number; overdue: number }
 }
 
 const EMPTY_STATS: DashboardStats = {
@@ -39,6 +40,7 @@ const EMPTY_STATS: DashboardStats = {
   locations: { scenes: 0, candidates: 0 },
   censor: { certificate: '--', score: 0 },
   storyboard: { frames: 0, approved: 0 },
+  tasks: { total: 0, pending: 0, inProgress: 0, completed: 0, overdue: 0 },
 }
 
 // Demo data for preview when database is not configured
@@ -50,6 +52,7 @@ const DEMO_STATS: DashboardStats = {
   locations: { scenes: 12, candidates: 34 },
   censor: { certificate: 'UA 13+', score: 78 },
   storyboard: { frames: 156, approved: 89 },
+  tasks: { total: 8, pending: 3, inProgress: 2, completed: 2, overdue: 1 },
 }
 
 const FEATURES = [
@@ -122,6 +125,19 @@ const FEATURES = [
     metric: (s: DashboardStats) => s.censor.certificate !== '--' ? `CBFC: ${s.censor.certificate}` : 'Not analyzed',
     sub: (s: DashboardStats) => s.censor.score > 0 ? `Score: ${s.censor.score}/100` : 'Run analysis',
   },
+  {
+    key: 'tasks',
+    label: 'Task Manager',
+    href: '/tasks',
+    icon: ListChecks,
+    color: 'from-indigo-600 to-blue-600',
+    metric: (s: DashboardStats) => s.tasks.total > 0 ? `${s.tasks.total} tasks` : 'No tasks',
+    sub: (s: DashboardStats) => {
+      if (s.tasks.total === 0) return 'Create your first task'
+      const pending = s.tasks.pending + s.tasks.inProgress
+      return `${pending} pending, ${s.tasks.completed} done`
+    },
+  },
 ]
 
 export default function Dashboard() {
@@ -153,7 +169,7 @@ export default function Dashboard() {
         }
       }
 
-      const [scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData] = await Promise.all([
+      const [scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData] = await Promise.all([
         safeFetch('/api/scripts'),
         safeFetch('/api/shots?stats=true'),
         safeFetch('/api/budget?action=forecast'),
@@ -161,12 +177,13 @@ export default function Dashboard() {
         safeFetch('/api/locations?stats=true'),
         safeFetch('/api/censor?stats=true'),
         safeFetch('/api/storyboard?stats=true'),
+        safeFetch('/api/tasks?projectId=default-project'),
       ])
 
-      console.log('[Dashboard] Data received:', { scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData })
+      console.log('[Dashboard] Data received:', { scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData })
 
       // If all data is null, use demo mode
-      if (!scriptsData && !shotsData && !budgetData && !scheduleData && !locationsData && !censorData && !storyboardData) {
+      if (!scriptsData && !shotsData && !budgetData && !scheduleData && !locationsData && !censorData && !storyboardData && !tasksData) {
         console.log('[Dashboard] All API calls failed, using demo data')
         setStats(DEMO_STATS)
         setIsDemoMode(true)
@@ -221,6 +238,19 @@ export default function Dashboard() {
             n + (s.frames?.filter((f: { isApproved?: boolean }) => f.isApproved).length || 0),
           0
         )
+      }
+
+      // Process tasks data
+      if (tasksData && tasksData.data) {
+        const tasks = tasksData.data
+        const today = new Date().toISOString().split('T')[0]
+        result.tasks.total = tasks.length
+        result.tasks.pending = tasks.filter((t: { status: string }) => t.status === 'pending').length
+        result.tasks.inProgress = tasks.filter((t: { status: string }) => t.status === 'in_progress').length
+        result.tasks.completed = tasks.filter((t: { status: string }) => t.status === 'completed').length
+        result.tasks.overdue = tasks.filter((t: { dueDate?: string; status: string }) => 
+          t.dueDate && t.dueDate < today && t.status !== 'completed'
+        ).length
       }
 
       setStats(result)

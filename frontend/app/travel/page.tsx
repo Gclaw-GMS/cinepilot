@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Calendar,
   X,
+  CheckCircle,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -579,16 +580,58 @@ export default function TravelExpensesPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
+                            {expense.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await fetch(`/api/travel?id=${expense.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: 'approved' }),
+                                      })
+                                      fetchExpenses()
+                                    } catch (err) {
+                                      setError('Failed to approve')
+                                    }
+                                  }}
+                                  className="p-1.5 text-emerald-500 hover:text-emerald-400 transition-colors"
+                                  title="Approve"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await fetch(`/api/travel?id=${expense.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: 'rejected' }),
+                                      })
+                                      fetchExpenses()
+                                    } catch (err) {
+                                      setError('Failed to reject')
+                                    }
+                                  }}
+                                  className="p-1.5 text-red-500 hover:text-red-400 transition-colors"
+                                  title="Reject"
+                                >
+                                  <AlertCircle className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                             <button
                               onClick={() => handleEdit(expense)}
                               className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors"
+                              title="Edit"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(expense.id)}
                               className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                              title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>

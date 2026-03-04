@@ -7,12 +7,48 @@ const DEFAULT_PROJECT_ID = 'default-project';
 let sentMessages: Array<{
   id: string
   recipient: string
+  recipientName?: string
   message: string
   status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
   timestamp: string
   useWacli: boolean
   error?: string
 }> = []
+
+// Simulate message status progression in demo mode
+// Messages progress: pending -> sent -> delivered -> read
+function simulateMessageDelivery(message: typeof sentMessages[0]) {
+  const now = Date.now();
+  const sentTime = new Date(message.timestamp).getTime();
+  
+  // After 2 seconds: delivered
+  setTimeout(() => {
+    const idx = sentMessages.findIndex(m => m.id === message.id);
+    if (idx !== -1 && sentMessages[idx].status === 'sent') {
+      sentMessages[idx].status = 'delivered';
+    }
+  }, 2000 - (now - sentTime));
+  
+  // After 5 seconds: read
+  setTimeout(() => {
+    const idx = sentMessages.findIndex(m => m.id === message.id);
+    if (idx !== -1 && sentMessages[idx].status === 'delivered') {
+      sentMessages[idx].status = 'read';
+    }
+  }, 5000 - (now - sentTime));
+}
+
+// Demo contacts for autofill
+const DEMO_CONTACTS = [
+  { name: 'Ajith Kumar', phone: '+919876543210', role: 'Lead Actor' },
+  { name: 'Sai Pallavi', phone: '+919876543211', role: 'Lead Actress' },
+  { name: 'Vijay Sethupathi', phone: '+919876543212', role: 'Supporting Actor' },
+  { name: 'Ravi K. Chandran', phone: '+919876543213', role: 'Cinematographer' },
+  { name: 'A.R. Rahman', phone: '+919876543214', role: 'Music Director' },
+  { name: 'Mani Ratnam', phone: '+919876543215', role: 'Director' },
+  { name: 'Lakshmi', phone: '+919876543216', role: 'Art Director' },
+  { name: 'Vetri', phone: '+919876543217', role: 'Editor' },
+];
 
 // Demo templates for WhatsApp messages
 const DEMO_TEMPLATES = [
@@ -72,7 +108,7 @@ async function checkDbConnection(): Promise<boolean> {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { recipient, message, useWacli } = body;
+    const { recipient, message, recipientName, useWacli } = body;
 
     if (!recipient || !message) {
       return NextResponse.json(
@@ -91,15 +127,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Auto-detect recipient name from demo contacts if not provided
+    let detectedName = recipientName;
+    if (!detectedName) {
+      const contact = DEMO_CONTACTS.find(c => c.phone === recipient);
+      if (contact) {
+        detectedName = contact.name;
+      }
+    }
+
     // Simulate sending (in production, this would use WhatsApp Business API)
     const messageId = `wa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = new Date().toISOString();
     
     const sentMessage = {
       id: messageId,
       recipient,
+      recipientName: detectedName || null,
       message,
       status: 'sent' as const,
-      timestamp: new Date().toISOString(),
+      timestamp,
       useWacli: useWacli ?? true,
     };
 
@@ -109,11 +156,15 @@ export async function POST(req: NextRequest) {
       sentMessages = sentMessages.slice(0, 100);
     }
 
+    // Simulate delivery progression in demo mode
+    simulateMessageDelivery(sentMessage);
+
     return NextResponse.json({
       success: true,
       messageId,
       status: 'sent',
-      timestamp: sentMessage.timestamp,
+      timestamp,
+      recipientName: detectedName,
       isDemoMode: true,
     });
   } catch (error) {
@@ -173,6 +224,15 @@ export async function GET(req: NextRequest) {
       id: message.id,
       status: message.status,
       timestamp: message.timestamp,
+      recipientName: message.recipientName,
+      isDemoMode: true,
+    });
+  }
+  
+  // Get contacts
+  if (action === 'contacts') {
+    return NextResponse.json({
+      contacts: DEMO_CONTACTS,
       isDemoMode: true,
     });
   }

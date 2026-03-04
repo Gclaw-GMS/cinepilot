@@ -98,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Management',
     items: [
       { href: '/projects', icon: Folder, label: 'Projects' },
+      { href: '/tasks', icon: ListChecks, label: 'Tasks' },
     ],
   },
   {

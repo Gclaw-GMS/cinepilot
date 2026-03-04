@@ -30,7 +30,8 @@ import {
   CalendarDays,
   ListChecks,
   LayoutGrid,
-  Keyboard
+  Keyboard,
+  ChevronDown
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -550,39 +551,123 @@ export default function TasksPage() {
           </div>
         )}
 
+        {/* Board View */}
+        {viewMode === 'board' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {['pending', 'in_progress', 'completed', 'blocked'].map(status => {
+              const statusTasks = filteredTasks.filter(t => t.status === status)
+              const statusInfo = STATUS_COLORS[status] || STATUS_COLORS.pending
+              return (
+                <div key={status} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                  <div className={`p-3 border-b ${statusInfo.bg} ${statusInfo.border} border`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`font-medium ${statusInfo.text} capitalize`}>
+                        {status.replace('_', ' ')}
+                      </span>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">
+                        {statusTasks.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2 space-y-2 min-h-[200px] max-h-[600px] overflow-y-auto">
+                    {statusTasks.map((task, index) => (
+                      <div
+                        key={task.id}
+                        data-task-card
+                        className="bg-slate-800/50 border border-slate-700 hover:border-slate-600 rounded-lg p-3 cursor-pointer transition-all hover:shadow-lg"
+                        onClick={() => openEditForm(task)}
+                      >
+                        <div className="flex items-start gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed') }}
+                            className={`mt-1 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                              task.status === 'completed' 
+                                ? 'bg-emerald-500 border-emerald-500' 
+                                : 'border-slate-500 hover:border-indigo-500'
+                            }`}
+                          >
+                            {task.status === 'completed' && <CheckCircle className="w-2.5 h-2.5 text-white" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <h4 className={`text-sm font-medium ${task.status === 'completed' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                              {task.title}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_COLORS[task.priority].bg} ${PRIORITY_COLORS[task.priority].text}`}>
+                                {task.priority}
+                              </span>
+                              {task.dueDate && (
+                                <span className={`text-[10px] flex items-center gap-1 ${
+                                  getDaysUntilDue(task.dueDate) < 0 && task.status !== 'completed' 
+                                    ? 'text-red-400' 
+                                    : 'text-slate-500'
+                                }`}>
+                                  <Calendar className="w-3 h-3" />
+                                  {formatDate(task.dueDate)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {statusTasks.length === 0 && (
+                      <div className="text-center py-8 text-slate-500 text-sm">
+                        No tasks
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {/* Task List */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-            <span className="ml-3 text-slate-400">Loading tasks...</span>
-          </div>
-        ) : filteredTasks.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-            <CheckSquare className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-            <p className="text-slate-400 text-lg">No tasks found</p>
-            <p className="text-slate-500 text-sm mt-1">Create your first task to get started</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
-            >
-              Create Task
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredTasks.map((task, index) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onStatusChange={handleStatusChange}
-                onEdit={() => openEditForm(task)}
-                onDelete={() => handleDelete(task.id)}
-                formatDate={formatDate}
-                getDaysUntilDue={getDaysUntilDue}
-                isSelected={selectedRowIndex === index}
-              />
-            ))}
-          </div>
+        {viewMode === 'list' && (
+          loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+              <span className="ml-3 text-slate-400">Loading tasks...</span>
+            </div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+              <CheckSquare className="w-12 h-12 mx-auto mb-3 text-slate-600" />
+              <p className="text-slate-400 text-lg">No tasks found</p>
+              <p className="text-slate-500 text-sm mt-1">Create your first task to get started</p>
+              <button
+                onClick={() => setShowForm(true)}
+                className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
+              >
+                Create Task
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredTasks.map((task, index) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onStatusChange={handleStatusChange}
+                  onEdit={() => openEditForm(task)}
+                  onDelete={() => handleDelete(task.id)}
+                  formatDate={formatDate}
+                  getDaysUntilDue={getDaysUntilDue}
+                  isSelected={selectedRowIndex === index}
+                />
+              ))}
+            </div>
+          )
+        )}
+
+        {/* Calendar View - Simple Month View */}
+        {viewMode === 'calendar' && (
+          <CalendarView 
+            tasks={filteredTasks} 
+            onTaskClick={openEditForm}
+            formatDate={formatDate}
+            getDaysUntilDue={getDaysUntilDue}
+          />
         )}
 
         {/* Task Form Modal */}
@@ -907,6 +992,118 @@ function TaskCard({
             </>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Simple Calendar View Component
+function CalendarView({ 
+  tasks, 
+  onTaskClick,
+  formatDate,
+  getDaysUntilDue
+}: { 
+  tasks: Task[]
+  onTaskClick: (task: Task) => void
+  formatDate: (date: string) => string
+  getDaysUntilDue: (date: string) => number
+}) {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  }
+  
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+  }
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December']
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  const daysInMonth = getDaysInMonth(currentDate)
+  const firstDay = getFirstDayOfMonth(currentDate)
+  const today = new Date()
+  const todayStr = today.toISOString().split('T')[0]
+
+  const getTasksForDay = (day: number) => {
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return tasks.filter(t => t.dueDate === dateStr)
+  }
+
+  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prevMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+          <ChevronDown className="w-5 h-5 rotate-90" />
+        </button>
+        <h3 className="text-lg font-semibold text-white">
+          {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </h3>
+        <button onClick={nextMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+          <ChevronDown className="w-5 h-5 -rotate-90" />
+        </button>
+      </div>
+
+      {/* Day Headers */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {dayNames.map(day => (
+          <div key={day} className="text-center text-xs font-medium text-slate-500 py-2">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: firstDay }).map((_, i) => (
+          <div key={`empty-${i}`} className="min-h-[80px] bg-slate-800/30 rounded" />
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1
+          const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const dayTasks = getTasksForDay(day)
+          const isToday = dateStr === todayStr
+          
+          return (
+            <div 
+              key={day}
+              className={`min-h-[80px] bg-slate-800/50 rounded p-1 ${isToday ? 'ring-2 ring-indigo-500' : ''}`}
+            >
+              <div className={`text-xs font-medium mb-1 ${isToday ? 'text-indigo-400' : 'text-slate-500'}`}>
+                {day}
+              </div>
+              <div className="space-y-1">
+                {dayTasks.slice(0, 3).map(task => (
+                  <div
+                    key={task.id}
+                    onClick={() => onTaskClick(task)}
+                    className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer ${
+                      task.status === 'completed' 
+                        ? 'bg-emerald-500/20 text-emerald-400' 
+                        : task.priority === 'high'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-slate-700 text-slate-300'
+                    }`}
+                  >
+                    {task.title}
+                  </div>
+                ))}
+                {dayTasks.length > 3 && (
+                  <div className="text-[10px] text-slate-500 text-center">
+                    +{dayTasks.length - 3} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

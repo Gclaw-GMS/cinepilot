@@ -706,8 +706,16 @@ export default function CrewPage() {
               placeholder="Search crew..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-10 pr-10 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <select
             value={deptFilter}

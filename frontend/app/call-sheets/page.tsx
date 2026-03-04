@@ -86,9 +86,11 @@ export default function CallSheetsPage() {
         throw new Error(data.error ?? 'Failed to fetch call sheets')
       }
       const data = await res.json()
-      setCallSheets(data)
-      // Check if we're in demo mode (demo data has 'demo-' prefixed IDs)
-      setIsDemoMode(data.some((s: CallSheet) => s.id.startsWith('demo-')))
+      // Handle both old format (array) and new format ({ data, isDemoMode })
+      const sheets = Array.isArray(data) ? data : (data.data || [])
+      setCallSheets(sheets)
+      // Check if we're in demo mode
+      setIsDemoMode(data.isDemoMode === true || sheets.some((s: CallSheet) => s.id.startsWith('demo-')))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error')
     } finally {

@@ -266,11 +266,18 @@ export async function GET() {
       include: { shootingDay: true },
       orderBy: { date: 'desc' },
     });
-    return NextResponse.json(callSheets);
+    
+    // If no call sheets exist, use demo data for better UX
+    if (callSheets.length === 0) {
+      console.log('[GET /api/call-sheets] No data found, using demo data');
+      return NextResponse.json({ data: demoCallSheets, isDemoMode: true });
+    }
+    
+    return NextResponse.json({ data: callSheets, isDemoMode: false });
   } catch (error) {
     // Fall back to demo data
     console.log('[GET /api/call-sheets] Using demo data - database not connected');
-    return NextResponse.json(demoCallSheets);
+    return NextResponse.json({ data: demoCallSheets, isDemoMode: true });
   }
 }
 

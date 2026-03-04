@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { Download } from 'lucide-react'
+import { Download, Keyboard, X } from 'lucide-react'
 
 interface BudgetItemData {
   id: string
@@ -123,6 +123,7 @@ export default function BudgetPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [error, setError] = useState<string | null>(null)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
 
   const [region, setRegion] = useState('Tamil Nadu')
   const [scale, setScale] = useState('mid')
@@ -188,6 +189,73 @@ export default function BudgetPage() {
       setGenerating(false)
     }
   }
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    switch (e.key) {
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'g':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          handleGenerate()
+        }
+        break
+      case 'r':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          fetchData()
+        }
+        break
+      case 'e':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          handleExportCSV()
+        }
+        break
+      case 'Escape':
+        setShowKeyboardHelp(false)
+        break
+      case '1':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setActiveTab('overview')
+        }
+        break
+      case '2':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setActiveTab('breakdown')
+        }
+        break
+      case '3':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setActiveTab('expenses')
+        }
+        break
+      case '4':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setActiveTab('forecast')
+        }
+        break
+    }
+  }, [handleGenerate, fetchData])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const handleAddExpense = async () => {
     if (!newExpense.description || !newExpense.amount) return
@@ -323,6 +391,13 @@ export default function BudgetPage() {
           <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded font-medium text-sm">
             {generating ? 'Generating...' : 'Generate Budget'}
           </button>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm flex items-center gap-2"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -330,6 +405,51 @@ export default function BudgetPage() {
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="text-red-500">Dismiss</button>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-lg font-semibold text-white">Keyboard Shortcuts</h2>
+              </div>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-gray-400">Generate Budget</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">G</div>
+                <div className="text-gray-400">Refresh Data</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">R</div>
+                <div className="text-gray-400">Export CSV</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">E</div>
+              </div>
+              <div className="border-t border-gray-700 my-3"></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-gray-400">Overview Tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">1</div>
+                <div className="text-gray-400">Breakdown Tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">2</div>
+                <div className="text-gray-400">Expenses Tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">3</div>
+                <div className="text-gray-400">Forecast Tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">4</div>
+              </div>
+              <div className="border-t border-gray-700 my-3"></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-gray-400">Show Help</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Shift+?</div>
+                <div className="text-gray-400">Close/Escape</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Esc</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

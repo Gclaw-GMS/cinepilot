@@ -6,7 +6,7 @@ import ScriptComparison from '@/components/ScriptComparison'
 import {
   FileText, Upload, Trash2, Check, AlertTriangle, Sparkles,
   Users, RefreshCw, X, Search, ChevronDown, ChevronRight,
-  Film, Clock, AlertOctagon, TrendingUp
+  Film, Clock, AlertOctagon, TrendingUp, Keyboard, HelpCircle
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -26,6 +26,7 @@ export default function ScriptsPage() {
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
 
   // Use the hook
   const {
@@ -219,6 +220,11 @@ export default function ScriptsPage() {
       } else if (e.key === 'f' && e.ctrlKey) {
         e.preventDefault()
         document.getElementById('scene-search')?.focus()
+      } else if (e.key === '?') {
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
       }
     }
     
@@ -288,7 +294,7 @@ export default function ScriptsPage() {
               : 'Upload and analyze your screenplay'}
           </p>
           <p className="text-gray-600 text-xs mt-1">
-            <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">↑↓</kbd> or <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">jk</kbd> navigate scenes • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Esc</kbd> close • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Ctrl+F</kbd> search
+            <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">↑↓</kbd> or <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">jk</kbd> navigate scenes • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Esc</kbd> close • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Ctrl+F</kbd> search • <kbd className="px-1 py-0.5 bg-gray-800 rounded text-gray-400">Shift+?</kbd> help
           </p>
         </div>
         
@@ -351,6 +357,51 @@ export default function ScriptsPage() {
           <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-300">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-lg font-semibold text-white">Keyboard Shortcuts</h2>
+              </div>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-gray-400">Navigate scenes down</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">↓ or J</div>
+                <div className="text-gray-400">Navigate scenes up</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">↑ or K</div>
+                <div className="text-gray-400">Close scene details</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Esc</div>
+                <div className="text-gray-400">Search scenes</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Ctrl+F</div>
+              </div>
+              <div className="border-t border-gray-700 my-3"></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-gray-400">Scenes tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Alt+1</div>
+                <div className="text-gray-400">Characters tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Alt+2</div>
+                <div className="text-gray-400">Warnings tab</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Alt+3</div>
+              </div>
+              <div className="border-t border-gray-700 my-3"></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-gray-400">Show this help</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Shift+?</div>
+                <div className="text-gray-400">Close/Escape</div>
+                <div className="text-white font-mono bg-gray-800 px-2 py-0.5 rounded">Esc</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

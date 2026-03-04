@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Download, Keyboard, X } from 'lucide-react'
 
@@ -139,6 +139,31 @@ export default function BudgetPage() {
     notes: '',
     status: 'pending'
   })
+
+  // Expense filtering
+  const [expenseFilter, setExpenseFilter] = useState({
+    category: 'all',
+    status: 'all',
+    dateFrom: '',
+    dateTo: ''
+  })
+
+  // Filtered expenses based on filters
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(exp => {
+      if (expenseFilter.category !== 'all' && exp.category !== expenseFilter.category) return false
+      if (expenseFilter.status !== 'all' && exp.status !== expenseFilter.status) return false
+      if (expenseFilter.dateFrom && exp.date && new Date(exp.date) < new Date(expenseFilter.dateFrom)) return false
+      if (expenseFilter.dateTo && exp.date && new Date(exp.date) > new Date(expenseFilter.dateTo)) return false
+      return true
+    })
+  }, [expenses, expenseFilter])
+
+  // Get unique categories from expenses for filter dropdown
+  const expenseCategories = useMemo(() => {
+    const cats = new Set(expenses.map(e => e.category))
+    return Array.from(cats)
+  }, [expenses])
 
   const fetchData = useCallback(async () => {
     try {
@@ -683,9 +708,64 @@ export default function BudgetPage() {
             </div>
           )}
 
-          {expenses.length === 0 ? (
+          {/* Filter Section */}
+          {expenses.length > 0 && (
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-3">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="text-xs text-gray-500 font-medium uppercase">Filter:</span>
+                <select 
+                  value={expenseFilter.category} 
+                  onChange={e => setExpenseFilter({ ...expenseFilter, category: e.target.value })}
+                  className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs"
+                >
+                  <option value="all">All Categories</option>
+                  {expenseCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <select 
+                  value={expenseFilter.status} 
+                  onChange={e => setExpenseFilter({ ...expenseFilter, status: e.target.value })}
+                  className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                <input 
+                  type="date" 
+                  value={expenseFilter.dateFrom}
+                  onChange={e => setExpenseFilter({ ...expenseFilter, dateFrom: e.target.value })}
+                  className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs" 
+                  placeholder="From"
+                />
+                <span className="text-gray-600">to</span>
+                <input 
+                  type="date" 
+                  value={expenseFilter.dateTo}
+                  onChange={e => setExpenseFilter({ ...expenseFilter, dateTo: e.target.value })}
+                  className="px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs" 
+                  placeholder="To"
+                />
+                {(expenseFilter.category !== 'all' || expenseFilter.status !== 'all' || expenseFilter.dateFrom || expenseFilter.dateTo) && (
+                  <button 
+                    onClick={() => setExpenseFilter({ category: 'all', status: 'all', dateFrom: '', dateTo: '' })}
+                    className="px-2 py-1.5 text-xs text-red-400 hover:text-red-300"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-gray-500">
+                  Showing {filteredExpenses.length} of {expenses.length} expenses
+                </span>
+              </div>
+            </div>
+          )}
+
+          {filteredExpenses.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No expenses recorded yet. Click "Add Expense" to track your first expense.
+              {expenses.length === 0 ? 'No expenses recorded yet. Click "Add Expense" to track your first expense.' : 'No expenses match the selected filters.'}
             </div>
           ) : (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden divide-y divide-gray-800">
@@ -697,7 +777,7 @@ export default function BudgetPage() {
                 <div className="col-span-2 text-right">Amount</div>
                 <div className="col-span-1 text-center">Action</div>
               </div>
-              {expenses.map(exp => (
+              {filteredExpenses.map(exp => (
                 <div key={exp.id} className="px-4 py-3 flex items-center gap-4 hover:bg-gray-800/30">
                   <div className="col-span-2 text-xs px-2 py-1 bg-gray-800 text-gray-400 rounded w-fit">{exp.category}</div>
                   <div className="col-span-3 text-sm text-gray-300">{exp.description}</div>

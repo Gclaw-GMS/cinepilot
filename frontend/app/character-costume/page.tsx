@@ -974,6 +974,45 @@ export default function CharacterCostumePage() {
                   />
                 </div>
 
+                {/* Mood Board Images */}
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Mood Board Images (URLs)</label>
+                  <div className="space-y-2">
+                    {formData.moodBoardImages.map((url, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <input
+                          type="url"
+                          value={url}
+                          onChange={(e) => {
+                            const newImages = [...formData.moodBoardImages]
+                            newImages[idx] = e.target.value
+                            setFormData({ ...formData, moodBoardImages: newImages })
+                          }}
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+                          placeholder="https://example.com/image.jpg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newImages = formData.moodBoardImages.filter((_, i) => i !== idx)
+                            setFormData({ ...formData, moodBoardImages: newImages })
+                          }}
+                          className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, moodBoardImages: [...formData.moodBoardImages, ''] })}
+                      className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" /> Add Image URL
+                    </button>
+                  </div>
+                </div>
+
                 {/* Submit */}
                 <div className="flex gap-3 pt-4">
                   <button
@@ -1115,6 +1154,33 @@ export default function CharacterCostumePage() {
                           style={{ backgroundColor: color }}
                           title={color}
                         />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Mood Board */}
+                {selectedCharacter.moodBoardImages && selectedCharacter.moodBoardImages.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Mood Board</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {selectedCharacter.moodBoardImages.filter(Boolean).map((url, i) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block aspect-square rounded-lg overflow-hidden bg-slate-700 border border-slate-600 hover:border-purple-500 transition-colors"
+                        >
+                          <img
+                            src={url}
+                            alt={`Mood board ${i + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23475569" width="100" height="100"/><text x="50" y="50" text-anchor="middle" dy=".3em" fill="%2394a3b8" font-size="12">Invalid URL</text></svg>'
+                            }}
+                          />
+                        </a>
                       ))}
                     </div>
                   </div>

@@ -3,6 +3,107 @@ import { prisma } from '@/lib/db';
 import { runTextTask } from '@/lib/ai/service';
 import { PROMPTS } from '@/lib/ai/config';
 
+// =============================================================================
+// VFX Detection Patterns - Deterministic keyword-based detection
+// =============================================================================
+
+interface VfxMatch {
+  type: string;
+  description: string;
+  confidence: number;
+}
+
+const VFX_PATTERNS: { pattern: RegExp; type: string; description: (match: string) => string; confidence: number }[] = [
+  // Time of day keywords (only specific ones need VFX)
+  { pattern: /sunset|sunrise|dawn|dusk|golden hour/i, type: 'beauty', description: (m) => `Sky/lighting enhancement for "${m}"`, confidence: 0.75 },
+  
+  // Weather - specific effects
+  { pattern: /\brain\b|\bstorm\b|\blightning\b|\bthunder\b/i, type: 'weather', description: (m) => `Weather VFX for "${m}"`, confidence: 0.85 },
+  { pattern: /\bsnow\b|\bblizzard\b|\bblizz\b/i, type: 'weather', description: (m) => `Winter effects for "${m}"`, confidence: 0.85 },
+  { pattern: /\bfog\b|\bmist\b/i, type: 'weather', description: (m) => `Atmospheric effects for "${m}"`, confidence: 0.75 },
+  
+  // Crowd & Large scale
+  { pattern: /\bcrowd\b|\bfestival\b|\bmob\b|\bextras\b/i, type: 'crowd', description: (m) => `Crowd simulation needed for "${m}"`, confidence: 0.85 },
+  
+  // Fire/Light effects - dangerous stuff
+  { pattern: /\bexplosion\b|\bexplod\b|\bblaze\b/i, type: 'destruction', description: (m) => `Fire/blast VFX for "${m}"`, confidence: 0.9 },
+  { pattern: /\bfireworks\b|\bdiya\b/i, type: 'lighting', description: (m) => `Lighting enhancement for "${m}"`, confidence: 0.8 },
+  
+  // Fantasy/Supernatural - clear VFX keywords
+  { pattern: /\bghost\b|\bspirit\b|\bsupernatural\b|\bhaunt\b|\bmagic\b|\bwitch\b|\bwizard\b/i, type: 'fantasy', description: (m) => `Supernatural/fantasy VFX for "${m}"`, confidence: 0.95 },
+  { pattern: /\bdream sequence\b|\bvision\b|\billusion\b/i, type: 'fantasy', description: (m) => `Dream sequence VFX for "${m}"`, confidence: 0.9 },
+  { pattern: /\bfloating\b|\blevitat\b|\bflying\b|\bhover\b/i, type: 'fantasy', description: (m) => `Gravity-defying VFX for "${m}"`, confidence: 0.85 },
+  
+  // Action/Stunts - vehicle specific
+  { pattern: /\bcar crash\b|\bchase\b|\bdrift\b/i, type: 'action', description: (m) => `Vehicle VFX for "${m}"`, confidence: 0.88 },
+  { pattern: /\bstunt\b|\bcombat\b|\bbattle\b/i, type: 'action', description: (m) => `Action enhancement VFX for "${m}"`, confidence: 0.75 },
+  
+  // Composites
+  { pattern: /\bgreen screen\b|\bchroma key\b|\bblue screen\b/i, type: 'composite', description: (m) => `Composite/VFX for "${m}"`, confidence: 0.9 },
+  { pattern: /\bset extension\b/i, type: 'composite', description: (m) => `Set extension for "${m}"`, confidence: 0.85 },
+  
+  // Time effects
+  { pattern: /\bflashback\b|\bflash forward\b|\btime lapse\b|\bslow motion\b/i, type: 'time', description: (m) => `Time manipulation VFX for "${m}"`, confidence: 0.8 },
+  
+  // Creature/Makeup - specific terms
+  { pattern: /\bmonster\b|\bcreature\b|\balien\b|\bbeast\b|\btransformation\b/i, type: 'prosthetic', description: (m) => `Creature enhancement for "${m}"`, confidence: 0.9 },
+  { pattern: /\bdigital aging\b|\bde-?ag/i, type: 'prosthetic', description: (m) => `Digital aging for "${m}"`, confidence: 0.85 },
+  
+  // Animals
+  { pattern: /\btiger\b|\blion\b|\belephant\b/i, type: 'animals', description: (m) => `Animal VFX/animation for "${m}"`, confidence: 0.8 },
+  
+  // Water
+  { pattern: /\bocean\b|\bsea\b|\bwave\b|\bflood\b|\bunderwater\b/i, type: 'water', description: (m) => `Water simulation for "${m}"`, confidence: 0.85 },
+  
+  // Reflections/Mirrors
+  { pattern: /\bmirror\b|\breflection\b/i, type: 'beauty', description: (m) => `Reflection VFX for "${m}"`, confidence: 0.75 },
+];
+
+function detectVfxInText(text: string): VfxMatch[] {
+  const matches: VfxMatch[] = [];
+  const seen = new Set<string>();
+  
+  for (const rule of VFX_PATTERNS) {
+    // Use match() instead of matchAll() to avoid global regex requirement
+    const regexMatches = text.match(rule.pattern);
+    if (regexMatches) {
+      // Match returns first match or array of matches
+      const allMatches = text.match(new RegExp(rule.pattern, 'gi')) || [];
+      for (const match of allMatches) {
+        const key = `${rule.type}-${match.toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          matches.push({
+            type: rule.type,
+            description: rule.description(match),
+            confidence: rule.confidence,
+          });
+        }
+      }
+    }
+  }
+  
+  return matches;
+}
+
+// Helper function to analyze scenes for VFX without AI
+function analyzeScenesForVfx(scenes: Array<{ id: string; sceneNumber: string; headingRaw: string | null; description: string | null }>): { notes: VfxMatch[]; sceneMap: Map<string, VfxMatch[]> } {
+  const notes: VfxMatch[] = [];
+  const sceneMap = new Map<string, VfxMatch[]>();
+  
+  for (const scene of scenes) {
+    const sceneText = `${scene.headingRaw || ''} ${scene.description || ''}`;
+    const vfxMatches = detectVfxInText(sceneText);
+    
+    if (vfxMatches.length > 0) {
+      sceneMap.set(scene.sceneNumber, vfxMatches);
+      notes.push(...vfxMatches);
+    }
+  }
+  
+  return { notes, sceneMap };
+}
+
 // Demo data for when database is not connected
 const DEMO_VFX_DATA = {
   vfxNotes: [
@@ -65,7 +166,15 @@ export async function GET(req: NextRequest) {
 
   // Database is available - use real data
   try {
-    const vfxNotes = await prisma.vfxNote.findMany({
+    // First check if there are any stored VFX notes for existing scenes
+    const allScenes = await prisma.scene.findMany({
+      where: { scriptId },
+      select: { id: true, sceneNumber: true },
+    });
+    
+    const sceneIds = new Set(allScenes.map(s => s.id));
+    
+    let vfxNotes = await prisma.vfxNote.findMany({
       where: { scene: { scriptId } },
       include: {
         scene: { select: { sceneNumber: true, headingRaw: true, sceneIndex: true } },
@@ -73,6 +182,58 @@ export async function GET(req: NextRequest) {
       orderBy: { scene: { sceneIndex: 'asc' } },
     });
 
+    // Filter to only include notes for scenes that actually exist in this script
+    // Demo data has scene IDs like 's1', 's2' - filter those out
+    const validVfxNotes = vfxNotes.filter(n => sceneIds.has(n.sceneId));
+    
+    // If we only have demo notes, clear them so we can run deterministic detection
+    if (validVfxNotes.length === 0 && vfxNotes.length > 0) {
+      console.log(`[GET /api/vfx] Found ${vfxNotes.length} VFX notes but none match script scenes. Running deterministic detection.`);
+      vfxNotes = [];
+    } else {
+      vfxNotes = validVfxNotes;
+    }
+    
+    // If no valid stored notes, run deterministic detection on the fly
+    if (vfxNotes.length === 0) {
+      const scenes = await prisma.scene.findMany({
+        where: { scriptId },
+        orderBy: { sceneIndex: 'asc' },
+      });
+      
+      // Use analyzeScenesForVfx which returns sceneMap for proper assignment
+      const { notes: detectedNotes, sceneMap } = analyzeScenesForVfx(scenes.map(s => ({
+        id: s.id,
+        sceneNumber: s.sceneNumber,
+        headingRaw: s.headingRaw,
+        description: s.description,
+      })));
+      
+      // Format notes for response with proper scene info - use sceneMap for matching
+      const allNotesWithScenes: typeof vfxNotes = [];
+      
+      // Iterate through scenes to build properly assigned notes
+      for (const scene of scenes) {
+        const sceneNotes = sceneMap.get(scene.sceneNumber) || [];
+        for (const note of sceneNotes) {
+          allNotesWithScenes.push({
+            id: `detected-${allNotesWithScenes.length}`,
+            sceneId: scene.id,
+            description: note.description,
+            vfxType: note.type,
+            confidence: note.confidence,
+            scene: { 
+              sceneNumber: scene.sceneNumber, 
+              headingRaw: scene.headingRaw, 
+              sceneIndex: scene.sceneIndex 
+            },
+          } as typeof vfxNotes[number]);
+        }
+      }
+      
+      vfxNotes = allNotesWithScenes;
+    }
+    
     const vfxWarnings = await prisma.warning.findMany({
       where: {
         scene: { scriptId },
@@ -193,28 +354,38 @@ export async function POST(req: NextRequest) {
 
       if (!sceneText.trim()) continue;
 
-      const result = await runTextTask(
-        'script.entityExtraction',
-        {
-          sceneText,
-          sceneNumber: scene.sceneNumber,
-          knownCharacters: '',
-        },
-        PROMPTS.scriptParsing.entityExtraction.system,
-        PROMPTS.scriptParsing.entityExtraction.user,
-        { responseFormat: { type: 'json_object' }, maxTokens: 4096 },
-      );
-
+      // Try AI-based extraction first
       let vfxEntities: Array<{
         description: string;
         type: string;
         confidence: number;
       }> = [];
+      
       try {
+        const result = await runTextTask(
+          'script.entityExtraction',
+          {
+            sceneText,
+            sceneNumber: scene.sceneNumber,
+            knownCharacters: '',
+          },
+          PROMPTS.scriptParsing.entityExtraction.system,
+          PROMPTS.scriptParsing.entityExtraction.user,
+          { responseFormat: { type: 'json_object' }, maxTokens: 4096 },
+        );
+
         const parsed = JSON.parse(result);
         vfxEntities = parsed.vfx || [];
-      } catch {
-        console.warn(`[POST /api/vfx] Failed to parse VFX result for scene ${scene.sceneNumber}`);
+      } catch (aiError) {
+        console.warn(`[POST /api/vfx] AI extraction failed for scene ${scene.sceneNumber}, using deterministic detection`);
+        
+        // Fallback to deterministic detection
+        const deterministicResults = detectVfxInText(sceneText);
+        vfxEntities = deterministicResults.map(v => ({
+          description: v.description,
+          type: v.type,
+          confidence: v.confidence,
+        }));
       }
 
       for (const vfx of vfxEntities) {

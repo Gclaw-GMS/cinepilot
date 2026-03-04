@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { Command, Keyboard, X } from 'lucide-react'
 
 interface KeyboardShortcut {
   key: string
@@ -123,15 +124,28 @@ export function KeyboardHelpModal({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
-          <h2 className="text-xl font-semibold text-white">Keyboard Shortcuts</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors"
-          >
-            ✕
-          </button>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+        {/* Header with gradient accent */}
+        <div className="relative px-6 py-5 border-b border-slate-800 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg">
+                <Keyboard className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Keyboard Shortcuts</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Work faster with keyboard shortcuts</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Decorative gradient line */}
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-indigo-500 via-purple-500 to-transparent" />
         </div>
         
         <div className="p-6 space-y-6">
@@ -163,9 +177,11 @@ export function KeyboardHelpModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="px-6 py-4 bg-slate-800/50 rounded-b-2xl">
-          <p className="text-xs text-slate-500 text-center">
-            Press <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-300">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-300">?</kbd> to toggle this help
+        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800/50 border-t border-slate-800">
+          <p className="text-xs text-slate-500 text-center flex items-center justify-center gap-2">
+            <span>Press</span>
+            <kbd className="px-2 py-1 bg-slate-800 border border-slate-600 rounded-lg text-slate-400 font-mono text-xs">?</kbd>
+            <span>anywhere to show this help</span>
           </p>
         </div>
       </div>
@@ -175,15 +191,15 @@ export function KeyboardHelpModal({ onClose }: { onClose: () => void }) {
 
 function ShortcutRow({ keys, action }: { keys: string[]; action: string }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors -mx-3">
       <span className="text-sm text-slate-300">{action}</span>
       <div className="flex items-center gap-1">
         {keys.map((key, i) => (
           <span key={i} className="flex items-center">
-            <kbd className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-300 font-mono">
-              {key}
+            <kbd className="px-2.5 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-xs text-slate-300 font-mono shadow-sm">
+              {key === 'Ctrl' ? <Command className="w-3 h-3" /> : key}
             </kbd>
-            {i < keys.length - 1 && <span className="text-slate-500 mx-1">+</span>}
+            {i < keys.length - 1 && <span className="text-slate-500 mx-0.5 text-xs">+</span>}
           </span>
         ))}
       </div>

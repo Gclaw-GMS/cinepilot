@@ -193,7 +193,19 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-slate-800">
-        <div className="text-xs text-slate-600 text-center">CinePilot v1.0</div>
+        <button
+          onClick={() => {
+            const event = new CustomEvent('toggleKeyboardHelp')
+            window.dispatchEvent(event)
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+        >
+          <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400">Ctrl</kbd>
+          <span>+</span>
+          <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400">?</kbd>
+          <span className="ml-1">Shortcuts</span>
+        </button>
+        <div className="text-xs text-slate-600 text-center mt-2">CinePilot v1.0</div>
       </div>
     </aside>
   )

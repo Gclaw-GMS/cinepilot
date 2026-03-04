@@ -158,8 +158,16 @@ export async function GET(request: NextRequest) {
       status: 'planning'
     }));
 
-    // If we have characters from DB, return them; otherwise return demo
-    if (formattedCharacters.length > 0) {
+    // If we have characters from DB with meaningful data, return them
+    // Otherwise fall back to demo data
+    const hasMeaningfulData = formattedCharacters.some(char => 
+      char.appearance?.length > 0 || 
+      char.personality?.length > 0 || 
+      char.costumeStyle?.length > 0 ||
+      char.description
+    );
+    
+    if (formattedCharacters.length > 0 && hasMeaningfulData) {
       return NextResponse.json({
         characters: formattedCharacters,
         summary: calculateSummary(formattedCharacters),
@@ -167,7 +175,7 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // No characters in DB, return demo data
+    // No meaningful characters in DB, return demo data
     return NextResponse.json({
       characters: DEMO_CHARACTERS,
       summary: calculateSummary(DEMO_CHARACTERS),

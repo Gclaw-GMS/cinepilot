@@ -159,7 +159,8 @@ export default function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`flex items-center justify-between px-3 py-2 rounded-md transition-all group ${
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`flex items-center justify-between px-3 py-2 rounded-md transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
                         isActive
                           ? 'bg-indigo-500/10 text-indigo-400'
                           : 'text-slate-400 hover:bg-slate-800 hover:text-white'
@@ -167,13 +168,13 @@ export default function Sidebar() {
                     >
                       <div className="flex items-center gap-3">
                         <item.icon
-                          className={`w-4 h-4 ${
+                          className={`w-4 h-4 shrink-0 ${
                             isActive
                               ? 'text-indigo-400'
                               : 'text-slate-500 group-hover:text-slate-300'
                           }`}
                         />
-                        <span className="text-sm font-medium">{item.label}</span>
+                        <span className="text-sm font-medium truncate">{item.label}</span>
                       </div>
                       {item.badge && (
                         <span

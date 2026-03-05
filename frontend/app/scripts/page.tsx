@@ -175,6 +175,35 @@ export default function ScriptsPage() {
     setError(null)
     setSuccess(null)
 
+    // Enhanced file validation
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    const ALLOWED_TYPES = ['.pdf', '.docx', '.txt', '.fdx', '.fountain']
+    const ALLOWED_MIME = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'application/x-fountain'
+    ]
+    
+    // Check file extension
+    const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+    if (!ALLOWED_TYPES.includes(fileExt)) {
+      setError(`Invalid file type. Allowed: ${ALLOWED_TYPES.join(', ')}`)
+      return
+    }
+    
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File too large. Maximum size is 10MB. Your file: ${(file.size / 1024 / 1024).toFixed(1)}MB`)
+      return
+    }
+    
+    // Check for empty file
+    if (file.size === 0) {
+      setError('File is empty. Please upload a valid script file.')
+      return
+    }
+
     const result = await uploadScript(file)
     
     if (result.success) {
@@ -522,6 +551,9 @@ export default function ScriptsPage() {
             <h2 className="font-semibold mb-4 flex items-center gap-2">
               <Upload className="w-5 h-5 text-indigo-400" />
               Upload Script
+              <span className="text-xs font-normal text-gray-500 ml-2">
+                AI-powered scene detection
+              </span>
             </h2>
             <label
               className={`block cursor-pointer ${dragActive ? 'scale-[1.01]' : ''} transition-transform`}
@@ -539,14 +571,17 @@ export default function ScriptsPage() {
                   <div className="space-y-3">
                     <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
                     <div className="text-gray-300 font-medium">{processProgress || 'Processing...'}</div>
+                    <div className="text-gray-500 text-xs">Analyzing screenplay structure...</div>
                   </div>
                 ) : (
                   <>
                     <div className="text-5xl mb-3 opacity-50">+</div>
                     <div className="text-gray-300 font-medium">Drop script here or click to upload</div>
-                    <div className="text-gray-500 text-sm mt-2">PDF, DOCX, TXT, FDX supported (max 10MB)</div>
-                    <div className="text-gray-600 text-xs mt-3">
-                      AI will automatically extract scenes, detect characters, locations, and analyze.
+                    <div className="text-gray-500 text-sm mt-2">PDF, DOCX, TXT, FDX, Fountain supported (max 10MB)</div>
+                    <div className="text-gray-600 text-xs mt-3 flex flex-col gap-1">
+                      <span>• AI extracts scenes, characters, locations automatically</span>
+                      <span>• Detects INT/EXT, time of day, VFX notes</span>
+                      <span>• Generates quality scores and warnings</span>
                     </div>
                   </>
                 )}
@@ -554,16 +589,19 @@ export default function ScriptsPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.txt,.fdx"
+                accept=".pdf,.docx,.txt,.fdx,.fountain"
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={processing}
               />
             </label>
-            <div className="mt-4 flex gap-2">
-              {['PDF', 'DOCX', 'TXT', 'FDX'].map(fmt => (
+            <div className="mt-4 flex gap-2 flex-wrap">
+              {['PDF', 'DOCX', 'TXT', 'FDX', 'Fountain'].map(fmt => (
                 <span key={fmt} className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-400">{fmt}</span>
               ))}
+              <span className="text-xs text-gray-500 ml-2 flex items-center">
+                Max 10MB • Auto scene detection • Character extraction
+              </span>
               <span className="px-2 py-1 bg-green-900/30 rounded text-xs text-green-400 ml-auto flex items-center gap-1">
                 <Check className="w-3 h-3" />
                 Local Storage

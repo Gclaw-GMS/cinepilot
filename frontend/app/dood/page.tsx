@@ -21,7 +21,8 @@ import {
   Workflow
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, Legend
 } from 'recharts'
 
 interface DOODRow {
@@ -487,6 +488,28 @@ export default function DOODPage() {
     }))
   }, [heatmapData])
 
+  // Pie chart data for cast breakdown (main vs supporting)
+  const castBreakdownData = useMemo(() => {
+    const mainCount = report.filter(r => r.isMain).length
+    const supportingCount = report.filter(r => !r.isMain).length
+    return [
+      { name: 'Main Cast', value: mainCount, color: '#06b6d4' },
+      { name: 'Supporting', value: supportingCount, color: '#8b5cf6' },
+    ]
+  }, [report])
+
+  // Pie chart data for workload distribution
+  const workloadDistributionData = useMemo(() => {
+    const heavy = report.filter(r => r.percentage >= 60).length
+    const medium = report.filter(r => r.percentage >= 30 && r.percentage < 60).length
+    const light = report.filter(r => r.percentage < 30).length
+    return [
+      { name: 'Heavy (60%+)', value: heavy, color: '#ef4444' },
+      { name: 'Medium (30-60%)', value: medium, color: '#f59e0b' },
+      { name: 'Light (<30%)', value: light, color: '#10b981' },
+    ]
+  }, [report])
+
   // Calculate max consecutive days for any actor
   const maxConsecutiveDays = useMemo(() => {
     let max = 0
@@ -539,6 +562,79 @@ export default function DOODPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Pie Charts Row */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Cast Breakdown Pie */}
+          <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
+            <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+              <Users className="w-4 h-4 text-cyan-400" />
+              Cast Breakdown
+            </h4>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={castBreakdownData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {castBreakdownData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value) => <span className="text-gray-400 text-xs">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Workload Distribution Pie */}
+          <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
+            <h4 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+              <Workflow className="w-4 h-4 text-purple-400" />
+              Workload Distribution
+            </h4>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={workloadDistributionData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {workloadDistributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value) => <span className="text-gray-400 text-xs">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 

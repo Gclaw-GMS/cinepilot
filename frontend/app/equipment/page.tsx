@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2, CheckCircle, Keyboard } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2, CheckCircle, Keyboard, Calendar, LayoutGrid, List } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface EquipmentRental {
@@ -116,6 +116,7 @@ export default function EquipmentPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid')
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchEquipment = useCallback(async () => {
@@ -214,6 +215,48 @@ export default function EquipmentPage() {
     const matchCat = filterCat === 'all' || eq.category === filterCat
     return matchSearch && matchCat
   })
+
+  // Timeline data - compute date range and generate timeline bars
+  const timelineData = useMemo(() => {
+    if (filtered.length === 0) return { weeks: [], equipmentBars: [] }
+    
+    // Find date range
+    const dates = filtered.flatMap(eq => [new Date(eq.dateStart), new Date(eq.dateEnd)])
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+    
+    // Add padding (1 week before and after)
+    minDate.setDate(minDate.getDate() - 7)
+    maxDate.setDate(maxDate.getDate() + 7)
+    
+    // Generate week columns
+    const weeks: { date: Date; label: string }[] = []
+    const current = new Date(minDate)
+    while (current <= maxDate) {
+      weeks.push({
+        date: new Date(current),
+        label: current.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+      })
+      current.setDate(current.getDate() + 7)
+    }
+    
+    // Generate equipment timeline bars
+    const equipmentBars = filtered.map(eq => {
+      const start = new Date(eq.dateStart)
+      const end = new Date(eq.dateEnd)
+      const totalDays = (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
+      const startOffset = (start.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
+      const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + 1
+      
+      return {
+        ...eq,
+        leftPercent: Math.max(0, (startOffset / totalDays) * 100),
+        widthPercent: Math.min(100 - (startOffset / totalDays) * 100, (duration / totalDays) * 100)
+      }
+    })
+    
+    return { weeks, equipmentBars }
+  }, [filtered])
 
   // Chart data preparation
   const categoryData = useMemo(() => {
@@ -394,6 +437,29 @@ export default function EquipmentPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center bg-slate-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('timeline')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                viewMode === 'timeline' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Timeline View"
+            >
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Timeline</span>
+            </button>
+          </div>
           <button
             onClick={handleExportCSV}
             disabled={filtered.length === 0}
@@ -576,7 +642,128 @@ export default function EquipmentPage() {
         </div>
       </div>
 
+      {/* Timeline View */}
+      {viewMode === 'timeline' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Calendar className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-lg font-semibold">Rental Timeline</h3>
+            <span className="text-slate-500 text-sm ml-2">({filtered.length} items)</span>
+          </div>
+          
+          {/* Timeline header with weeks */}
+          <div className="mb-4 ml-48">
+            <div className="flex justify-between">
+              {timelineData.weeks.map((week, idx) => (
+                <div key={idx} className="text-xs text-slate-500 text-center flex-1">
+                  {week.label}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Timeline bars */}
+          <div className="space-y-3">
+            {timelineData.equipmentBars.map((eq) => (
+              <div key={eq.id} className="flex items-center group">
+                <div className="w-44 shrink-0 pr-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-white truncate">{eq.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-slate-500 capitalize">{eq.category}</span>
+                    <span className="text-xs text-slate-600">•</span>
+                    <span className="text-xs text-slate-500">₹{eq.dailyRate.toLocaleString()}/day</span>
+                  </div>
+                </div>
+                <div className="flex-1 relative h-10 bg-slate-800/50 rounded-lg overflow-hidden">
+                  {/* Grid lines for weeks */}
+                  <div className="absolute inset-0 flex">
+                    {timelineData.weeks.map((_, idx) => (
+                      <div key={idx} className="flex-1 border-l border-slate-700/50" />
+                    ))}
+                  </div>
+                  {/* Rental bar */}
+                  <div
+                    className={`absolute top-1.5 bottom-1.5 rounded-md transition-all cursor-pointer hover:opacity-80 ${
+                      eq.status === 'available' ? 'bg-emerald-500/70' :
+                      eq.status === 'in-use' ? 'bg-amber-500/70' :
+                      eq.status === 'maintenance' ? 'bg-red-500/70' :
+                      'bg-slate-500/70'
+                    }`}
+                    style={{
+                      left: `${eq.leftPercent}%`,
+                      width: `${Math.max(eq.widthPercent, 2)}%`
+                    }}
+                    title={`${eq.name}: ${eq.dateStart} to ${eq.dateEnd} (${eq.status})`}
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-xs text-white font-medium truncate px-2">
+                        {eq.widthPercent > 15 ? `${new Date(eq.dateStart).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - ${new Date(eq.dateEnd).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="ml-2 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                  <button
+                    onClick={() => {
+                      setEditingId(eq.id)
+                      setForm({
+                        name: eq.name,
+                        category: eq.category,
+                        status: eq.status,
+                        dateStart: eq.dateStart,
+                        dateEnd: eq.dateEnd,
+                        dailyRate: eq.dailyRate.toString(),
+                        vendor: eq.vendor || '',
+                        notes: eq.notes || '',
+                      })
+                      setModalOpen(true)
+                    }}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
+                    title="Edit equipment"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            
+            {timelineData.equipmentBars.length === 0 && (
+              <div className="text-center py-8 text-slate-500">
+                <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p>No rental data to display</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Legend */}
+          <div className="flex items-center gap-6 mt-6 pt-4 border-t border-slate-800">
+            <span className="text-xs text-slate-500">Status:</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-emerald-500/70" />
+                <span className="text-xs text-slate-400">Available</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-amber-500/70" />
+                <span className="text-xs text-slate-400">In Use</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-red-500/70" />
+                <span className="text-xs text-slate-400">Maintenance</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-slate-500/70" />
+                <span className="text-xs text-slate-400">Returned</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Equipment Grid */}
+      {viewMode === 'grid' && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((eq) => (
           <div key={eq.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
@@ -649,6 +836,7 @@ export default function EquipmentPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Add/Edit Modal */}
       {modalOpen && (

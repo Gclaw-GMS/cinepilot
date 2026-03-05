@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard } from 'lucide-react'
 
 interface WhatsAppTemplate { id: string; name: string; category: string; content: string; variables: string[]; createdAt: string }
 interface SentMessage { id: string; recipient: string; recipientName?: string; message: string; status: string; timestamp: string }
@@ -44,6 +44,46 @@ export default function WhatsAppPage() {
   const [templateFormData, setTemplateFormData] = useState({ name: '', category: 'schedule', content: '' })
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      const key = e.key.toLowerCase()
+      const mod = e.metaKey || e.ctrlKey
+      
+      if (mod && key === 'n') {
+        e.preventDefault()
+        setShowTemplateEditor(true)
+      } else if (mod && key === 'k') {
+        e.preventDefault()
+        setShowKeyboardHelp(true)
+      } else if (key === 'c' && !mod) {
+        setActiveTab('compose')
+      } else if (key === 't' && !mod) {
+        setActiveTab('templates')
+      } else if (key === 'h' && !mod) {
+        setActiveTab('history')
+      } else if (key === 'o' && !mod) {
+        setActiveTab('contacts')
+      } else if (key === 'escape') {
+        setShowTemplateEditor(false)
+        setShowKeyboardHelp(false)
+      } else if (key === 's' && mod) {
+        e.preventDefault()
+        if (recipient && message && !sending) {
+          handleSend()
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [recipient, message, sending])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -126,7 +166,16 @@ export default function WhatsAppPage() {
           <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg"><MessageCircle className="w-6 h-6 text-white" /></div>
           <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
         </div>
-        <button onClick={fetchData} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"><RefreshCw className="w-5 h-5 text-gray-400" /></button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setShowKeyboardHelp(true)} 
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            title="Keyboard shortcuts"
+          >
+            <Keyboard className="w-5 h-5 text-gray-400" />
+          </button>
+          <button onClick={fetchData} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"><RefreshCw className="w-5 h-5 text-gray-400" /></button>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-gray-800 pb-2">
@@ -170,6 +219,78 @@ export default function WhatsAppPage() {
       {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>))}</div></div>)}
 
       {showTemplateEditor && (<div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"><div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6"><div className="flex items-center justify-between mb-6"><h3 className="text-xl font-semibold text-white">{editingTemplate ? 'Edit' : 'New'} Template</h3><button onClick={() => setShowTemplateEditor(false)}><X className="w-5 h-5 text-gray-400" /></button></div><div className="space-y-4"><div><label className="block text-sm text-gray-400 mb-1">Name</label><input type="text" value={templateFormData.name} onChange={(e) => setTemplateFormData(p => ({...p, name: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><select value={templateFormData.category} onChange={(e) => setTemplateFormData(p => ({...p, category: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white"><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option><option value="update">Update</option></select></div><div><label className="block text-sm text-gray-400 mb-1">Content (use {'{var}'})</label><textarea value={templateFormData.content} onChange={(e) => setTemplateFormData(p => ({...p, content: e.target.value}))} rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white resize-none" /></div><button onClick={handleSaveTemplate} className="w-full py-3 bg-green-500 text-black font-semibold rounded-lg">Save Template</button></div></div></div>)}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-green-400" />
+                Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="p-1 hover:bg-gray-800 rounded">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium text-gray-400 mb-2">Navigation</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Compose tab</span>
+                    <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">C</kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Templates tab</span>
+                    <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">T</kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">History tab</span>
+                    <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">H</kbd>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Contacts tab</span>
+                    <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">O</kbd>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t border-gray-800">
+                <h4 className="text-sm font-medium text-gray-400 mb-2">Actions</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">New template</span>
+                    <div className="flex gap-1">
+                      <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">⌘</kbd>
+                      <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">N</kbd>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Send message</span>
+                    <div className="flex gap-1">
+                      <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">⌘</kbd>
+                      <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">S</kbd>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Show shortcuts</span>
+                    <div className="flex gap-1">
+                      <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">⌘</kbd>
+                      <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">K</kbd>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Close modal</span>
+                    <kbd className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">Esc</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

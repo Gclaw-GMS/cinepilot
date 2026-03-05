@@ -25,6 +25,7 @@ import {
   BarChart3,
   PieChart,
   RefreshCw,
+  RotateCcw,
   Target,
   TrendingUp,
   CalendarDays,
@@ -111,21 +112,77 @@ export default function TasksPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
 
+  // localStorage key for demo mode persistence
+  const STORAGE_KEY = 'cinepilot_tasks_demo'
+
+  // Load tasks from localStorage
+  const loadFromLocalStorage = useCallback((): Task[] => {
+    if (typeof window === 'undefined') return []
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        return JSON.parse(stored)
+      }
+    } catch (e) {
+      console.error('Failed to load tasks from localStorage:', e)
+    }
+    return []
+  }, [])
+
+  // Save tasks to localStorage
+  const saveToLocalStorage = useCallback((tasks: Task[]) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
+    } catch (e) {
+      console.error('Failed to save tasks to localStorage:', e)
+    }
+  }, [])
+
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      // First try to load from localStorage for instant feedback
+      const storedTasks = loadFromLocalStorage()
+      if (storedTasks.length > 0) {
+        setTasks(storedTasks)
+        setIsDemoMode(true)
+      }
+
       const res = await fetch('/api/tasks?projectId=default-project')
       const data = await res.json()
-      setTasks(data.data || [])
-      setIsDemoMode(data.isDemoMode === true)
+      
+      // If we got data from API, use it; otherwise keep localStorage data
+      if (data.data && data.data.length > 0) {
+        setTasks(data.data || [])
+        setIsDemoMode(data.isDemoMode === true)
+        // Also save to localStorage for offline access
+        if (data.isDemoMode === true) {
+          saveToLocalStorage(data.data)
+        }
+      } else if (storedTasks.length === 0) {
+        // No API data and no localStorage - use demo data from API
+        setTasks(data.data || [])
+        setIsDemoMode(data.isDemoMode === true)
+        if (data.isDemoMode === true && data.data) {
+          saveToLocalStorage(data.data)
+        }
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
+      // On error, fall back to localStorage or empty
+      const storedTasks = loadFromLocalStorage()
+      if (storedTasks.length > 0) {
+        setTasks(storedTasks)
+        setIsDemoMode(true)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
+      }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadFromLocalStorage, saveToLocalStorage])
 
   useEffect(() => {
     fetchTasks()
@@ -264,11 +321,15 @@ export default function TasksPage() {
       
       const data = await res.json()
       
+      let updatedTasks: Task[]
       if (editingTask) {
-        setTasks(prev => prev.map(t => t.id === editingTask.id ? data.data : t))
+        updatedTasks = tasks.map(t => t.id === editingTask.id ? data.data : t)
       } else {
-        setTasks(prev => [...prev, data.data])
+        updatedTasks = [...tasks, data.data]
       }
+      
+      setTasks(updatedTasks)
+      saveToLocalStorage(updatedTasks)
       
       setShowForm(false)
       setEditingTask(null)
@@ -292,7 +353,9 @@ export default function TasksPage() {
       if (!res.ok) throw new Error('Failed to update status')
       
       const data = await res.json()
-      setTasks(prev => prev.map(t => t.id === taskId ? data.data : t))
+      const updatedTasks = tasks.map(t => t.id === taskId ? data.data : t)
+      setTasks(updatedTasks)
+      saveToLocalStorage(updatedTasks)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update status')
     }
@@ -305,7 +368,9 @@ export default function TasksPage() {
     try {
       const res = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete task')
-      setTasks(prev => prev.filter(t => t.id !== taskId))
+      const updatedTasks = tasks.filter(t => t.id !== taskId)
+      setTasks(updatedTasks)
+      saveToLocalStorage(updatedTasks)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete task')
     }
@@ -385,6 +450,20 @@ export default function TasksPage() {
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            {isDemoMode && (
+              <button
+                onClick={() => {
+                  if (confirm('Clear all saved tasks and reset to demo data?')) {
+                    localStorage.removeItem(STORAGE_KEY)
+                    fetchTasks()
+                  }
+                }}
+                className="p-2 bg-slate-800 hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                title="Reset to Demo"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"

@@ -6,7 +6,7 @@ import {
   CheckCircle, AlertCircle, Download, RefreshCw, Loader2, 
   ChevronDown, ChevronUp, Search, Filter, Video, Image, 
   FileText, TrendingUp, DollarSign, Sun, Moon, MapPin,
-  Edit2, Trash2, X, Save, Printer, BarChart3, PieChart
+  Edit2, Trash2, X, Save, Printer, BarChart3, PieChart, Keyboard
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -146,6 +146,8 @@ export default function DailyReportPage() {
   const [expandedReport, setExpandedReport] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingReport, setEditingReport] = useState<DailyReport | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState(0)
   
   const [newReport, setNewReport] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -195,12 +197,201 @@ export default function DailyReportPage() {
     fetchData()
   }, [fetchData])
 
+  // Filter reports based on search query
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.notes.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.scenes.some(s => s.sceneNumber.includes(searchQuery))
     return matchesSearch
   })
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      
+      if (e.key === '?' && e.shiftKey) {
+        e.preventDefault()
+        setShowKeyboardHelp(prev => !prev)
+        return
+      }
+      
+      if (isInput) return
+      
+      switch (e.key.toLowerCase()) {
+        case 'a':
+          if (!showAddForm) {
+            e.preventDefault()
+            setShowAddForm(true)
+          }
+          break
+        case 'r':
+          e.preventDefault()
+          fetchData(true)
+          break
+        case 'e':
+          e.preventDefault()
+          handleExportCSV()
+          break
+        case 'f':
+          e.preventDefault()
+          document.getElementById('search-input')?.focus()
+          break
+        case 'arrowdown':
+          e.preventDefault()
+          setFocusedIndex(prev => Math.min(prev + 1, filteredReports.length - 1))
+          break
+        case 'arrowup':
+          e.preventDefault()
+          setFocusedIndex(prev => Math.max(prev - 1, 0))
+          break
+        case 'home':
+          e.preventDefault()
+          setFocusedIndex(0)
+          break
+        case 'end':
+          e.preventDefault()
+          setFocusedIndex(filteredReports.length - 1)
+          break
+        case 'enter':
+          e.preventDefault()
+          if (filteredReports[focusedIndex]) {
+            setExpandedReport(prev => prev === filteredReports[focusedIndex].id ? null : filteredReports[focusedIndex].id)
+          }
+          break
+        case 'escape':
+          setShowKeyboardHelp(false)
+          setShowAddForm(false)
+          setEditingReport(null)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [fetchData, showAddForm, filteredReports, focusedIndex])
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const headers = ['Date', 'Day', 'Location', 'Call Time', 'Wrap Time', 'Weather', 'Shots Planned', 'Shots Shot', 'Completion %', 'Crew', 'Cast']
+    const rows = filteredReports.map(r => [
+      r.date,
+      r.dayNumber,
+      r.location,
+      r.callTime,
+      r.wrapTime,
+      r.weather,
+      r.totalShotsPlanned,
+      r.totalShotsShot,
+      Math.round((r.totalShotsShot / r.totalShotsPlanned) * 100) + '%',
+      r.crewPresent,
+      r.castPresent
+    ])
+    
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dailies-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      const currentIndex = focusedIndex
+      const maxIndex = filteredReports.length - 1
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          if (currentIndex < maxIndex) {
+            setFocusedIndex(currentIndex + 1)
+            setExpandedReport(filteredReports[currentIndex + 1]?.id || null)
+          }
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          if (currentIndex > 0) {
+            setFocusedIndex(currentIndex - 1)
+            setExpandedReport(filteredReports[currentIndex - 1]?.id || null)
+          }
+          break
+        case 'Home':
+          e.preventDefault()
+          setFocusedIndex(0)
+          setExpandedReport(filteredReports[0]?.id || null)
+          break
+        case 'End':
+          e.preventDefault()
+          setFocusedIndex(maxIndex)
+          setExpandedReport(filteredReports[maxIndex]?.id || null)
+          break
+        case 'Enter':
+          e.preventDefault()
+          if (expandedReport) {
+            setExpandedReport(null)
+          } else if (filteredReports[currentIndex]) {
+            setExpandedReport(filteredReports[currentIndex].id)
+          }
+          break
+        case 'Escape':
+          e.preventDefault()
+          setExpandedReport(null)
+          setShowAddForm(false)
+          setEditingReport(null)
+          setShowKeyboardHelp(false)
+          break
+        case '?':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setShowKeyboardHelp(true)
+          }
+          break
+        case 'a':
+        case 'A':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setShowAddForm(true)
+            setEditingReport(null)
+          }
+          break
+        case 'r':
+        case 'R':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            fetchData(true)
+          }
+          break
+        case 'e':
+        case 'E':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            handleExportCSV()
+          }
+          break
+        case 'f':
+        case 'F':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            document.getElementById('search-input')?.focus()
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [fetchData, focusedIndex, filteredReports, expandedReport])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -512,8 +703,9 @@ export default function DailyReportPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
+            id="search-input"
             type="text"
-            placeholder="Search by location, notes, or scene number..."
+            placeholder="Search by location, notes, or scene number... (Press F)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-orange-500"
@@ -842,6 +1034,66 @@ export default function DailyReportPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-orange-400" />
+                Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Navigate Up/Down</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">↑ / ↓</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">First / Last</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Home / End</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Expand/Collapse</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Enter</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Close</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Esc</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Add Report</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">A</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Refresh</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">R</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Export CSV</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">E</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Search</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">F</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2 col-span-2">
+                  <span className="text-slate-400 text-sm">Show Help</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Shift + ?</kbd>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 text-center pt-2">
+                Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">Esc</kbd> to close
+              </p>
+            </div>
           </div>
         </div>
       )}

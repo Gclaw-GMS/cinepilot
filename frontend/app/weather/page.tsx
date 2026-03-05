@@ -157,6 +157,7 @@ export default function WeatherPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [filterCondition, setFilterCondition] = useState<string>('all');
 
   const fetchWeather = useCallback(async (location: (typeof LOCATIONS)[0]) => {
     setSelectedLocation(location);
@@ -192,11 +193,21 @@ export default function WeatherPage() {
     }
   }, [selectedLocation, fetchWeather]);
 
-  const selectedDay = weatherData?.forecast[selectedDayIndex];
+  // Filter forecast based on condition
+  const filteredForecast = useMemo(() => {
+    if (!weatherData?.forecast) return [];
+    if (filterCondition === 'all') return weatherData.forecast;
+    return weatherData.forecast.filter(day => 
+      day.condition.toLowerCase().includes(filterCondition.toLowerCase()) ||
+      day.recommendationSeverity === filterCondition
+    );
+  }, [weatherData?.forecast, filterCondition]);
+
+  const selectedDay = filteredForecast[selectedDayIndex];
 
   const chartData = useMemo(() => {
-    if (!weatherData?.forecast) return [];
-    return weatherData.forecast.map((day) => ({
+    if (!filteredForecast) return [];
+    return filteredForecast.map((day) => ({
       name: day.dayName.substring(0, 3),
       high: day.tempHigh,
       low: day.tempLow,
@@ -375,9 +386,28 @@ export default function WeatherPage() {
               </div>
             )}
 
-            {/* Day Selector */}
+            {/* Day Selector with Filter */}
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Filter:</span>
+              <select
+                value={filterCondition}
+                onChange={(e) => { setFilterCondition(e.target.value); setSelectedDayIndex(0); }}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+              >
+                <option value="all">All Days</option>
+                <option value="sunny">Sunny</option>
+                <option value="cloudy">Cloudy</option>
+                <option value="rain">Rain</option>
+                <option value="green">Good for Shooting</option>
+                <option value="amber">Fair for Shooting</option>
+                <option value="red">Avoid</option>
+              </select>
+              <span className="text-xs text-slate-500 ml-auto">
+                {filteredForecast.length} day{filteredForecast.length !== 1 ? 's' : ''} shown
+              </span>
+            </div>
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {weatherData.forecast.map((day, idx) => (
+              {filteredForecast.map((day, idx) => (
                 <button
                   key={day.date}
                   onClick={() => setSelectedDayIndex(idx)}

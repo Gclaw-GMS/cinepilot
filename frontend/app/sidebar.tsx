@@ -66,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/travel', icon: Plane, label: 'Travel Expenses' },
       { href: '/character-costume', icon: Shirt, label: 'Character Costume', badge: 'NEW' },
       { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment' },
+      { href: '/dailies', icon: Clapperboard, label: 'Daily Reports', badge: 'NEW' },
       { href: '/catering', icon: Utensils, label: 'Catering', badge: 'NEW' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
       { href: '/reports', icon: FileText, label: 'Reports' },

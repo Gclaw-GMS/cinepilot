@@ -135,6 +135,8 @@ export default function ShotHubPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [expandedShot, setExpandedShot] = useState<string | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [selectedShotIndex, setSelectedShotIndex] = useState<number>(-1)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // --------------------------------------------------------------------------
@@ -214,7 +216,6 @@ export default function ShotHubPage() {
       else setLoading(false)
     })()
   }, [fetchScriptId, fetchShots])
-
   // --------------------------------------------------------------------------
   // ACTIONS
   // --------------------------------------------------------------------------
@@ -448,6 +449,81 @@ export default function ShotHubPage() {
     })
   }, [shots, selectedSceneId, sizeFilter, movementFilter, showIncomplete])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        // Allow Escape to work even in input fields
+        if (e.key === 'Escape') {
+          setExpandedShot(null)
+          setSelectedShotIndex(-1)
+        }
+        return
+      }
+
+      const maxIndex = filteredShots.length - 1
+      
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelectedShotIndex(prev => Math.min(prev + 1, maxIndex))
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelectedShotIndex(prev => Math.max(prev - 1, 0))
+          break
+        case 'Enter':
+          if (selectedShotIndex >= 0 && filteredShots[selectedShotIndex]) {
+            setExpandedShot(prev => prev === filteredShots[selectedShotIndex].id ? null : filteredShots[selectedShotIndex].id)
+          }
+          break
+        case 'Home':
+          e.preventDefault()
+          setSelectedShotIndex(0)
+          break
+        case 'End':
+          e.preventDefault()
+          setSelectedShotIndex(maxIndex)
+          break
+        case 'Escape':
+          setExpandedShot(null)
+          setSelectedShotIndex(-1)
+          break
+        case '?':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setShowKeyboardHelp(prev => !prev)
+          }
+          break
+        case 'e':
+          if (!e.ctrlKey && !e.metaKey) {
+            handleExport()
+          }
+          break
+        case 'g':
+          if (!e.ctrlKey && !e.metaKey) {
+            setViewMode(prev => prev === 'grid' ? 'list' : 'grid')
+          }
+          break
+        case 'f':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            document.getElementById('scene-filter-input')?.focus()
+          }
+          break
+        case 'i':
+          if (!e.ctrlKey && !e.metaKey) {
+            setShowIncomplete(prev => !prev)
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [filteredShots, selectedShotIndex])
+
   // --------------------------------------------------------------------------
   // CHART DATA
   // --------------------------------------------------------------------------
@@ -527,6 +603,13 @@ export default function ShotHubPage() {
                 <RefreshCw className="w-4 h-4" />
               </button>
               <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
+                title="Keyboard Shortcuts"
+              >
+                <span className="text-xs font-mono">⌨</span>
+              </button>
+              <button
                 onClick={handleExport}
                 disabled={shots.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
@@ -588,6 +671,61 @@ export default function ShotHubPage() {
           </div>
         </div>
       </header>
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Navigate shots</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">↑↓</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Expand/Collapse</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">Enter</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">First/Last</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">Home/End</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Close</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">Esc</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Export</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">E</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Toggle view</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">G</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Filter</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">F</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                  <span className="text-slate-400">Incomplete</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">I</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2 col-span-2">
+                  <span className="text-slate-400">Show help</span>
+                  <kbd className="text-xs bg-slate-700 px-2 py-0.5 rounded">?</kbd>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-4 text-center">Press ? anytime to toggle this help</p>
+          </div>
+        </div>
+      )}
 
       <main className="p-8">
         {/* Alerts */}
@@ -738,6 +876,7 @@ export default function ShotHubPage() {
                   <span className="text-sm text-slate-400">Filters:</span>
                 </div>
                 <input
+                  id="scene-filter-input"
                   type="text"
                   placeholder="Search scenes..."
                   value={sceneFilter}

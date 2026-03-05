@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   StickyNote,
   Plus,
@@ -73,6 +73,7 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [editingNote, setEditingNote] = useState<Note | null>(null)
@@ -124,25 +125,47 @@ export default function NotesPage() {
         e.preventDefault()
         openNewForm()
       }
+      // Ctrl/Cmd + K = Focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
       // Ctrl/Cmd + E = Export JSON
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault()
         handleExport('json')
       }
-      // Escape = Close modal
-      if (e.key === 'Escape' && showForm) {
-        setShowForm(false)
-        setEditingNote(null)
+      // Escape = Close modal or clear search
+      if (e.key === 'Escape') {
+        if (showForm) {
+          setShowForm(false)
+          setEditingNote(null)
+        } else if (searchQuery) {
+          setSearchQuery('')
+          searchInputRef.current?.blur()
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm])
+  }, [showForm, searchQuery])
 
   const filteredNotes = notes.filter(note =>
     note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     note.author.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  // Highlight helper for search
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    return parts.map((part, i) => 
+      regex.test(part) 
+        ? <mark key={i} className="bg-indigo-500/40 text-indigo-200 rounded px-0.5">{part}</mark>
+        : part
+    )
+  }
 
   // Compute chart data for notes distribution
   const categoryChartData = useMemo(() => {
@@ -398,7 +421,7 @@ export default function NotesPage() {
       </div>
       
       <p className="text-sm text-slate-200 whitespace-pre-wrap mb-3 line-clamp-4">
-        {note.content}
+        {highlightText(note.content, searchQuery)}
       </p>
       
       <div className="flex items-center justify-between text-xs text-slate-500">
@@ -519,12 +542,28 @@ export default function NotesPage() {
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-20 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
+            {searchQuery && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <span className="text-xs text-slate-500">{filteredNotes.length} of {notes.length}</span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="p-0.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="text-xs text-slate-600 hidden md:block">
+            Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">⌘K</kbd> to search
           </div>
         </div>
 

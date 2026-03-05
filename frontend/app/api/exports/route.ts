@@ -16,9 +16,11 @@ const DEMO_EXPORT_TYPES = [
 ];
 
 const DEMO_SCHEDULE = [
-  { dayNumber: 1, date: '2026-03-15', location: 'Studio A', scenes: ['Scene 1', 'Scene 2', 'Scene 3'], notes: 'Hero introduction' },
-  { dayNumber: 2, date: '2026-03-16', location: 'Temple Road', scenes: ['Scene 4', 'Scene 5'], notes: 'Outdoor shoot' },
-  { dayNumber: 3, date: '2026-03-17', location: 'Office Building', scenes: ['Scene 6', 'Scene 7', 'Scene 8'], notes: 'Day interior' },
+  { dayNumber: 1, date: '2026-03-15', location: 'Studio A', scenes: ['Scene 1', 'Scene 2', 'Scene 3'], callTime: '06:00', estimatedHours: 10, notes: 'Hero introduction' },
+  { dayNumber: 2, date: '2026-03-16', location: 'Temple Road', scenes: ['Scene 4', 'Scene 5'], callTime: '05:30', estimatedHours: 12, notes: 'Outdoor shoot - temple festival' },
+  { dayNumber: 3, date: '2026-03-17', location: 'Office Building', scenes: ['Scene 6', 'Scene 7', 'Scene 8'], callTime: '07:00', estimatedHours: 8, notes: 'Day interior - corporate meeting' },
+  { dayNumber: 4, date: '2026-03-18', location: 'Marina Beach', scenes: ['Scene 9', 'Scene 10'], callTime: '04:30', estimatedHours: 10, notes: 'Sunrise shoot - romantic sequence' },
+  { dayNumber: 5, date: '2026-03-19', location: 'Village House', scenes: ['Scene 11', 'Scene 12', 'Scene 13'], callTime: '06:00', estimatedHours: 12, notes: 'Family drama sequences' },
 ];
 
 const DEMO_BUDGET = {
@@ -34,9 +36,26 @@ const DEMO_BUDGET = {
 };
 
 const DEMO_CREW = [
-  { name: 'John Smith', role: 'Director', department: 'Direction' },
-  { name: 'Sarah Johnson', role: 'Cinematographer', department: 'Camera' },
-  { name: 'Mike Davis', role: 'Gaffer', department: 'Electrical' },
+  { name: 'Ravi Kumar', role: 'Director of Photography', department: 'Camera', phone: '+91 98765 43210', email: 'ravi@film.com', dailyRate: 75000 },
+  { name: 'Anand Venkatesh', role: 'Gaffer', department: 'Lighting', phone: '+91 98765 43211', email: 'anand@film.com', dailyRate: 15000 },
+  { name: 'Vijay Raghavan', role: 'Sound Mixer', department: 'Sound', phone: '+91 98765 43212', email: 'vijay@film.com', dailyRate: 12000 },
+  { name: 'Madhan Kumar', role: 'Production Designer', department: 'Art', phone: '+91 98765 43213', email: 'madhan@film.com', dailyRate: 45000 },
+  { name: 'Lakshmi Devi', role: 'Chief Makeup Artist', department: 'Makeup', phone: '+91 98765 43214', email: 'lakshmi@film.com', dailyRate: 25000 },
+  { name: 'Kamal Haasan', role: 'Director', department: 'Direction', phone: '+91 98765 43216', email: 'kamal@film.com', dailyRate: 150000 },
+];
+
+const DEMO_SHOTS = [
+  { sceneNumber: '1', shotIndex: 1, shotText: 'Hero enters the frame', shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'static', characters: ['Arjun'], durationEstSec: 8 },
+  { sceneNumber: '1', shotIndex: 2, shotText: 'Close-up reaction', shotSize: 'CU', cameraAngle: 'eye', cameraMovement: 'dolly', characters: ['Arjun'], durationEstSec: 5 },
+  { sceneNumber: '1', shotIndex: 3, shotText: 'Two-shot dialogue', shotSize: 'MS', cameraAngle: 'eye', cameraMovement: 'pan', characters: ['Arjun', 'Priya'], durationEstSec: 12 },
+  { sceneNumber: '2', shotIndex: 1, shotText: 'Wide establishing', shotSize: 'EWS', cameraAngle: 'high', cameraMovement: 'crane', characters: [], durationEstSec: 10 },
+  { sceneNumber: '2', shotIndex: 2, shotText: 'Medium shot conversation', shotSize: 'MS', cameraAngle: 'eye', cameraMovement: 'steadicam', characters: ['Mahendra', 'Sathya'], durationEstSec: 15 },
+];
+
+const DEMO_LOCATIONS = [
+  { id: 'loc-1', name: 'Studio A', address: 'Anna Nagar, Chennai', type: 'studio', capacity: 200, contact: '+91 44 1234 5678', notes: 'Fully equipped sound stage' },
+  { id: 'loc-2', name: 'Marina Beach', address: 'Marina Beach Road, Chennai', type: 'exterior', capacity: 500, contact: '+91 44 2345 6789', permits: 'Beach shooting permit required', notes: 'Sunrise and sunset shoots ideal' },
+  { id: 'loc-3', name: 'Heritage Villa', address: 'Teynampet, Chennai', type: 'residential', capacity: 50, owner: 'Tamil Nadu Film Society', notes: 'Traditional Tamil architecture' },
 ];
 
 async function checkDbConnection(): Promise<boolean> {
@@ -92,15 +111,15 @@ export async function GET(req: NextRequest) {
           filename = 'budget.json';
           break;
         case 'crew':
-          data = { crew: DEMO_CREW };
+          data = { crew: DEMO_CREW, totalCrew: DEMO_CREW.length, message: 'Demo crew data' };
           filename = 'crew.json';
           break;
         case 'shot_list':
-          data = { shots: [], totalShots: 0, message: 'No shots in demo mode' };
+          data = { shots: DEMO_SHOTS, totalShots: DEMO_SHOTS.length, message: 'Demo shot data' };
           filename = 'shot_list.json';
           break;
         case 'locations':
-          data = { locations: [], message: 'No locations in demo mode' };
+          data = { locations: DEMO_LOCATIONS, totalLocations: DEMO_LOCATIONS.length, message: 'Demo location data' };
           filename = 'locations.json';
           break;
         case 'full_json':
@@ -299,6 +318,15 @@ export async function POST(req: NextRequest) {
           break;
         case 'crew':
           exports.crew = { crew: DEMO_CREW, count: DEMO_CREW.length };
+          break;
+        case 'shot_list':
+          exports.shot_list = { shots: DEMO_SHOTS, count: DEMO_SHOTS.length };
+          break;
+        case 'locations':
+          exports.locations = { locations: DEMO_LOCATIONS, count: DEMO_LOCATIONS.length };
+          break;
+        case 'full_json':
+          exports.full_json = { project: 'Demo Project', shootingDays: DEMO_SCHEDULE, crew: DEMO_CREW, shots: DEMO_SHOTS, locations: DEMO_LOCATIONS };
           break;
         default:
           exports[type] = { message: 'Demo data not available' };

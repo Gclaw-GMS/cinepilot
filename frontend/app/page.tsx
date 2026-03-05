@@ -155,7 +155,9 @@ export default function Dashboard() {
         try {
           const res = await fetch(url)
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          return await res.json()
+          const data = await res.json()
+          console.log(`[Dashboard] Fetch success for ${url}:`, data ? 'OK' : 'empty')
+          return data
         } catch (e) {
           console.error(`[Dashboard] Fetch failed for ${url}:`, e)
           return null
@@ -235,7 +237,14 @@ export default function Dashboard() {
       }
 
       // Check if we got real data - update stats if we have data
-      const hasRealData = result.scripts.total > 0 || result.shots.total > 0
+      // Also check for any meaningful data from any source
+      const hasRealData = 
+        result.scripts.total > 0 || 
+        result.shots.total > 0 || 
+        result.budget.planned > 0 ||
+        result.schedule.days > 0 ||
+        result.locations.scenes > 0
+      
       if (hasRealData) {
         console.log('[Dashboard] Got real data:', result)
         setStats(result)
@@ -337,7 +346,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-semibold tracking-tight">Production Dashboard</h1>
                 {isDemoMode && (
-                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                  <span className="group relative px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium cursor-help" title="Demo data shown. Upload a script or configure your database to see real production data.">
                     Demo Mode
                   </span>
                 )}
@@ -345,7 +354,13 @@ export default function Dashboard() {
               <p className="text-slate-500 text-sm mt-1">CinePilot &mdash; AI Pre-Production Command Center</p>
             </div>
             <button
-              onClick={fetchStats}
+              onClick={() => {
+                // Force refresh by clearing cache first
+                setStats(EMPTY_STATS)
+                setIsDemoMode(true)
+                // Small delay to ensure state is cleared before fetch
+                setTimeout(() => fetchStats(), 50)
+              }}
               disabled={loading}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
             >
@@ -367,7 +382,7 @@ export default function Dashboard() {
         {isDemoMode && (
           <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            Preview mode — Connect a PostgreSQL database to see real production data
+            <span>Preview mode — Connect a PostgreSQL database or <Link href="/scripts" className="underline hover:text-amber-300">upload a script</Link> to see real production data</span>
           </div>
         )}
 

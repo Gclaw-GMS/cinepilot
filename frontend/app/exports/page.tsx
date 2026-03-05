@@ -4,14 +4,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { 
   Download, FileSpreadsheet, FileJson, Calendar, Loader2, 
   CheckCircle, X, RefreshCw, FileText, Package, Clock,
-  CheckSquare, Square, File, Archive
+  CheckSquare, Square, File, Archive, Film, Clapperboard,
+  DollarSign, Users, MapPin, User, Camera, FileCheck,
+  Folder, Image, ClipboardList, BarChart3, TrendingUp,
+  UsersRound, Briefcase
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface ExportType {
   id: string
   name: string
   format: string
-  icon: string
+  icon: LucideIcon
   description?: string
 }
 
@@ -28,37 +32,37 @@ const EXPORT_CATEGORIES = [
     id: 'production',
     label: 'Production',
     exports: [
-      { id: 'schedule', name: 'Shooting Schedule', format: 'JSON', icon: '📅', description: 'Day-by-day shooting plan' },
-      { id: 'call_sheets', name: 'Call Sheets', format: 'PDF', icon: '📋', description: 'Daily call sheets for crew' },
-      { id: 'shot_list', name: 'Shot List', format: 'CSV', icon: '🎬', description: 'Complete shot breakdown' },
-      { id: 'storyboard', name: 'Storyboard Frames', format: 'JSON', icon: '🎞️', description: 'All storyboard frames' },
+      { id: 'schedule', name: 'Shooting Schedule', format: 'JSON', icon: Calendar, description: 'Day-by-day shooting plan' },
+      { id: 'call_sheets', name: 'Call Sheets', format: 'PDF', icon: ClipboardList, description: 'Daily call sheets for crew' },
+      { id: 'shot_list', name: 'Shot List', format: 'CSV', icon: Clapperboard, description: 'Complete shot breakdown' },
+      { id: 'storyboard', name: 'Storyboard Frames', format: 'JSON', icon: Film, description: 'All storyboard frames' },
     ]
   },
   {
     id: 'financial',
     label: 'Financial',
     exports: [
-      { id: 'budget', name: 'Budget Report', format: 'XLSX', icon: '💰', description: 'Full budget breakdown' },
-      { id: 'expenses', name: 'Expenses Log', format: 'CSV', icon: '📊', description: 'All expenses with details' },
-      { id: 'crew_costs', name: 'Crew Costs', format: 'CSV', icon: '👥', description: 'Daily rates and totals' },
+      { id: 'budget', name: 'Budget Report', format: 'XLSX', icon: DollarSign, description: 'Full budget breakdown' },
+      { id: 'expenses', name: 'Expenses Log', format: 'CSV', icon: TrendingUp, description: 'All expenses with details' },
+      { id: 'crew_costs', name: 'Crew Costs', format: 'CSV', icon: Users, description: 'Daily rates and totals' },
     ]
   },
   {
     id: 'creative',
     label: 'Creative',
     exports: [
-      { id: 'scripts', name: 'Script Breakdown', format: 'PDF', icon: '📝', description: 'Scene-by-scene analysis' },
-      { id: 'characters', name: 'Character Profiles', format: 'JSON', icon: '🎭', description: 'All characters with details' },
-      { id: 'locations', name: 'Location Scout', format: 'PDF', icon: '📍', description: 'Location details and images' },
+      { id: 'scripts', name: 'Script Breakdown', format: 'PDF', icon: FileText, description: 'Scene-by-scene analysis' },
+      { id: 'characters', name: 'Character Profiles', format: 'JSON', icon: UsersRound, description: 'All characters with details' },
+      { id: 'locations', name: 'Location Scout', format: 'PDF', icon: MapPin, description: 'Location details and images' },
     ]
   },
   {
     id: 'admin',
     label: 'Administrative',
     exports: [
-      { id: 'crew', name: 'Crew Directory', format: 'PDF', icon: '👨‍💼', description: 'Contact information' },
-      { id: 'equipment', name: 'Equipment List', format: 'CSV', icon: '🎥', description: 'Rental inventory' },
-      { id: 'full_backup', name: 'Full Backup', format: 'ZIP', icon: '📦', description: 'Complete project archive' },
+      { id: 'crew', name: 'Crew Directory', format: 'PDF', icon: Briefcase, description: 'Contact information' },
+      { id: 'equipment', name: 'Equipment List', format: 'CSV', icon: Camera, description: 'Rental inventory' },
+      { id: 'full_backup', name: 'Full Backup', format: 'ZIP', icon: Package, description: 'Complete project archive' },
     ]
   }
 ]
@@ -68,35 +72,35 @@ const FORMAT_INFO = [
     format: 'PDF', 
     label: 'PDF Documents', 
     desc: 'Best for printing and formal sharing',
-    icon: '📄',
+    icon: FileText,
     color: 'bg-red-500/20 text-red-400 border-red-500/30'
   },
   { 
     format: 'XLSX', 
     label: 'Excel Spreadsheets', 
     desc: 'Best for data analysis and manipulation',
-    icon: '📊',
+    icon: BarChart3,
     color: 'bg-green-500/20 text-green-400 border-green-500/30'
   },
   { 
     format: 'CSV', 
     label: 'CSV Files', 
     desc: 'Universal format for spreadsheets',
-    icon: '📈',
+    icon: TrendingUp,
     color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
   },
   { 
     format: 'JSON', 
     label: 'JSON Data', 
     desc: 'For developers and API integration',
-    icon: '💠',
+    icon: FileJson,
     color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
   },
   { 
     format: 'ZIP', 
     label: 'Archive Files', 
     desc: 'Compressed backup bundles',
-    icon: '📦',
+    icon: Archive,
     color: 'bg-purple-500/20 text-purple-400 border-purple-500/30'
   },
 ]
@@ -356,7 +360,9 @@ export default function ExportsPage() {
                           : 'bg-slate-800/50 border-slate-700 hover:border-slate-600 hover:bg-slate-800'
                       }`}
                     >
-                      <div className="text-2xl shrink-0">{exp.icon}</div>
+                      <div className="p-2 rounded-lg bg-indigo-500/20 shrink-0">
+                        <exp.icon className="w-5 h-5 text-indigo-400" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-white text-sm">{exp.name}</span>
@@ -392,11 +398,11 @@ export default function ExportsPage() {
               </h3>
               <div className="space-y-3">
                 {FORMAT_INFO.map((fmt) => (
-                  <div key={fmt.format} className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/50">
-                    <span className="text-xl">{fmt.icon}</span>
+                  <div key={fmt.format} className={`flex items-start gap-3 p-3 rounded-lg border ${fmt.color}`}>
+                    <fmt.icon className="w-5 h-5 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-white">{fmt.label}</p>
-                      <p className="text-xs text-slate-500">{fmt.desc}</p>
+                      <p className="text-sm font-medium">{fmt.label}</p>
+                      <p className="text-xs opacity-70">{fmt.desc}</p>
                     </div>
                   </div>
                 ))}

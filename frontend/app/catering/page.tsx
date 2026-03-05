@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
-  TrendingUp
+  TrendingUp, RefreshCw, Keyboard
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -71,6 +71,8 @@ export default function CateringPage() {
   const [showMealForm, setShowMealForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -100,6 +102,58 @@ export default function CateringPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+
+      // R: Refresh data
+      if (e.key === 'r' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        fetchData()
+      }
+
+      // A: Add new shoot day
+      if (e.key === 'a' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        setShowDayForm(true)
+      }
+
+      // M: Add new meal (when shoot days exist)
+      if (e.key === 'm' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        if (plan && plan.shootDays.length > 0) {
+          setSelectedDate(plan.shootDays[0].date)
+          setShowMealForm(true)
+        }
+      }
+
+      // ?: Show keyboard help
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowKeyboardHelp(true)
+      }
+
+      // Escape: Close modals
+      if (e.key === 'Escape') {
+        if (showKeyboardHelp) {
+          setShowKeyboardHelp(false)
+        } else if (showMealForm) {
+          setShowMealForm(false)
+          setEditingMeal(null)
+        } else if (showDayForm) {
+          setShowDayForm(false)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [fetchData, plan, showDayForm, showMealForm, showKeyboardHelp])
 
   const handleAddShootDay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -240,10 +294,22 @@ export default function CateringPage() {
               </h1>
               <p className="text-slate-500 text-sm mt-1">Meal planning & budget tracking</p>
             </div>
-            <button onClick={() => setShowDayForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium">
-              <Plus className="w-4 h-4" /> Add Shoot Day
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowKeyboardHelp(true)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                title="Keyboard Shortcuts ( ? )">
+                <Keyboard className="w-4 h-4" />
+              </button>
+              <button onClick={fetchData}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                title="Refresh ( R )">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              <button onClick={() => setShowDayForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium">
+                <Plus className="w-4 h-4" /> Add Shoot Day
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -557,6 +623,37 @@ export default function CateringPage() {
                 <button type="submit" className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium">{editingMeal ? 'Save Changes' : 'Add Meal'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Keyboard className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+              </div>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'R', action: 'Refresh data' },
+                { key: 'A', action: 'Add new shoot day' },
+                { key: 'M', action: 'Add new meal (when days exist)' },
+                { key: '?', action: 'Show this help' },
+                { key: 'Esc', action: 'Close modal' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                  <span className="text-sm text-slate-300">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-amber-400">{shortcut.key}</kbd>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

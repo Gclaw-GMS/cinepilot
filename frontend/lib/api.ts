@@ -652,6 +652,31 @@ export const aiAnalysis = {
   getResults: async (scriptId: string): Promise<any> => {
     return apiFetch(`/api/ai-analysis?scriptId=${scriptId}`);
   },
+  // Script content analysis methods
+  analyzePacing: async (scriptContent: string, language: string = 'tamil'): Promise<any> => {
+    return apiFetch('/api/ai/analyze-pacing', {
+      method: 'POST',
+      body: JSON.stringify({ text: scriptContent, language }),
+    });
+  },
+  analyzeCharacters: async (scriptContent: string, language: string = 'tamil'): Promise<any> => {
+    return apiFetch('/api/ai/analyze-characters', {
+      method: 'POST',
+      body: JSON.stringify({ text: scriptContent, language }),
+    });
+  },
+  analyzeEmotionalArc: async (scriptContent: string, language: string = 'tamil'): Promise<any> => {
+    return apiFetch('/api/ai/analyze-emotions', {
+      method: 'POST',
+      body: JSON.stringify({ text: scriptContent, language }),
+    });
+  },
+  generateTags: async (scriptContent: string, language: string = 'tamil'): Promise<any> => {
+    return apiFetch('/api/ai/generate-tags', {
+      method: 'POST',
+      body: JSON.stringify({ text: scriptContent, language }),
+    });
+  },
 };
 
 // Script Upload API
@@ -746,6 +771,40 @@ export const collaborationNew = {
   },
   addComment: async (data: any): Promise<any> => {
     return apiFetch('/api/collaboration/comments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  // Tasks API
+  getTasks: async (projectId: number): Promise<{ tasks: any[] }> => {
+    const tasks = await apiFetch<any[]>(`/api/tasks?projectId=${projectId}`);
+    return { tasks };
+  },
+  createTask: async (data: any): Promise<any> => {
+    return apiFetch('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateTask: async (taskId: string, data: any): Promise<any> => {
+    return apiFetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  // Activity API
+  getActivity: async (projectId: number): Promise<{ activities: any[] }> => {
+    const activities = await apiFetch<any[]>(`/api/activity?projectId=${projectId}`);
+    return { activities };
+  },
+  // Expenses API - wraps budget expenses
+  getExpenses: async (projectId: number): Promise<{ expenses: any[] }> => {
+    const response = await apiFetch<any>(`/api/budget?projectId=${projectId}`);
+    // Handle both { expenses: [...] } and { items: [...], expenses: [...] } formats
+    return { expenses: response.expenses || [] };
+  },
+  createExpense: async (data: any): Promise<any> => {
+    return apiFetch('/api/budget/expenses', {
       method: 'POST',
       body: JSON.stringify(data),
     });

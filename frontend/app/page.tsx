@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
-  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, Plus, X
+  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, Plus, X, Zap
 } from 'lucide-react'
 
 const PALETTE = {
@@ -487,6 +487,147 @@ export default function Dashboard() {
             value={stats.censor.certificate}
             isText
           />
+        </div>
+
+        {/* Production Progress Section */}
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-indigo-500/20">
+              <FileText className="w-4 h-4 text-indigo-400" />
+            </div>
+            Production Progress
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Script Progress */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-400">Script Analysis</span>
+                <span className="text-xs text-emerald-400">{stats.scripts.scenes > 0 ? '100%' : '0%'}</span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
+                  style={{ width: stats.scripts.scenes > 0 ? '100%' : '0%' }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">{stats.scripts.scenes} scenes identified</p>
+            </div>
+
+            {/* Shot Generation Progress */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-400">Shot Generation</span>
+                <span className="text-xs text-emerald-400">
+                  {stats.scripts.scenes > 0 ? Math.round((stats.shots.total / (stats.scripts.scenes * 6)) * 100) : 0}%
+                </span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-500"
+                  style={{ width: stats.scripts.scenes > 0 ? `${Math.min(100, (stats.shots.total / (stats.scripts.scenes * 6)) * 100)}%` : '0%' }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">{stats.shots.total} shots / ~{stats.scripts.scenes * 6} expected</p>
+            </div>
+
+            {/* Storyboard Progress */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-400">Storyboard</span>
+                <span className="text-xs text-emerald-400">
+                  {stats.shots.total > 0 ? Math.round((stats.storyboard.frames / stats.shots.total) * 100) : 0}%
+                </span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 rounded-full transition-all duration-500"
+                  style={{ width: stats.shots.total > 0 ? `${Math.min(100, (stats.storyboard.frames / stats.shots.total) * 100)}%` : '0%' }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">{stats.storyboard.frames} frames / {stats.shots.total} shots</p>
+            </div>
+
+            {/* Budget Progress */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-400">Budget Setup</span>
+                <span className={`text-xs ${stats.budget.planned > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {stats.budget.planned > 0 ? '100%' : 'Pending'}
+                </span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: stats.budget.planned > 0 ? '100%' : '0%' }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                {stats.budget.planned > 0 
+                  ? `₹${(stats.budget.planned / 10000000).toFixed(1)}Cr allocated`
+                  : 'Generate budget to track'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-500/20">
+              <Zap className="w-4 h-4 text-amber-400" />
+            </div>
+            Quick Actions
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link 
+              href="/scripts" 
+              className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-xl transition-all group"
+            >
+              <div className="p-2 rounded-lg bg-blue-500/20 group-hover:bg-blue-500/30">
+                <FileText className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Upload Script</p>
+                <p className="text-xs text-slate-500">Start new project</p>
+              </div>
+            </Link>
+            <Link 
+              href="/shot-list" 
+              className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-violet-500/50 rounded-xl transition-all group"
+            >
+              <div className="p-2 rounded-lg bg-violet-500/20 group-hover:bg-violet-500/30">
+                <Video className="w-4 h-4 text-violet-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Generate Shots</p>
+                <p className="text-xs text-slate-500">AI-powered breakdown</p>
+              </div>
+            </Link>
+            <Link 
+              href="/budget" 
+              className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl transition-all group"
+            >
+              <div className="p-2 rounded-lg bg-emerald-500/20 group-hover:bg-emerald-500/30">
+                <DollarSign className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Create Budget</p>
+                <p className="text-xs text-slate-500">Plan finances</p>
+              </div>
+            </Link>
+            <Link 
+              href="/schedule" 
+              className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all group"
+            >
+              <div className="p-2 rounded-lg bg-amber-500/20 group-hover:bg-amber-500/30">
+                <Calendar className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Plan Schedule</p>
+                <p className="text-xs text-slate-500">Optimize shoot days</p>
+              </div>
+            </Link>
+          </div>
         </div>
       </main>
 

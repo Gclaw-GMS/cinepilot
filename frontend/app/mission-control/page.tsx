@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw
+  Loader2, RefreshCw, Keyboard, X
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -159,6 +159,9 @@ export default function MissionControl() {
   const [refreshing, setRefreshing] = useState(false)
   const [time, setTime] = useState(new Date())
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [expandedSection, setExpandedSection] = useState<string | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -196,6 +199,85 @@ export default function MissionControl() {
     setRefreshing(true)
     fetchData()
   }
+
+  // Export data to JSON
+  const handleExport = () => {
+    if (!data) return
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      production: data.production,
+      today: data.today,
+      weekly: data.weekly,
+      departments: data.departments,
+      risks: data.risks,
+      locations: data.locations,
+      summary: data.summary,
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mission-control-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      
+      if (isInput) return
+      
+      switch (e.key.toLowerCase()) {
+        case '?':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setShowKeyboardHelp(prev => !prev)
+          }
+          break
+        case 'r':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            handleRefresh()
+          }
+          break
+        case 'e':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            handleExport()
+          }
+          break
+        case 'escape':
+          setShowKeyboardHelp(false)
+          setExpandedSection(null)
+          break
+        case '1':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setExpandedSection('health')
+          }
+          break
+        case '2':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setExpandedSection('budget')
+          }
+          break
+        case '3':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setExpandedSection('risks')
+          }
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [data])
 
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`
@@ -271,11 +353,23 @@ export default function MissionControl() {
                 onClick={handleRefresh}
                 disabled={refreshing}
                 className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all disabled:opacity-50"
+                title="Refresh (R)"
               >
                 <RefreshCw className={`w-5 h-5 text-cyan-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
-              <button className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all">
+              <button 
+                onClick={handleExport}
+                className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all"
+                title="Export (E)"
+              >
                 <Download className="w-5 h-5 text-cyan-400" />
+              </button>
+              <button 
+                onClick={() => setShowKeyboardHelp(true)}
+                className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all"
+                title="Keyboard Shortcuts (?)"
+              >
+                <Keyboard className="w-5 h-5 text-cyan-400" />
               </button>
             </div>
           </div>
@@ -591,6 +685,48 @@ export default function MissionControl() {
         </div>
 
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-cyan-400" />
+                Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Refresh Data</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">R</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Export JSON</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">E</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Show Help</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Shift+?</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-slate-400 text-sm">Close</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs">Esc</kbd>
+                </div>
+              </div>
+              <div className="border-t border-white/10 pt-4">
+                <p className="text-xs text-slate-500 text-center">
+                  Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">?</kbd> anytime to show this help
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Cloud,
   Sun,
@@ -24,6 +24,7 @@ import {
   CloudFog,
   Gauge,
   Zap,
+  Keyboard,
 } from 'lucide-react';
 import {
   LineChart,
@@ -158,6 +159,8 @@ export default function WeatherPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [filterCondition, setFilterCondition] = useState<string>('all');
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const filterInputRef = useRef<HTMLInputElement>(null);
 
   const fetchWeather = useCallback(async (location: (typeof LOCATIONS)[0]) => {
     setSelectedLocation(location);
@@ -193,7 +196,7 @@ export default function WeatherPage() {
     }
   }, [selectedLocation, fetchWeather]);
 
-  // Filter forecast based on condition
+  // Filter forecast based on condition (moved before keyboard handler)
   const filteredForecast = useMemo(() => {
     if (!weatherData?.forecast) return [];
     if (filterCondition === 'all') return weatherData.forecast;
@@ -202,6 +205,60 @@ export default function WeatherPage() {
       day.recommendationSeverity === filterCondition
     );
   }, [weatherData?.forecast, filterCondition]);
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    
+    const key = e.key.toLowerCase();
+    const forecastLength = filteredForecast.length;
+    
+    // R: Refresh weather
+    if (key === 'r' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      refreshWeather();
+    }
+    // Arrow Up: Previous day
+    else if (key === 'arrowup' || key === 'arrowleft') {
+      e.preventDefault();
+      setSelectedDayIndex(prev => Math.max(0, prev - 1));
+    }
+    // Arrow Down: Next day
+    else if (key === 'arrowdown' || key === 'arrowright') {
+      e.preventDefault();
+      setSelectedDayIndex(prev => Math.min(forecastLength - 1, prev + 1));
+    }
+    // 1-5: Quick select day
+    else if (['1', '2', '3', '4', '5'].includes(key)) {
+      e.preventDefault();
+      const dayNum = parseInt(key) - 1;
+      if (dayNum < forecastLength) {
+        setSelectedDayIndex(dayNum);
+      }
+    }
+    // F: Focus filter
+    else if (key === 'f' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      filterInputRef.current?.focus();
+    }
+    // ?: Show keyboard help
+    else if (key === '?' || (e.shiftKey && key === '/')) {
+      e.preventDefault();
+      setShowKeyboardHelp(prev => !prev);
+    }
+    // Escape: Close modal
+    else if (key === 'escape') {
+      e.preventDefault();
+      setShowKeyboardHelp(false);
+    }
+  }, [refreshWeather, filteredForecast.length]);
+
+  // Attach keyboard listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const selectedDay = filteredForecast[selectedDayIndex];
 
@@ -266,6 +323,13 @@ export default function WeatherPage() {
                   Refresh
                 </button>
               )}
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+                title="Keyboard shortcuts"
+              >
+                <Keyboard className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -693,6 +757,61 @@ export default function WeatherPage() {
             <p className="text-slate-500 mb-6 max-w-md mx-auto">
               Choose a filming location above to see the weather forecast with production recommendations.
             </p>
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts Help Modal */}
+        {showKeyboardHelp && (
+          <div 
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+            onClick={() => setShowKeyboardHelp(false)}
+          >
+            <div 
+              className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                  Keyboard Shortcuts
+                </h3>
+                <button 
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {[
+                  { keys: ['R'], description: 'Refresh weather data' },
+                  { keys: ['↑', '↓'], description: 'Navigate between forecast days' },
+                  { keys: ['←', '→'], description: 'Navigate between forecast days' },
+                  { keys: ['1', '2', '3', '4', '5'], description: 'Quick select day 1-5' },
+                  { keys: ['?'], description: 'Toggle this help menu' },
+                  { keys: ['Esc'], description: 'Close modal' },
+                ].map((shortcut, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <span className="text-slate-400 text-sm">{shortcut.description}</span>
+                    <div className="flex gap-1">
+                      {shortcut.keys.map((key, j) => (
+                        <kbd 
+                          key={j}
+                          className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs font-mono text-slate-300"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <p className="mt-6 pt-4 border-t border-slate-700 text-xs text-slate-500">
+                Press ? or Shift+/ to toggle this menu
+              </p>
+            </div>
           </div>
         )}
       </main>

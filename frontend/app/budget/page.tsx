@@ -1,6 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
+} from 'recharts'
+import { 
+  DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
+  RefreshCw, Loader2, Download, Filter, Plus, X
+} from 'lucide-react'
 
 interface BudgetItemData {
   id: string
@@ -48,6 +56,61 @@ const SCALES = [
   { key: 'big', label: 'Big (10Cr+)' },
 ]
 
+// Demo data for budget preview
+const DEMO_BUDGET_ITEMS: BudgetItemData[] = [
+  { id: '1', category: 'Production', subcategory: 'Crew', description: 'Director Fee', quantity: '1', unit: 'lot', rate: '5000000', rateLow: '4000000', rateHigh: '6000000', total: '5000000', source: 'ai', notes: null, actualCost: null },
+  { id: '2', category: 'Production', subcategory: 'Crew', description: 'Cinematographer Fee', quantity: '1', unit: 'lot', rate: '3000000', rateLow: '2500000', rateHigh: '4000000', total: '3000000', source: 'ai', notes: null, actualCost: null },
+  { id: '3', category: 'Production', subcategory: 'Camera', description: 'RED Komodo Rental', quantity: '15', unit: 'days', rate: '15000', rateLow: '12000', rateHigh: '18000', total: '225000', source: 'ai', notes: null, actualCost: null },
+  { id: '4', category: 'Production', subcategory: 'Camera', description: 'Arri Alexa Mini LF', quantity: '15', unit: 'days', rate: '35000', rateLow: '30000', rateHigh: '40000', total: '525000', source: 'ai', notes: null, actualCost: null },
+  { id: '5', category: 'Production', subcategory: 'Lighting', description: 'Arri SkyPanel S60', quantity: '10', unit: 'days', rate: '8000', rateLow: '6000', rateHigh: '10000', total: '80000', source: 'ai', notes: null, actualCost: null },
+  { id: '6', category: 'Production', subcategory: 'Sound', description: 'Sound Equipment Package', quantity: '20', unit: 'days', rate: '5000', rateLow: '4000', rateHigh: '6000', total: '100000', source: 'ai', notes: null, actualCost: null },
+  { id: '7', category: 'Talent', subcategory: 'Lead Actors', description: 'Lead Actor Fee', quantity: '1', unit: 'lot', rate: '15000000', rateLow: '12000000', rateHigh: '18000000', total: '15000000', source: 'ai', notes: null, actualCost: null },
+  { id: '8', category: 'Talent', subcategory: 'Lead Actors', description: 'Lead Actress Fee', quantity: '1', unit: 'lot', rate: '10000000', rateLow: '8000000', rateHigh: '12000000', total: '10000000', source: 'ai', notes: null, actualCost: null },
+  { id: '9', category: 'Talent', subcategory: 'Supporting', description: 'Supporting Cast', quantity: '15', unit: 'days', rate: '50000', rateLow: '40000', rateHigh: '60000', total: '750000', source: 'ai', notes: null, actualCost: null },
+  { id: '10', category: 'Talent', subcategory: 'Extras', description: 'Background Artists', quantity: '500', unit: 'mandays', rate: '1500', rateLow: '1000', rateHigh: '2000', total: '750000', source: 'ai', notes: null, actualCost: null },
+  { id: '11', category: 'Locations', subcategory: 'Location Fees', description: 'Temple Location', quantity: '3', unit: 'days', rate: '100000', rateLow: '80000', rateHigh: '120000', total: '300000', source: 'ai', notes: null, actualCost: null },
+  { id: '12', category: 'Locations', subcategory: 'Location Fees', description: 'Beach Location', quantity: '2', unit: 'days', rate: '150000', rateLow: '100000', rateHigh: '200000', total: '300000', source: 'ai', notes: null, actualCost: null },
+  { id: '13', category: 'Locations', subcategory: 'Permits', description: 'Government Permits', quantity: '1', unit: 'lot', rate: '200000', rateLow: '150000', rateHigh: '250000', total: '200000', source: 'ai', notes: null, actualCost: null },
+  { id: '14', category: 'Post-Production', subcategory: 'Editing', description: 'Editor Fee', quantity: '1', unit: 'lot', rate: '2000000', rateLow: '1500000', rateHigh: '2500000', total: '2000000', source: 'ai', notes: null, actualCost: null },
+  { id: '15', category: 'Post-Production', subcategory: 'VFX', description: 'VFX Work', quantity: '1', unit: 'lot', rate: '8000000', rateLow: '6000000', rateHigh: '10000000', total: '8000000', source: 'ai', notes: null, actualCost: null },
+  { id: '16', category: 'Post-Production', subcategory: 'Color Grading', description: 'Digital Intermediate', quantity: '1', unit: 'lot', rate: '1500000', rateLow: '1000000', rateHigh: '2000000', total: '1500000', source: 'ai', notes: null, actualCost: null },
+  { id: '17', category: 'Music', subcategory: 'Composition', description: 'Music Composer', quantity: '1', unit: 'lot', rate: '5000000', rateLow: '4000000', rateHigh: '6000000', total: '5000000', source: 'ai', notes: null, actualCost: null },
+  { id: '18', category: 'Music', subcategory: 'Background Score', description: 'Orchestra & Recording', quantity: '1', unit: 'lot', rate: '2000000', rateLow: '1500000', rateHigh: '2500000', total: '2000000', source: 'ai', notes: null, actualCost: null },
+  { id: '19', category: 'Music', subcategory: 'Lyrics', description: 'Lyricist', quantity: '5', unit: 'songs', rate: '100000', rateLow: '80000', rateHigh: '120000', total: '500000', source: 'ai', notes: null, actualCost: null },
+  { id: '20', category: 'Marketing', subcategory: 'Promotions', description: 'First Look & Teasers', quantity: '1', unit: 'lot', rate: '3000000', rateLow: '2000000', rateHigh: '4000000', total: '3000000', source: 'ai', notes: null, actualCost: null },
+  { id: '21', category: 'Marketing', subcategory: 'Promotions', description: 'Audio Launch', quantity: '1', unit: 'lot', rate: '2000000', rateLow: '1500000', rateHigh: '2500000', total: '2000000', source: 'ai', notes: null, actualCost: null },
+  { id: '22', category: 'Marketing', subcategory: 'Publicity', description: 'Digital Marketing', quantity: '1', unit: 'lot', rate: '5000000', rateLow: '4000000', rateHigh: '6000000', total: '5000000', source: 'ai', notes: null, actualCost: null },
+  { id: '23', category: 'Contingency', subcategory: 'Emergency', description: 'Contingency (10%)', quantity: '1', unit: 'lot', rate: '8500000', rateLow: '7000000', rateHigh: '10000000', total: '8500000', source: 'ai', notes: null, actualCost: null },
+]
+
+const DEMO_EXPENSES: ExpenseData[] = [
+  { id: 'e1', category: 'Production', description: 'Director Advance', amount: '1000000', date: '2026-02-01', vendor: 'Director Account', status: 'approved', notes: 'First installment' },
+  { id: 'e2', category: 'Production', description: 'Camera Rental Deposit', amount: '200000', date: '2026-02-05', vendor: 'Film Gear Chennai', status: 'approved', notes: 'Security deposit' },
+  { id: 'e3', category: 'Talent', description: 'Lead Actor Signing Amount', amount: '3000000', date: '2026-02-10', vendor: 'Actor Manager', status: 'approved', notes: 'Signing amount' },
+  { id: 'e4', category: 'Locations', description: 'Temple Permit Fee', amount: '50000', date: '2026-02-15', vendor: 'Temple Trust', status: 'approved', notes: 'Permit payment' },
+  { id: 'e5', category: 'Production', description: 'Location Scouting Expenses', amount: '25000', date: '2026-02-18', vendor: 'Production Team', status: 'approved', notes: 'Travel & accommodation' },
+  { id: 'e6', category: 'Post-Production', description: 'Editor Booking', amount: '500000', date: '2026-02-20', vendor: 'Editor Account', status: 'approved', notes: 'Advance booking' },
+]
+
+const DEMO_FORECAST: ForecastData = {
+  planned: 85000000,
+  actual: 7850000,
+  eacTotal: 92000000,
+  variance: -7000000,
+  percentSpent: 9.2,
+  categories: [
+    { category: 'Production', planned: 12000000, actual: 1600000, forecast: 13000000, status: 'warning' },
+    { category: 'Talent', planned: 26500000, actual: 4000000, forecast: 26500000, status: 'on_track' },
+    { category: 'Locations', planned: 800000, actual: 75000, forecast: 850000, status: 'on_track' },
+    { category: 'Post-Production', planned: 11500000, actual: 500000, forecast: 12000000, status: 'over' },
+    { category: 'Music', planned: 7500000, actual: 0, forecast: 7500000, status: 'on_track' },
+    { category: 'Marketing', planned: 10000000, actual: 0, forecast: 10000000, status: 'on_track' },
+    { category: 'Contingency', planned: 8500000, actual: 0, forecast: 10000000, status: 'warning' },
+  ]
+}
+
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
+
 export default function BudgetPage() {
   const [items, setItems] = useState<BudgetItemData[]>([])
   const [expenses, setExpenses] = useState<ExpenseData[]>([])
@@ -67,11 +130,22 @@ export default function BudgetPage() {
     try {
       const res = await fetch('/api/budget')
       const data = await res.json()
-      setItems(data.items || [])
-      setExpenses(data.expenses || [])
-      setForecast(data.forecast || null)
+      if (data.items && data.items.length > 0) {
+        setItems(data.items || [])
+        setExpenses(data.expenses || [])
+        setForecast(data.forecast || null)
+      } else {
+        // Use demo data for preview
+        setItems(DEMO_BUDGET_ITEMS)
+        setExpenses(DEMO_EXPENSES)
+        setForecast(DEMO_FORECAST)
+      }
     } catch (e) {
       console.error(e)
+      // Fallback to demo data
+      setItems(DEMO_BUDGET_ITEMS)
+      setExpenses(DEMO_EXPENSES)
+      setForecast(DEMO_FORECAST)
     } finally {
       setLoading(false)
     }
@@ -204,29 +278,110 @@ export default function BudgetPage() {
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Budget Distribution Pie Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+                Budget Distribution
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(categoryGroups).map(([cat, catItems], idx) => ({
+                        name: cat,
+                        value: catItems.reduce((s, i) => s + Number(i.total || 0), 0),
+                        color: CHART_COLORS[idx % CHART_COLORS.length]
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={3}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      labelLine={false}
+                    >
+                      {Object.entries(categoryGroups).map((_, idx) => (
+                        <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number) => formatINR(value)}
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Spending Progress Bar Chart */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+                Category Spending
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={Object.entries(categoryGroups).map(([cat, catItems]) => ({
+                      category: cat,
+                      planned: catItems.reduce((s, i) => s + Number(i.total || 0), 0),
+                      actual: forecast?.categories?.find(c => c.category === cat)?.actual || 0,
+                    }))}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis type="number" tickFormatter={(v) => formatINR(v)} stroke="#64748b" fontSize={11} />
+                    <YAxis type="category" dataKey="category" stroke="#64748b" fontSize={11} />
+                    <Tooltip 
+                      formatter={(value: number) => formatINR(value)}
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="actual" name="Spent" fill="#10b981" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Cards */}
           {items.length === 0 ? (
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
-              <div className="text-gray-500 mb-3">No budget generated yet</div>
-              <p className="text-gray-600 text-sm mb-4">Upload a script first, then click "Generate Budget" to create an AI-powered budget from your script breakdown.</p>
-              <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-medium">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-12 text-center">
+              <div className="text-slate-400 mb-3">No budget generated yet</div>
+              <p className="text-slate-500 text-sm mb-4">Upload a script first, then click "Generate Budget" to create an AI-powered budget from your script breakdown.</p>
+              <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm font-medium">
                 Generate Budget from Script
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(categoryGroups).map(([cat, catItems]) => {
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Object.entries(categoryGroups).map(([cat, catItems], idx) => {
                 const catTotal = catItems.reduce((s, i) => s + Number(i.total || 0), 0)
                 const pct = totalPlanned > 0 ? (catTotal / totalPlanned) * 100 : 0
+                const catActual = forecast?.categories?.find(c => c.category === cat)?.actual || 0
+                const catPctSpent = catTotal > 0 ? (catActual / catTotal) * 100 : 0
                 return (
-                  <div key={cat} className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium text-gray-300">{cat}</h3>
-                      <span className="text-sm text-cinepilot-accent">{formatINR(catTotal)}</span>
+                  <div key={cat} className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} />
+                      <h3 className="font-medium text-slate-200">{cat}</h3>
                     </div>
-                    <div className="w-full h-2 bg-gray-800 rounded-full">
-                      <div className="h-full bg-cinepilot-accent rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
+                    <div className="text-xl font-bold text-white mb-1">{formatINR(catTotal)}</div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full mb-2">
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} />
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">{pct.toFixed(1)}% of total</div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500">{pct.toFixed(1)}% of total</span>
+                      <span className={catPctSpent > 80 ? 'text-amber-400' : 'text-slate-500'}>
+                        {catPctSpent.toFixed(1)}% spent
+                      </span>
+                    </div>
                   </div>
                 )
               })}
@@ -322,50 +477,157 @@ export default function BudgetPage() {
 
       {/* Forecast Tab */}
       {activeTab === 'forecast' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {!forecast || forecast.planned === 0 ? (
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 text-center text-slate-500">
               Generate a budget first to see forecasting data.
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
-                  <div className="text-xs text-gray-500 mb-1">% Spent</div>
-                  <div className="text-3xl font-bold text-cinepilot-accent">{forecast.percentSpent}%</div>
-                  <div className="w-full h-2 bg-gray-800 rounded-full mt-2">
-                    <div className={`h-full rounded-full ${forecast.percentSpent > 100 ? 'bg-red-500' : 'bg-cinepilot-accent'}`}
+              {/* Forecast Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-slate-400 text-sm">Budget Utilization</span>
+                    {forecast.percentSpent > 80 ? (
+                      <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    ) : (
+                      <CheckCircle className="w-5 h-5 text-emerald-400" />
+                    )}
+                  </div>
+                  <div className="text-4xl font-bold text-white mb-2">{forecast.percentSpent}%</div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full">
+                    <div className={`h-full rounded-full ${forecast.percentSpent > 100 ? 'bg-red-500' : forecast.percentSpent > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                       style={{ width: `${Math.min(100, forecast.percentSpent)}%` }} />
                   </div>
+                  <div className="text-xs text-slate-500 mt-2">{formatINR(forecast.actual)} of {formatINR(forecast.planned)}</div>
                 </div>
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
-                  <div className="text-xs text-gray-500 mb-1">EAC (Forecast)</div>
-                  <div className="text-3xl font-bold text-yellow-400">{formatINR(forecast.eacTotal)}</div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-slate-400 text-sm">EAC (Forecast)</span>
+                    <TrendingUp className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div className="text-4xl font-bold text-blue-400 mb-2">{formatINR(forecast.eacTotal)}</div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    {forecast.eacTotal > forecast.planned ? (
+                      <span className="text-amber-400">+{formatINR(forecast.eacTotal - forecast.planned)} over budget</span>
+                    ) : (
+                      <span className="text-emerald-400">{formatINR(forecast.planned - forecast.eacTotal)} under budget</span>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
-                  <div className="text-xs text-gray-500 mb-1">Variance</div>
-                  <div className={`text-3xl font-bold ${forecast.variance >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-                    {forecast.variance >= 0 ? '+' : ''}{formatINR(Math.abs(forecast.variance))}
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-slate-400 text-sm">Variance</span>
+                    {forecast.variance >= 0 ? <TrendingDown className="w-5 h-5 text-red-400" /> : <TrendingUp className="w-5 h-5 text-emerald-400" />}
+                  </div>
+                  <div className={`text-4xl font-bold mb-2 ${forecast.variance >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {forecast.variance >= 0 ? '+' : ''}{formatINR(forecast.variance)}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    {forecast.variance >= 0 ? 'Over budget' : 'Under budget'}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden">
-                <div className="px-4 py-3 bg-gray-800/50 font-medium text-sm text-gray-300">Category Forecasts</div>
-                <div className="divide-y divide-gray-800">
-                  {forecast.categories.map(cat => (
-                    <div key={cat.category} className="px-4 py-3 flex items-center gap-4">
-                      <div className="flex-1 text-sm text-gray-300">{cat.category}</div>
-                      <div className="text-xs text-gray-500 w-24 text-right">Planned: {formatINR(cat.planned)}</div>
-                      <div className="text-xs text-gray-500 w-24 text-right">Actual: {formatINR(cat.actual)}</div>
-                      <div className="text-sm font-medium w-24 text-right text-gray-300">EAC: {formatINR(cat.forecast)}</div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded ${
-                        cat.status === 'over' ? 'bg-red-900/30 text-red-400' :
-                        cat.status === 'warning' ? 'bg-yellow-900/30 text-yellow-400' :
-                        'bg-green-900/30 text-green-400'
-                      }`}>{cat.status === 'on_track' ? 'On Track' : cat.status === 'warning' ? 'Warning' : 'Over Budget'}</span>
-                    </div>
-                  ))}
+              {/* Forecast Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold mb-4">Planned vs Actual by Category</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={forecast.categories}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="category" stroke="#64748b" fontSize={11} />
+                        <YAxis tickFormatter={(v) => formatINR(v)} stroke="#64748b" fontSize={11} />
+                        <Tooltip 
+                          formatter={(value: number) => formatINR(value)}
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="actual" name="Actual" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold mb-4">Forecast vs Budget</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={forecast.categories.map(cat => ({
+                          category: cat.category,
+                          budget: cat.planned,
+                          forecast: cat.forecast,
+                          variance: cat.forecast - cat.planned,
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="category" stroke="#64748b" fontSize={11} />
+                        <YAxis tickFormatter={(v) => formatINR(v)} stroke="#64748b" fontSize={11} />
+                        <Tooltip 
+                          formatter={(value: number) => formatINR(value)}
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="budget" name="Budget" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="forecast" name="Forecast" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Forecast Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 bg-slate-800/50 font-medium text-sm text-slate-200">Category Forecasts</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-800">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Planned</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Actual</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Forecast</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Variance</th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-slate-400 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {forecast.categories.map(cat => {
+                        const variance = cat.forecast - cat.planned
+                        const variancePct = cat.planned > 0 ? (variance / cat.planned) * 100 : 0
+                        return (
+                          <tr key={cat.category} className="hover:bg-slate-800/30">
+                            <td className="px-6 py-4 text-sm text-slate-200 font-medium">{cat.category}</td>
+                            <td className="px-6 py-4 text-sm text-slate-400 text-right">{formatINR(cat.planned)}</td>
+                            <td className="px-6 py-4 text-sm text-slate-400 text-right">{formatINR(cat.actual)}</td>
+                            <td className="px-6 py-4 text-sm text-white text-right font-medium">{formatINR(cat.forecast)}</td>
+                            <td className={`px-6 py-4 text-sm text-right font-medium ${variance > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {variance > 0 ? '+' : ''}{formatINR(variance)} ({variancePct.toFixed(1)}%)
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                cat.status === 'over' ? 'bg-red-500/20 text-red-400' :
+                                cat.status === 'warning' ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-emerald-500/20 text-emerald-400'
+                              }`}>
+                                {cat.status === 'on_track' ? 'On Track' : cat.status === 'warning' ? 'Warning' : 'Over'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>

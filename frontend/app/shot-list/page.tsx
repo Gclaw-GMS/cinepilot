@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock } from 'lucide-react'
+import { Lock, Unlock, Loader2 } from 'lucide-react'
+import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 
 interface ShotData {
   id: string
@@ -197,8 +198,43 @@ export default function ShotHubPage() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <div className="text-gray-400 animate-pulse">Loading Shot Hub...</div>
+      <div className="p-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <div>
+              <Skeleton className="h-8 w-32 mb-1" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-28 rounded-lg" />
+            <Skeleton className="h-10 w-36 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Stats Row Skeleton */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="grid grid-cols-4 gap-6">
+          <div className="col-span-1">
+            <Skeleton className="h-10 w-full mb-3 rounded-lg" />
+            <Skeleton className="h-10 w-full mb-3 rounded-lg" />
+            <SceneListSkeleton />
+          </div>
+          <div className="col-span-3 space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <ShotRowSkeleton key={i} />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }

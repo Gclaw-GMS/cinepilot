@@ -626,9 +626,22 @@ export default function TasksPage() {
         {/* Task List */}
         {viewMode === 'list' && (
           loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-              <span className="ml-3 text-slate-400">Loading tasks...</span>
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-5 h-5 rounded border-2 border-slate-700 animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-5 w-1/3 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-4 w-2/3 bg-slate-800/50 rounded animate-pulse" />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="h-6 w-16 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-6 w-20 bg-slate-800 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filteredTasks.length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">

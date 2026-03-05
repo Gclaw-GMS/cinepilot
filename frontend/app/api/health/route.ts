@@ -1,20 +1,140 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { promises as fs } from 'fs';
+import path from 'path';
 
-export async function GET() {
+interface HealthCheck {
+  component: string;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  message?: string;
+  details?: Record<string, unknown>;
+  latencyMs?: number;
+}
+
+interface HealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  uptime: number;
+  checks: HealthCheck[];
+  version: string;
+}
+
+export async function GET(): Promise<NextResponse<HealthResponse>> {
+  const checks: HealthCheck[] = [];
+  const startTime = Date.now();
+  
+  // Check database connection
+  const dbStart = Date.now();
   try {
-    // Try to do a simple database query
     await prisma.$queryRaw`SELECT 1`;
-    
-    return NextResponse.json({ 
-      status: 'connected',
-      timestamp: new Date().toISOString()
+    checks.push({
+      component: 'database',
+      status: 'healthy',
+      message: 'Connected',
+      latencyMs: Date.now() - dbStart,
     });
   } catch (error) {
-    console.log('[Health] Database not connected:', error);
-    return NextResponse.json({ 
-      status: 'disconnected',
-      timestamp: new Date().toISOString()
+    checks.push({
+      component: 'database',
+      status: 'unhealthy',
+      message: error instanceof Error ? error.message : 'Connection failed',
+      latencyMs: Date.now() - dbStart,
     });
   }
+
+  // Check disk space (workspace)
+  const diskStart = Date.now();
+  try {
+    const workspacePath = process.cwd();
+    const stats = await fs.statfs(workspacePath);
+    const totalGB = stats.bsize * stats.blocks / (1024 * 1024 * 1024);
+    const freeGB = stats.bsize * stats.bfree / (1024 * 1024 * 1024);
+    const usedPercent = ((stats.blocks - stats.bfree) / stats.blocks) * 100;
+    
+    checks.push({
+      component: 'disk',
+      status: usedPercent > 90 ? 'unhealthy' : usedPercent > 75 ? 'degraded' : 'healthy',
+      message: `${freeGB.toFixed(1)}GB free of ${totalGB.toFixed(1)}GB`,
+      details: { totalGB, freeGB, usedPercent: Math.round(usedPercent) },
+      latencyMs: Date.now() - diskStart,
+    });
+  } catch (error) {
+    checks.push({
+      component: 'disk',
+      status: 'degraded',
+      message: 'Could not check disk space',
+      latencyMs: Date.now() - diskStart,
+    });
+  }
+
+  // Check memory (Node process)
+  const memStart = Date.now();
+  try {
+    const used = process.memoryUsage();
+    const heapUsedMB = used.heapUsed / (1024 * 1024);
+    const heapTotalMB = used.heapTotal / (1024 * 1024);
+    const heapPercent = (heapUsedMB / heapTotalMB) * 100;
+    
+    checks.push({
+      component: 'memory',
+      status: heapPercent > 90 ? 'unhealthy' : heapPercent > 75 ? 'degraded' : 'healthy',
+      message: `${heapUsedMB.toFixed(1)}MB heap used of ${heapTotalMB.toFixed(1)}MB`,
+      details: { heapUsedMB: Math.round(heapUsedMB), heapTotalMB: Math.round(heapTotalMB), heapPercent: Math.round(heapPercent) },
+      latencyMs: Date.now() - memStart,
+    });
+  } catch (error) {
+    checks.push({
+      component: 'memory',
+      status: 'degraded',
+      message: 'Could not check memory',
+      latencyMs: Date.now() - memStart,
+    });
+  }
+
+  // Check environment variables
+  const envStart = Date.now();
+  try {
+    const requiredVars = ['DATABASE_URL'];
+    const missing = requiredVars.filter(v => !process.env[v]);
+    
+    checks.push({
+      component: 'environment',
+      status: missing.length > 0 ? 'degraded' : 'healthy',
+      message: missing.length > 0 ? `Missing: ${missing.join(', ')}` : 'All required variables set',
+      details: { missingVars: missing },
+      latencyMs: Date.now() - envStart,
+    });
+  } catch (error) {
+    checks.push({
+      component: 'environment',
+      status: 'degraded',
+      message: 'Could not check environment',
+      latencyMs: Date.now() - envStart,
+    });
+  }
+
+  // Determine overall status
+  const unhealthyCount = checks.filter(c => c.status === 'unhealthy').length;
+  const degradedCount = checks.filter(c => c.status === 'degraded').length;
+  
+  let overallStatus: 'healthy' | 'degraded' | 'unhealthy';
+  if (unhealthyCount > 0) {
+    overallStatus = 'unhealthy';
+  } else if (degradedCount > 0) {
+    overallStatus = 'degraded';
+  } else {
+    overallStatus = 'healthy';
+  }
+
+  const response: HealthResponse = {
+    status: overallStatus,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    checks,
+    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+  };
+
+  return NextResponse.json(response, {
+    status: overallStatus === 'healthy' ? 200 : overallStatus === 'degraded' ? 200 : 503,
+  });
 }

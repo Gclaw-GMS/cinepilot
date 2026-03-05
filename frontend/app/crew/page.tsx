@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Download,
   FileText,
+  Keyboard,
 } from 'lucide-react';
 import {
   BarChart,
@@ -151,6 +152,8 @@ export default function CrewPage() {
     dailyRate: '',
     notes: '',
   });
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -197,6 +200,80 @@ export default function CrewPage() {
   useEffect(() => {
     fetchCrew();
   }, [fetchCrew]);
+
+  // Keyboard shortcuts handler - gets filtered count from DOM to avoid ordering issue
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return
+      }
+
+      // Get the actual filtered count from DOM
+      const crewCards = document.querySelectorAll('[data-crew-card]')
+      const maxIndex = crewCards.length - 1
+      
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelectedRowIndex(prev => Math.min(prev + 1, maxIndex))
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelectedRowIndex(prev => Math.max(prev - 1, 0))
+          break
+        case 'Home':
+          e.preventDefault()
+          setSelectedRowIndex(0)
+          break
+        case 'End':
+          e.preventDefault()
+          setSelectedRowIndex(maxIndex)
+          break
+        case 'Escape':
+          setSelectedRowIndex(-1)
+          break
+        case '?':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setShowKeyboardHelp(prev => !prev)
+          }
+          break
+        case 'n':
+        case 'N':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setEditingId(null)
+            setForm({ name: '', role: '', department: '', phone: '', email: '', dailyRate: '', notes: '' })
+            setModalOpen(true)
+          }
+          break
+        case 'f':
+        case 'F':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            const searchInput = document.querySelector('input[placeholder="Search crew..."]') as HTMLInputElement
+            searchInput?.focus()
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Auto-scroll to selected crew member
+  useEffect(() => {
+    if (selectedRowIndex >= 0) {
+      const crewCards = document.querySelectorAll('[data-crew-card]')
+      const selectedElement = crewCards[selectedRowIndex]
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }, [selectedRowIndex])
 
   // Memoized filtered and sorted crew
   const filtered = useMemo(() => {
@@ -560,6 +637,13 @@ export default function CrewPage() {
             Reset Demo
           </button>
         )}
+        <button
+          onClick={() => setShowKeyboardHelp(true)}
+          className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors text-sm"
+          title="Keyboard shortcuts"
+        >
+          <Keyboard className="w-4 h-4" />
+        </button>
       </div>
 
       {error && (
@@ -761,8 +845,11 @@ export default function CrewPage() {
       </div>
 
       {/* Results count */}
-      <div className="mb-4 text-sm text-slate-500">
-        Showing {filtered.length} of {crew.length} crew members
+      <div className="mb-4 text-sm text-slate-500 flex items-center justify-between">
+        <span>Showing {filtered.length} of {crew.length} crew members</span>
+        {selectedRowIndex >= 0 && (
+          <span className="text-sm text-indigo-400">Row {selectedRowIndex + 1} selected</span>
+        )}
       </div>
 
       {/* Loading State */}
@@ -803,10 +890,15 @@ export default function CrewPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((member) => (
+          {filtered.map((member, idx) => (
             <div
               key={member.id}
-              className="bg-slate-900 rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-indigo-500/5"
+              data-crew-card
+              className={`bg-slate-900 rounded-xl p-4 border transition-all hover:shadow-lg hover:shadow-indigo-500/5 ${
+                selectedRowIndex === idx
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/10'
+                  : 'border-slate-800 hover:border-slate-700'
+              }`}
             >
               <div className="flex items-start gap-4">
                 <div
@@ -990,6 +1082,79 @@ export default function CrewPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div 
+            className="bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-indigo-500/10"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                </div>
+                <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                  Keyboard Shortcuts
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { keys: ['↑', '↓'], desc: 'Navigate crew members', category: 'Navigation' },
+                { keys: ['Home'], desc: 'Go to first member', category: 'Navigation' },
+                { keys: ['End'], desc: 'Go to last member', category: 'Navigation' },
+                { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
+                { keys: ['N'], desc: 'Add new crew member', category: 'Actions' },
+                { keys: ['F'], desc: 'Focus search', category: 'Actions' },
+                { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+              ].map((shortcut, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider w-20">
+                      {shortcut.category}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {shortcut.keys.map((key, i) => (
+                        <kbd 
+                          key={i} 
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-indigo-300 shadow-sm"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Quick reference for power users</span>
+                <span className="flex items-center gap-2">
+                  Press 
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-indigo-400">?</kbd> 
+                  anytime to toggle
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}

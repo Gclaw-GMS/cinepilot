@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ProductionTimeline from '../components/production-timeline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, Download, Plus, Layers, Grid3X3, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Target, CheckCircle, Zap, Clock, Film, MapPin,
-  Filter, RefreshCw, TrendingUp, TrendingDown
+  Filter, RefreshCw, TrendingUp, TrendingDown, Keyboard
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -43,6 +43,8 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const filterInputRef = useRef<HTMLInputElement>(null);
   
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
@@ -161,6 +163,71 @@ export default function TimelinePage() {
 
   const projectOptions = DEMO_PROJECTS;
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // R: Refresh data
+      if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        handleRefresh();
+      }
+      
+      // V: Cycle through view modes
+      if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const modes: Array<'timeline' | 'gantt' | 'calendar'> = ['timeline', 'gantt', 'calendar'];
+        const currentIndex = modes.indexOf(viewMode);
+        setViewMode(modes[(currentIndex + 1) % modes.length]);
+      }
+      
+      // +/-: Zoom in/out
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        setZoomLevel(prev => Math.min(prev + 0.25, 2));
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+      }
+      
+      // F: Focus filter
+      if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowFilters(true);
+        setTimeout(() => filterInputRef.current?.focus(), 50);
+      }
+      
+      // E: Export
+      if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        handleExportTimeline();
+      }
+      
+      // ?: Show keyboard help (Shift+?)
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShowKeyboardHelp(true);
+      }
+      
+      // Escape: Close keyboard help
+      if (e.key === 'Escape') {
+        if (showKeyboardHelp) {
+          setShowKeyboardHelp(false);
+        } else if (showFilters) {
+          setShowFilters(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, showFilters, showKeyboardHelp, handleExportTimeline]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -184,6 +251,13 @@ export default function TimelinePage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 hover:text-white transition-colors"
+                title="Keyboard shortcuts (?)"
+              >
+                <Keyboard className="w-4 h-4" />
+              </button>
               <select
                 value={selectedProject}
                 onChange={(e) => setSelectedProject(e.target.value)}
@@ -734,6 +808,47 @@ export default function TimelinePage() {
           </div>
         </div>
       </main>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-purple-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'R', description: 'Refresh timeline data' },
+                { key: 'V', description: 'Cycle view mode (Timeline → Gantt → Calendar)' },
+                { key: '+/-', description: 'Zoom in/out' },
+                { key: 'F', description: 'Focus filter input' },
+                { key: 'E', description: 'Export to CSV' },
+                { key: '?', description: 'Show this help' },
+                { key: 'Esc', description: 'Close modal' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between">
+                  <span className="text-slate-300">{shortcut.description}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm font-mono text-purple-400">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-700">
+              <p className="text-xs text-slate-500">Press <kbd className="px-1 bg-slate-800 rounded">?</kbd> anytime to show this help</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

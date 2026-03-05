@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2, CheckCircle } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, TrendingUp, Download, FileText, Edit2, CheckCircle, Keyboard } from 'lucide-react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface EquipmentRental {
@@ -115,6 +115,8 @@ export default function EquipmentPage() {
   })
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true)
@@ -163,6 +165,48 @@ export default function EquipmentPage() {
   useEffect(() => {
     fetchEquipment()
   }, [fetchEquipment])
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + N = New equipment
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        setModalOpen(true)
+        setEditingId(null)
+        setForm({ name: '', category: 'camera', status: 'available', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+      }
+      // Ctrl/Cmd + K = Focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+      // Ctrl/Cmd + E = Export CSV
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault()
+        handleExportCSV()
+      }
+      // Ctrl/Cmd + / = Show keyboard shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault()
+        setShowKeyboardHelp(true)
+      }
+      // Escape = Close modal
+      if (e.key === 'Escape') {
+        if (modalOpen) {
+          setModalOpen(false)
+          setEditingId(null)
+          setForm({ name: '', category: 'camera', status: 'available', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+        }
+        if (showKeyboardHelp) {
+          setShowKeyboardHelp(false)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [modalOpen, showKeyboardHelp])
 
   const filtered = equipment.filter(eq => {
     const matchSearch = eq.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -359,6 +403,13 @@ export default function EquipmentPage() {
             Export CSV
           </button>
           <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => setModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
           >
@@ -492,8 +543,9 @@ export default function EquipmentPage() {
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search equipment..."
+              placeholder="Search equipment... (⌘K)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
@@ -736,6 +788,57 @@ export default function EquipmentPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                </div>
+                <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Add new equipment</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-400">⌘ N</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Focus search</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-400">⌘ K</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export to CSV</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-400">⌘ E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-400">⌘ /</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-300">Close modal</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-400">Esc</kbd>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <p className="text-xs text-slate-500">
+                Use these shortcuts for faster navigation. On Windows, use Ctrl instead of ⌘.
+              </p>
+            </div>
           </div>
         </div>
       )}

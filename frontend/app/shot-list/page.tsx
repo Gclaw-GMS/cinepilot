@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { Lock, Unlock } from 'lucide-react'
 
 interface ShotData {
   id: string
@@ -458,10 +459,10 @@ function ShotRow({
 
           <button
             onClick={() => onUpdate(shot.id, 'isLocked', !shot.isLocked)}
-            className={`text-sm ${shot.isLocked ? 'text-blue-400' : 'text-gray-600 hover:text-gray-400'}`}
+            className={`p-1 rounded ${shot.isLocked ? 'text-blue-400' : 'text-gray-600 hover:text-gray-400'}`}
             title={shot.isLocked ? 'Unlock' : 'Lock'}
           >
-            {shot.isLocked ? '\u{1F512}' : '\u{1F513}'}
+            {shot.isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
           </button>
         </div>
       </div>

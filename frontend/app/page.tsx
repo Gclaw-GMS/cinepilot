@@ -8,7 +8,8 @@ import {
 } from 'recharts'
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
-  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, Plus, X, Zap
+  ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, Plus, X, Zap,
+  Activity, Wifi, WifiOff
 } from 'lucide-react'
 
 const PALETTE = {
@@ -144,9 +145,26 @@ export default function Dashboard() {
   })
   const [projectError, setProjectError] = useState<string | null>(null)
   const [projectSuccess, setProjectSuccess] = useState<string | null>(null)
+  
+  // Connection status
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
+    setConnectionStatus('checking')
+    
+    // Check API health first
+    try {
+      const healthRes = await fetch('/api/health', { method: 'GET' })
+      if (healthRes.ok) {
+        setConnectionStatus('connected')
+      } else {
+        setConnectionStatus('disconnected')
+      }
+    } catch {
+      setConnectionStatus('disconnected')
+    }
+    
     const result = { ...EMPTY_STATS }
 
     try {
@@ -350,6 +368,27 @@ export default function Dashboard() {
                     Demo Mode
                   </span>
                 )}
+                {/* Connection Status Indicator */}
+                <div className="flex items-center gap-1.5 ml-2">
+                  {connectionStatus === 'checking' && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-800 text-slate-400 text-xs rounded-full">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Checking...
+                    </span>
+                  )}
+                  {connectionStatus === 'connected' && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full" title="Database connected">
+                      <Wifi className="w-3 h-3" />
+                      Connected
+                    </span>
+                  )}
+                  {connectionStatus === 'disconnected' && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full" title="Using demo data - no database connection">
+                      <WifiOff className="w-3 h-3" />
+                      Offline
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-slate-500 text-sm mt-1">CinePilot &mdash; AI Pre-Production Command Center</p>
             </div>

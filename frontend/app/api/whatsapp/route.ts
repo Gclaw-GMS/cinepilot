@@ -251,3 +251,55 @@ export async function GET(req: NextRequest) {
     isDemoMode: true,
   });
 }
+
+// DELETE /api/whatsapp - Delete a message from history
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const messageId = searchParams.get('messageId');
+    const action = searchParams.get('action');
+
+    // Clear all messages
+    if (action === 'clear-all') {
+      const count = sentMessages.length;
+      sentMessages = [];
+      return NextResponse.json({
+        success: true,
+        deleted: count,
+        message: 'All messages cleared',
+        isDemoMode: true,
+      });
+    }
+
+    // Delete specific message
+    if (!messageId) {
+      return NextResponse.json(
+        { error: 'messageId is required' },
+        { status: 400 }
+      );
+    }
+
+    const initialLength = sentMessages.length;
+    sentMessages = sentMessages.filter(m => m.id !== messageId);
+    
+    if (sentMessages.length === initialLength) {
+      return NextResponse.json(
+        { error: 'Message not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      messageId,
+      deleted: true,
+      isDemoMode: true,
+    });
+  } catch (error) {
+    console.error('[DELETE /api/whatsapp]', error);
+    return NextResponse.json(
+      { error: 'Failed to delete message' },
+      { status: 500 }
+    );
+  }
+}

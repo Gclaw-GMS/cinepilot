@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Download, FileSpreadsheet, FileJson, Calendar, Loader2, CheckCircle } from 'lucide-react'
+import { Download, FileSpreadsheet, FileJson, Calendar, Loader2, CheckCircle, FileText } from 'lucide-react'
 
 interface ExportType {
   id: string
@@ -19,6 +19,7 @@ interface ExportPanelProps {
 export default function ExportPanel({ projectId = 'default-project' }: ExportPanelProps) {
   const [exportTypes, setExportTypes] = useState<ExportType[]>([])
   const [selectedType, setSelectedType] = useState<string>('schedule')
+  const [selectedFormat, setSelectedFormat] = useState<string>('pdf')
   const [loading, setLoading] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [downloadName, setDownloadName] = useState<string>('')
@@ -40,13 +41,13 @@ export default function ExportPanel({ projectId = 'default-project' }: ExportPan
   }, [])
 
   const defaultExportTypes: ExportType[] = [
-    { id: 'schedule', name: 'Shooting Schedule', format: 'JSON', icon: '📅', description: 'Export shooting schedule' },
-    { id: 'budget', name: 'Budget Report', format: 'JSON', icon: '💰', description: 'Budget breakdown and expenses' },
-    { id: 'shot_list', name: 'Shot List', format: 'JSON', icon: '🎬', description: 'Detailed shot breakdown' },
-    { id: 'crew', name: 'Crew List', format: 'JSON', icon: '👥', description: 'Contact and role information' },
-    { id: 'equipment', name: 'Equipment', format: 'JSON', icon: '🎥', description: 'Equipment inventory' },
+    { id: 'schedule', name: 'Shooting Schedule', format: 'PDF', icon: '📅', description: 'Export shooting schedule' },
+    { id: 'budget', name: 'Budget Report', format: 'PDF', icon: '💰', description: 'Budget breakdown and expenses' },
+    { id: 'shot_list', name: 'Shot List', format: 'PDF', icon: '🎬', description: 'Detailed shot breakdown' },
+    { id: 'crew', name: 'Crew List', format: 'PDF', icon: '👥', description: 'Contact and role information' },
+    { id: 'equipment', name: 'Equipment', format: 'CSV', icon: '🎥', description: 'Equipment inventory' },
     { id: 'full_json', name: 'Full Project', format: 'JSON', icon: '📦', description: 'Complete project data' },
-    { id: 'locations', name: 'Locations', format: 'JSON', icon: '📍', description: 'Location data and details' },
+    { id: 'locations', name: 'Locations', format: 'PDF', icon: '📍', description: 'Location data and details' },
   ]
 
   const types = exportTypes.length > 0 ? exportTypes : defaultExportTypes
@@ -57,19 +58,34 @@ export default function ExportPanel({ projectId = 'default-project' }: ExportPan
     )
   }
 
-  const handleSingleExport = async (type: string) => {
+  const handleSingleExport = async (type: string, format?: string) => {
     setLoading(true)
     setDownloadUrl(null)
     setMessage(null)
 
+    const exportFormat = format || selectedFormat
+
     try {
-      const response = await fetch(`/api/exports?type=${type}`)
+      const response = await fetch(`/api/exports?type=${type}&format=${exportFormat}`)
       
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Export failed')
       }
       
+      // Handle PDF response
+      if (exportFormat === 'pdf') {
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        
+        setDownloadUrl(url)
+        setDownloadName(`${type}_${new Date().toISOString().split('T')[0]}.pdf`)
+        setMessage({ type: 'success', text: `${type} exported as PDF!` })
+        setLoading(false)
+        return
+      }
+      
+      // Handle JSON response
       const data = await response.json()
       
       // Create downloadable blob
@@ -150,11 +166,47 @@ export default function ExportPanel({ projectId = 'default-project' }: ExportPan
 
   return (
     <div className="space-y-6">
+      {/* Format Selection */}
+      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5 text-indigo-400" />
+          Export Format
+        </h3>
+        
+        <div className="flex gap-4">
+          <button
+            onClick={() => setSelectedFormat('pdf')}
+            className={`flex-1 p-4 rounded-xl text-center transition-all border ${
+              selectedFormat === 'pdf'
+                ? 'bg-indigo-600/30 border-indigo-500 ring-2 ring-indigo-400/50'
+                : 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 hover:border-slate-500'
+            }`}
+          >
+            <div className="text-3xl mb-2">📄</div>
+            <div className="text-white font-medium">PDF Document</div>
+            <div className="text-slate-400 text-xs mt-1">Best for printing & sharing</div>
+          </button>
+          
+          <button
+            onClick={() => setSelectedFormat('json')}
+            className={`flex-1 p-4 rounded-xl text-center transition-all border ${
+              selectedFormat === 'json'
+                ? 'bg-indigo-600/30 border-indigo-500 ring-2 ring-indigo-400/50'
+                : 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 hover:border-slate-500'
+            }`}
+          >
+            <div className="text-3xl mb-2">📦</div>
+            <div className="text-white font-medium">JSON Data</div>
+            <div className="text-slate-400 text-xs mt-1">Best for automation & APIs</div>
+          </button>
+        </div>
+      </div>
+
       {/* Export Types Grid */}
       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
           <Download className="w-5 h-5 text-indigo-400" />
-          Available Exports
+          Available Exports ({selectedFormat.toUpperCase()})
         </h3>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -173,7 +225,7 @@ export default function ExportPanel({ projectId = 'default-project' }: ExportPan
             >
               <div className="text-2xl mb-2">{item.icon}</div>
               <div className="text-white font-medium text-sm">{item.name}</div>
-              <div className="text-slate-400 text-xs mt-1">{item.format}</div>
+              <div className="text-slate-400 text-xs mt-1">{selectedFormat.toUpperCase()}</div>
             </motion.button>
           ))}
         </div>
@@ -181,8 +233,12 @@ export default function ExportPanel({ projectId = 'default-project' }: ExportPan
         {/* Quick Export Buttons */}
         <div className="mt-6 pt-6 border-t border-slate-700">
           <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-            <FileJson className="w-4 h-4 text-yellow-400" />
-            Quick JSON Exports
+            {selectedFormat === 'pdf' ? (
+              <FileText className="w-4 h-4 text-red-400" />
+            ) : (
+              <FileJson className="w-4 h-4 text-yellow-400" />
+            )}
+            Quick {selectedFormat.toUpperCase()} Exports
           </h4>
           <div className="flex flex-wrap gap-3">
             {[

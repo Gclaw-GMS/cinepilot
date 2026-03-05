@@ -1,7 +1,287 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { jsPDF } from 'jspdf';
 
 const DEFAULT_PROJECT_ID = 'default-project';
+
+// PDF Generation helpers
+function generateSchedulePDF(shootingDays: any[]): Buffer {
+  const doc = new jsPDF();
+  
+  // Title
+  doc.setFontSize(20);
+  doc.setTextColor(40, 40, 40);
+  doc.text('CinePilot Shooting Schedule', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
+  
+  let yPos = 40;
+  
+  shootingDays.forEach((day: any, index: number) => {
+    if (yPos > 270) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    // Day header
+    doc.setFillColor(99, 102, 241);
+    doc.rect(15, yPos - 5, 180, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Day ${day.dayNumber} - ${day.scheduledDate || 'TBD'}`, 20, yPos);
+    yPos += 12;
+    
+    // Day details
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const location = day.location?.name || day.location || 'TBD';
+    const callTime = day.callTime || '06:00';
+    const hours = day.estimatedHours || 10;
+    const status = day.status || 'pending';
+    
+    doc.text(`📍 Location: ${location}`, 20, yPos);
+    yPos += 6;
+    doc.text(`⏰ Call Time: ${callTime} | Duration: ${hours}h`, 20, yPos);
+    yPos += 6;
+    doc.text(`📊 Status: ${status}`, 20, yPos);
+    
+    if (day.notes) {
+      yPos += 6;
+      doc.text(`Notes: ${day.notes}`, 20, yPos);
+    }
+    
+    // Scenes
+    if (day.dayScenes && day.dayScenes.length > 0) {
+      yPos += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Scenes:', 20, yPos);
+      doc.setFont('helvetica', 'normal');
+      yPos += 6;
+      
+      day.dayScenes.forEach((ds: any) => {
+        const scene = ds.scene;
+        const sceneNum = scene?.sceneNumber || '?';
+        const heading = scene?.headingRaw || 'Unknown';
+        doc.text(`  • Scene ${sceneNum}: ${heading}`, 20, yPos);
+        yPos += 5;
+      });
+    }
+    
+    yPos += 10;
+  });
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}
+
+function generateBudgetPDF(budget: any): Buffer {
+  const doc = new jsPDF();
+  
+  // Title
+  doc.setFontSize(20);
+  doc.setTextColor(40, 40, 40);
+  doc.text('CinePilot Budget Report', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
+  
+  let yPos = 45;
+  
+  // Summary box
+  doc.setFillColor(240, 240, 250);
+  doc.rect(15, yPos - 5, 180, 25, 'F');
+  
+  doc.setFontSize(14);
+  doc.setTextColor(40, 40, 40);
+  doc.setFont('helvetica', 'bold');
+  
+  const planned = budget.totalPlanned || budget.planned || 0;
+  const actual = budget.totalActual || budget.actual || 0;
+  const variance = budget.variance || (planned - actual);
+  
+  doc.text(`Total Budget: ₹${(planned / 100000).toFixed(1)}L`, 25, yPos + 5);
+  doc.text(`Spent: ₹${(actual / 100000).toFixed(1)}L`, 25, yPos + 13);
+  doc.text(`Remaining: ₹${(variance / 100000).toFixed(1)}L`, 110, yPos + 5);
+  
+  const percentSpent = planned > 0 ? ((actual / planned) * 100).toFixed(1) : '0';
+  doc.text(`Utilization: ${percentSpent}%`, 110, yPos + 13);
+  
+  yPos += 40;
+  
+  // Line items
+  if (budget.items && budget.items.length > 0) {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Line Items', 15, yPos);
+    yPos += 8;
+    
+    // Header
+    doc.setFillColor(99, 102, 241);
+    doc.rect(15, yPos - 4, 180, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.text('Category', 17, yPos);
+    doc.text('Item', 60, yPos);
+    doc.text('Planned', 120, yPos);
+    doc.text('Actual', 155, yPos);
+    yPos += 8;
+    
+    // Rows
+    doc.setTextColor(60, 60, 60);
+    doc.setFont('helvetica', 'normal');
+    
+    budget.items.forEach((item: any) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.text(String(item.category || '').substring(0, 20), 17, yPos);
+      doc.text(String(item.item || '').substring(0, 25), 60, yPos);
+      doc.text(`₹${((item.planned || 0) / 1000).toFixed(0)}K`, 120, yPos);
+      doc.text(`₹${((item.actual || 0) / 1000).toFixed(0)}K`, 155, yPos);
+      yPos += 6;
+    });
+  }
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}
+
+function generateCrewPDF(crew: any[]): Buffer {
+  const doc = new jsPDF();
+  
+  doc.setFontSize(20);
+  doc.setTextColor(40, 40, 40);
+  doc.text('CinePilot Crew List', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Total Crew: ${crew.length} | Generated: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
+  
+  let yPos = 40;
+  
+  // Header
+  doc.setFillColor(99, 102, 241);
+  doc.rect(15, yPos - 4, 180, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.text('Name', 17, yPos);
+  doc.text('Role', 60, yPos);
+  doc.text('Department', 110, yPos);
+  doc.text('Contact', 150, yPos);
+  yPos += 8;
+  
+  // Rows
+  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(9);
+  
+  crew.forEach((member: any) => {
+    if (yPos > 270) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    doc.text(String(member.name || '').substring(0, 20), 17, yPos);
+    doc.text(String(member.role || '').substring(0, 22), 60, yPos);
+    doc.text(String(member.department || '').substring(0, 18), 110, yPos);
+    doc.text(String(member.phone || '').substring(0, 15), 150, yPos);
+    yPos += 6;
+  });
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}
+
+function generateShotListPDF(shots: any[]): Buffer {
+  const doc = new jsPDF();
+  
+  doc.setFontSize(20);
+  doc.setTextColor(40, 40, 40);
+  doc.text('CinePilot Shot List', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Total Shots: ${shots.length} | Generated: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
+  
+  let yPos = 40;
+  
+  // Header
+  doc.setFillColor(99, 102, 241);
+  doc.rect(15, yPos - 4, 180, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.text('Scene', 17, yPos);
+  doc.text('Shot', 35, yPos);
+  doc.text('Description', 55, yPos);
+  doc.text('Size', 120, yPos);
+  doc.text('Movement', 145, yPos);
+  doc.text('Duration', 175, yPos);
+  yPos += 8;
+  
+  // Rows
+  doc.setTextColor(60, 60, 60);
+  
+  shots.forEach((shot: any) => {
+    if (yPos > 270) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    doc.text(String(shot.sceneNumber || ''), 17, yPos);
+    doc.text(String(shot.shotIndex || ''), 35, yPos);
+    doc.text(String(shot.shotText || '').substring(0, 30), 55, yPos);
+    doc.text(String(shot.shotSize || ''), 120, yPos);
+    doc.text(String(shot.cameraMovement || '').substring(0, 12), 145, yPos);
+    doc.text(`${shot.durationEstSec || 0}s`, 175, yPos);
+    yPos += 5;
+  });
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}
+
+function generateLocationsPDF(locations: any[]): Buffer {
+  const doc = new jsPDF();
+  
+  doc.setFontSize(20);
+  doc.setTextColor(40, 40, 40);
+  doc.text('CinePilot Location List', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Total Locations: ${locations.length} | Generated: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
+  
+  let yPos = 40;
+  
+  locations.forEach((loc: any) => {
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    // Location card
+    doc.setFillColor(245, 245, 250);
+    doc.rect(15, yPos - 4, 180, 22, 'F');
+    
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(String(loc.name || 'Unknown'), 20, yPos + 3);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(String(loc.address || '').substring(0, 50), 20, yPos + 10);
+    doc.text(`Type: ${loc.type || 'N/A'} | Capacity: ${loc.capacity || 'N/A'}`, 20, yPos + 16);
+    
+    yPos += 28;
+  });
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}
 
 // Demo fallback data when database is unavailable
 const DEMO_EXPORT_TYPES = [
@@ -96,6 +376,46 @@ export async function GET(req: NextRequest) {
     // Return demo data with isDemoMode flag
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type');
+    const format = searchParams.get('format') || 'json';
+    const shootingDays = DEMO_SCHEDULE;
+
+    // Handle PDF format in demo mode
+    if (format === 'pdf' && type) {
+      let pdfBuffer: Buffer;
+      let filename = 'export.pdf';
+
+      switch (type) {
+        case 'schedule':
+          pdfBuffer = generateSchedulePDF(shootingDays);
+          filename = 'schedule.pdf';
+          break;
+        case 'budget':
+          pdfBuffer = generateBudgetPDF(DEMO_BUDGET);
+          filename = 'budget.pdf';
+          break;
+        case 'crew':
+          pdfBuffer = generateCrewPDF(DEMO_CREW);
+          filename = 'crew.pdf';
+          break;
+        case 'shot_list':
+          pdfBuffer = generateShotListPDF(DEMO_SHOTS);
+          filename = 'shot_list.pdf';
+          break;
+        case 'locations':
+          pdfBuffer = generateLocationsPDF(DEMO_LOCATIONS);
+          filename = 'locations.pdf';
+          break;
+        default:
+          return NextResponse.json({ error: 'PDF not available for this type' }, { status: 400 });
+      }
+
+      return new NextResponse(new Uint8Array(pdfBuffer), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      });
+    }
     
     if (type) {
       let data: Record<string, unknown> = {};
@@ -141,6 +461,7 @@ export async function GET(req: NextRequest) {
     const projectId = await ensureDefaultProject();
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type');
+    const format = searchParams.get('format') || 'json';
 
     // Base export types
     const exportTypes = [
@@ -153,6 +474,98 @@ export async function GET(req: NextRequest) {
       { id: 'full_json', name: 'Full Project JSON', format: 'JSON', icon: '📦' },
       { id: 'locations', name: 'Locations', format: 'JSON', icon: '📍' },
     ];
+
+    // Handle PDF format requests
+    if (format === 'pdf' && type) {
+      let pdfBuffer: Buffer;
+      let filename = 'export.pdf';
+
+      switch (type) {
+        case 'schedule': {
+          const shootingDays = await prisma.shootingDay.findMany({
+            where: { projectId },
+            include: {
+              location: true,
+              dayScenes: {
+                include: { scene: true },
+              },
+            },
+            orderBy: { dayNumber: 'asc' },
+          });
+          pdfBuffer = generateSchedulePDF(shootingDays);
+          filename = 'schedule.pdf';
+          break;
+        }
+        case 'budget': {
+          const items = await prisma.budgetItem.findMany({
+            where: { projectId },
+            orderBy: { category: 'asc' },
+          });
+          const totalPlanned = items.reduce((sum, i) => sum + Number(i.total || 0), 0);
+          const totalActual = items.reduce((sum, i) => sum + Number(i.actualCost || 0), 0);
+          pdfBuffer = generateBudgetPDF({ items, totalPlanned, totalActual, variance: totalPlanned - totalActual });
+          filename = 'budget.pdf';
+          break;
+        }
+        case 'crew': {
+          const crew = await prisma.crew.findMany({
+            where: { projectId },
+            orderBy: { department: 'asc' },
+          });
+          pdfBuffer = generateCrewPDF(crew);
+          filename = 'crew.pdf';
+          break;
+        }
+        case 'shot_list': {
+          const scripts = await prisma.script.findMany({
+            where: { projectId, isActive: true },
+            include: {
+              scenes: {
+                include: {
+                  shots: { orderBy: { shotIndex: 'asc' } },
+                },
+              },
+            },
+          });
+          const shots: any[] = [];
+          scripts.forEach((script) => {
+            script.scenes.forEach((scene) => {
+              scene.shots.forEach((shot) => {
+                shots.push({
+                  sceneNumber: scene.sceneNumber,
+                  shotIndex: shot.shotIndex,
+                  shotText: shot.shotText,
+                  shotSize: shot.shotSize,
+                  cameraMovement: shot.cameraMovement,
+                  durationEstSec: shot.durationEstSec,
+                });
+              });
+            });
+          });
+          pdfBuffer = generateShotListPDF(shots);
+          filename = 'shot_list.pdf';
+          break;
+        }
+        case 'locations': {
+          const locations = await prisma.location.findMany({
+            where: { projectId },
+            orderBy: { name: 'asc' },
+          });
+          pdfBuffer = generateLocationsPDF(locations);
+          filename = 'locations.pdf';
+          break;
+        }
+        default:
+          return NextResponse.json({ error: 'PDF not available for this type' }, { status: 400 });
+      }
+
+      return new NextResponse(new Uint8Array(pdfBuffer), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      });
+    }
 
     if (type) {
       // Generate specific export

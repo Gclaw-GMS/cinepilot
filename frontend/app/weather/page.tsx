@@ -111,35 +111,70 @@ function getConditionColor(condition: string, iconCode: number): string {
   return 'from-blue-400 to-indigo-500';
 }
 
-// Calculate production score based on weather conditions (0-100)
+// Enhanced production scoring algorithm for film production (0-100)
+// Considers cinematography needs, crew comfort, and equipment safety
 function getProductionScore(day: WeatherDay): number {
   let score = 100;
   
-  // Precipitation impact
-  if (day.precipitationChance > 60) score -= 40;
-  else if (day.precipitationChance > 30) score -= 20;
-  else if (day.precipitationChance > 10) score -= 5;
+  // === PRECIPITATION IMPACT (Most Critical) ===
+  // Rain completely disrupts outdoor shooting
+  if (day.precipitationChance > 70) score -= 50; // Heavy rain likely - avoid
+  else if (day.precipitationChance > 50) score -= 35; // Moderate rain likely
+  else if (day.precipitationChance > 30) score -= 20; // Light rain possible
+  else if (day.precipitationChance > 15) score -= 10; // Minimal chance
+  else if (day.precipitationChance > 5) score -= 3; // Very unlikely
   
-  // Wind impact
-  if (day.windSpeed > 30) score -= 20;
-  else if (day.windSpeed > 20) score -= 10;
-  else if (day.windSpeed > 10) score -= 5;
+  // === WIND IMPACT (Equipment & Safety) ===
+  // High winds affect cranes, drones, lighting rigs
+  if (day.windSpeed > 35) score -= 30; // Dangerous - cranes/drones grounded
+  else if (day.windSpeed > 25) score -= 20; // High - heavy grip equipment risky
+  else if (day.windSpeed > 18) score -= 12; // Moderate - flags/reflectors difficult
+  else if (day.windSpeed > 12) score -= 6; // Light - manageable
+  else if (day.windSpeed > 8) score -= 2; // Minimal impact
   
-  // Humidity impact
-  if (day.humidity > 85) score -= 15;
-  else if (day.humidity > 75) score -= 8;
+  // Wind gusts are especially problematic
+  if (day.windGust > 40) score -= 15;
+  else if (day.windGust > 30) score -= 8;
   
-  // Temperature impact (extreme temps not ideal)
-  if (day.tempHigh > 40 || day.tempHigh < 15) score -= 15;
-  else if (day.tempHigh > 35 || day.tempHigh < 20) score -= 5;
+  // === HUMIDITY IMPACT (Equipment & Makeup) ===
+  // High humidity affects equipment, causes makeup issues
+  if (day.humidity > 90) score -= 20; // Extreme - lens fogging, makeup running
+  else if (day.humidity > 80) score -= 12; // High - moisture on equipment
+  else if (day.humidity > 70) score -= 6; // Moderate
+  else if (day.humidity > 60) score -= 2; // Slight
   
-  // Visibility impact
-  if (day.visibility < 5000) score -= 20;
-  else if (day.visibility < 8000) score -= 10;
+  // === TEMPERATURE IMPACT (Crew & Equipment) ===
+  // Extreme temps affect crew comfort and battery life
+  if (day.tempHigh > 42 || day.tempLow < 10) score -= 20; // Extreme
+  else if (day.tempHigh > 38 || day.tempLow < 15) score -= 12; // Very hot/cold
+  else if (day.tempHigh > 35 || day.tempLow < 18) score -= 6; // Hot/cold
+  else if (day.tempHigh > 32 || day.tempLow < 20) score -= 2; // Warm/cool
   
-  // UV impact (for outdoor shooting)
-  if (day.uvIndex >= 10) score -= 10;
-  else if (day.uvIndex >= 8) score -= 5;
+  // === VISIBILITY IMPACT (Cinematography) ===
+  // Low visibility affects shot composition and safety
+  if (day.visibility < 3000) score -= 25; // Very poor - fog/mist
+  else if (day.visibility < 5000) score -= 15; // Poor
+  else if (day.visibility < 8000) score -= 8; // Moderate
+  else if (day.visibility < 10000) score -= 2; // Good
+  
+  // === UV INDEX IMPACT (Crew Safety) ===
+  // High UV requires frequent breaks and sun protection
+  if (day.uvIndex >= 11) score -= 15; // Extreme - mandatory breaks
+  else if (day.uvIndex >= 8) score -= 8; // Very high
+  else if (day.uvIndex >= 6) score -= 4; // High
+  else if (day.uvIndex >= 3) score -= 1; // Moderate
+  
+  // === WEATHER CONDITION BONUSES ===
+  // Some conditions are actually ideal for filming
+  const cond = day.condition.toLowerCase();
+  if (cond.includes('clear') || cond.includes('sunny')) {
+    // Check if not too hot
+    if (day.tempHigh < 32 && day.precipitationChance < 10) score += 5; // Perfect day
+  }
+  if (cond.includes('partly cloud')) {
+    // Natural diffusers - excellent for cinematography
+    score += 3;
+  }
   
   return Math.max(0, Math.min(100, score));
 }
@@ -150,6 +185,52 @@ function getScoreColor(score: number): { bg: string; text: string; label: string
   if (score >= 40) return { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Fair' };
   if (score >= 20) return { bg: 'bg-orange-500/20', text: 'text-orange-400', label: 'Poor' };
   return { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Avoid' };
+}
+
+// Calculate golden hour quality based on weather conditions (0-100)
+// Golden hour is critical for cinematography
+function getGoldenHourQuality(day: WeatherDay): { score: number; label: string; color: string } {
+  let quality = 100;
+  
+  // Cloud cover can enhance golden hour (scattered clouds create variety)
+  const cond = day.condition.toLowerCase();
+  if (cond.includes('clear') || cond.includes('sunny')) {
+    // Clear skies = classic golden hour, no penalty
+    quality = 100;
+  } else if (cond.includes('partly cloud')) {
+    // Partly cloudy = enhanced golden hour with dramatic colors
+    quality = 110; // Bonus!
+  } else if (cond.includes('overcast')) {
+    // Overcast = soft, diffused golden hour
+    quality = 70;
+  } else if (cond.includes('rain') || cond.includes('cloud')) {
+    // Rain/clouds = minimal golden hour
+    quality = 30;
+  }
+  
+  // Precipitation kills golden hour
+  if (day.precipitationChance > 50) quality -= 50;
+  else if (day.precipitationChance > 30) quality -= 30;
+  else if (day.precipitationChance > 10) quality -= 10;
+  
+  // Humidity affects light quality
+  if (day.humidity > 85) quality -= 15;
+  else if (day.humidity > 75) quality -= 8;
+  
+  // Dust/haze can enhance golden hour (warm tones)
+  if (day.visibility < 8000 && day.visibility > 4000) quality += 5;
+  
+  quality = Math.max(0, Math.min(100, quality));
+  
+  let label: string;
+  let color: string;
+  if (quality >= 90) { label = 'Perfect'; color = 'text-amber-400'; }
+  else if (quality >= 70) { label = 'Great'; color = 'text-yellow-400'; }
+  else if (quality >= 50) { label = 'Good'; color = 'text-orange-400'; }
+  else if (quality >= 30) { label = 'Fair'; color = 'text-orange-500'; }
+  else { label = 'Poor'; color = 'text-red-400'; }
+  
+  return { score: quality, label, color };
 }
 
 export default function WeatherPage() {

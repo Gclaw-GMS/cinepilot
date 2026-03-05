@@ -286,3 +286,82 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// PUT /api/dailies - Update a daily report
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, ...updateData } = body;
+
+    const dbAvailable = await isDbAvailable();
+    
+    if (!dbAvailable) {
+      // Update demo data in memory
+      const index = DEMO_DAILIES.findIndex(d => d.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: 'Report not found' }, { status: 404 });
+      }
+      DEMO_DAILIES[index] = { ...DEMO_DAILIES[index], ...updateData };
+      return NextResponse.json({
+        success: true,
+        data: DEMO_DAILIES[index],
+        mode: 'demo'
+      });
+    }
+
+    // Update in database
+    const shootingDay = await prisma.shootingDay.update({
+      where: { id },
+      data: {
+        dayNumber: updateData.dayNumber,
+        scheduledDate: updateData.date ? new Date(updateData.date) : null,
+        locationId: updateData.locationId,
+        callTime: updateData.callTime,
+        weatherData: updateData.weather ? { weather: updateData.weather } : undefined,
+        notes: updateData.notes,
+        status: 'completed',
+        actualHours: updateData.wrapTime && updateData.callTime ? 
+          (parseInt(updateData.wrapTime.split(':')[0]) - parseInt(updateData.callTime.split(':')[0])) : null
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { id: shootingDay.id, ...updateData },
+      mode: 'live'
+    });
+  } catch (error) {
+    console.error('Error updating daily report:', error);
+    return NextResponse.json({ success: false, error: 'Failed to update report' }, { status: 500 });
+  }
+}
+
+// DELETE /api/dailies - Delete a daily report
+export async function DELETE(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
+    }
+
+    const dbAvailable = await isDbAvailable();
+    
+    if (!dbAvailable) {
+      const index = DEMO_DAILIES.findIndex(d => d.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: 'Report not found' }, { status: 404 });
+      }
+      DEMO_DAILIES.splice(index, 1);
+      return NextResponse.json({ success: true, mode: 'demo' });
+    }
+
+    await prisma.shootingDay.delete({ where: { id } });
+
+    return NextResponse.json({ success: true, mode: 'live' });
+  } catch (error) {
+    console.error('Error deleting daily report:', error);
+    return NextResponse.json({ success: false, error: 'Failed to delete report' }, { status: 500 });
+  }
+}

@@ -144,9 +144,25 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS)
   const [loading, setLoading] = useState(true)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking')
+
+  // Check database connection status
+  const checkDbStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/health')
+      const data = await res.json()
+      setDbStatus(data.status === 'connected' ? 'connected' : 'disconnected')
+    } catch {
+      setDbStatus('disconnected')
+    }
+  }, [])
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
+    
+    // Check database status first
+    await checkDbStatus()
+    
     const result = { ...EMPTY_STATS }
 
     try {
@@ -183,7 +199,8 @@ export default function Dashboard() {
       console.log('[Dashboard] Data received:', { scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData })
 
       // If all data is null, use demo mode
-      if (!scriptsData && !shotsData && !budgetData && !scheduleData && !locationsData && !censorData && !storyboardData && !tasksData) {
+      const hasRealData = scriptsData || shotsData || budgetData || scheduleData || locationsData || censorData || storyboardData || tasksData
+      if (!hasRealData) {
         console.log('[Dashboard] All API calls failed, using demo data')
         setStats(DEMO_STATS)
         setIsDemoMode(true)
@@ -268,7 +285,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [checkDbStatus])
 
   useEffect(() => {
     fetchStats()
@@ -298,9 +315,20 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-semibold tracking-tight">Production Dashboard</h1>
-                {isDemoMode && (
-                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                {dbStatus === 'connected' && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                    Database Connected
+                  </span>
+                )}
+                {dbStatus === 'disconnected' && (
+                  <span className="px-2 py-0.5 bg-slate-700/50 text-slate-400 text-xs rounded-full font-medium">
                     Demo Mode
+                  </span>
+                )}
+                {dbStatus === 'checking' && (
+                  <span className="px-2 py-0.5 bg-slate-700/50 text-slate-400 text-xs rounded-full font-medium">
+                    Checking...
                   </span>
                 )}
               </div>
@@ -319,7 +347,7 @@ export default function Dashboard() {
       </header>
 
       <main className="p-8">
-        {isDemoMode && (
+        {dbStatus === 'disconnected' && (
           <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
             Preview mode — Connect a PostgreSQL database to see real production data

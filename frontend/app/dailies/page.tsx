@@ -138,7 +138,9 @@ export default function DailyReportPage() {
   const [reports, setReports] = useState<DailyReport[]>([])
   const [stats, setStats] = useState<DailiesStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'partial' | 'pending'>('all')
   const [expandedReport, setExpandedReport] = useState<string | null>(null)
@@ -154,34 +156,44 @@ export default function DailyReportPage() {
     notes: '',
   })
 
-  // Load data on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/dailies')
-        const result = await response.json()
-        
-        if (result.success && result.data) {
-          setReports(result.data)
-          setStats(result.stats)
-          setIsDemoMode(result.mode === 'demo')
-        } else {
-          setReports(DEMO_REPORTS)
-          setStats(DEMO_STATS)
-          setIsDemoMode(true)
-        }
-      } catch (error) {
-        console.error('Error fetching dailies:', error)
+  // Fetch data function
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
+    try {
+      const response = await fetch('/api/dailies')
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        setReports(result.data)
+        setStats(result.stats)
+        setIsDemoMode(result.mode === 'demo')
+        setLastUpdated(new Date())
+      } else {
         setReports(DEMO_REPORTS)
         setStats(DEMO_STATS)
         setIsDemoMode(true)
-      } finally {
-        setLoading(false)
+        setLastUpdated(new Date())
       }
+    } catch (error) {
+      console.error('Error fetching dailies:', error)
+      setReports(DEMO_REPORTS)
+      setStats(DEMO_STATS)
+      setIsDemoMode(true)
+      setLastUpdated(new Date())
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-    
-    fetchData()
   }, [])
+
+  // Load data on mount
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -291,6 +303,34 @@ export default function DailyReportPage() {
     return { completed, partial, notDone }
   }
 
+  // Export to CSV
+  const exportToCSV = () => {
+    const headers = ['Day', 'Date', 'Location', 'Call Time', 'Wrap Time', 'Weather', 'Shots Planned', 'Shots Shot', 'Crew Present', 'Cast Present', 'Completion %', 'Notes']
+    const rows = reports.map(r => [
+      r.dayNumber,
+      r.date,
+      r.location,
+      r.callTime,
+      r.wrapTime,
+      r.weather,
+      r.totalShotsPlanned,
+      r.totalShotsShot,
+      r.crewPresent,
+      r.castPresent,
+      Math.round((r.totalShotsShot / r.totalShotsPlanned) * 100) || 0,
+      `"${(r.notes || '').replace(/"/g, '""')}"`
+    ])
+    
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `daily-reports-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex items-center justify-center">
@@ -318,17 +358,46 @@ export default function DailyReportPage() {
                   Demo Data
                 </span>
               )}
+              {lastUpdated && !isDemoMode && (
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
+                  Live
+                </span>
+              )}
             </div>
-            <p className="text-slate-500 text-sm mt-0.5">Track daily production progress & shot completion</p>
+            <p className="text-slate-500 text-sm mt-0.5">
+              Track daily production progress & shot completion
+              {lastUpdated && (
+                <span className="ml-2 text-slate-600">
+                  • Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Report
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Report
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}

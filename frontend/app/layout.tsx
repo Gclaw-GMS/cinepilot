@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import ClientLayout from './client-layout'
 import Sidebar from './sidebar'
+import { Menu, X } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'CinePilot - AI-Powered Pre-Production',

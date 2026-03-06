@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Brain, Sparkles, FileText, Clapperboard, DollarSign, 
   Calendar, AlertTriangle, MessageSquare, Wand2, Search,
   Play, ArrowRight, TrendingUp, Target, Zap, Loader2,
   BarChart3, PieChart, Activity, Gauge, AlertOctagon,
-  CheckCircle, XCircle, Info
+  CheckCircle, XCircle, Info, RefreshCw
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -22,58 +22,30 @@ interface AnalysisResult {
   timestamp?: string;
 }
 
-const AI_FEATURES = [
-  { 
-    id: 'script-analyzer', 
-    name: 'Script Intelligence', 
-    desc: 'Deep analysis of your script with scene breakdown',
-    icon: FileText, 
-    color: 'indigo',
-    category: 'Script'
-  },
-  { 
-    id: 'budget-forecast', 
-    name: 'Budget Forecast', 
-    desc: 'AI-powered cost estimation and breakdown',
-    icon: DollarSign, 
-    color: 'emerald',
-    category: 'Finance'
-  },
-  { 
-    id: 'shot-suggest', 
-    name: 'Shot Recommender', 
-    desc: 'Cinematography suggestions per scene',
-    icon: Clapperboard, 
-    color: 'violet',
-    category: 'Production'
-  },
-  { 
-    id: 'schedule', 
-    name: 'Schedule Optimizer', 
-    desc: 'Optimize shooting schedule by location',
-    icon: Calendar, 
-    color: 'amber',
-    category: 'Planning'
-  },
-  { 
-    id: 'risk-detect', 
-    name: 'Risk Detector', 
-    desc: 'Identify and mitigate production risks',
-    icon: AlertTriangle, 
-    color: 'rose',
-    category: 'Risk'
-  },
-  { 
-    id: 'dialogue', 
-    name: 'Dialogue Refiner', 
-    desc: 'Improve script dialogue and pacing',
-    icon: MessageSquare, 
-    color: 'cyan',
-    category: 'Script'
-  },
-]
+interface AITool {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  color: string;
+  category: string;
+  endpoint: string;
+}
 
-const COLORS = {
+// Icon mapping for API data
+const ICON_MAP: Record<string, typeof FileText> = {
+  FileText,
+  DollarSign,
+  Clapperboard,
+  Calendar,
+  AlertTriangle,
+  MessageSquare,
+  Sparkles,
+  CheckCircle,
+}
+
+// Color mapping
+const COLORS_MAP: Record<string, string> = {
   indigo: '#6366f1',
   emerald: '#10b981',
   violet: '#8b5cf6',
@@ -81,6 +53,28 @@ const COLORS = {
   rose: '#f43f5e',
   cyan: '#06b6d4',
   slate: '#64748b',
+  blue: '#3b82f6',
+  purple: '#a855f7',
+}
+
+// Default features if API fails
+const DEFAULT_AI_FEATURES: AITool[] = [
+  { id: 'script-analyzer', name: 'Script Intelligence', desc: 'Deep analysis of your script with scene breakdown', icon: 'FileText', color: 'indigo', category: 'Script', endpoint: '/api/scripts' },
+  { id: 'budget-forecast', name: 'Budget Forecast', desc: 'AI-powered cost estimation and breakdown', icon: 'DollarSign', color: 'emerald', category: 'Finance', endpoint: '/api/budget?action=forecast' },
+  { id: 'shot-suggest', name: 'Shot Recommender', desc: 'Cinematography suggestions per scene', icon: 'Clapperboard', color: 'violet', category: 'Production', endpoint: '/api/shots' },
+  { id: 'schedule', name: 'Schedule Optimizer', desc: 'Optimize shooting schedule by location', icon: 'Calendar', color: 'amber', category: 'Planning', endpoint: '/api/schedule' },
+  { id: 'risk-detect', name: 'Risk Detector', desc: 'Identify and mitigate production risks', icon: 'AlertTriangle', color: 'rose', category: 'Risk', endpoint: '/api/mission-control' },
+  { id: 'dialogue', name: 'Dialogue Refiner', desc: 'Improve script dialogue and pacing', icon: 'MessageSquare', color: 'cyan', category: 'Script', endpoint: '/api/scripts' },
+]
+
+// Convert API tool to component format
+function apiToolToFeature(tool: AITool) {
+  const IconComponent = ICON_MAP[tool.icon] || FileText;
+  return {
+    ...tool,
+    iconComponent: IconComponent,
+    color: tool.color || 'slate',
+  };
 }
 
 // Production Input Form
@@ -199,9 +193,9 @@ function BudgetChart({ data }: { data: any }) {
   if (!data?.breakdown) return null
   
   const chartData = [
-    { name: 'Production', value: data.breakdown.production?.amount || 0, color: COLORS.indigo },
-    { name: 'Post-Production', value: data.breakdown.postProduction?.amount || 0, color: COLORS.emerald },
-    { name: 'Talent', value: data.breakdown.talent?.amount || 0, color: COLORS.violet },
+    { name: 'Production', value: data.breakdown.production?.amount || 0, color: COLORS_MAP.indigo },
+    { name: 'Post-Production', value: data.breakdown.postProduction?.amount || 0, color: COLORS_MAP.emerald },
+    { name: 'Talent', value: data.breakdown.talent?.amount || 0, color: COLORS_MAP.violet },
   ]
 
   return (
@@ -236,10 +230,10 @@ function SceneBreakdownChart({ data }: { data: any }) {
   if (!data?.sceneBreakdown) return null
   
   const chartData = [
-    { name: 'Interior', value: data.sceneBreakdown.interior || 0, fill: COLORS.indigo },
-    { name: 'Exterior', value: data.sceneBreakdown.exterior || 0, fill: COLORS.emerald },
-    { name: 'Day', value: data.sceneBreakdown.day || 0, fill: COLORS.amber },
-    { name: 'Night', value: data.sceneBreakdown.night || 0, fill: COLORS.violet },
+    { name: 'Interior', value: data.sceneBreakdown.interior || 0, fill: COLORS_MAP.indigo },
+    { name: 'Exterior', value: data.sceneBreakdown.exterior || 0, fill: COLORS_MAP.emerald },
+    { name: 'Day', value: data.sceneBreakdown.day || 0, fill: COLORS_MAP.amber },
+    { name: 'Night', value: data.sceneBreakdown.night || 0, fill: COLORS_MAP.violet },
   ]
 
   return (
@@ -299,7 +293,7 @@ function RiskCards({ risks }: { risks: any[] }) {
   return (
     <div className="space-y-3">
       {risks.map((risk, i) => (
-        <div key={i} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-slate-700 hover:border-l-4 transition-all" style={{ borderColor: COLORS[severityColors[risk.severity] as keyof typeof COLORS] }}>
+        <div key={i} className="bg-slate-800/50 rounded-lg p-4 border-l-4 border-slate-700 hover:border-l-4 transition-all" style={{ borderColor: COLORS_MAP[severityColors[risk.severity] as keyof typeof COLORS_MAP] }}>
           <div className="flex items-start justify-between">
             <div>
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-${severityColors[risk.severity]}-500/20 text-${severityColors[risk.severity]}-400`}>
@@ -357,6 +351,9 @@ function Recommendations({ items }: { items: string[] }) {
 
 // Main Component
 export default function AIToolsPage() {
+  const [tools, setTools] = useState<AITool[]>(DEFAULT_AI_FEATURES)
+  const [categories, setCategories] = useState<string[]>([])
+  const [loadingTools, setLoadingTools] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -368,6 +365,30 @@ export default function AIToolsPage() {
     is_outdoor: true,
     is_night_shoots: false,
   })
+
+  // Fetch tools from API on mount
+  useEffect(() => {
+    async function fetchTools() {
+      try {
+        const res = await fetch('/api/ai-tools')
+        const data = await res.json()
+        if (data.tools && Array.isArray(data.tools) && data.tools.length > 0) {
+          setTools(data.tools)
+          if (data.categories) {
+            setCategories(data.categories)
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch AI tools from API, using defaults:', e)
+      } finally {
+        setLoadingTools(false)
+      }
+    }
+    fetchTools()
+  }, [])
+
+  // Convert tools to renderable format
+  const aiFeatures = tools.map(apiToolToFeature)
 
   const runAnalysis = async (featureId: string) => {
     setSelected(featureId)
@@ -391,7 +412,12 @@ export default function AIToolsPage() {
     setLoading(false)
   }
 
-  const getFeatureColor = (color: string) => COLORS[color as keyof typeof COLORS] || COLORS.slate
+  const getFeatureColor = (color: string) => COLORS_MAP[color] || COLORS_MAP.slate
+
+  // Get unique categories from tools
+  const allCategories = categories.length > 0 
+    ? categories 
+    : [...new Set(aiFeatures.map(f => f.category))]
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -422,7 +448,7 @@ export default function AIToolsPage() {
             <div className="flex items-center gap-3">
               <Brain className="w-8 h-8 text-indigo-400" />
               <div>
-                <p className="text-2xl font-bold text-white">6</p>
+                <p className="text-2xl font-bold text-white">{loadingTools ? '-' : tools.length}</p>
                 <p className="text-xs text-slate-400">AI Tools</p>
               </div>
             </div>
@@ -526,37 +552,47 @@ export default function AIToolsPage() {
 
         {/* Feature Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {AI_FEATURES.map((feature) => (
-            <button
-              key={feature.id}
-              onClick={() => runAnalysis(feature.id)}
-              disabled={loading}
-              style={{ 
-                borderColor: selected === feature.id ? getFeatureColor(feature.color) + '/50' : undefined,
-                boxShadow: selected === feature.id ? `0 0 20px ${getFeatureColor(feature.color)}/20` : undefined
-              }}
-              className={`text-left bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-600 hover:shadow-lg transition-all ${loading ? 'opacity-50' : ''}`}
-            >
-              <div className="flex items-start gap-4">
-                <div 
-                  className="p-3 rounded-xl"
-                  style={{ backgroundColor: `${getFeatureColor(feature.color)}20` }}
+          {loadingTools ? (
+            <div className="col-span-full flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mr-2" />
+              <span className="text-slate-400">Loading AI tools...</span>
+            </div>
+          ) : (
+            aiFeatures.map((feature) => {
+              const IconComponent = feature.iconComponent || FileText;
+              return (
+                <button
+                  key={feature.id}
+                  onClick={() => runAnalysis(feature.id)}
+                  disabled={loading}
+                  style={{ 
+                    borderColor: selected === feature.id ? getFeatureColor(feature.color) + '/50' : undefined,
+                    boxShadow: selected === feature.id ? `0 0 20px ${getFeatureColor(feature.color)}/20` : undefined
+                  }}
+                  className={`text-left bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-600 hover:shadow-lg transition-all ${loading ? 'opacity-50' : ''}`}
                 >
-                  <feature.icon className="w-6 h-6" style={{ color: getFeatureColor(feature.color) }} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-white">{feature.name}</h3>
-                    {selected === feature.id && loading && <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />}
+                  <div className="flex items-start gap-4">
+                    <div 
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: `${getFeatureColor(feature.color)}20` }}
+                    >
+                      <IconComponent className="w-6 h-6" style={{ color: getFeatureColor(feature.color) }} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-white">{feature.name}</h3>
+                        {selected === feature.id && loading && <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />}
+                      </div>
+                      <p className="text-slate-400 text-sm mt-1">{feature.desc}</p>
+                      <div className="flex items-center gap-2 mt-3">
+                        <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-500">{feature.category}</span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-slate-400 text-sm mt-1">{feature.desc}</p>
-                  <div className="flex items-center gap-2 mt-3">
-                    <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-500">{feature.category}</span>
-                  </div>
-                </div>
-              </div>
-            </button>
-          ))}
+                </button>
+              );
+            })
+          )}
         </div>
 
         {/* Results Section */}
@@ -578,7 +614,7 @@ export default function AIToolsPage() {
                   <Info className="w-5 h-5 text-amber-400" />
                 )}
                 <span className="font-semibold text-white">
-                  {AI_FEATURES.find(f => f.id === result.action)?.name} Results
+                  {aiFeatures.find(f => f.id === result.action)?.name} Results
                 </span>
               </div>
               <div className="flex items-center gap-3">

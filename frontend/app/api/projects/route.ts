@@ -1,9 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import fs from 'fs';
+import path from 'path';
 
-const DEFAULT_USER_ID = 'default-user';
+const DATA_FILE = path.join(process.cwd(), 'data', 'projects.json');
 
-// Demo projects for when database is unavailable
+// Ensure data directory exists
+function ensureDataDir() {
+  const dataDir = path.dirname(DATA_FILE);
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+}
+
+// Read projects from file
+function readProjects(): any[] {
+  ensureDataDir();
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const data = fs.readFileSync(DATA_FILE, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading projects:', error);
+  }
+  return [];
+}
+
+// Write projects to file
+function writeProjects(projects: any[]): void {
+  ensureDataDir();
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(projects, null, 2));
+  } catch (error) {
+    console.error('Error writing projects:', error);
+  }
+}
+
+// Demo projects for initial data
 const DEMO_PROJECTS = [
   {
     id: 'proj-1',
@@ -43,79 +76,118 @@ const DEMO_PROJECTS = [
   },
 ];
 
-// Helper to check if database is connected
-async function checkDbConnection(): Promise<boolean> {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // GET /api/projects — list all projects
 export async function GET(req: NextRequest) {
-  const isDemo = !(await checkDbConnection());
+  const projects = readProjects();
   
-  if (isDemo) {
+  // If no projects exist, initialize with demo data
+  if (projects.length === 0) {
+    writeProjects(DEMO_PROJECTS);
     return NextResponse.json(DEMO_PROJECTS, {
       headers: { 'Cache-Control': 'no-store' }
     });
   }
   
-  try {
-    const projects = await prisma.project.findMany({
-      orderBy: { updatedAt: 'desc' },
-    });
-    
-    return NextResponse.json(projects);
-  } catch (error) {
-    console.error('[GET /api/projects]', error);
-    // Fallback to demo data on error
-    return NextResponse.json(DEMO_PROJECTS);
-  }
+  return NextResponse.json(projects, {
+    headers: { 'Cache-Control': 'no-store' }
+  });
 }
 
 // POST /api/projects — create a new project
 export async function POST(req: NextRequest) {
-  const isDemo = !(await checkDbConnection());
-  
-  if (isDemo) {
+  try {
     const body = await req.json();
-    return NextResponse.json({
+    const projects = readProjects();
+    
+    const newProject = {
       id: `proj-${Date.now()}`,
-      name: body.name || body.title,
-      description: body.description,
+      name: body.name || body.title || 'Untitled Project',
+      title: body.title || body.name || 'Untitled Project',
+      description: body.description || null,
       language: body.language || 'tamil',
-      genre: body.genre,
-      budget: body.budget,
+      genre: body.genre || null,
+      budget: body.budget || null,
       status: body.status || 'planning',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    }, { status: 201 });
-  }
-  
-  try {
-    const body = await req.json();
+    };
     
-    const project = await prisma.project.create({
-      data: {
-        id: `proj-${Date.now()}`,
-        name: body.name || body.title,
-        description: body.description,
-        language: body.language || 'tamil',
-        genre: body.genre,
-        budget: body.budget,
-        status: body.status || 'planning',
-        userId: DEFAULT_USER_ID,
-      },
-    });
+    projects.push(newProject);
+    writeProjects(projects);
     
-    return NextResponse.json(project, { status: 201 });
+    return NextResponse.json(newProject, { status: 201 });
   } catch (error) {
     console.error('[POST /api/projects]', error);
     return NextResponse.json(
       { error: 'Failed to create project' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/projects — update a project
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const projects = readProjects();
+    
+    const index = projects.findIndex((p: any) => p.id === body.id);
+    if (index === -1) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      );
+    }
+    
+    projects[index] = {
+      ...projects[index],
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    writeProjects(projects);
+    
+    return NextResponse.json(projects[index]);
+  } catch (error) {
+    console.error('[PUT /api/projects]', error);
+    return NextResponse.json(
+      { error: 'Failed to update project' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/projects — delete a project
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Project ID required' },
+        { status: 400 }
+      );
+    }
+    
+    let projects = readProjects();
+    const index = projects.findIndex((p: any) => p.id === id);
+    
+    if (index === -1) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      );
+    }
+    
+    projects = projects.filter((p: any) => p.id !== id);
+    writeProjects(projects);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[DELETE /api/projects]', error);
+    return NextResponse.json(
+      { error: 'Failed to delete project' },
       { status: 500 }
     );
   }

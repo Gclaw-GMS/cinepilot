@@ -147,11 +147,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Derive location from scenes if not explicitly set
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const getLocationFromScenes = (dayScenes: any[]): string => {
+    const getLocationFromScenes = (dayScenes: Record<string, unknown>[]): string => {
       if (!dayScenes || dayScenes.length === 0) return 'Unknown';
       // Get unique locations from scenes
-      const locations = [...new Set(dayScenes.map((ds: any) => ds.scene?.location).filter(Boolean))];
+      const locations = [...new Set(dayScenes.map((ds: Record<string, unknown>) => (ds.scene as Record<string, unknown>)?.location as string).filter(Boolean))];
       if (locations.length === 0) return 'Unknown';
       if (locations.length === 1) return locations[0];
       return `${locations[0]} +${locations.length - 1} more`;

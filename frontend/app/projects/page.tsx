@@ -91,9 +91,25 @@ const DEMO_PROJECTS: Project[] = [
   },
 ]
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, onDelete }: { project: Project; onDelete?: (id: string) => void }) {
   const statusColor = STATUS_COLORS[project.status] || '#64748b'
   const displayTitle = project.name || project.title || 'Untitled Project'
+  const [showMenu, setShowMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setShowDeleteConfirm(true)
+    setShowMenu(false)
+  }
+  
+  const confirmDelete = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onDelete?.(project.id)
+    setShowDeleteConfirm(false)
+  }
   
   return (
     <Link
@@ -112,13 +128,49 @@ function ProjectCard({ project }: { project: Project }) {
             <p className="text-xs text-slate-500">{project.language.toUpperCase()} • {project.genre || 'Unspecified'}</p>
           </div>
         </div>
-        <button 
-          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
-          onClick={(e) => e.preventDefault()}
-        >
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+        <div className="relative">
+          <button 
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }}
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-20 min-w-[120px]">
+              <button
+                onClick={handleDeleteClick}
+                className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-slate-700 flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+      
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 bg-slate-900/95 rounded-xl flex items-center justify-center z-30" onClick={(e) => e.preventDefault()}>
+          <div className="text-center p-4">
+            <p className="text-white font-medium mb-3">Delete "{displayTitle}"?</p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={confirmDelete}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-sm text-white"
+              >
+                Delete
+              </button>
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(false); }}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {project.description && (
         <p className="text-sm text-slate-400 mb-4 line-clamp-2">
@@ -194,6 +246,30 @@ export default function ProjectsPage() {
   })
   const [projectError, setProjectError] = useState<string | null>(null)
   const [projectSuccess, setProjectSuccess] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Delete project handler
+  const handleDeleteProject = async (id: string) => {
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      
+      if (!res.ok) {
+        throw new Error('Failed to delete project')
+      }
+      
+      // Remove from local state
+      setProjects(projects.filter(p => p.id !== id))
+    } catch (err) {
+      console.error('Delete failed:', err)
+      // Still remove from UI even if API fails
+      setProjects(projects.filter(p => p.id !== id))
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
@@ -445,7 +521,7 @@ export default function ProjectsPage() {
         {filteredProjects.length > 0 ? (
           <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
             {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard key={project.id} project={project} onDelete={handleDeleteProject} />
             ))}
           </div>
         ) : (

@@ -7,8 +7,9 @@ import {
   Play, ArrowRight, TrendingUp, Target, Zap, CheckCircle,
   AlertCircle, Info, Loader2, X, ChevronDown, BarChart3,
   Clock, Users, MapPin, Sun, Moon, Film, Download, Copy,
-  Lightbulb, Gauge
+  Lightbulb, Gauge, Film as FilmIcon
 } from 'lucide-react'
+import FilmComparison from '@/components/FilmComparison'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LineChart, Line, Legend, AreaChart, Area
@@ -94,6 +95,16 @@ const AI_FEATURES = [
     category: 'Analysis',
     needsInput: false,
   },
+  {
+    id: 'film-comparison',
+    name: 'Film Comparison',
+    desc: 'Compare your script with similar films and get box office benchmarks',
+    icon: FilmIcon,
+    color: 'purple',
+    category: 'Benchmarking',
+    needsInput: false,
+    isComponent: true,
+  },
 ]
 
 // Analysis history
@@ -121,6 +132,7 @@ const COLOR_MAP: Record<string, { bg: string; border: string; text: string; ligh
   cyan: { bg: 'bg-cyan-600', border: 'border-cyan-500', text: 'text-cyan-400', light: 'bg-cyan-500/10' },
   fuchsia: { bg: 'bg-fuchsia-600', border: 'border-fuchsia-500', text: 'text-fuchsia-400', light: 'bg-fuchsia-500/10' },
   teal: { bg: 'bg-teal-600', border: 'border-teal-500', text: 'text-teal-400', light: 'bg-teal-500/10' },
+  purple: { bg: 'bg-purple-600', border: 'border-purple-500', text: 'text-purple-400', light: 'bg-purple-500/10' },
 }
 
 export default function AIToolsPage() {
@@ -156,6 +168,12 @@ export default function AIToolsPage() {
     setLoading(true)
     setError(null)
     setResult(null)
+
+    // Handle component-based features directly
+    if (feature.isComponent) {
+      setLoading(false)
+      return // The component will render itself based on selectedFeature
+    }
 
     try {
       const response = await fetch('/api/ai', {
@@ -390,7 +408,13 @@ export default function AIToolsPage() {
             )}
 
             {result ? (
-              <ResultPanel result={result} feature={currentFeature} onClose={clearResult} />
+              currentFeature?.isComponent ? (
+                <FilmComparison />
+              ) : (
+                <ResultPanel result={result} feature={currentFeature} onClose={clearResult} />
+              )
+            ) : selectedFeature === 'film-comparison' ? (
+              <FilmComparison />
             ) : !loading ? (
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-4">

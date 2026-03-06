@@ -160,23 +160,36 @@ export default function VfxPage() {
       
       if (!res.ok) {
         // If API fails, use demo data
-        console.log('Using demo VFX data');
+        console.log('Using demo VFX data - API error');
         setVfxNotes(DEMO_VFX_DATA.vfxNotes);
         setVfxWarnings(DEMO_VFX_DATA.vfxWarnings);
         setVfxProps(DEMO_VFX_DATA.props);
         setSummary(DEMO_VFX_DATA.summary);
         setIsDemoMode(true);
       } else {
-        setVfxNotes(data.vfxNotes || []);
-        setVfxWarnings(data.vfxWarnings || []);
-        setVfxProps(data.props || []);
-        setSummary(data.summary || null);
-        // Check for isDemo flag in response body (new API format)
-        setIsDemoMode(data.isDemoMode === true);
+        // Check if we have actual data or if it's empty
+        const hasVfxData = data.vfxNotes?.length > 0 || data.vfxWarnings?.length > 0;
+        
+        if (hasVfxData) {
+          // We have real VFX data from the script
+          setVfxNotes(data.vfxNotes || []);
+          setVfxWarnings(data.vfxWarnings || []);
+          setVfxProps(data.props || []);
+          setSummary(data.summary || null);
+          setIsDemoMode(data.isDemoMode === true);
+        } else {
+          // No VFX detected in this script - offer demo data for demonstration
+          console.log('No VFX detected in script, using demo for demonstration');
+          setVfxNotes(DEMO_VFX_DATA.vfxNotes);
+          setVfxWarnings(DEMO_VFX_DATA.vfxWarnings);
+          setVfxProps(DEMO_VFX_DATA.props);
+          setSummary(DEMO_VFX_DATA.summary);
+          setIsDemoMode(true);
+        }
       }
     } catch (err) {
       // Use demo data on error
-      console.log('Using demo VFX data (error)');
+      console.log('Using demo VFX data (catch error)');
       setVfxNotes(DEMO_VFX_DATA.vfxNotes);
       setVfxWarnings(DEMO_VFX_DATA.vfxWarnings);
       setVfxProps(DEMO_VFX_DATA.props);
@@ -478,6 +491,40 @@ export default function VfxPage() {
         {error && (
           <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-4 text-red-400 text-sm">
             {error}
+          </div>
+        )}
+
+        {/* Demo Mode Banner */}
+        {isDemoMode && !loading && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-medium text-amber-400">Demo Data Active</h3>
+                <p className="text-sm text-slate-400">
+                  Showing sample VFX analysis for demonstration. Upload a script with VFX-heavy scenes to see real analysis.
+                </p>
+              </div>
+              <button
+                onClick={runAnalysis}
+                disabled={analyzing}
+                className="ml-auto flex items-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4" />
+                    Analyze Script
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 

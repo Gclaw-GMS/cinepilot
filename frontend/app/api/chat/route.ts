@@ -194,6 +194,66 @@ async function buildProjectContext(projectId: string) {
   };
 }
 
+// GET /api/chat - Get chat context and capabilities
+export async function GET(req: NextRequest) {
+  let context: any = null;
+  let projectId = 'demo-project';
+  let isDemoMode = false;
+
+  // Try to get project context
+  try {
+    projectId = await ensureDefaultProject();
+    if (projectId !== 'demo-project') {
+      context = await buildProjectContext(projectId);
+    }
+  } catch (dbError) {
+    console.warn('Database unavailable, using demo mode');
+    isDemoMode = true;
+  }
+
+  // Default context for demo mode
+  if (!context) {
+    context = {
+      scriptsCount: 2,
+      scenesCount: 47,
+      budgetSummary: { totalPlanned: 85000000, totalActual: 32000000 },
+      scheduleSummary: { totalDays: 8 },
+      crewCount: 8,
+      recentWarnings: [],
+    };
+  }
+
+  const aiConfigured = AIML_API_KEY && AIML_API_KEY !== 'your-aiml-api-key-here';
+
+  return NextResponse.json({
+    capabilities: [
+      'schedule_query',
+      'budget_analysis', 
+      'crew_management',
+      'script_insights',
+      'risk_assessment',
+      'general_assistance'
+    ],
+    context: {
+      scriptsCount: context.scriptsCount,
+      scenesCount: context.scenesCount,
+      budgetTotal: context.budgetSummary?.totalPlanned || 0,
+      scheduleDays: context.scheduleSummary?.totalDays || 0,
+      crewCount: context.crewCount || 0,
+      warningsCount: context.recentWarnings?.length || 0,
+    },
+    isDemoMode: !aiConfigured,
+    aiEnabled: aiConfigured,
+    suggestions: [
+      'What scenes are scheduled for today?',
+      'What is the current budget status?',
+      'Show me the crew availability',
+      'Give me an overview of the shooting schedule',
+      'What are the current production risks?'
+    ]
+  });
+}
+
 export async function POST(req: NextRequest) {
   let context: any = null;
   let projectId = 'demo-project';

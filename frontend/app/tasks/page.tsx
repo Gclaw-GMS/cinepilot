@@ -117,14 +117,20 @@ export default function TasksPage() {
     setLoading(true)
     setError(null)
     try {
+      console.log('[Tasks] Fetching tasks...')
       const res = await fetch('/api/tasks?projectId=default-project')
       const data = await res.json()
+      console.log('[Tasks] Received data:', data)
+      console.log('[Tasks] Setting tasks:', data.data?.length || 0)
       setTasks(data.data || [])
       setIsDemoMode(data.isDemoMode === true)
+      console.log('[Tasks] Tasks state updated, length:', (data.data || []).length)
     } catch (err) {
+      console.error('[Tasks] Error fetching tasks:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
     } finally {
       setLoading(false)
+      console.log('[Tasks] Loading complete')
     }
   }, [])
 
@@ -219,6 +225,8 @@ export default function TasksPage() {
     const today = now.toISOString().split('T')[0]
     const completed = tasks.filter(t => t.status === 'completed').length
     const total = tasks.length
+    
+    console.log('[Tasks] Calculating stats from', total, 'tasks')
     
     return {
       total,

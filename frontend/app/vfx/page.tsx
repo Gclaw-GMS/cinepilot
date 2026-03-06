@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, Loader2, BarChart3, PieChart, RefreshCw, Download } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, Loader2, BarChart3, PieChart, RefreshCw, Download, Keyboard, X } from 'lucide-react';
 import { 
   PieChart as RechartsPie, Pie, Cell, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -121,6 +121,8 @@ export default function VfxPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [selectedSceneIndex, setSelectedSceneIndex] = useState<number>(-1);
 
   // Fetch scripts on mount
   useEffect(() => {
@@ -219,6 +221,82 @@ export default function VfxPage() {
     setSummary(DEMO_VFX_DATA.summary);
     setIsDemoMode(true);
   }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Don't trigger shortcuts when typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      // Show keyboard help: ?
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowKeyboardHelp(true);
+        return;
+      }
+      
+      // Close modal: Escape
+      if (e.key === 'Escape') {
+        if (showKeyboardHelp) {
+          setShowKeyboardHelp(false);
+          setSelectedSceneIndex(-1);
+        }
+        return;
+      }
+      
+      // Refresh: R
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        if (selectedScript) fetchVfxData(selectedScript);
+        return;
+      }
+      
+      // Run analysis: A
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        if (selectedScript && !analyzing) runAnalysis();
+        return;
+      }
+      
+      // Export: E
+      if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        exportToCSV();
+        return;
+      }
+      
+      // Navigate scenes: Arrow Up/Down - use vfxNotes length as proxy for scene groups
+      if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
+        if (e.key === 'ArrowDown' || e.key === 'j') {
+          e.preventDefault();
+          setSelectedSceneIndex(prev => 
+            prev < 20 ? prev + 1 : prev // reasonable max
+          );
+          return;
+        }
+        if (e.key === 'ArrowUp' || e.key === 'k') {
+          e.preventDefault();
+          setSelectedSceneIndex(prev => prev > 0 ? prev - 1 : 0);
+          return;
+        }
+        // Jump to first: Home
+        if (e.key === 'Home') {
+          e.preventDefault();
+          setSelectedSceneIndex(0);
+          return;
+        }
+        // Jump to last: End
+        if (e.key === 'End') {
+          e.preventDefault();
+          setSelectedSceneIndex(20); // reasonable max
+          return;
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedScript, analyzing, showKeyboardHelp, fetchVfxData, vfxNotes.length, vfxWarnings.length]);
 
   // Export VFX data as CSV
   function exportToCSV() {
@@ -340,6 +418,14 @@ export default function VfxPage() {
               </p>
             </div>
           </div>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+            title="Keyboard shortcuts (press ?)"
+          >
+            <Keyboard className="w-4 h-4" />
+            Shortcuts
+          </button>
         </div>
 
         {/* Controls */}
@@ -627,6 +713,74 @@ export default function VfxPage() {
           </>
         )}
       </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-purple-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => {
+                  setShowKeyboardHelp(false);
+                  setSelectedSceneIndex(-1);
+                }}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Refresh data</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">R</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Run analysis</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">A</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Export CSV</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">E</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Next scene</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">↓ / J</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Previous scene</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">↑ / K</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">First scene</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">Home</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Last scene</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">End</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-300">Close / Clear</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">Esc</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2 col-span-2">
+                  <span className="text-sm text-slate-300">Show shortcuts</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-purple-400">?</kbd>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-500 mt-6 text-center">
+              Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">?</kbd> anytime to show this help
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

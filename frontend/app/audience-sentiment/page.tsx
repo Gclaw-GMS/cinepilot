@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   MessageCircle,
   ThumbsUp,
@@ -22,6 +22,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Keyboard,
+  X,
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -73,6 +75,9 @@ export default function AudienceSentimentPage() {
     videoUrl: '',
   })
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const analysesRef = useRef<HTMLDivElement>(null)
 
   const fetchAnalyses = useCallback(async () => {
     setLoading(true)
@@ -174,7 +179,84 @@ export default function AudienceSentimentPage() {
     }
   }
 
-  const selectedAnalysis = analyses[0]
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if user is typing in an input
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    // Ignore if modal is open
+    if (showForm) return
+
+    const maxIndex = analyses.length - 1
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev => Math.min(prev + 1, maxIndex))
+        // Scroll the selected item into view
+        setTimeout(() => {
+          const items = analysesRef.current?.querySelectorAll('[data-analysis-item]')
+          items?.[selectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }, 0)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => Math.max(prev - 1, 0))
+        setTimeout(() => {
+          const items = analysesRef.current?.querySelectorAll('[data-analysis-item]')
+          items?.[selectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }, 0)
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedIndex(maxIndex)
+        break
+      case 'Enter':
+        e.preventDefault()
+        // Run analysis on selected item if not completed
+        if (analyses[selectedIndex]?.status !== 'completed') {
+          runAnalysis(analyses[selectedIndex].id)
+        }
+        break
+      case 'n':
+      case 'N':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setShowForm(true)
+        }
+        break
+      case 'r':
+      case 'R':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          fetchAnalyses()
+        }
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'Escape':
+        setSelectedIndex(0)
+        break
+    }
+  }, [analyses, selectedIndex, showForm, fetchAnalyses])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  const selectedAnalysis = analyses[selectedIndex] || analyses[0]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -198,13 +280,23 @@ export default function AudienceSentimentPage() {
                 <p className="text-sm text-slate-400">Analyze trailer & first look reactions</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              New Analysis
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
+                title="Keyboard shortcuts"
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+                Shortcuts
+              </button>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                New Analysis
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -592,6 +684,74 @@ export default function AudienceSentimentPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-rose-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-rose-500/10" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-rose-500/20">
+                  <Keyboard className="w-5 h-5 text-rose-400" />
+                </div>
+                <span className="bg-gradient-to-r from-rose-400 to-orange-400 bg-clip-text text-transparent">
+                  Keyboard Shortcuts
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { keys: ['↑', '↓'], desc: 'Navigate analyses', category: 'Navigation' },
+                { keys: ['Home'], desc: 'Go to first analysis', category: 'Navigation' },
+                { keys: ['End'], desc: 'Go to last analysis', category: 'Navigation' },
+                { keys: ['Enter'], desc: 'Run analysis on selected', category: 'Action' },
+                { keys: ['N'], desc: 'New analysis', category: 'Action' },
+                { keys: ['R'], desc: 'Refresh list', category: 'Action' },
+                { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
+                { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+              ].map((shortcut, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider w-16">
+                      {shortcut.category}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {shortcut.keys.map((key, i) => (
+                        <kbd 
+                          key={i} 
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-rose-300 shadow-sm"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Quick reference for power users</span>
+                <span className="flex items-center gap-2">
+                  Press 
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-rose-400">?</kbd> 
+                  anytime to toggle
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}

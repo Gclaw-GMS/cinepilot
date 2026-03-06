@@ -30,6 +30,7 @@ import {
   UsersRound,
   Folder,
   CheckSquare,
+  Activity,
 } from 'lucide-react'
 
 type NavItem = {
@@ -98,6 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'System',
     items: [
+      { href: '/health', icon: Activity, label: 'System Health', badge: 'NEW' },
       { href: '/exports', icon: Download, label: 'Export Center' },
       { href: '/weather', icon: Cloud, label: 'Weather' },
       { href: '/notifications', icon: Bell, label: 'Notifications' },

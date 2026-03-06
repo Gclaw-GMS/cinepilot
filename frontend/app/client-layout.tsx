@@ -14,6 +14,7 @@ interface KeyboardShortcut {
 }
 
 const SHORTCUTS: KeyboardShortcut[] = [
+  { key: '0', ctrl: true, action: () => navigate('/health'), description: 'Go to System Health' },
   { key: '1', ctrl: true, action: () => navigate('/'), description: 'Go to Dashboard' },
   { key: '2', ctrl: true, action: () => navigate('/projects'), description: 'Go to Projects' },
   { key: '3', ctrl: true, action: () => navigate('/scripts'), description: 'Go to Scripts' },

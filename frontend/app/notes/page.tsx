@@ -43,6 +43,25 @@ const CHART_COLORS = {
 
 const CATEGORY_PALETTE = Object.values(CHART_COLORS)
 
+// Helper function to highlight search terms in text
+function HighlightedText({ text, highlight }: { text: string; highlight: string }) {
+  if (!highlight.trim()) return <>{text}</>
+  
+  const parts = text.split(new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'))
+  
+  return (
+    <>
+      {parts.map((part, i) => 
+        part.toLowerCase() === highlight.toLowerCase() ? (
+          <mark key={i} className="bg-yellow-500/30 text-yellow-200 rounded px-0.5">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
+
 const DEMO_NOTES: Note[] = [
   { 
     id: '1', 
@@ -544,6 +563,7 @@ export default function NotesPage() {
                       onTogglePin={handleTogglePin}
                       getCategoryStyle={getCategoryStyle}
                       formatDate={formatDate}
+                      searchTerm={search}
                     />
                   ))}
                 </div>
@@ -564,6 +584,7 @@ export default function NotesPage() {
                       onTogglePin={handleTogglePin}
                       getCategoryStyle={getCategoryStyle}
                       formatDate={formatDate}
+                      searchTerm={search}
                     />
                   ))}
                 </div>
@@ -679,7 +700,8 @@ function NoteCard({
   onDelete, 
   onTogglePin,
   getCategoryStyle,
-  formatDate
+  formatDate,
+  searchTerm = ''
 }: { 
   note: Note
   onEdit: (note: Note) => void
@@ -687,6 +709,7 @@ function NoteCard({
   onTogglePin: (note: Note) => void
   getCategoryStyle: (category: string) => string
   formatDate: (date: string) => string
+  searchTerm?: string
 }) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-600 transition-colors group">
@@ -716,8 +739,12 @@ function NoteCard({
           </button>
         </div>
       </div>
-      <h3 className="text-white font-medium mb-2 line-clamp-1">{note.title}</h3>
-      <p className="text-slate-400 text-sm mb-3 line-clamp-3 whitespace-pre-wrap">{note.content}</p>
+      <h3 className="text-white font-medium mb-2 line-clamp-1">
+        <HighlightedText text={note.title} highlight={searchTerm} />
+      </h3>
+      <p className="text-slate-400 text-sm mb-3 line-clamp-3 whitespace-pre-wrap">
+        <HighlightedText text={note.content} highlight={searchTerm} />
+      </p>
       {note.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
           {note.tags.slice(0, 3).map(tag => (

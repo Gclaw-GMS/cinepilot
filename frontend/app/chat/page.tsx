@@ -37,6 +37,7 @@ interface ContextData {
   scheduleDays: number
   crewCount: number
   warningsCount: number
+  isDemoMode?: boolean
 }
 
 const SUGGESTED_PROMPTS = [
@@ -55,6 +56,7 @@ export default function ChatPage() {
   const [context, setContext] = useState<ContextData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const initialLoadDone = useRef(false)
@@ -133,6 +135,11 @@ What would you like to know about your production?`,
       if (data.context) {
         setContext(data.context)
       }
+      
+      // Track demo mode state
+      if (data.isDemoMode !== undefined) {
+        setIsDemoMode(data.isDemoMode)
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -179,6 +186,7 @@ What would you like to know about your production?`,
     if (confirm('Clear all messages? This cannot be undone.')) {
       setMessages([])
       setContext(null)
+      setIsDemoMode(false)
       initialLoadDone.current = false
     }
   }
@@ -212,6 +220,12 @@ What would you like to know about your production?`,
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {isDemoMode && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-xs">
+                  <Zap className="w-3 h-3" />
+                  <span>Demo Mode</span>
+                </div>
+              )}
               {context && (
                 <div className="flex items-center gap-4 px-4 py-2 bg-slate-800 rounded-lg text-sm">
                   <div className="flex items-center gap-1.5">

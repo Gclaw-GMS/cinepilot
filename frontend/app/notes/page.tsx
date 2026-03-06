@@ -328,9 +328,28 @@ export default function NotesPage() {
               placeholder="Search notes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
+          {(search || filterCategory !== 'all') && (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <span>{filteredNotes.length} result{filteredNotes.length !== 1 ? 's' : ''}</span>
+              <button
+                onClick={() => { setSearch(''); setFilterCategory('all') }}
+                className="text-indigo-400 hover:text-indigo-300"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500" />
             <select

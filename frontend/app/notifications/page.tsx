@@ -109,8 +109,18 @@ export default function NotificationCenter() {
       const res = await fetch('/api/notifications')
       const data = await res.json()
       
-      if (data.notifications && Array.isArray(data.notifications)) {
-        setNotifications(data.notifications)
+      // Map API response to UI format
+      const apiNotifications = data.data || data.notifications || []
+      if (Array.isArray(apiNotifications) && apiNotifications.length > 0) {
+        setNotifications(apiNotifications.map((n: any) => ({
+          id: n.id,
+          type: (n.metadata?.priority === 'high' ? 'warning' : n.metadata?.priority === 'medium' ? 'info' : 'info') as 'info' | 'success' | 'warning' | 'error',
+          title: n.title,
+          message: n.body,
+          timestamp: n.createdAt,
+          read: n.status === 'read',
+          actionUrl: undefined
+        })))
         setIsDemoMode(data.isDemoMode === true)
       } else {
         setNotifications(DEMO_NOTIFICATIONS)

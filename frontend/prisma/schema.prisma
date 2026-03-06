@@ -28,12 +28,12 @@ model Project {
   description      String?
   language         String            @default("tamil")
   status           String            @default("planning")
-  budget           Decimal?          @db.Decimal(12, 2)
+  budget           Float?
   genre            String?
   directorStyle    String?           @map("director_style")
   defaultLenses    String[]          @default([]) @map("default_lenses")
-  startDate        DateTime?         @map("start_date") @db.Date
-  endDate          DateTime?         @map("end_date") @db.Date
+  startDate        DateTime?         @map("start_date") 
+  endDate          DateTime?         @map("end_date") 
   userId           String            @map("user_id")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
@@ -322,8 +322,8 @@ model Location {
   name         String
   nameTamil    String?       @map("name_tamil")
   address      String?
-  latitude     Decimal?      @db.Decimal(10, 8)
-  longitude    Decimal?      @db.Decimal(11, 8)
+  latitude     Float?      
+  longitude    Float?      
   placeType    String?       @map("place_type")
   notes        String?
   imageUrls    String[]      @default([]) @map("image_urls")
@@ -338,8 +338,8 @@ model Region {
   id              String           @id @default(cuid())
   projectId       String           @map("project_id")
   name            String
-  centerLat       Decimal          @map("center_lat") @db.Decimal(10, 8)
-  centerLng       Decimal          @map("center_lng") @db.Decimal(11, 8)
+  centerLat       Float          @map("center_lat") 
+  centerLng       Float          @map("center_lng") 
   radiusKm        Float            @map("radius_km")
   locationIntents LocationIntent[]
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -369,8 +369,8 @@ model Candidate {
   id            String                @id @default(cuid())
   intentId      String                @map("intent_id")
   name          String?
-  latitude      Decimal               @db.Decimal(10, 8)
-  longitude     Decimal               @db.Decimal(11, 8)
+  latitude      Float               
+  longitude     Float               
   osmId         String?               @map("osm_id")
   placeType     String?               @map("place_type")
   scoreTotal    Float                 @map("score_total")
@@ -419,8 +419,8 @@ model VerifiedLocation {
   id         String    @id @default(cuid())
   projectId  String    @map("project_id")
   name       String
-  latitude   Decimal   @db.Decimal(10, 8)
-  longitude  Decimal   @db.Decimal(11, 8)
+  latitude   Float   
+  longitude  Float   
   address    String?
   photos     String[]  @default([])
   notes      String?
@@ -445,11 +445,11 @@ model ShootingDay {
   id             String      @id @default(cuid())
   projectId      String      @map("project_id")
   dayNumber      Int         @map("day_number")
-  scheduledDate  DateTime?   @map("scheduled_date") @db.Date
+  scheduledDate  DateTime?   @map("scheduled_date") 
   callTime       String?     @map("call_time")
   locationId     String?     @map("location_id")
-  estimatedHours Decimal?    @map("estimated_hours") @db.Decimal(5, 2)
-  actualHours    Decimal?    @map("actual_hours") @db.Decimal(5, 2)
+  estimatedHours Float?    @map("estimated_hours") 
+  actualHours    Float?    @map("actual_hours") 
   weatherData    Json?       @map("weather_data")
   notes          String?
   status         String      @default("scheduled")
@@ -482,8 +482,8 @@ model CastAvailability {
   id          String   @id @default(cuid())
   projectId   String   @map("project_id")
   characterId String   @map("character_id")
-  dateStart   DateTime @map("date_start") @db.Date
-  dateEnd     DateTime @map("date_end") @db.Date
+  dateStart   DateTime @map("date_start") 
+  dateEnd     DateTime @map("date_end") 
   status      String   @default("available")
   notes       String?
 
@@ -494,8 +494,8 @@ model CrewConstraint {
   id        String   @id @default(cuid())
   projectId String   @map("project_id")
   crewId    String   @map("crew_id")
-  dateStart DateTime @map("date_start") @db.Date
-  dateEnd   DateTime @map("date_end") @db.Date
+  dateStart DateTime @map("date_start") 
+  dateEnd   DateTime @map("date_end") 
   status    String   @default("unavailable")
   notes     String?
 
@@ -507,9 +507,9 @@ model EquipmentRental {
   projectId String   @map("project_id")
   name      String
   category  String
-  dateStart DateTime @map("date_start") @db.Date
-  dateEnd   DateTime @map("date_end") @db.Date
-  dailyRate Decimal  @map("daily_rate") @db.Decimal(10, 2)
+  dateStart DateTime @map("date_start") 
+  dateEnd   DateTime @map("date_end") 
+  dailyRate Float  @map("daily_rate") 
   vendor    String?
   notes     String?
 
@@ -538,14 +538,14 @@ model BudgetItem {
   category    String
   subcategory String?
   description String?
-  quantity    Decimal? @db.Decimal(10, 2)
+  quantity    Float? 
   unit        String?
-  rate        Decimal? @db.Decimal(10, 2)
-  rateLow     Decimal? @map("rate_low") @db.Decimal(10, 2)
-  rateHigh    Decimal? @map("rate_high") @db.Decimal(10, 2)
-  taxRate     Decimal? @map("tax_rate") @db.Decimal(5, 2)
-  total       Decimal? @db.Decimal(12, 2)
-  actualCost  Decimal? @map("actual_cost") @db.Decimal(12, 2)
+  rate        Float? 
+  rateLow     Float? @map("rate_low") 
+  rateHigh    Float? @map("rate_high") 
+  taxRate     Float? @map("tax_rate") 
+  total       Float? 
+  actualCost  Float? @map("actual_cost") 
   source      String   @default("manual")
   notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -584,8 +584,8 @@ model Expense {
   projectId   String     @map("project_id")
   category    String
   description String
-  amount      Decimal    @db.Decimal(12, 2)
-  date        DateTime   @db.Date
+  amount      Float    
+  date        DateTime   
   vendor      String?
   receiptUrl  String?    @map("receipt_url")
   status      String     @default("pending")
@@ -617,10 +617,10 @@ model ContractRate {
   vendorName     String    @map("vendor_name")
   category       String
   itemDesc       String    @map("item_desc")
-  contractedRate Decimal   @map("contracted_rate") @db.Decimal(10, 2)
+  contractedRate Float   @map("contracted_rate") 
   unit           String?
-  validFrom      DateTime? @map("valid_from") @db.Date
-  validTo        DateTime? @map("valid_to") @db.Date
+  validFrom      DateTime? @map("valid_from") 
+  validTo        DateTime? @map("valid_to") 
   project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("contracts_rates")
@@ -631,9 +631,9 @@ model Benchmark {
   projectId String   @map("project_id")
   category  String
   region    String
-  avgRate   Decimal  @map("avg_rate") @db.Decimal(10, 2)
-  minRate   Decimal? @map("min_rate") @db.Decimal(10, 2)
-  maxRate   Decimal? @map("max_rate") @db.Decimal(10, 2)
+  avgRate   Float  @map("avg_rate") 
+  minRate   Float? @map("min_rate") 
+  maxRate   Float? @map("max_rate") 
   source    String?
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -647,10 +647,10 @@ model Invoice {
   recipientName      String?   @map("recipient_name")
   vendorName         String?   @map("vendor_name")
   description        String?
-  amount             Decimal   @db.Decimal(12, 2)
+  amount             Float   
   status             String    @default("pending")
-  dueDate            DateTime? @map("due_date") @db.Date
-  paidDate           DateTime? @map("paid_date") @db.Date
+  dueDate            DateTime? @map("due_date") 
+  paidDate           DateTime? @map("paid_date") 
   fileUrl            String?   @map("file_url")
   ocrData            Json?     @map("ocr_data")
   verificationResult Json?     @map("verification_result")
@@ -767,9 +767,9 @@ model Crew {
   department String?
   phone      String?
   email      String?
-  dailyRate  Decimal?  @map("daily_rate") @db.Decimal(10, 2)
-  startDate  DateTime? @map("start_date") @db.Date
-  endDate    DateTime? @map("end_date") @db.Date
+  dailyRate  Float?  @map("daily_rate") 
+  startDate  DateTime? @map("start_date") 
+  endDate    DateTime? @map("end_date") 
   notes      String?
   createdAt  DateTime  @default(now()) @map("created_at")
   project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -783,7 +783,7 @@ model CallSheet {
   projectId     String       @map("project_id")
   shootingDayId String?      @map("shooting_day_id")
   title         String?
-  date          DateTime     @db.Date
+  date          DateTime     
   content       Json?
   notes         String?
   createdAt     DateTime     @default(now()) @map("created_at")
@@ -849,11 +849,11 @@ model Milestone {
   projectId   String         @map("project_id")
   name        String
   description String?
-  targetDate  DateTime       @map("target_date") @db.Date
+  targetDate  DateTime       @map("target_date") 
   status      MilestoneStatus @default(pending)
   order       Int            @default(0)
   phase       String?        // pre_production, production, post_production
-  completedAt DateTime?      @map("completed_at") @db.Date
+  completedAt DateTime?      @map("completed_at") 
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
   project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -879,8 +879,8 @@ model ProductionTask {
   status      TaskStatus @default(pending)
   progress    Int        @default(0) // 0-100
   priority    String     @default("medium") // low, medium, high, critical
-  dueDate     DateTime?  @map("due_date") @db.Date
-  completedAt DateTime?  @map("completed_at") @db.Date
+  dueDate     DateTime?  @map("due_date") 
+  completedAt DateTime?  @map("completed_at") 
   order       Int        @default(0)
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
@@ -898,8 +898,8 @@ model ProductionPhase {
   displayName String   @map("display_name")
   status      String   @default("pending") // pending, active, completed
   progress    Int      @default(0) // 0-100
-  startDate   DateTime? @map("start_date") @db.Date
-  endDate     DateTime? @map("end_date") @db.Date
+  startDate   DateTime? @map("start_date") 
+  endDate     DateTime? @map("end_date") 
   order       Int      @default(0)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -962,8 +962,8 @@ model CateringPlan {
   projectId            String          @map("project_id")
   catererId            String?         @map("caterer_id")
   dietaryRestrictions  Json?           @map("dietary_restrictions")
-  totalBudget          Decimal?        @db.Decimal(12, 2) @map("total_budget")
-  totalSpent           Decimal?        @db.Decimal(12, 2) @map("total_spent")
+  totalBudget          Float?         @map("total_budget")
+  totalSpent           Float?         @map("total_spent")
   createdAt            DateTime        @default(now()) @map("created_at")
   updatedAt            DateTime        @updatedAt @map("updated_at")
   shootDays            CateringShootDay[]
@@ -975,7 +975,7 @@ model CateringPlan {
 model CateringShootDay {
   id            String        @id @default(cuid())
   cateringPlanId String       @map("catering_plan_id")
-  date          DateTime      @db.Date
+  date          DateTime      
   totalCrew     Int           @default(0) @map("total_crew")
   totalCast     Int           @default(0) @map("total_cast")
   meals         CateringMeal[]
@@ -993,8 +993,8 @@ model CateringMeal {
   mealType      String            // breakfast, lunch, dinner, snacks
   menuItems     String[]          @map("menu_items")
   dietary       String[]          
-  budget        Decimal?          @db.Decimal(10, 2)
-  actualCost    Decimal?          @db.Decimal(10, 2) @map("actual_cost")
+  budget        Float?          
+  actualCost    Float?           @map("actual_cost")
   notes         String?
   status        String            @default("planned") // planned, confirmed, served
   createdAt     DateTime          @default(now()) @map("created_at")
@@ -1013,7 +1013,7 @@ model Caterer {
   phone         String
   email         String?
   specialty     String?
-  rating        Decimal? @db.Decimal(2, 1)
+  rating        Float? 
   notes         String?
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")

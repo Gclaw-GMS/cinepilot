@@ -166,6 +166,23 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // If no notifications in database, return demo data
+    if (notifications.length === 0) {
+      let filtered = notificationsStore.filter(n => n.projectId === projectId);
+      if (channel && channel !== 'all') {
+        filtered = filtered.filter(n => n.channel === channel);
+      }
+      if (status && status !== 'all') {
+        filtered = filtered.filter(n => n.status === status);
+      }
+      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      return NextResponse.json({ 
+        data: filtered,
+        isDemoMode: true 
+      });
+    }
+
     return NextResponse.json({ 
       data: notifications,
       isDemoMode: false 

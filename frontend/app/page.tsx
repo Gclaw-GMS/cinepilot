@@ -9,8 +9,18 @@ import {
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
   ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, Plus, X, Zap,
-  Activity, Wifi, WifiOff
+  Activity, Wifi, WifiOff, Cloud, Sun, Moon, CloudRain, Wind, Droplets
 } from 'lucide-react'
+
+// Weather widget types
+interface WeatherData {
+  location: string
+  temp: number
+  condition: string
+  humidity: number
+  windSpeed: number
+  forecast: { day: string; high: number; low: number; condition: string }[]
+}
 
 const PALETTE = {
   primary: '#6366f1',
@@ -148,6 +158,62 @@ export default function Dashboard() {
   
   // Connection status
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  
+  // Weather state
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  
+  // Demo weather data fallback
+  const DEMO_WEATHER: WeatherData = {
+    location: 'Chennai',
+    temp: 32,
+    condition: 'Partly Cloudy',
+    humidity: 65,
+    windSpeed: 12,
+    forecast: [
+      { day: 'Today', high: 32, low: 24, condition: 'Partly Cloudy' },
+      { day: 'Mon', high: 33, low: 25, condition: 'Clear' },
+      { day: 'Tue', high: 34, low: 26, condition: 'Clear' },
+      { day: 'Wed', high: 31, low: 23, condition: 'Rain' },
+      { day: 'Thu', high: 30, low: 22, condition: 'Rain' },
+    ]
+  }
+  
+  // Fetch weather data
+  const fetchWeather = useCallback(async () => {
+    setWeatherLoading(true)
+    try {
+      const res = await fetch('/api/weather?location=Chennai')
+      const data = await res.json()
+      if (data.forecast && data.forecast.length > 0) {
+        setWeather({
+          location: data.location || 'Chennai',
+          temp: data.forecast[0]?.tempHigh || 32,
+          condition: data.forecast[0]?.condition || 'Clear',
+          humidity: data.forecast[0]?.humidity || 65,
+          windSpeed: data.forecast[0]?.windSpeed || 12,
+          forecast: data.forecast.slice(0, 5).map((f: any) => ({
+            day: f.dayName || f.date,
+            high: f.tempHigh || 32,
+            low: f.tempLow || 24,
+            condition: f.condition || 'Clear'
+          }))
+        })
+      } else {
+        // Use demo data if no forecast
+        setWeather(DEMO_WEATHER)
+      }
+    } catch (e) {
+      console.warn('Weather fetch failed, using demo data:', e)
+      setWeather(DEMO_WEATHER)
+    } finally {
+      setWeatherLoading(false)
+    }
+  }, [])
+  
+  useEffect(() => {
+    fetchWeather()
+  }, [fetchWeather])
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -445,6 +511,55 @@ export default function Dashboard() {
             </Link>
           ))}
         </div>
+
+        {/* Weather Widget */}
+        {weather && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-blue-900/40 to-cyan-900/40 border border-blue-800/30 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    {weather.condition.toLowerCase().includes('rain') ? (
+                      <CloudRain className="w-5 h-5 text-blue-400" />
+                    ) : weather.condition.toLowerCase().includes('cloud') ? (
+                      <Cloud className="w-5 h-5 text-slate-400" />
+                    ) : (
+                      <Sun className="w-5 h-5 text-yellow-400" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-white">{weather.temp}°</span>
+                      <span className="text-slate-400">{weather.condition}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
+                      <span className="flex items-center gap-1"><Droplets className="w-3 h-3" /> {weather.humidity}%</span>
+                      <span className="flex items-center gap-1"><Wind className="w-3 h-3" /> {weather.windSpeed} km/h</span>
+                      <span className="text-slate-500">📍 {weather.location}</span>
+                    </div>
+                  </div>
+                </div>
+                <Link href="/weather" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                  View Details →
+                </Link>
+              </div>
+              <div className="flex items-center gap-4 overflow-x-auto pb-1">
+                {weather.forecast.map((day, idx) => (
+                  <div key={idx} className="flex-shrink-0 text-center min-w-[60px]">
+                    <div className="text-xs text-slate-400 mb-1">{idx === 0 ? 'Today' : day.day}</div>
+                    <div className="text-lg mb-1">
+                      {day.condition.toLowerCase().includes('rain') ? '🌧️' : day.condition.toLowerCase().includes('cloud') ? '☁️' : '☀️'}
+                    </div>
+                    <div className="text-xs">
+                      <span className="text-white font-medium">{day.high}°</span>
+                      <span className="text-slate-500"> / {day.low}°</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

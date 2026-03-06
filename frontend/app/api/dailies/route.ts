@@ -146,33 +146,51 @@ export async function GET(request: NextRequest) {
       orderBy: { dayNumber: 'desc' }
     });
 
-    const dailies = shootingDays.map(day => ({
-      id: day.id,
-      date: day.scheduledDate?.toISOString().split('T')[0] || '',
-      dayNumber: day.dayNumber,
-      location: day.location?.name || 'Unknown',
-      locationId: day.locationId,
-      callTime: day.callTime || '',
-      wrapTime: '',
-      weather: day.weatherData ? JSON.stringify(day.weatherData) : 'Indoor (Studio)',
-      scenes: day.dayScenes.map(ds => ({
-        sceneId: ds.sceneId,
-        sceneNumber: ds.scene.sceneNumber,
-        description: ds.scene.description || '',
-        plannedShots: ds.estimatedMinutes || 0,
-        actualShots: ds.actualMinutes || 0,
-        status: day.status === 'completed' ? 'completed' : day.status === 'in-progress' ? 'partial' : 'pending',
-        notes: ds.notes || ''
-      })),
-      totalShotsPlanned: day.dayScenes.reduce((acc, ds) => acc + (ds.estimatedMinutes || 0), 0),
-      totalShotsShot: day.dayScenes.reduce((acc, ds) => acc + (ds.actualMinutes || 0), 0),
-      crewPresent: 0,
-      castPresent: 0,
-      incidents: [],
-      notes: day.notes || '',
-      createdAt: day.createdAt.toISOString(),
-      createdBy: 'Production Manager'
-    }));
+    // Derive location from scenes if not explicitly set
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const getLocationFromScenes = (dayScenes: any[]): string => {
+      if (!dayScenes || dayScenes.length === 0) return 'Unknown';
+      // Get unique locations from scenes
+      const locations = [...new Set(dayScenes.map((ds: any) => ds.scene?.location).filter(Boolean))];
+      if (locations.length === 0) return 'Unknown';
+      if (locations.length === 1) return locations[0];
+      return `${locations[0]} +${locations.length - 1} more`;
+    };
+
+    const dailies = shootingDays.map(day => {
+      // Use explicit location or derive from scenes
+      const explicitLocation = day.location?.name;
+      const sceneLocations = getLocationFromScenes(day.dayScenes);
+      const resolvedLocation = explicitLocation || sceneLocations;
+      
+      return {
+        id: day.id,
+        date: day.scheduledDate?.toISOString().split('T')[0] || '',
+        dayNumber: day.dayNumber,
+        location: resolvedLocation,
+        locationId: day.locationId,
+        callTime: day.callTime || '',
+        wrapTime: '',
+        weather: day.weatherData ? JSON.stringify(day.weatherData) : 'Indoor (Studio)',
+        scenes: day.dayScenes.map(ds => ({
+          sceneId: ds.sceneId,
+          sceneNumber: ds.scene.sceneNumber,
+          description: ds.scene.description || '',
+          plannedShots: ds.estimatedMinutes || 0,
+          actualShots: ds.actualMinutes || 0,
+          status: day.status === 'completed' ? 'completed' : day.status === 'in-progress' ? 'partial' : 'pending',
+          notes: ds.notes || ''
+        })),
+        totalShotsPlanned: day.dayScenes.reduce((acc, ds) => acc + (ds.estimatedMinutes || 0), 0),
+        totalShotsShot: day.dayScenes.reduce((acc, ds) => acc + (ds.actualMinutes || 0), 0),
+        crewPresent: 0,
+        castPresent: 0,
+        incidents: [],
+        notes: day.notes || '',
+        createdAt: day.createdAt.toISOString(),
+        createdBy: 'Production Manager'
+      };
+    });
 
     const stats = {
       totalDays: dailies.length,

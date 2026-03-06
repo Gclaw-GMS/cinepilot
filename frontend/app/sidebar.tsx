@@ -75,7 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/character-costume', icon: Shirt, label: 'Costume Design' },
       { href: '/audience-sentiment', icon: MessageCircle, label: 'Audience Sentiment' },
       { href: '/budget', icon: DollarSign, label: 'Budget Engine' },
-      { href: '/reports', icon: Shield, label: 'Censor Board' },
+      { href: '/censor', icon: Shield, label: 'Censor Board' },
       { href: '/continuity', icon: Eye, label: 'Continuity' },
       { href: '/vfx', icon: Sparkles, label: 'VFX Breakdown' },
       { href: '/dubbing', icon: Languages, label: 'Dubbing' },

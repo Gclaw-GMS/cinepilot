@@ -71,6 +71,15 @@ export async function GET(req: NextRequest) {
         },
       });
 
+      // Return demo data if no dubbed scripts found
+      if (dubbedScripts.length === 0) {
+        return NextResponse.json({ 
+          scripts: DEMO_DUBBED_VERSIONS,
+          translatedScenes: DEMO_TRANSLATED_SCENES,
+          isDemoMode: true 
+        });
+      }
+
       return NextResponse.json({ scripts: dubbedScripts });
     } catch (dbError) {
       // Fallback to demo data if database fails

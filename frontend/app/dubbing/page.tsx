@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, BarChart3, PieChart, TrendingUp, Download, Copy, Check, Wand2, Film } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, BarChart3, PieChart, TrendingUp, Download, Copy, Check, Wand2, Film, Keyboard } from 'lucide-react'
 import {
   PieChart as RechartsPie,
   Pie,
@@ -65,6 +65,8 @@ export default function DubbingPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [copiedScene, setCopiedScene] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'versions' | 'preview'>('versions')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const scriptSelectRef = useRef<HTMLSelectElement>(null)
 
   // Load available scripts
   useEffect(() => {
@@ -113,6 +115,67 @@ export default function DubbingPage() {
       setPreview([])
     }
   }, [selectedScriptId, loadDubbedVersions])
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+    
+    const key = e.key.toLowerCase()
+    
+    // G: Generate translation
+    if (key === 'g' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault()
+      if (selectedScriptId && targetLanguage && !generating) {
+        handleGenerate()
+      }
+    }
+    // R: Refresh versions
+    else if (key === 'r' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault()
+      if (selectedScriptId) {
+        loadDubbedVersions(selectedScriptId)
+      }
+    }
+    // 1: Switch to versions tab
+    else if (key === '1') {
+      e.preventDefault()
+      setActiveTab('versions')
+    }
+    // 2: Switch to preview tab
+    else if (key === '2') {
+      e.preventDefault()
+      if (preview.length > 0) {
+        setActiveTab('preview')
+      }
+    }
+    // ?: Show keyboard help
+    else if (key === '?') {
+      e.preventDefault()
+      setShowKeyboardHelp(prev => !prev)
+    }
+    // Escape: Close keyboard help
+    else if (key === 'escape') {
+      e.preventDefault()
+      setShowKeyboardHelp(false)
+    }
+    // Arrow keys for language selection
+    else if (key === 'arrowright' || key === 'arrowleft') {
+      const currentIndex = TARGET_LANGUAGES.findIndex(l => l.value === targetLanguage)
+      if (currentIndex === -1) {
+        setTargetLanguage(TARGET_LANGUAGES[0].value)
+      } else {
+        const direction = key === 'arrowright' ? 1 : -1
+        const newIndex = (currentIndex + direction + TARGET_LANGUAGES.length) % TARGET_LANGUAGES.length
+        setTargetLanguage(TARGET_LANGUAGES[newIndex].value)
+      }
+    }
+  }, [selectedScriptId, targetLanguage, generating, preview.length, loadDubbedVersions])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   // Calculate statistics
   const stats: Stats = useMemo(() => {
@@ -224,6 +287,14 @@ export default function DubbingPage() {
                 Demo Mode
               </span>
             )}
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs rounded-lg transition-colors"
+              title="Keyboard shortcuts"
+            >
+              <Keyboard className="w-4 h-4" />
+              <span className="hidden sm:inline">?</span>
+            </button>
           </div>
         </div>
 
@@ -584,6 +655,86 @@ export default function DubbingPage() {
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-rose-500 rounded-full" />
                 Kannada
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                  Keyboard Shortcuts
+                </h2>
+                <button
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="text-slate-500 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Generate</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">G</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Generate translation</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Refresh</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">R</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Reload versions</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Versions</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">1</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Show versions tab</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Preview</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">2</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Show preview tab</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Next Lang</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">→</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Next language</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Prev Lang</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">←</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Previous language</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Help</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">?</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Toggle this panel</p>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 text-xs">Close</span>
+                      <kbd className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">Esc</kbd>
+                    </div>
+                    <p className="text-slate-500 text-xs">Close modal</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

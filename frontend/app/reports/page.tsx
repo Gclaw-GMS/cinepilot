@@ -65,6 +65,7 @@ const REPORT_CATEGORIES = [
     title: 'Team Reports',
     reports: [
       { id: 'crew-list', name: 'Crew List', description: 'Complete crew directory with contact details', icon: '👥', format: 'CSV' },
+      { id: 'dood-report', name: 'DOOD Report', description: 'Day Out of Days - actor availability tracking', icon: '📅', format: 'PDF' },
     ]
   },
   {
@@ -72,12 +73,19 @@ const REPORT_CATEGORIES = [
     reports: [
       { id: 'shot-list', name: 'Shot List', description: 'Complete shot breakdown with technical details', icon: '🎞️', format: 'CSV' },
       { id: 'equipment-list', name: 'Equipment List', description: 'All rented equipment with return dates', icon: '🎥', format: 'CSV' },
+      { id: 'vfx-report', name: 'VFX Report', description: 'Visual effects breakdown with complexity analysis', icon: '✨', format: 'PDF' },
+    ]
+  },
+  {
+    title: 'Locations',
+    reports: [
+      { id: 'location-report', name: 'Location Report', description: 'Shooting locations, permits and logistics', icon: '📍', format: 'PDF' },
     ]
   },
   {
     title: 'Compliance',
     reports: [
-      { id: 'censor-prediction', name: 'CBFC Certificate', description: 'Content sensitivity analysis and rating prediction', icon: '🛡️', format: 'PDF', href: '/reports' },
+      { id: 'censor-prediction', name: 'CBFC Certificate', description: 'Content sensitivity analysis and rating prediction', icon: '🛡️', format: 'PDF' },
     ]
   }
 ]
@@ -343,7 +351,7 @@ export default function ReportsPage() {
               {category.title}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-             1 md:grid {category.reports.map(report => {
+              {category.reports.map(report => {
                 const isGenerated = generatedReports[report.id]
                 const isGenerating = generatingReport === report.id
                 const isCensorReport = report.id === 'censor-prediction'

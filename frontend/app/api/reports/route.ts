@@ -65,6 +65,30 @@ const DEMO_REPORTS = [
     format: 'CSV',
     lastGenerated: null,
   },
+  {
+    id: 'vfx-report',
+    name: 'VFX Report',
+    description: 'Visual effects breakdown with shot counts and complexity analysis',
+    icon: '✨',
+    format: 'PDF',
+    lastGenerated: null,
+  },
+  {
+    id: 'location-report',
+    name: 'Location Report',
+    description: 'Shooting location details, permits, and logistics summary',
+    icon: '📍',
+    format: 'PDF',
+    lastGenerated: new Date(Date.now() - 259200000).toISOString(),
+  },
+  {
+    id: 'dood-report',
+    name: 'DOOD Report',
+    description: 'Day Out of Days - actor availability and shooting schedule',
+    icon: '📅',
+    format: 'PDF',
+    lastGenerated: null,
+  },
 ];
 
 const DEMO_PRODUCTION_DATA = {
@@ -159,6 +183,78 @@ export async function GET(req: NextRequest) {
                 { name: 'Mid-production Review', date: '2026-02-25' },
               ],
             },
+          },
+          generated_at: new Date().toISOString(),
+          isDemoMode: true,
+        });
+
+      case 'vfx-report':
+        return NextResponse.json({
+          success: true,
+          report: {
+            project_name: DEMO_PRODUCTION_DATA.project_name,
+            total_vfx_shots: 156,
+            completed_shots: 89,
+            pending_shots: 67,
+            breakdown_by_type: [
+              { type: 'CGI Character', count: 24, complexity: 'High', avg_render_hours: 48 },
+              { type: 'Environment Extension', count: 45, complexity: 'Medium', avg_render_hours: 12 },
+              { type: 'Matte Painting', count: 18, complexity: 'High', avg_render_hours: 24 },
+              { type: 'Wire Removal', count: 32, complexity: 'Low', avg_render_hours: 2 },
+              { type: 'Green Screen Comp', count: 28, complexity: 'Medium', avg_render_hours: 8 },
+              { type: 'Particle Effects', count: 9, complexity: 'High', avg_render_hours: 36 },
+            ],
+            budget_allocation: {
+              allocated: 2500000,
+              spent: 1450000,
+              remaining: 1050000,
+            },
+            vendor_info: [
+              { name: 'Redrooster Studios', shots: 67, status: 'In Progress' },
+              { name: 'Makuta VFX', shots: 52, status: 'In Progress' },
+              { name: 'In-house', shots: 37, status: 'Completed' },
+            ],
+          },
+          generated_at: new Date().toISOString(),
+          isDemoMode: true,
+        });
+
+      case 'location-report':
+        return NextResponse.json({
+          success: true,
+          report: {
+            project_name: DEMO_PRODUCTION_DATA.project_name,
+            total_locations: 8,
+            completed_shoots: 5,
+            upcoming_shoots: 3,
+            locations: [
+              { name: 'AVM Studios', type: 'Studio', days_shot: 4, permit_status: 'Approved', cost_per_day: 50000 },
+              { name: 'Mahabalipuram Beach', type: 'Outdoor', days_shot: 2, permit_status: 'Approved', cost_per_day: 25000 },
+              { name: 'Chennai Railway Station', type: 'Public', days_shot: 1, permit_status: 'Approved', cost_per_day: 15000 },
+              { name: 'T Nagar Street', type: 'Public', days_shot: 0, permit_status: 'Pending', cost_per_day: 10000 },
+              { name: 'Marina Beach', type: 'Outdoor', days_shot: 0, permit_status: 'Approved', cost_per_day: 30000 },
+            ],
+            total_location_cost: 650000,
+          },
+          generated_at: new Date().toISOString(),
+          isDemoMode: true,
+        });
+
+      case 'dood-report':
+        return NextResponse.json({
+          success: true,
+          report: {
+            project_name: DEMO_PRODUCTION_DATA.project_name,
+            total_shooting_days: 20,
+            characters: [
+              { name: 'Arjun', actor: 'Ajith Kumar', total_days: 15, days: [1,2,3,5,6,7,9,10,11,12,14,15,16,18,20], percentage: 75 },
+              { name: 'Priya', actor: 'Sai Pallavi', total_days: 12, days: [1,2,4,5,6,8,9,10,12,13,14,15], percentage: 60 },
+              { name: 'Mahendra', actor: 'Vijay Sethupathi', total_days: 8, days: [3,7,11,15,16,17,18,19], percentage: 40 },
+              { name: 'Sathya', actor: 'Nivin Pauly', total_days: 10, days: [1,4,5,9,10,14,15,16,20,21], percentage: 50 },
+              { name: 'Divya', actor: 'Aishwarya Rajesh', total_days: 6, days: [2,3,8,12,13,19], percentage: 30 },
+            ],
+            total_calls: 51,
+            avg_days_per_actor: 10.2,
           },
           generated_at: new Date().toISOString(),
           isDemoMode: true,

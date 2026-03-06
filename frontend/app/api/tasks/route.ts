@@ -176,6 +176,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// Valid status and priority values
+const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'blocked'];
+const VALID_PRIORITIES = ['low', 'medium', 'high'];
+
 // POST /api/tasks - Create a new task
 export async function POST(req: NextRequest) {
   try {
@@ -184,6 +188,20 @@ export async function POST(req: NextRequest) {
 
     if (typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
+    }
+
+    // Validate status if provided
+    if (status && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ 
+        error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    // Validate priority if provided
+    if (priority && !VALID_PRIORITIES.includes(priority)) {
+      return NextResponse.json({ 
+        error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` 
+      }, { status: 400 });
     }
 
     const resolvedProjectId = projectId || await ensureDefaultProject();
@@ -248,6 +266,20 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json();
     const { title, description, status, priority, assignee, dueDate } = body;
+
+    // Validate status if provided
+    if (status && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ 
+        error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    // Validate priority if provided
+    if (priority && !VALID_PRIORITIES.includes(priority)) {
+      return NextResponse.json({ 
+        error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}` 
+      }, { status: 400 });
+    }
 
     const updateData: Record<string, unknown> = {};
     

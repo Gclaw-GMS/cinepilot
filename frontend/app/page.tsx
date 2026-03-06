@@ -151,7 +151,10 @@ export default function Dashboard() {
     try {
       const res = await fetch('/api/health')
       const data = await res.json()
-      setDbStatus(data.status === 'connected' ? 'connected' : 'disconnected')
+      // Handle 'connected', 'degraded', or other statuses - if database is healthy, consider it connected
+      const isConnected = data.status === 'connected' || data.status === 'degraded' ||
+        (data.checks?.some((c: { component: string; status: string }) => c.component === 'database' && c.status === 'healthy'))
+      setDbStatus(isConnected ? 'connected' : 'disconnected')
     } catch {
       setDbStatus('disconnected')
     }
@@ -198,17 +201,23 @@ export default function Dashboard() {
 
       console.log('[Dashboard] Data received:', { scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData })
 
-      // If all data is null, use demo mode
-      const hasRealData = scriptsData || shotsData || budgetData || scheduleData || locationsData || censorData || storyboardData || tasksData
+      // If no real data from any API, use demo mode
+      const hasRealData = (scriptsData?.scripts?.length > 0) || 
+        (shotsData?.totalShots > 0) || 
+        (budgetData?.totalPlanned > 0) || 
+        (scheduleData?.days?.length > 0) ||
+        (tasksData?.data?.length > 0)
+      
       if (!hasRealData) {
-        console.log('[Dashboard] All API calls failed, using demo data')
+        console.log('[Dashboard] No real data found, using demo mode')
         setStats(DEMO_STATS)
         setIsDemoMode(true)
         setLoading(false)
         return
       }
 
-      if (scriptsData) {
+      // Process scripts data
+      if (scriptsData?.scripts) {
         const scripts = scriptsData.scripts || []
         const characters = scriptsData.characters || []
         result.scripts.total = scripts.length
@@ -218,35 +227,41 @@ export default function Dashboard() {
         result.scripts.characters = characters.length
       }
 
+      // Process shots data
       if (shotsData) {
         result.shots.total = shotsData.totalShots || 0
         result.shots.missingFields = shotsData.missingFields || 0
         result.shots.runtimeMin = Math.round((shotsData.totalDurationSec || 0) / 60)
       }
 
+      // Process budget data
       if (budgetData) {
         result.budget.planned = budgetData.totalPlanned || 0
         result.budget.actual = budgetData.totalActual || 0
         result.budget.variance = budgetData.variance || 0
       }
 
-      if (scheduleData) {
+      // Process schedule data
+      if (scheduleData?.days) {
         const days = scheduleData.days || []
         result.schedule.days = days.length
         result.schedule.scenes = days.reduce((n: number, day: { scenes?: unknown[] }) => n + (day.scenes?.length || 0), 0)
       }
 
-      if (locationsData) {
+      // Process locations data
+      if (locationsData?.scenes) {
         const scenes = locationsData.scenes || []
         result.locations.scenes = scenes.length
         result.locations.candidates = scenes.reduce((n: number, s: { candidates?: unknown[] }) => n + (s.candidates?.length || 0), 0)
       }
 
+      // Process censor data
       if (censorData) {
         result.censor.certificate = censorData.predictedCertificate || '--'
         result.censor.score = censorData.sensitivityScore || 0
       }
 
+      // Process storyboard data
       if (storyboardData) {
         result.storyboard.frames = storyboardData.totalFrames || 0
         const scenes = storyboardData.scenes || []
@@ -288,7 +303,14 @@ export default function Dashboard() {
   }, [checkDbStatus])
 
   useEffect(() => {
-    fetchStats()
+    // Set a fallback timeout to ensure loading completes even if there's an error
+    const timeoutId = setTimeout(() => {
+      setLoading(false)
+    }, 10000) // 10 second timeout
+    
+    fetchStats().finally(() => {
+      clearTimeout(timeoutId)
+    })
   }, [fetchStats])
 
   const budgetData = stats.budget.planned > 0

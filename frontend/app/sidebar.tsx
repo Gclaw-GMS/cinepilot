@@ -31,6 +31,7 @@ import {
   Briefcase,
   Shirt,
   Utensils,
+  MessageSquare,
 } from 'lucide-react'
 
 type NavItem = {
@@ -104,6 +105,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'System',
     items: [
+      { href: '/chat', icon: MessageSquare, label: 'AI Chat', badge: 'NEW' },
       { href: '/weather', icon: Cloud, label: 'Weather' },
       { href: '/notifications', icon: Bell, label: 'Notifications' },
       { href: '/settings', icon: Settings, label: 'Settings' },

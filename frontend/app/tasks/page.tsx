@@ -81,6 +81,7 @@ interface TaskStats {
   blocked: number
   overdue: number
   highPriority: number
+  completionPercent: number
 }
 
 type ViewMode = 'list' | 'board' | 'calendar'
@@ -216,15 +217,18 @@ export default function TasksPage() {
   const stats = useMemo((): TaskStats => {
     const now = new Date()
     const today = now.toISOString().split('T')[0]
+    const completed = tasks.filter(t => t.status === 'completed').length
+    const total = tasks.length
     
     return {
-      total: tasks.length,
+      total,
       pending: tasks.filter(t => t.status === 'pending').length,
       inProgress: tasks.filter(t => t.status === 'in_progress').length,
-      completed: tasks.filter(t => t.status === 'completed').length,
+      completed,
       blocked: tasks.filter(t => t.status === 'blocked').length,
       overdue: tasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'completed').length,
       highPriority: tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length,
+      completionPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
     }
   }, [tasks])
 
@@ -398,6 +402,32 @@ export default function TasksPage() {
               <Plus className="w-4 h-4" />
               Add Task
             </button>
+          </div>
+        </div>
+
+        {/* Progress Overview */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">{stats.completionPercent}%</span>
+              </div>
+              <div>
+                <h3 className="text-white font-medium">Overall Progress</h3>
+                <p className="text-sm text-slate-400">{stats.completed} of {stats.total} tasks completed</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-slate-400">{stats.pending} pending</span>
+              <span className="text-blue-400">{stats.inProgress} in progress</span>
+              {stats.overdue > 0 && <span className="text-red-400">{stats.overdue} overdue</span>}
+            </div>
+          </div>
+          <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 rounded-full transition-all duration-500"
+              style={{ width: `${stats.completionPercent}%` }}
+            />
           </div>
         </div>
 

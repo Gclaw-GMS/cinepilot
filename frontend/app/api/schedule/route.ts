@@ -149,16 +149,53 @@ export async function POST(req: NextRequest) {
       const start = startDate || new Date().toISOString().split('T')[0];
       const result = await optimizeSchedule(projectId, start, mode || 'balanced');
 
+      // Convert result.days to shootingDays format for frontend compatibility
+      const shootingDays = result.days.map(d => ({
+        id: `day-${d.dayNumber}`,
+        dayNumber: d.dayNumber,
+        scheduledDate: d.date,
+        callTime: d.isNight ? '18:00' : '06:00',
+        estimatedHours: Math.round(d.totalMinutes / 60 * 10) / 10,
+        notes: d.warnings.length > 0 ? d.warnings.join('; ') : null,
+        status: 'scheduled',
+        locationId: null,
+        location: d.location ? { name: d.location } : null,
+        dayScenes: d.scenes.map((s, idx) => ({
+          id: `ds-${d.dayNumber}-${idx}`,
+          orderNumber: idx + 1,
+          estimatedMinutes: s.estimatedMinutes,
+          scene: {
+            id: s.sceneId,
+            sceneNumber: s.sceneNumber,
+            headingRaw: null,
+            intExt: null,
+            timeOfDay: null,
+            location: d.location,
+          },
+        })),
+      }));
+
+      const totalHours = result.totalMinutes / 60;
+      const totalScenes = result.days.reduce((s, d) => s + d.scenes.length, 0);
+
       return NextResponse.json({
         message: `Schedule optimized: ${result.totalDays} days`,
-        ...result,
+        shootingDays,
+        versions: [],
+        stats: {
+          totalDays: result.totalDays,
+          totalHours: Math.round(totalHours * 10) / 10,
+          totalScenes,
+        },
+        warnings: result.warnings,
+        unscheduledScenes: result.unscheduledScenes,
       });
     }
 
     // Demo mode: return mock optimized schedule
     if (action === 'optimize' && process.env.NODE_ENV !== 'production') {
       const startDateStr = startDate || new Date().toISOString().split('T')[0];
-      const days = DEMO_SHOOTING_DAYS.map((d, i) => {
+      const shootingDays = DEMO_SHOOTING_DAYS.map((d, i) => {
         const date = new Date(startDateStr);
         date.setDate(date.getDate() + i);
         return {
@@ -167,10 +204,18 @@ export async function POST(req: NextRequest) {
         };
       });
 
+      const totalHours = shootingDays.reduce((s, d) => s + Number(d.estimatedHours || 0), 0);
+      const totalScenes = shootingDays.reduce((s, d) => s + d.dayScenes.length, 0);
+
       return NextResponse.json({
-        message: `Schedule optimized: ${days.length} days (demo mode)`,
-        totalDays: days.length,
-        days,
+        message: `Schedule optimized: ${shootingDays.length} days (demo mode)`,
+        shootingDays,
+        versions: DEMO_VERSIONS,
+        stats: {
+          totalDays: shootingDays.length,
+          totalHours: Math.round(totalHours * 10) / 10,
+          totalScenes,
+        },
         _demo: true,
       });
     }

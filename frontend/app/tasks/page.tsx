@@ -84,7 +84,7 @@ interface TaskStats {
 }
 
 type ViewMode = 'list' | 'board' | 'calendar'
-type FilterStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'blocked'
+type FilterStatus = 'all' | 'overdue' | 'pending' | 'in_progress' | 'completed' | 'blocked'
 type FilterPriority = 'all' | 'high' | 'medium' | 'low'
 
 export default function TasksPage() {
@@ -230,8 +230,14 @@ export default function TasksPage() {
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    
     return tasks.filter(task => {
-      const matchesStatus = filterStatus === 'all' || task.status === filterStatus
+      const isOverdue = task.dueDate && task.dueDate < today && task.status !== 'completed'
+      
+      const matchesStatus = filterStatus === 'all' || 
+        (filterStatus === 'overdue' ? isOverdue : task.status === filterStatus)
       const matchesPriority = filterPriority === 'all' || task.priority === filterPriority
       const matchesSearch = !searchQuery || 
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -484,6 +490,7 @@ export default function TasksPage() {
               className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
             >
               <option value="all">All Status</option>
+              <option value="overdue">⚠️ Overdue</option>
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>

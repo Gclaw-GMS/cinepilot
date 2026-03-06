@@ -3,6 +3,32 @@ import { prisma } from '@/lib/db'
 
 const DEFAULT_PROJECT_ID = 'default-project'
 
+async function ensureDefaultProject(): Promise<string> {
+  try {
+    let user = await prisma.user.findFirst({ where: { id: 'default-user' } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: 'default-user',
+          email: 'dev@cinepilot.ai',
+          passwordHash: 'none',
+          name: 'Dev User',
+        },
+      });
+    }
+    let project = await prisma.project.findUnique({ where: { id: DEFAULT_PROJECT_ID } });
+    if (!project) {
+      project = await prisma.project.create({
+        data: { id: DEFAULT_PROJECT_ID, name: 'Default Project', userId: user.id },
+      });
+    }
+    return project.id;
+  } catch (error) {
+    console.log('[ensureDefaultProject] Database not available');
+    return DEFAULT_PROJECT_ID;
+  }
+}
+
 // In-memory storage for demo mode
 const demoNotes: Map<string, Note[]> = new Map()
 
@@ -84,9 +110,12 @@ demoNotes.set(DEFAULT_PROJECT_ID, [...DEMO_NOTES])
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const category = searchParams.get('category')
-  const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID
+  const requestedProjectId = searchParams.get('projectId')
 
   try {
+    // Ensure default project exists
+    const projectId = requestedProjectId || await ensureDefaultProject()
+
     // Prisma Client automatically manages connections in Next.js API routes
     const where: Record<string, unknown> = { projectId }
     if (category && category !== 'all') where.category = category
@@ -117,9 +146,13 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return NextResponse.json({ notes: formattedNotes })
-  } catch {
+    return NextResponse.json({ notes: formattedNotes, isDemoMode: false })
+  } catch (error) {
+    // Log the error for debugging
+    console.error('[GET /api/notes] Database error:', error)
+    
     // Fall back to demo data
+    const projectId = requestedProjectId || DEFAULT_PROJECT_ID
     const notes = demoNotes.get(projectId) || DEMO_NOTES
     let filtered = notes
     
@@ -134,7 +167,7 @@ export async function GET(req: NextRequest) {
 // POST /api/notes - Create a new note
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { title, content, category, tags, isPinned, projectId = DEFAULT_PROJECT_ID } = body
+  const { title, content, category, tags, isPinned, projectId: requestedProjectId } = body
 
   if (!title) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -153,6 +186,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Ensure default project exists
+    const projectId = requestedProjectId || await ensureDefaultProject()
+
     const created = await prisma.note.create({
       data: {
         title,
@@ -176,10 +212,14 @@ export async function POST(req: NextRequest) {
         createdAt: created.createdAt.toISOString(),
         updatedAt: created.updatedAt.toISOString(),
         isPinned: created.isPinned,
-      }
+      },
+      isDemoMode: false
     })
-  } catch {
+  } catch (error) {
+    console.error('[POST /api/notes] Database error:', error)
+    
     // Save to demo storage
+    const projectId = requestedProjectId || DEFAULT_PROJECT_ID
     const notes = demoNotes.get(projectId) || []
     notes.push(newNote)
     demoNotes.set(projectId, notes)

@@ -188,7 +188,10 @@ export default function Dashboard() {
         }
       }
 
-      const [scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData] = await Promise.all([
+      console.log('[Dashboard] Starting data fetch...')
+      
+      // Fetch data with explicit error handling
+      const results = await Promise.allSettled([
         safeFetch('/api/scripts'),
         safeFetch('/api/shots?stats=true'),
         safeFetch('/api/budget?action=forecast'),
@@ -199,14 +202,28 @@ export default function Dashboard() {
         safeFetch('/api/tasks?projectId=default-project'),
       ])
 
-      console.log('[Dashboard] Data received:', { scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData })
+      const [scriptsData, shotsData, budgetData, scheduleData, locationsData, censorData, storyboardData, tasksData] = results.map(r => 
+        r.status === 'fulfilled' ? r.value : null
+      )
+
+      console.log('[Dashboard] Data received:', { 
+        scriptsData: scriptsData ? `${scriptsData.scripts?.length} scripts` : 'null',
+        shotsData: shotsData ? `${shotsData.totalShots} shots` : 'null', 
+        budgetData: budgetData ? `₹${budgetData.totalPlanned}` : 'null',
+        scheduleData: scheduleData ? `${scheduleData.days?.length} days` : 'null',
+        tasksData: tasksData ? `${tasksData.data?.length} tasks` : 'null'
+      })
 
       // If no real data from any API, use demo mode
-      const hasRealData = (scriptsData?.scripts?.length > 0) || 
-        (shotsData?.totalShots > 0) || 
-        (budgetData?.totalPlanned > 0) || 
-        (scheduleData?.days?.length > 0) ||
-        (tasksData?.data?.length > 0)
+      const scriptsLen = scriptsData?.scripts?.length || 0
+      const shotsCount = shotsData?.totalShots || 0
+      const budgetTotal = budgetData?.totalPlanned || 0
+      const scheduleDays = scheduleData?.days?.length || 0
+      const tasksCount = tasksData?.data?.length || 0
+      
+      console.log(`[Dashboard] Check: scripts=${scriptsLen}, shots=${shotsCount}, budget=${budgetTotal}, days=${scheduleDays}, tasks=${tasksCount}`)
+
+      const hasRealData = scriptsLen > 0 || shotsCount > 0 || budgetTotal > 0 || scheduleDays > 0 || tasksCount > 0
       
       if (!hasRealData) {
         console.log('[Dashboard] No real data found, using demo mode')
@@ -217,7 +234,7 @@ export default function Dashboard() {
       }
 
       // Process scripts data
-      if (scriptsData?.scripts) {
+      if (scriptsData && scriptsData.scripts) {
         const scripts = scriptsData.scripts || []
         const characters = scriptsData.characters || []
         result.scripts.total = scripts.length
@@ -225,6 +242,7 @@ export default function Dashboard() {
           (n: number, s: { scenes?: unknown[] }) => n + (s.scenes?.length || 0), 0
         )
         result.scripts.characters = characters.length
+        console.log('[Dashboard] Processed scripts:', result.scripts)
       }
 
       // Process shots data
@@ -232,6 +250,7 @@ export default function Dashboard() {
         result.shots.total = shotsData.totalShots || 0
         result.shots.missingFields = shotsData.missingFields || 0
         result.shots.runtimeMin = Math.round((shotsData.totalDurationSec || 0) / 60)
+        console.log('[Dashboard] Processed shots:', result.shots)
       }
 
       // Process budget data
@@ -239,26 +258,30 @@ export default function Dashboard() {
         result.budget.planned = budgetData.totalPlanned || 0
         result.budget.actual = budgetData.totalActual || 0
         result.budget.variance = budgetData.variance || 0
+        console.log('[Dashboard] Processed budget:', result.budget)
       }
 
       // Process schedule data
-      if (scheduleData?.days) {
+      if (scheduleData && scheduleData.days) {
         const days = scheduleData.days || []
         result.schedule.days = days.length
         result.schedule.scenes = days.reduce((n: number, day: { scenes?: unknown[] }) => n + (day.scenes?.length || 0), 0)
+        console.log('[Dashboard] Processed schedule:', result.schedule)
       }
 
       // Process locations data
-      if (locationsData?.scenes) {
+      if (locationsData && locationsData.scenes) {
         const scenes = locationsData.scenes || []
         result.locations.scenes = scenes.length
         result.locations.candidates = scenes.reduce((n: number, s: { candidates?: unknown[] }) => n + (s.candidates?.length || 0), 0)
+        console.log('[Dashboard] Processed locations:', result.locations)
       }
 
       // Process censor data
       if (censorData) {
         result.censor.certificate = censorData.predictedCertificate || '--'
         result.censor.score = censorData.sensitivityScore || 0
+        console.log('[Dashboard] Processed censor:', result.censor)
       }
 
       // Process storyboard data
@@ -270,6 +293,7 @@ export default function Dashboard() {
             n + (s.frames?.filter((f: { isApproved?: boolean }) => f.isApproved).length || 0),
           0
         )
+        console.log('[Dashboard] Processed storyboard:', result.storyboard)
       }
 
       // Process tasks data
@@ -283,6 +307,7 @@ export default function Dashboard() {
         result.tasks.overdue = tasks.filter((t: { dueDate?: string; status: string }) => 
           t.dueDate && t.dueDate < today && t.status !== 'completed'
         ).length
+        console.log('[Dashboard] Processed tasks:', result.tasks)
       }
 
       setStats(result)

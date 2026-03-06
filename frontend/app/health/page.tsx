@@ -17,11 +17,13 @@ interface HealthResponse {
   timestamp: string
   version: string
   uptime: number
+  environment: string
   database: {
     status: 'connected' | 'disconnected'
     latencyMs?: number
     error?: string
     records?: number
+    provider?: string
   }
   services: {
     name: string
@@ -40,6 +42,7 @@ interface HealthResponse {
     }
     nodeVersion: string
     platform: string
+    arch: string
   }
   endpoints: {
     name: string
@@ -68,6 +71,8 @@ const CORE_ENDPOINTS = [
   { name: 'Analytics', path: '/api/analytics' },
   { name: 'Reports', path: '/api/reports' },
   { name: 'Health', path: '/api/health' },
+  { name: 'Shots', path: '/api/shots' },
+  { name: 'Locations', path: '/api/locations' },
 ]
 
 export default function HealthPage() {
@@ -237,6 +242,9 @@ export default function HealthPage() {
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBg(health?.status || 'unhealthy')} ${getStatusColor(health?.status || 'unhealthy')}`}>
                 {health?.status?.toUpperCase() || 'UNKNOWN'}
               </span>
+              <span className="text-xs text-gray-500 font-normal">
+                v{health?.version || '1.0.0'} • {health?.environment || 'dev'}
+              </span>
             </h1>
             <p className="text-gray-500 text-sm mt-1">
               Real-time system monitoring and endpoint status
@@ -366,7 +374,21 @@ export default function HealthPage() {
                 <Server className="w-4 h-4 text-green-400" />
                 <div>
                   <div className="text-xs text-gray-500">Platform</div>
-                  <div className="text-sm text-white">{health?.system?.platform || 'N/A'}</div>
+                  <div className="text-sm text-white">{health?.system?.platform || 'N/A'} ({health?.system?.arch || 'N/A'})</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-purple-400" />
+                <div>
+                  <div className="text-xs text-gray-500">Environment</div>
+                  <div className="text-sm text-white">{health?.environment || 'development'}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-orange-400" />
+                <div>
+                  <div className="text-xs text-gray-500">Database</div>
+                  <div className="text-sm text-white">{health?.database?.provider || 'N/A'}</div>
                 </div>
               </div>
             </div>

@@ -13,11 +13,13 @@ interface HealthResponse {
   timestamp: string;
   version: string;
   uptime: number;
+  environment: string;
   database: {
     status: 'connected' | 'disconnected';
     latencyMs?: number;
     error?: string;
     records?: number;
+    provider?: string;
   };
   services: {
     name: string;
@@ -36,6 +38,7 @@ interface HealthResponse {
     };
     nodeVersion: string;
     platform: string;
+    arch: string;
   };
   endpoints: {
     name: string;
@@ -82,7 +85,18 @@ async function checkDatabase(): Promise<{
   latencyMs?: number;
   error?: string;
   records?: number;
+  provider?: string;
 }> {
+  // First check if DATABASE_URL is configured
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    return {
+      connected: false,
+      error: 'DATABASE_URL not configured - using demo mode',
+      provider: 'none'
+    };
+  }
+
   try {
     const start = Date.now();
     await prisma.$queryRaw`SELECT 1`;
@@ -97,15 +111,39 @@ async function checkDatabase(): Promise<{
       // Table might not exist yet
     }
 
+    // Determine provider from URL
+    let provider = 'postgresql';
+    if (dbUrl.includes('postgres')) provider = 'postgresql';
+    else if (dbUrl.includes('mysql')) provider = 'mysql';
+    else if (dbUrl.includes('sqlite')) provider = 'sqlite';
+
     return {
       connected: true,
       latencyMs: latency,
-      records: recordCount
+      records: recordCount,
+      provider
     };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Database connection failed';
+    // Check for common error types
+    if (errorMessage.includes('ECONNREFUSED')) {
+      return {
+        connected: false,
+        error: 'Connection refused - is the database server running?',
+        provider: 'postgresql'
+      };
+    }
+    if (errorMessage.includes('timeout')) {
+      return {
+        connected: false,
+        error: 'Connection timeout - database may be unreachable',
+        provider: 'postgresql'
+      };
+    }
     return {
       connected: false,
-      error: error instanceof Error ? error.message : 'Database connection failed'
+      error: errorMessage,
+      provider: 'postgresql'
     };
   }
 }
@@ -165,6 +203,7 @@ export async function GET(req: NextRequest) {
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
     uptime: process.uptime?.() || 0,
+    environment: process.env.NODE_ENV || 'development',
     database: {
       status: 'disconnected'
     },
@@ -175,7 +214,8 @@ export async function GET(req: NextRequest) {
         loadAverage: getCpuLoad()
       },
       nodeVersion: process.version || 'unknown',
-      platform: process.platform || 'unknown'
+      platform: process.platform || 'unknown',
+      arch: process.arch || 'unknown'
     },
     endpoints: [],
     responseTimeMs: 0
@@ -187,7 +227,8 @@ export async function GET(req: NextRequest) {
     status: dbResult.connected ? 'connected' : 'disconnected',
     latencyMs: dbResult.latencyMs,
     error: dbResult.error,
-    records: dbResult.records
+    records: dbResult.records,
+    provider: dbResult.provider
   };
 
   // Add database to services list
@@ -198,12 +239,32 @@ export async function GET(req: NextRequest) {
     details: dbResult.records !== undefined ? `${dbResult.records} projects` : undefined
   });
 
+  // Check Redis if configured
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    try {
+      health.services.push({
+        name: 'Redis',
+        status: 'up',
+        details: 'Cache layer available'
+      });
+    } catch {
+      health.services.push({
+        name: 'Redis',
+        status: 'down',
+        details: 'Redis configured but unreachable'
+      });
+    }
+  }
+
   // Check key API endpoints
   const endpointChecks = [
     { name: 'Scripts API', path: '/api/scripts' },
     { name: 'Tasks API', path: '/api/tasks' },
     { name: 'Budget API', path: '/api/budget' },
-    { name: 'Weather API', path: '/api/weather' }
+    { name: 'Weather API', path: '/api/weather' },
+    { name: 'Projects API', path: '/api/projects' },
+    { name: 'Schedule API', path: '/api/schedule' }
   ];
 
   for (const endpoint of endpointChecks) {

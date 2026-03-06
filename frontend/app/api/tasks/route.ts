@@ -159,6 +159,19 @@ export async function GET(req: NextRequest) {
       updatedAt: t.updatedAt.toISOString(),
     }));
 
+    // If no tasks found in database, use demo data
+    if (transformed.length === 0) {
+      console.log('[GET /api/tasks] No tasks in database, using demo data');
+      let filtered = DEMO_TASKS.filter(t => t.projectId === projectId);
+      if (status && status !== 'all') {
+        filtered = filtered.filter(t => t.status === status);
+      }
+      if (priority && priority !== 'all') {
+        filtered = filtered.filter(t => t.priority === priority);
+      }
+      return NextResponse.json({ data: filtered, isDemoMode: true });
+    }
+    
     return NextResponse.json({ data: transformed, isDemoMode: false });
   } catch (error) {
     // If database is not connected, return demo data

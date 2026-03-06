@@ -106,6 +106,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [showForm, setShowForm] = useState(false)
@@ -128,13 +129,16 @@ export default function NotesPage() {
       if (!res.ok) {
         // Fall back to demo data
         setNotes(DEMO_NOTES)
+        setIsDemoMode(true)
         return
       }
       const data = await res.json()
       setNotes(data.notes || DEMO_NOTES)
+      setIsDemoMode(data.isDemoMode === true)
     } catch (err) {
       console.warn('Using demo notes:', err)
       setNotes(DEMO_NOTES)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -281,7 +285,14 @@ export default function NotesPage() {
               <StickyNote className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Production Notes</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white">Production Notes</h1>
+                {isDemoMode && (
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                    Demo Data
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-400">Keep track of important production details</p>
             </div>
           </div>

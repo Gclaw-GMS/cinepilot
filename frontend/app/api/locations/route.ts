@@ -51,8 +51,34 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ intent });
     }
 
+    // First get script IDs for this project, then query scenes
+    const scripts = await prisma.script.findMany({
+      where: { projectId },
+      select: { id: true },
+    });
+    const scriptIds = scripts.map(s => s.id);
+
+    // If no scripts found in database, fall back to demo data
+    if (scriptIds.length === 0) {
+      if (statsOnly) {
+        return NextResponse.json({
+          scenes: DEMO_SCENES.map(s => ({
+            sceneNumber: s.sceneNumber,
+            headingRaw: s.headingRaw,
+            location: s.location,
+            candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
+          })),
+          _demo: true,
+        });
+      }
+      return NextResponse.json({ 
+        scenes: DEMO_SCENES,
+        _demo: true,
+      });
+    }
+
     const scenes = await prisma.scene.findMany({
-      where: { script: { projectId } },
+      where: { scriptId: { in: scriptIds } },
       select: {
         id: true,
         sceneNumber: true,
@@ -71,6 +97,25 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { sceneIndex: 'asc' },
     });
+
+    // If no scenes with location intents, return demo data
+    if (scenes.length === 0) {
+      if (statsOnly) {
+        return NextResponse.json({
+          scenes: DEMO_SCENES.map(s => ({
+            sceneNumber: s.sceneNumber,
+            headingRaw: s.headingRaw,
+            location: s.location,
+            candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
+          })),
+          _demo: true,
+        });
+      }
+      return NextResponse.json({ 
+        scenes: DEMO_SCENES,
+        _demo: true,
+      });
+    }
 
     // For stats-only requests (dashboard), return flat format
     if (statsOnly) {

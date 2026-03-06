@@ -16,7 +16,7 @@ const DEMO_SCRIPTS = {
   scripts: [
     {
       id: 'demo-script-1',
-      projectId: 'demo-project-1',
+      projectId: DEFAULT_PROJECT_ID,
       title: 'Kaathal - The Core (Final Draft)',
       version: 3,
       isActive: true,
@@ -82,7 +82,7 @@ const DEMO_SCRIPTS = {
     },
     {
       id: 'demo-script-2',
-      projectId: 'demo-project-1',
+      projectId: 'default-project',
       title: 'Kaathal - Scene Extensions',
       version: 1,
       isActive: false,
@@ -94,21 +94,21 @@ const DEMO_SCRIPTS = {
     },
   ],
   characters: [
-    { id: 'char-1', name: 'JUDGE', aliases: [], roleHint: 'Honorable Judge', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }] },
-    { id: 'char-2', name: 'RAVI', aliases: ['Ravi Kumar'], roleHint: 'Protagonist', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }, { sceneId: 'scene-3', isSpeaking: true }] },
-    { id: 'char-3', name: 'DIVYA', aliases: [], roleHint: 'Female Lead', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-2', isSpeaking: true }] },
-    { id: 'char-4', name: 'SARATH', aliases: [], roleHint: 'Antagonist', projectId: 'demo-project-1', sceneCharacters: [{ sceneId: 'scene-3', isSpeaking: true }] },
-    { id: 'char-5', name: 'KANMANI', aliases: ['Kani'], roleHint: 'Comic Relief', projectId: 'demo-project-1', sceneCharacters: [] },
+    { id: 'char-1', name: 'JUDGE', aliases: [], roleHint: 'Honorable Judge', projectId: 'default-project', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }] },
+    { id: 'char-2', name: 'RAVI', aliases: ['Ravi Kumar'], roleHint: 'Protagonist', projectId: 'default-project', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }, { sceneId: 'scene-3', isSpeaking: true }] },
+    { id: 'char-3', name: 'DIVYA', aliases: [], roleHint: 'Female Lead', projectId: 'default-project', sceneCharacters: [{ sceneId: 'scene-2', isSpeaking: true }] },
+    { id: 'char-4', name: 'SARATH', aliases: [], roleHint: 'Antagonist', projectId: 'default-project', sceneCharacters: [{ sceneId: 'scene-3', isSpeaking: true }] },
+    { id: 'char-5', name: 'KANMANI', aliases: ['Kani'], roleHint: 'Comic Relief', projectId: 'default-project', sceneCharacters: [] },
   ],
   props: [
-    { id: 'prop-1', name: 'DIYA', projectId: 'demo-project-1' },
-    { id: 'prop-2', name: 'PHOTOGRAPH', projectId: 'demo-project-1' },
-    { id: 'prop-3', name: 'COFFEE CUP', projectId: 'demo-project-1' },
+    { id: 'prop-1', name: 'DIYA', projectId: 'default-project' },
+    { id: 'prop-2', name: 'PHOTOGRAPH', projectId: 'default-project' },
+    { id: 'prop-3', name: 'COFFEE CUP', projectId: 'default-project' },
   ],
   analyses: [
     {
       id: 'analysis-1',
-      projectId: 'demo-project-1',
+      projectId: 'default-project',
       analysisType: 'breakdown_summary',
       result: {
         totalScenes: 3,

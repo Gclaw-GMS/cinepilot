@@ -18,7 +18,8 @@ import {
   Keyboard,
   X,
   BarChart3,
-  Workflow
+  Workflow,
+  Plus
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -79,6 +80,15 @@ export default function DOODPage() {
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showLinkGuide, setShowLinkGuide] = useState(false)
+  const [showAddCharacter, setShowAddCharacter] = useState(false)
+  const [newCharacter, setNewCharacter] = useState({
+    character: '',
+    characterTamil: '',
+    actorName: '',
+    isMain: true,
+    days: [] as number[]
+  })
+  const [selectedDays, setSelectedDays] = useState<number[]>([])
   const tableRef = useRef<HTMLDivElement>(null)
   const filteredReportLength = useRef(0)
 
@@ -439,6 +449,47 @@ export default function DOODPage() {
         a.click()
       }
     }
+  }
+
+  // Handle adding a new character (demo mode)
+  const handleAddCharacter = () => {
+    if (!newCharacter.character.trim()) return
+    
+    const days = selectedDays.length > 0 ? selectedDays : Array.from({ length: Math.min(10, stats.totalShootingDays) }, (_, i) => i + 1)
+    const percentage = stats.totalShootingDays > 0 ? Math.round((days.length / stats.totalShootingDays) * 100) : 0
+    
+    const addedCharacter: DOODRow = {
+      characterId: `demo-${Date.now()}`,
+      character: newCharacter.character,
+      characterTamil: newCharacter.characterTamil || newCharacter.character,
+      actorName: newCharacter.actorName || undefined,
+      isMain: newCharacter.isMain,
+      total_days: days.length,
+      days: days,
+      percentage
+    }
+    
+    setReport(prev => [...prev, addedCharacter])
+    setStats(prev => ({
+      ...prev,
+      totalCharacters: prev.totalCharacters + 1,
+      totalCalls: prev.totalCalls + days.length,
+      avgDaysPerActor: Math.round(((prev.totalCalls + days.length) / (prev.totalCharacters + 1)) * 10) / 10
+    }))
+    
+    // Reset form
+    setNewCharacter({ character: '', characterTamil: '', actorName: '', isMain: true, days: [] })
+    setSelectedDays([])
+    setShowAddCharacter(false)
+  }
+
+  // Toggle day selection for new character
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day)
+        : [...prev, day].sort((a, b) => a - b)
+    )
   }
 
   const totalShootingDays = stats.totalShootingDays
@@ -1091,6 +1142,136 @@ export default function DOODPage() {
         </div>
       )}
 
+      {/* Add Character Modal */}
+      {showAddCharacter && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-green-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl shadow-green-500/10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-500/20">
+                  <Users className="w-5 h-5 text-green-400" />
+                </div>
+                <span className="bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
+                  Add New Character
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowAddCharacter(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Character Name *
+                </label>
+                <input
+                  type="text"
+                  value={newCharacter.character}
+                  onChange={(e) => setNewCharacter({ ...newCharacter, character: e.target.value })}
+                  placeholder="e.g., Ramesh"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Tamil Name
+                </label>
+                <input
+                  type="text"
+                  value={newCharacter.characterTamil}
+                  onChange={(e) => setNewCharacter({ ...newCharacter, characterTamil: e.target.value })}
+                  placeholder="ராமேஷ்"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Actor Name
+                </label>
+                <input
+                  type="text"
+                  value={newCharacter.actorName}
+                  onChange={(e) => setNewCharacter({ ...newCharacter, actorName: e.target.value })}
+                  placeholder="e.g., Vijay Sethupathi"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500"
+                />
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isMain"
+                  checked={newCharacter.isMain}
+                  onChange={(e) => setNewCharacter({ ...newCharacter, isMain: e.target.checked })}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500/50"
+                />
+                <label htmlFor="isMain" className="text-sm text-slate-300">
+                  Main Cast
+                </label>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Working Days (select days)
+                </label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                  {Array.from({ length: Math.max(totalShootingDays, 10) }, (_, i) => i + 1).map(day => (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleDay(day)}
+                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
+                        selectedDays.includes(day)
+                          ? 'bg-green-500 text-black shadow-md shadow-green-500/30'
+                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {selectedDays.length} days selected • Click to toggle
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowAddCharacter(false)}
+                className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddCharacter}
+                disabled={!newCharacter.character.trim()}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-600 hover:to-cyan-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Add Character
+              </button>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-800">
+              <p className="text-xs text-slate-500 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                Demo mode: Character will be added to the current session
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((stat, idx) => (
@@ -1202,6 +1383,14 @@ export default function DOODPage() {
               >
                 <FileText className="w-4 h-4" />
                 <span className="hidden sm:inline">Export Report</span>
+              </button>
+              <button
+                onClick={() => setShowAddCharacter(true)}
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-lg text-sm transition-colors"
+                title="Add Character (Demo Mode)"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Character</span>
               </button>
             </div>
           </div>

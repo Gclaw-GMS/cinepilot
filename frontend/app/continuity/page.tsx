@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight } from 'lucide-react';
+import {
+  LineChart, Line, AreaChart, Area, BarChart, Bar,
+  PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 
 type Script = { id: string; title: string };
 
@@ -27,12 +31,45 @@ type Summary = {
   _demo?: boolean;
 };
 
-const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string; bar: string }> = {
-  low: { bg: 'bg-slate-700/50', text: 'text-slate-300', border: 'border-slate-600', bar: 'bg-slate-500' },
-  medium: { bg: 'bg-amber-900/30', text: 'text-amber-400', border: 'border-amber-700/50', bar: 'bg-amber-500' },
-  high: { bg: 'bg-orange-900/30', text: 'text-orange-400', border: 'border-orange-700/50', bar: 'bg-orange-500' },
-  critical: { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700/50', bar: 'bg-red-500' },
+const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string; bar: string; hex: string }> = {
+  low: { bg: 'bg-slate-700/50', text: 'text-slate-300', border: 'border-slate-600', bar: 'bg-slate-500', hex: '#64748b' },
+  medium: { bg: 'bg-amber-900/30', text: 'text-amber-400', border: 'border-amber-700/50', bar: 'bg-amber-500', hex: '#f59e0b' },
+  high: { bg: 'bg-orange-900/30', text: 'text-orange-400', border: 'border-orange-700/50', bar: 'bg-orange-500', hex: '#f97316' },
+  critical: { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700/50', bar: 'bg-red-500', hex: '#ef4444' },
 };
+
+const WARNING_TYPES = [
+  { key: 'all', label: 'All Issues' },
+  { key: 'continuity', label: 'Continuity' },
+  { key: 'plot_hole', label: 'Plot Holes' },
+  { key: 'character', label: 'Character' },
+  { key: 'timeline', label: 'Timeline' },
+  { key: 'dialogue', label: 'Dialogue' },
+];
+
+// Historical data for trend visualization
+const DEMO_HISTORICAL_DATA = [
+  { date: '2026-02-01', critical: 3, high: 5, medium: 8, low: 12 },
+  { date: '2026-02-08', critical: 2, high: 4, medium: 7, low: 10 },
+  { date: '2026-02-15', critical: 1, high: 3, medium: 5, low: 8 },
+  { date: '2026-02-22', critical: 1, high: 2, medium: 4, low: 6 },
+  { date: '2026-03-01', critical: 0, high: 1, medium: 3, low: 4 },
+  { date: '2026-03-06', critical: 0, high: 0, medium: 2, low: 3 },
+];
+
+// Scene breakdown data
+const DEMO_SCENE_BREAKDOWN = [
+  { sceneNumber: '1', issues: 0, status: 'clean' },
+  { sceneNumber: '2', issues: 1, status: 'good' },
+  { sceneNumber: '3', issues: 2, status: 'warning' },
+  { sceneNumber: '4', issues: 0, status: 'clean' },
+  { sceneNumber: '5', issues: 3, status: 'critical' },
+  { sceneNumber: '6', issues: 1, status: 'good' },
+  { sceneNumber: '7', issues: 0, status: 'clean' },
+  { sceneNumber: '8', issues: 2, status: 'warning' },
+  { sceneNumber: '9', issues: 1, status: 'good' },
+  { sceneNumber: '10', issues: 0, status: 'clean' },
+];
 
 function getSeverityStyle(severity: string) {
   return SEVERITY_COLORS[severity] || SEVERITY_COLORS.low;
@@ -49,6 +86,91 @@ export default function ContinuityPage() {
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isDemo, setIsDemo] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'breakdown' | 'trends'>('overview');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [selectedWarning, setSelectedWarning] = useState<Warning | null>(null);
+  
+  // Historical and breakdown data
+  const [historicalData] = useState(DEMO_HISTORICAL_DATA);
+  const [sceneBreakdown] = useState(DEMO_SCENE_BREAKDOWN);
+
+  // Compute severity counts (needed for stats)
+  const severityCounts = warnings.reduce(
+    (acc, w) => {
+      acc[w.severity] = (acc[w.severity] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  // Computed statistics
+  const stats = useMemo(() => {
+    const total = warnings.length;
+    const continuityCount = warnings.filter(w => w.warningType === 'continuity').length;
+    const plotHoleCount = warnings.filter(w => w.warningType === 'plot_hole').length;
+    const characterCount = warnings.filter(w => w.warningType === 'character').length;
+    const timelineCount = warnings.filter(w => w.warningType === 'timeline').length;
+    const dialogueCount = warnings.filter(w => w.warningType === 'dialogue').length;
+    
+    const byType = {
+      continuity: continuityCount,
+      plot_hole: plotHoleCount,
+      character: characterCount,
+      timeline: timelineCount,
+      dialogue: dialogueCount,
+    };
+    
+    const criticalCount = severityCounts.critical || 0;
+    const highCount = severityCounts.high || 0;
+    const mediumCount = severityCounts.medium || 0;
+    const lowCount = severityCounts.low || 0;
+    
+    // Health score (inverse of issues weighted by severity)
+    const healthScore = total > 0 
+      ? Math.max(0, 100 - (criticalCount * 15 + highCount * 8 + mediumCount * 4 + lowCount * 1))
+      : 100;
+    
+    // Resolution rate (mock - would be tracked in real app)
+    const resolvedCount = 0;
+    const resolutionRate = total > 0 ? (resolvedCount / total) * 100 : 0;
+    
+    return {
+      total,
+      byType,
+      criticalCount,
+      highCount,
+      mediumCount,
+      lowCount,
+      healthScore,
+      resolvedCount,
+      resolutionRate,
+    };
+  }, [warnings, severityCounts]);
+
+  // Chart data for type distribution
+  const typeDistributionData = useMemo(() => {
+    return Object.entries(stats.byType)
+      .filter(([_, count]) => count > 0)
+      .map(([type, count]) => ({
+        name: type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value: count,
+        color: type === 'continuity' ? '#6366f1' : 
+               type === 'plot_hole' ? '#f59e0b' :
+               type === 'character' ? '#10b981' :
+               type === 'timeline' ? '#06b6d4' : '#8b5cf6',
+      }));
+  }, [stats.byType]);
+
+  // Severity pie chart data
+  const severityPieData = useMemo(() => {
+    return [
+      { name: 'Critical', value: stats.criticalCount, color: SEVERITY_COLORS.critical.hex },
+      { name: 'High', value: stats.highCount, color: SEVERITY_COLORS.high.hex },
+      { name: 'Medium', value: stats.mediumCount, color: SEVERITY_COLORS.medium.hex },
+      { name: 'Low', value: stats.lowCount, color: SEVERITY_COLORS.low.hex },
+    ].filter(d => d.value > 0);
+  }, [stats]);
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -124,31 +246,27 @@ export default function ContinuityPage() {
   const continuityWarnings = warnings.filter((w) => w.warningType === 'continuity');
   const plotHoleWarnings = warnings.filter((w) => w.warningType === 'plot_hole');
 
-  const filteredContinuity = filter
-    ? continuityWarnings.filter(
-        (w) =>
-          w.description.toLowerCase().includes(filter.toLowerCase()) ||
-          w.scene.sceneNumber.includes(filter) ||
-          (w.scene.headingRaw || '').toLowerCase().includes(filter.toLowerCase()),
-      )
-    : continuityWarnings;
+  const filteredContinuity = typeFilter === 'all' || typeFilter === 'continuity'
+    ? (filter
+        ? continuityWarnings.filter(
+            (w) =>
+              w.description.toLowerCase().includes(filter.toLowerCase()) ||
+              w.scene.sceneNumber.includes(filter) ||
+              (w.scene.headingRaw || '').toLowerCase().includes(filter.toLowerCase()),
+          )
+        : continuityWarnings)
+    : [];
 
-  const filteredPlotHoles = filter
-    ? plotHoleWarnings.filter(
-        (w) =>
-          w.description.toLowerCase().includes(filter.toLowerCase()) ||
-          w.scene.sceneNumber.includes(filter) ||
-          (w.scene.headingRaw || '').toLowerCase().includes(filter.toLowerCase()),
-      )
-    : plotHoleWarnings;
-
-  const severityCounts = warnings.reduce(
-    (acc, w) => {
-      acc[w.severity] = (acc[w.severity] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
+  const filteredPlotHoles = typeFilter === 'all' || typeFilter === 'plot_hole'
+    ? (filter
+        ? plotHoleWarnings.filter(
+            (w) =>
+              w.description.toLowerCase().includes(filter.toLowerCase()) ||
+              w.scene.sceneNumber.includes(filter) ||
+              (w.scene.headingRaw || '').toLowerCase().includes(filter.toLowerCase()),
+          )
+        : plotHoleWarnings)
+    : [];
 
   // Calculate percentages for severity bars
   const total = warnings.length || 1;
@@ -159,11 +277,59 @@ export default function ContinuityPage() {
     low: ((severityCounts.low || 0) / total) * 100,
   };
 
+  // Filter warnings by type
+  const filteredWarnings = useMemo(() => {
+    let filtered = warnings;
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(w => w.warningType === typeFilter);
+    }
+    if (filter) {
+      filtered = filtered.filter(
+        (w) =>
+          w.description.toLowerCase().includes(filter.toLowerCase()) ||
+          w.scene.sceneNumber.includes(filter) ||
+          (w.scene.headingRaw || '').toLowerCase().includes(filter.toLowerCase()),
+      );
+    }
+    return filtered;
+  }, [warnings, typeFilter, filter]);
+
+  // Export handlers
+  const handleExport = (format: 'csv' | 'json' | 'pdf') => {
+    const data = filteredWarnings.map(w => ({
+      scene: w.scene.sceneNumber,
+      heading: w.scene.headingRaw,
+      type: w.warningType,
+      severity: w.severity,
+      description: w.description,
+    }));
+    
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `continuity-issues-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+    } else if (format === 'csv') {
+      const csv = ['Scene,Heading,Type,Severity,Description']
+        .concat(data.map(d => `"${d.scene}","${d.heading || ''}","${d.type}","${d.severity}","${d.description.replace(/"/g, '""')}"`))
+        .join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `continuity-issues-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+    }
+    setShowExportMenu(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-indigo-600/20 rounded-xl flex items-center justify-center">
               <Eye className="w-6 h-6 text-indigo-400" />
@@ -175,12 +341,54 @@ export default function ContinuityPage() {
               </p>
             </div>
           </div>
-          {isDemo && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan-900/20 border border-cyan-800/50 rounded-lg">
-              <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-              <span className="text-xs text-cyan-400">Demo Data</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Health Score Badge */}
+            {warnings.length > 0 && (
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${
+                stats.healthScore >= 80 ? 'bg-emerald-900/20 border-emerald-800/50' :
+                stats.healthScore >= 50 ? 'bg-amber-900/20 border-amber-800/50' :
+                'bg-red-900/20 border-red-800/50'
+              }`}>
+                <Target className={`w-4 h-4 ${
+                  stats.healthScore >= 80 ? 'text-emerald-400' :
+                  stats.healthScore >= 50 ? 'text-amber-400' : 'text-red-400'
+                }`} />
+                <span className={`font-semibold ${
+                  stats.healthScore >= 80 ? 'text-emerald-400' :
+                  stats.healthScore >= 50 ? 'text-amber-400' : 'text-red-400'
+                }`}>{stats.healthScore}%</span>
+                <span className="text-xs text-slate-400">Health</span>
+              </div>
+            )}
+            {isDemo && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan-900/20 border border-cyan-800/50 rounded-lg">
+                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
+                <span className="text-xs text-cyan-400">Demo Data</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
+          {[
+            { key: 'overview', label: 'Overview', icon: BarChart3 },
+            { key: 'breakdown', label: 'Scene Breakdown', icon: LayoutGrid },
+            { key: 'trends', label: 'Trends', icon: TrendingUp },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-indigo-600/20 text-indigo-400 border-b-2 border-indigo-500'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Controls */}
@@ -205,9 +413,26 @@ export default function ContinuityPage() {
               disabled={!selectedScript || checking}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
             >
-              <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+              <Zap className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
               {checking ? 'Analyzing...' : 'Run Analysis'}
             </button>
+
+            {/* Type Filter */}
+            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+              {WARNING_TYPES.map((type) => (
+                <button
+                  key={type.key}
+                  onClick={() => setTypeFilter(type.key)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    typeFilter === type.key
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
 
             <div className="relative flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -234,6 +459,33 @@ export default function ContinuityPage() {
                 <LayoutGrid className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Export Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors"
+                  >
+                    Export as JSON
+                  </button>
+                  <button
+                    onClick={() => handleExport('csv')}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors"
+                  >
+                    Export as CSV
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -244,8 +496,8 @@ export default function ContinuityPage() {
           </div>
         )}
 
-        {/* Stats Cards with Charts */}
-        {warnings.length > 0 && (
+        {/* Overview Tab */}
+        {activeTab === 'overview' && warnings.length > 0 && (
           <>
             {/* Main Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -254,9 +506,9 @@ export default function ContinuityPage() {
                   <BarChart3 className="w-4 h-4 text-indigo-400" />
                   <span className="text-xs text-slate-400 uppercase tracking-wider">Total Issues</span>
                 </div>
-                <div className="text-3xl font-bold">{warnings.length}</div>
+                <div className="text-3xl font-bold">{stats.total}</div>
                 <div className="text-xs text-slate-500 mt-1">
-                  {filteredContinuity.length + filteredPlotHoles.length} shown
+                  {filteredWarnings.length} shown
                 </div>
               </div>
               
@@ -265,10 +517,8 @@ export default function ContinuityPage() {
                   <Eye className="w-4 h-4 text-indigo-400" />
                   <span className="text-xs text-slate-400 uppercase tracking-wider">Continuity</span>
                 </div>
-                <div className="text-3xl font-bold">{continuityWarnings.length}</div>
-                <div className="text-xs text-slate-500 mt-1">
-                  {summary?.continuityIssues || continuityWarnings.length} detected
-                </div>
+                <div className="text-3xl font-bold">{stats.byType.continuity}</div>
+                <div className="text-xs text-slate-500 mt-1">issues detected</div>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
@@ -276,49 +526,240 @@ export default function ContinuityPage() {
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
                   <span className="text-xs text-slate-400 uppercase tracking-wider">Plot Holes</span>
                 </div>
-                <div className="text-3xl font-bold">{plotHoleWarnings.length}</div>
-                <div className="text-xs text-slate-500 mt-1">
-                  {summary?.plotHoles || plotHoleWarnings.length} detected
-                </div>
+                <div className="text-3xl font-bold">{stats.byType.plot_hole}</div>
+                <div className="text-xs text-slate-500 mt-1">issues detected</div>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <FileCheck className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs text-slate-400 uppercase tracking-wider">Issues Resolved</span>
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Resolved</span>
                 </div>
-                <div className="text-3xl font-bold text-emerald-400">0</div>
-                <div className="text-xs text-slate-500 mt-1">Click to mark resolved</div>
+                <div className="text-3xl font-bold text-emerald-400">{stats.resolvedCount}</div>
+                <div className="text-xs text-slate-500 mt-1">{stats.resolutionRate.toFixed(0)}% rate</div>
               </div>
             </div>
 
-            {/* Severity Distribution Chart */}
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Severity Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-indigo-400" />
+                  Severity Distribution
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { name: 'Critical', value: stats.criticalCount, fill: SEVERITY_COLORS.critical.hex },
+                      { name: 'High', value: stats.highCount, fill: SEVERITY_COLORS.high.hex },
+                      { name: 'Medium', value: stats.mediumCount, fill: SEVERITY_COLORS.medium.hex },
+                      { name: 'Low', value: stats.lowCount, fill: SEVERITY_COLORS.low.hex },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#f1f5f9' }}
+                      />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Type Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-indigo-400" />
+                  Issue Type Distribution
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={typeDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={{ stroke: '#64748b' }}
+                      >
+                        {typeDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#f1f5f9' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Trend Chart */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-indigo-400" />
-                Severity Distribution
+                <TrendingUp className="w-4 h-4 text-indigo-400" />
+                Issue Trend Over Time
               </h3>
-              <div className="space-y-3">
-                {(['critical', 'high', 'medium', 'low'] as const).map((sev) => {
-                  const count = severityCounts[sev] || 0;
-                  const pct = severityPercentages[sev];
-                  const style = getSeverityStyle(sev);
-                  return (
-                    <div key={sev} className="flex items-center gap-3">
-                      <span className={`text-xs w-16 capitalize ${style.text}`}>{sev}</span>
-                      <div className="flex-1 h-6 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${style.bar} rounded-full transition-all duration-500`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className={`text-sm font-mono w-8 text-right ${style.text}`}>{count}</span>
-                    </div>
-                  );
-                })}
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={historicalData}>
+                    <defs>
+                      <linearGradient id="colorCritical" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorHigh" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorMedium" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorLow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#64748b" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#64748b" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => v.split('-').slice(1).join('/')} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      labelStyle={{ color: '#f1f5f9' }}
+                    />
+                    <Legend />
+                    <Area type="monotone" dataKey="critical" stackId="1" stroke="#ef4444" fill="url(#colorCritical)" name="Critical" />
+                    <Area type="monotone" dataKey="high" stackId="1" stroke="#f97316" fill="url(#colorHigh)" name="High" />
+                    <Area type="monotone" dataKey="medium" stackId="1" stroke="#f59e0b" fill="url(#colorMedium)" name="Medium" />
+                    <Area type="monotone" dataKey="low" stackId="1" stroke="#64748b" fill="url(#colorLow)" name="Low" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </>
+        )}
+
+        {/* Breakdown Tab */}
+        {activeTab === 'breakdown' && warnings.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <LayoutGrid className="w-4 h-4 text-indigo-400" />
+              Scene-by-Scene Breakdown
+            </h3>
+            <div className="overflow-x-auto">
+              <div className="min-w-[600px]">
+                <div className="grid grid-cols-[80px_1fr_100px_100px] gap-2 mb-2 px-2">
+                  <span className="text-xs text-slate-400 uppercase">Scene</span>
+                  <span className="text-xs text-slate-400 uppercase">Heading</span>
+                  <span className="text-xs text-slate-400 uppercase text-right">Issues</span>
+                  <span className="text-xs text-slate-400 uppercase text-right">Status</span>
+                </div>
+                {sceneBreakdown.map((scene) => (
+                  <div 
+                    key={scene.sceneNumber}
+                    className={`grid grid-cols-[80px_1fr_100px_100px] gap-2 items-center px-2 py-3 rounded-lg mb-1 ${
+                      scene.status === 'clean' ? 'bg-emerald-900/10' :
+                      scene.status === 'good' ? 'bg-blue-900/10' :
+                      scene.status === 'warning' ? 'bg-amber-900/10' :
+                      'bg-red-900/10'
+                    }`}
+                  >
+                    <span className="font-mono text-sm text-slate-300">#{scene.sceneNumber}</span>
+                    <span className="text-xs text-slate-500 truncate">
+                      Scene {scene.sceneNumber} Description
+                    </span>
+                    <span className="text-right font-semibold">{scene.issues}</span>
+                    <span className={`text-right text-xs px-2 py-1 rounded-full ${
+                      scene.status === 'clean' ? 'bg-emerald-500/20 text-emerald-400' :
+                      scene.status === 'good' ? 'bg-blue-500/20 text-blue-400' :
+                      scene.status === 'warning' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {scene.status === 'clean' ? '✓ Clean' :
+                       scene.status === 'good' ? '✓ Good' :
+                       scene.status === 'warning' ? '⚠ Warning' : '✗ Critical'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Trends Tab */}
+        {activeTab === 'trends' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-indigo-400" />
+                Resolution Progress
+              </h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={historicalData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => v.split('-').slice(1).join('/')} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      labelStyle={{ color: '#f1f5f9' }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={2} name="Critical" dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="high" stroke="#f97316" strokeWidth={2} name="High" dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={2} name="Medium" dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="low" stroke="#64748b" strokeWidth={2} name="Low" dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingDown className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Reduced</span>
+                </div>
+                <div className="text-2xl font-bold text-emerald-400">75%</div>
+                <div className="text-xs text-slate-500 mt-1">since first check</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Avg Resolution</span>
+                </div>
+                <div className="text-2xl font-bold">2.3 days</div>
+                <div className="text-xs text-slate-500 mt-1">per issue</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Target</span>
+                </div>
+                <div className="text-2xl font-bold">95%</div>
+                <div className="text-xs text-slate-500 mt-1">health score goal</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs text-slate-400 uppercase tracking-wider">Check Streak</span>
+                </div>
+                <div className="text-2xl font-bold">5</div>
+                <div className="text-xs text-slate-500 mt-1">consecutive checks</div>
+              </div>
+            </div>
+          </div>
         )}
 
         {loading && (

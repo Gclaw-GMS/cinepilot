@@ -244,6 +244,56 @@ export default function CharacterCostumePage() {
     value
   })) : []
 
+  // Calculate fabric distribution
+  const fabricData = characters.length > 0 ? characters.flatMap(c => c.fabrics || []).reduce((acc, fabric) => {
+    acc[fabric] = (acc[fabric] || 0) + 1
+    return acc
+  }, {} as Record<string, number>) : {}
+
+  const fabricChartData = Object.entries(fabricData).map(([name, value]) => ({
+    name,
+    value
+  })).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  // Calculate budget by character
+  const budgetByCharacter = characters.map(char => ({
+    name: char.name.length > 12 ? char.name.slice(0, 12) + '...' : char.name,
+    budget: char.estimatedBudget || 0,
+    role: char.role
+  })).sort((a, b) => b.budget - a.budget)
+
+  // Calculate costume style distribution
+  const styleData = characters.length > 0 ? characters.flatMap(c => c.costumeStyle || []).reduce((acc, style) => {
+    acc[style] = (acc[style] || 0) + 1
+    return acc
+  }, {} as Record<string, number>) : {}
+
+  const styleChartData = Object.entries(styleData).map(([name, value]) => ({
+    name,
+    value
+  })).sort((a, b) => b.value - a.value).slice(0, 6)
+
+  // Status breakdown
+  const statusData = characters.reduce((acc, char) => {
+    acc[char.status || 'planning'] = (acc[char.status || 'planning'] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const statusChartData = Object.entries(statusData).map(([name, value]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    value
+  }))
+
+  const STATUS_COLORS: Record<string, string> = {
+    planning: '#f59e0b',
+    'in-progress': '#3b82f6',
+    completed: '#10b981',
+    reviewed: '#8b5cf6'
+  }
+
+  const FABRIC_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#f59e0b']
+  const STYLE_COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
@@ -267,46 +317,57 @@ export default function CharacterCostumePage() {
 
         {/* Summary Cards */}
         {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="flex items-center gap-3">
-                <Users className="w-8 h-8 text-purple-400" />
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+            <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
+              <div className="flex items-center gap-2">
+                <Users className="w-6 h-6 text-purple-400" />
                 <div>
-                  <p className="text-2xl font-bold text-white">{summary.totalCharacters}</p>
-                  <p className="text-slate-400 text-sm">Total Characters</p>
+                  <p className="text-xl font-bold text-white">{summary.totalCharacters}</p>
+                  <p className="text-slate-400 text-xs">Total Characters</p>
                 </div>
               </div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="flex items-center gap-3">
-                <PaletteIcon className="w-8 h-8 text-pink-400" />
+            <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
+              <div className="flex items-center gap-2">
+                <PaletteIcon className="w-6 h-6 text-pink-400" />
                 <div>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-xl font-bold text-white">
                     {Object.keys(summary.byRole).length}
                   </p>
-                  <p className="text-slate-400 text-sm">Role Types</p>
+                  <p className="text-slate-400 text-xs">Role Types</p>
                 </div>
               </div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="flex items-center gap-3">
-                <Crown className="w-8 h-8 text-yellow-400" />
+            <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
+              <div className="flex items-center gap-2">
+                <Crown className="w-6 h-6 text-yellow-400" />
                 <div>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-xl font-bold text-white">
                     {summary.byRole['protagonist'] || 0}
                   </p>
-                  <p className="text-slate-400 text-sm">Protagonists</p>
+                  <p className="text-slate-400 text-xs">Protagonists</p>
                 </div>
               </div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="flex items-center gap-3">
-                <DollarSign className="w-8 h-8 text-green-400" />
+            <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-6 h-6 text-green-400" />
                 <div>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-xl font-bold text-white">
                     ₹{(summary.totalBudget / 100000).toFixed(1)}L
                   </p>
-                  <p className="text-slate-400 text-sm">Total Budget</p>
+                  <p className="text-slate-400 text-xs">Total Budget</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-cyan-400" />
+                <div>
+                  <p className="text-xl font-bold text-white">
+                    {fabricChartData.length}
+                  </p>
+                  <p className="text-slate-400 text-xs">Fabric Types</p>
                 </div>
               </div>
             </div>
@@ -315,18 +376,18 @@ export default function CharacterCostumePage() {
 
         {/* Charts */}
         {characters.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Characters by Role</h3>
-              <ResponsiveContainer width="100%" height={200}>
+              <h3 className="text-sm font-semibold text-white mb-3">By Role</h3>
+              <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie
                     data={roleData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={3}
                     dataKey="value"
                   >
                     {roleData.map((entry, index) => (
@@ -339,15 +400,80 @@ export default function CharacterCostumePage() {
               </ResponsiveContainer>
             </div>
             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Characters by Age Group</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={ageData}>
+              <h3 className="text-sm font-semibold text-white mb-3">By Age Group</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={ageData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <XAxis type="number" stroke="#9ca3af" fontSize={10} />
+                  <YAxis dataKey="name" type="category" stroke="#9ca3af" fontSize={10} width={80} />
                   <Tooltip />
-                  <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-3">Fabric Usage</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={fabricChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={9} angle={-45} textAnchor="end" height={60} />
+                  <YAxis stroke="#9ca3af" fontSize={10} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-3">Budget by Character</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={budgetByCharacter.slice(0, 5)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis type="number" stroke="#9ca3af" fontSize={10} tickFormatter={(v) => `₹${(v/1000)}k`} />
+                  <YAxis dataKey="name" type="category" stroke="#9ca3af" fontSize={10} width={70} />
+                  <Tooltip formatter={(value: number) => [`₹${(value/1000).toFixed(0)}k`, 'Budget']} />
+                  <Bar dataKey="budget" fill="#10b981" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Additional Analytics Row */}
+        {characters.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-3">Costume Style Distribution</h3>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={styleChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={10} />
+                  <YAxis stroke="#9ca3af" fontSize={10} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+              <h3 className="text-sm font-semibold text-white mb-3">Status Overview</h3>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie
+                    data={statusChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={65}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                  >
+                    {statusChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name.toLowerCase()] || '#6b7280'} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </div>

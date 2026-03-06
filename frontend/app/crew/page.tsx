@@ -69,22 +69,23 @@ type CrewMember = {
   email: string | null;
   dailyRate: string | number | null;
   notes: string | null;
+  skills?: string[];
   createdAt: string;
 };
 
 const DEMO_CREW: CrewMember[] = [
-  { id: '1', name: 'Ravi Kumar', role: 'Director of Photography', department: 'Camera', phone: '+91 98765 43210', email: 'ravi@cinepilot.ai', dailyRate: '25000', notes: 'Award-winning cinematographer with 15+ years experience', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '2', name: 'Priya Venkatesh', role: 'Director', department: 'Direction', phone: '+91 98765 43211', email: 'priya@cinepilot.ai', dailyRate: '50000', notes: 'National Award winning director', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '3', name: 'Arun Raj', role: 'Sound Engineer', department: 'Sound', phone: '+91 98765 43212', email: 'arun@cinepilot.ai', dailyRate: '15000', notes: 'Specialist in outdoor location sound', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '4', name: 'Madhavan S', role: 'Gaffer', department: 'Lighting', phone: '+91 98765 43213', email: 'madhavan@cinepilot.ai', dailyRate: '12000', notes: 'Expert in LED and traditional lighting setups', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '5', name: 'Lakshmi Narayanan', role: 'Production Designer', department: 'Art', phone: '+91 98765 43214', email: 'lakshmi@cinepilot.ai', dailyRate: '20000', notes: 'Specializes in period dramas', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '6', name: 'Karthik R', role: 'Makeup Artist', department: 'Makeup', phone: '+91 98765 43215', email: 'karthik@cinepilot.ai', dailyRate: '10000', notes: 'Prosthetics and special effects makeup expert', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '7', name: 'Samantha R', role: 'Costume Designer', department: 'Costume', phone: '+91 98765 43216', email: 'samantha@cinepilot.ai', dailyRate: '18000', notes: 'Contemporary and traditional South Indian costumes', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '8', name: 'Vijay B', role: 'Editor', department: 'Production', phone: '+91 98765 43217', email: 'vijay@cinepilot.ai', dailyRate: '22000', notes: 'Known for fast-paced action sequences', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '9', name: 'Anand Prakash', role: 'VFX Supervisor', department: 'VFX', phone: '+91 98765 43218', email: 'anand@cinepilot.ai', dailyRate: '35000', notes: 'Specialist in CGI and compositing', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '10', name: 'Bala Subramani', role: 'Stunt Choreographer', department: 'Stunts', phone: '+91 98765 43219', email: 'bala@cinepilot.ai', dailyRate: '28000', notes: 'International stunt coordination experience', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '11', name: 'Divya K', role: 'Assistant Director', department: 'Direction', phone: '+91 98765 43220', email: 'divya@cinepilot.ai', dailyRate: '8000', notes: 'Assisted on 10+ major Tamil films', createdAt: '2024-01-15T10:00:00Z' },
-  { id: '12', name: 'Ramesh T', role: 'Camera Operator', department: 'Camera', phone: '+91 98765 43221', email: 'ramesh@cinepilot.ai', dailyRate: '9000', notes: 'Steadicam and gimbal specialist', createdAt: '2024-01-15T10:00:00Z' },
+  { id: '1', name: 'Ravi Kumar', role: 'Director of Photography', department: 'Camera', phone: '+91 98765 43210', email: 'ravi@cinepilot.ai', dailyRate: '25000', notes: 'Award-winning cinematographer with 15+ years experience', skills: ['ARRI', 'RED', 'Drone Cinematography', 'Steadicam'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '2', name: 'Priya Venkatesh', role: 'Director', department: 'Direction', phone: '+91 98765 43211', email: 'priya@cinepilot.ai', dailyRate: '50000', notes: 'National Award winning director', skills: ['Script Breakdown', 'Actor Coaching', 'Montage'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '3', name: 'Arun Raj', role: 'Sound Engineer', department: 'Sound', phone: '+91 98765 43212', email: 'arun@cinepilot.ai', dailyRate: '15000', notes: 'Specialist in outdoor location sound', skills: ['Boom Operation', 'Location Mixing', 'ADR'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '4', name: 'Madhavan S', role: 'Gaffer', department: 'Lighting', phone: '+91 98765 43213', email: 'madhavan@cinepilot.ai', dailyRate: '12000', notes: 'Expert in LED and traditional lighting setups', skills: ['LED Walls', 'Grip Equipment', 'Color Theory'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '5', name: 'Lakshmi Narayanan', role: 'Production Designer', department: 'Art', phone: '+91 98765 43214', email: 'lakshmi@cinepilot.ai', dailyRate: '20000', notes: 'Specializes in period dramas', skills: ['Set Design', 'Prop Management', 'Period Research'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '6', name: 'Karthik R', role: 'Makeup Artist', department: 'Makeup', phone: '+91 98765 43215', email: 'karthik@cinepilot.ai', dailyRate: '10000', notes: 'Prosthetics and special effects makeup expert', skills: ['Prosthetics', 'SFX Makeup', 'HD Makeup'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '7', name: 'Samantha R', role: 'Costume Designer', department: 'Costume', phone: '+91 98765 43216', email: 'samantha@cinepilot.ai', dailyRate: '18000', notes: 'Contemporary and traditional South Indian costumes', skills: ['Traditional wear', 'Modern Fashion', 'Jewelry Design'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '8', name: 'Vijay B', role: 'Editor', department: 'Production', phone: '+91 98765 43217', email: 'vijay@cinepilot.ai', dailyRate: '22000', notes: 'Known for fast-paced action sequences', skills: ['Action Editing', 'Color Grading', 'Sound Design'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '9', name: 'Anand Prakash', role: 'VFX Supervisor', department: 'VFX', phone: '+91 98765 43218', email: 'anand@cinepilot.ai', dailyRate: '35000', notes: 'Specialist in CGI and compositing', skills: ['Compositing', 'CGI', 'Motion Graphics'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '10', name: 'Bala Subramani', role: 'Stunt Choreographer', department: 'Stunts', phone: '+91 98765 43219', email: 'bala@cinepilot.ai', dailyRate: '28000', notes: 'International stunt coordination experience', skills: ['Car Stunts', 'Fight Choreography', 'Wire Work'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '11', name: 'Divya K', role: 'Assistant Director', department: 'Direction', phone: '+91 98765 43220', email: 'divya@cinepilot.ai', dailyRate: '8000', notes: 'Assisted on 10+ major Tamil films', skills: ['Scheduling', 'Call Sheets', 'Location Scouting'], createdAt: '2024-01-15T10:00:00Z' },
+  { id: '12', name: 'Ramesh T', role: 'Camera Operator', department: 'Camera', phone: '+91 98765 43221', email: 'ramesh@cinepilot.ai', dailyRate: '9000', notes: 'Steadicam and gimbal specialist', skills: ['Steadicam', 'Gimbal', 'Sports Coverage'], createdAt: '2024-01-15T10:00:00Z' },
 ];
 
 function getInitials(name: string): string {
@@ -511,6 +512,7 @@ export default function CrewPage() {
                 <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
                 <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
                 <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Department</th>
+                <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Skills</th>
                 <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Contact</th>
                 <th className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Daily Rate</th>
                 <th className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
@@ -519,7 +521,7 @@ export default function CrewPage() {
             <tbody className="divide-y divide-slate-800">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     No crew members found. Add your first crew member!
                   </td>
                 </tr>
@@ -544,6 +546,24 @@ export default function CrewPage() {
                           {member.department}
                         </span>
                       ) : (<span className="text-slate-500 text-sm">—</span>)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {member.skills && member.skills.length > 0 ? (
+                          member.skills.slice(0, 2).map((skill, i) => (
+                            <span key={i} className="inline-flex px-1.5 py-0.5 bg-slate-800 text-slate-400 text-xs rounded">
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-500 text-sm">—</span>
+                        )}
+                        {member.skills && member.skills.length > 2 && (
+                          <span className="inline-flex px-1.5 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">
+                            +{member.skills.length - 2}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">

@@ -329,6 +329,26 @@ export default function TasksPage() {
     }
   }
 
+  // Handle clear all completed tasks
+  const handleClearCompleted = async () => {
+    const completedTasks = tasks.filter(t => t.status === 'completed')
+    if (completedTasks.length === 0) {
+      setError('No completed tasks to clear')
+      return
+    }
+    if (!confirm(`Delete ${completedTasks.length} completed task(s)?`)) return
+    
+    try {
+      // Delete each completed task
+      await Promise.all(completedTasks.map(task => 
+        fetch(`/api/tasks?id=${task.id}`, { method: 'DELETE' })
+      ))
+      setTasks(prev => prev.filter(t => t.status !== 'completed'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clear completed tasks')
+    }
+  }
+
   // Open edit form
   const openEditForm = (task: Task) => {
     setEditingTask(task)
@@ -403,6 +423,16 @@ export default function TasksPage() {
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            {stats.completed > 0 && (
+              <button
+                onClick={handleClearCompleted}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-red-900/30 border border-slate-700 hover:border-red-700/50 rounded-lg text-sm text-slate-400 hover:text-red-400 transition-colors"
+                title="Clear completed tasks"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Clear Done</span>
+              </button>
+            )}
             <button
               onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"

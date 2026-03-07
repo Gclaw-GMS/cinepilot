@@ -92,6 +92,42 @@ const COLORS = {
   muted: '#64748b',
 }
 
+// Demo data for when no scripts are available
+const DEMO_SHOTS: ShotData[] = [
+  { id: 'shot-1', shotIndex: 1, beatIndex: 1, shotText: 'Wide establishing shot of beach at sunrise', characters: ['ARJUN', 'PRIYA'], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 24, lensType: 'zoom', keyStyle: 'golden_hour', colorTemp: 'warm', durationEstSec: 8, confidenceCamera: 0.92, confidenceLens: 0.88, confidenceLight: 0.95, confidenceDuration: 0.9, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Chennai Beach' } },
+  { id: 'shot-2', shotIndex: 2, beatIndex: 1, shotText: 'Medium shot of couple walking along the shore', characters: ['ARJUN', 'PRIYA'], shotSize: 'MS', cameraAngle: 'eye', cameraMovement: 'steadicam', focalLengthMm: 50, lensType: 'prime', keyStyle: 'romantic', colorTemp: 'warm', durationEstSec: 6, confidenceCamera: 0.89, confidenceLens: 0.91, confidenceLight: 0.87, confidenceDuration: 0.85, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Chennai Beach' } },
+  { id: 'shot-3', shotIndex: 3, beatIndex: 2, shotText: 'Close-up of ice cream in hands', characters: [], shotSize: 'CU', cameraAngle: 'high', cameraMovement: 'static', focalLengthMm: 85, lensType: 'macro', keyStyle: 'product', colorTemp: 'neutral', durationEstSec: 3, confidenceCamera: 0.95, confidenceLens: 0.93, confidenceLight: 0.9, confidenceDuration: 0.92, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Chennai Beach' } },
+  { id: 'shot-4', shotIndex: 4, beatIndex: 2, shotText: 'Reaction shot - Priya laughing', characters: ['PRIYA'], shotSize: 'CU', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 50, lensType: 'prime', keyStyle: 'soft_light', colorTemp: 'warm', durationEstSec: 4, confidenceCamera: 0.88, confidenceLens: 0.9, confidenceLight: 0.85, confidenceDuration: 0.88, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Chennai Beach' } },
+  { id: 'shot-5', shotIndex: 5, beatIndex: 3, shotText: 'Sunset silhouette shot of couple', characters: ['ARJUN', 'PRIYA'], shotSize: 'WS', cameraAngle: 'low', cameraMovement: 'dolly', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'sunset', colorTemp: 'orange', durationEstSec: 10, confidenceCamera: 0.91, confidenceLens: 0.87, confidenceLight: 0.96, confidenceDuration: 0.89, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Chennai Beach' } },
+  { id: 'shot-6', shotIndex: 1, beatIndex: 1, shotText: 'Establishing shot of restaurant exterior', characters: [], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'crane', focalLengthMm: 24, lensType: 'zoom', keyStyle: 'motivated', colorTemp: 'cool', durationEstSec: 6, confidenceCamera: 0.9, confidenceLens: 0.89, confidenceLight: 0.88, confidenceDuration: 0.85, isLocked: false, userEdited: false, scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'Sea Shell Restaurant' } },
+  { id: 'shot-7', shotIndex: 2, beatIndex: 1, shotText: 'Two-shot at corner table', characters: ['ARJUN', 'RAHUL'], shotSize: 'MS', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'candlelight', colorTemp: 'warm', durationEstSec: 8, confidenceCamera: 0.87, confidenceLens: 0.86, confidenceLight: 0.92, confidenceDuration: 0.84, isLocked: false, userEdited: false, scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'Sea Shell Restaurant' } },
+  { id: 'shot-8', shotIndex: 3, beatIndex: 2, shotText: 'Over-the-shoulder dialogue between friends', characters: ['ARJUN', 'RAHUL'], shotSize: 'OTS', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 50, lensType: 'prime', keyStyle: 'dialogue', colorTemp: 'neutral', durationEstSec: 12, confidenceCamera: 0.93, confidenceLens: 0.91, confidenceLight: 0.89, confidenceDuration: 0.91, isLocked: false, userEdited: false, scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'Sea Shell Restaurant' } },
+  { id: 'shot-9', shotIndex: 1, beatIndex: 1, shotText: 'Interior establishing - apartment living room', characters: [], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'steadicam', focalLengthMm: 28, lensType: 'zoom', keyStyle: 'motivated', colorTemp: 'neutral', durationEstSec: 5, confidenceCamera: 0.88, confidenceLens: 0.87, confidenceLight: 0.86, confidenceDuration: 0.82, isLocked: false, userEdited: false, scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. APARTMENT - DAY', intExt: 'INT', timeOfDay: 'DAY', location: "Arjun's Apartment" } },
+  { id: 'shot-10', shotIndex: 2, beatIndex: 1, shotText: 'Arjun pacing, looking at phone', characters: ['ARJUN'], shotSize: 'MCU', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 35, lensType: 'prime', keyStyle: 'natural', colorTemp: 'neutral', durationEstSec: 4, confidenceCamera: 0.9, confidenceLens: 0.92, confidenceLight: 0.88, confidenceDuration: 0.87, isLocked: false, userEdited: false, scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. APARTMENT - DAY', intExt: 'INT', timeOfDay: 'DAY', location: "Arjun's Apartment" } },
+]
+
+const DEMO_SCENES: SceneInfo[] = [
+  { id: 'scene-1', sceneNumber: '1', headingRaw: 'EXT. CHENNAI BEACH - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Chennai Beach', _count: { shots: 5 } },
+  { id: 'scene-2', sceneNumber: '2', headingRaw: 'INT. RESTAURANT - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'Sea Shell Restaurant', _count: { shots: 3 } },
+  { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. APARTMENT - DAY', intExt: 'INT', timeOfDay: 'DAY', location: "Arjun's Apartment", _count: { shots: 2 } },
+  { id: 'scene-4', sceneNumber: '4', headingRaw: 'EXT. TEMPLE - MORNING', intExt: 'EXT', timeOfDay: 'MORNING', location: 'Kapaleeshwarar Temple', _count: { shots: 0 } },
+  { id: 'scene-5', sceneNumber: '5', headingRaw: 'INT. HOSPITAL - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'General Hospital', _count: { shots: 0 } },
+]
+
+const DEMO_STATS: Stats = {
+  totalShots: 10,
+  totalDuration: 66,
+  missingFields: 0,
+  avgConfidence: 0.89,
+  bySize: { 'WS': 3, 'MS': 2, 'CU': 2, 'MCU': 1, 'OTS': 2 },
+  byMovement: { 'static': 5, 'steadicam': 2, 'dolly': 1, 'crane': 1 },
+  byScene: [
+    { sceneNumber: '1', count: 5 },
+    { sceneNumber: '2', count: 3 },
+    { sceneNumber: '3', count: 2 },
+  ]
+}
+
 // ============================================================================
 // COMPONENTS
 // ============================================================================
@@ -212,8 +248,17 @@ export default function ShotHubPage() {
   useEffect(() => {
     (async () => {
       const id = await fetchScriptId()
-      if (id) await fetchShots(id)
-      else setLoading(false)
+      if (id) {
+        await fetchShots(id)
+      } else {
+        // No script available - load demo data
+        console.log('No scripts found, loading demo data')
+        setShots(DEMO_SHOTS)
+        setScenes(DEMO_SCENES)
+        setStats(DEMO_STATS)
+        setIsDemoMode(true)
+        setLoading(false)
+      }
     })()
   }, [fetchScriptId, fetchShots])
   // --------------------------------------------------------------------------

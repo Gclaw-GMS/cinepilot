@@ -1,0 +1,38 @@
+[
+  {
+    "id": "proj-1",
+    "name": "Kaadhal Vartham",
+    "title": "Kaadhal Vartham",
+    "description": "A romantic drama set in Chennai exploring love and relationships",
+    "language": "tamil",
+    "genre": "Romance",
+    "budget": 15000000,
+    "status": "pre_production",
+    "createdAt": "2026-01-15T10:00:00.000Z",
+    "updatedAt": "2026-03-01T14:30:00.000Z"
+  },
+  {
+    "id": "proj-2",
+    "name": "Vikram Vedha 2",
+    "title": "Vikram Vedha 2",
+    "description": "Action thriller sequel with high-octane sequences",
+    "language": "tamil",
+    "genre": "Action Thriller",
+    "budget": 45000000,
+    "status": "production",
+    "createdAt": "2026-02-01T09:00:00.000Z",
+    "updatedAt": "2026-03-02T16:45:00.000Z"
+  },
+  {
+    "id": "proj-3",
+    "name": "Thirudan Police",
+    "title": "Thirudan Police",
+    "description": "Comedy drama with a unique twist",
+    "language": "tamil",
+    "genre": "Comedy",
+    "budget": 8000000,
+    "status": "planning",
+    "createdAt": "2026-02-20T11:00:00.000Z",
+    "updatedAt": "2026-02-28T10:00:00.000Z"
+  }
+]

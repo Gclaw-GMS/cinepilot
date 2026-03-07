@@ -48,73 +48,90 @@ export async function GET(req: NextRequest) {
   const endDate = searchParams.get('endDate');
   const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
 
+  // Check database connection first
+  let isDbConnected = false;
   try {
-    // Try database first
     await prisma.$connect();
-    
-    const where: Record<string, unknown> = { projectId };
-    if (category && category !== 'all') where.category = category;
-    if (status && status !== 'all') where.status = status;
-    
-    // Date range filtering
-    if (startDate || endDate) {
-      where.date = {};
-      if (startDate) {
-        (where.date as Record<string, Date>).gte = new Date(startDate);
+    await prisma.$queryRaw`SELECT 1`;
+    isDbConnected = true;
+  } catch {
+    isDbConnected = false;
+  }
+
+  if (isDbConnected) {
+    try {
+      const where: Record<string, unknown> = { projectId };
+      if (category && category !== 'all') where.category = category;
+      if (status && status !== 'all') where.status = status;
+      
+      // Date range filtering
+      if (startDate || endDate) {
+        where.date = {};
+        if (startDate) {
+          (where.date as Record<string, Date>).gte = new Date(startDate);
+        }
+        if (endDate) {
+          (where.date as Record<string, Date>).lte = new Date(endDate);
+        }
       }
-      if (endDate) {
-        (where.date as Record<string, Date>).lte = new Date(endDate);
+
+      const expenses = await prisma.expense.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        include: { project: { select: { name: true } } },
+      });
+
+      // Get all expenses for summary
+      const allExpenses = await prisma.expense.findMany({ where: { projectId } });
+      
+      await prisma.$disconnect();
+      
+      // If no expenses in DB, fallback to demo data
+      if (allExpenses.length === 0) {
+        throw new Error('No expenses in database');
       }
+      
+      const totalAmount = allExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const byCategory: Record<string, number> = {};
+      const byStatus: Record<string, number> = {};
+
+      for (const expense of allExpenses) {
+        const cat = expense.category;
+        const stat = expense.status;
+        byCategory[cat] = (byCategory[cat] || 0) + Number(expense.amount);
+        byStatus[stat] = (byStatus[stat] || 0) + Number(expense.amount);
+      }
+
+      // Format expenses for response
+      const formattedExpenses = expenses.map(e => ({
+        id: e.id,
+        category: e.category,
+        description: e.description,
+        amount: Number(e.amount),
+        date: e.date.toISOString().split('T')[0],
+        vendor: e.vendor || undefined,
+        status: e.status,
+        notes: e.notes || undefined,
+      }));
+
+      return NextResponse.json({
+        expenses: formattedExpenses,
+        summary: {
+          totalAmount,
+          totalCount: allExpenses.length,
+          byCategory,
+          byStatus,
+        },
+        isDemoMode: false,
+      });
+    } catch (error) {
+      console.error('[GET /api/travel] DB error:', error);
+      await prisma.$disconnect().catch(() => {});
     }
-
-    const expenses = await prisma.expense.findMany({
-      where,
-      orderBy: { date: 'desc' },
-      include: { project: { select: { name: true } } },
-    });
-
-    // Get all expenses for summary
-    const allExpenses = await prisma.expense.findMany({ where: { projectId } });
-    
-    // If no expenses in DB, fallback to demo data
-    if (allExpenses.length === 0) {
-      throw new Error('No expenses in database');
-    }
-    
-    const totalAmount = allExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-    const byCategory: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-
-    for (const expense of allExpenses) {
-      const cat = expense.category;
-      const stat = expense.status;
-      byCategory[cat] = (byCategory[cat] || 0) + Number(expense.amount);
-      byStatus[stat] = (byStatus[stat] || 0) + Number(expense.amount);
-    }
-
-    // Format expenses for response
-    const formattedExpenses = expenses.map(e => ({
-      id: e.id,
-      category: e.category,
-      description: e.description,
-      amount: Number(e.amount),
-      date: e.date.toISOString().split('T')[0],
-      vendor: e.vendor || undefined,
-      status: e.status,
-      notes: e.notes || undefined,
-    }));
-
-    return NextResponse.json({
-      expenses: formattedExpenses,
-      summary: {
-        totalAmount,
-        totalCount: allExpenses.length,
-        byCategory,
-        byStatus,
-      },
-      isDemoMode: false,
-    });
-  } catch (error) {
+  }
+  
+  // Demo mode - return demo data with filters
+  try {
     console.log('[GET /api/travel] Database not connected, using demo data');
     
     // Demo mode - return demo data with filters
@@ -165,83 +182,95 @@ export async function GET(req: NextRequest) {
 
 // POST /api/travel - Create a new travel expense
 export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>;
+  
   try {
-    const body = await req.json();
-    const { category, description, amount, date, vendor, personName, status, notes } = body;
-    const projectId = body.projectId || DEFAULT_PROJECT_ID;
-
-    // Validation
-    if (!category || !TRAVEL_CATEGORIES.includes(category)) {
-      return NextResponse.json({ error: 'Valid category required: ' + TRAVEL_CATEGORIES.join(', ') }, { status: 400 });
-    }
-    if (!description || !description.trim()) {
-      return NextResponse.json({ error: 'description is required' }, { status: 400 });
-    }
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'amount must be a positive number' }, { status: 400 });
-    }
-    if (!date) {
-      return NextResponse.json({ error: 'date is required' }, { status: 400 });
-    }
-
-    const fullDescription = personName ? `${personName}: ${description}` : description;
-
-    // Try database first
-    await prisma.$connect();
-    
-    const expense = await prisma.expense.create({
-      data: {
-        projectId,
-        category,
-        description: fullDescription,
-        amount,
-        date: new Date(date),
-        vendor: vendor || null,
-        status: (status && EXPENSE_STATUSES.includes(status)) ? status : 'pending',
-        notes: notes || null,
-      },
-    });
-
-    return NextResponse.json({
-      id: expense.id,
-      category: expense.category,
-      description: expense.description,
-      amount: Number(expense.amount),
-      date: expense.date.toISOString().split('T')[0],
-      vendor: expense.vendor || undefined,
-      status: expense.status,
-      notes: expense.notes || undefined,
-    });
-  } catch (error) {
-    console.error('[POST /api/travel]', error);
-    
-    // Demo mode - add to in-memory storage
-    try {
-      const body = await req.json();
-      const { category, description, amount, date, vendor, personName, status, notes } = body;
-      const projectId = body.projectId || DEFAULT_PROJECT_ID;
-      
-      const fullDescription = personName ? `${personName}: ${description}` : description;
-      const expenses = demoExpenses.get(projectId) || [];
-      const newExpense: TravelExpense = {
-        id: `t${Date.now()}`,
-        category,
-        description: fullDescription,
-        amount,
-        date,
-        vendor: vendor || undefined,
-        status: status || 'pending',
-        notes: notes || undefined,
-      };
-      expenses.push(newExpense);
-      demoExpenses.set(projectId, expenses);
-      return NextResponse.json({ ...newExpense, isDemoMode: true });
-    } catch {
-      return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 });
-    }
-  } finally {
-    await prisma.$disconnect().catch(() => {});
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+  
+  const { category, description, amount, date, vendor, personName, status, notes } = body;
+  const projectId = (body.projectId as string) || DEFAULT_PROJECT_ID;
+
+  // Validation
+  const categoryStr = String(category || '');
+  if (!categoryStr || !TRAVEL_CATEGORIES.includes(categoryStr)) {
+    return NextResponse.json({ error: 'Valid category required: ' + TRAVEL_CATEGORIES.join(', ') }, { status: 400 });
+  }
+  if (!description || !String(description).trim()) {
+    return NextResponse.json({ error: 'description is required' }, { status: 400 });
+  }
+  if (!amount || Number(amount) <= 0) {
+    return NextResponse.json({ error: 'amount must be a positive number' }, { status: 400 });
+  }
+  if (!date) {
+    return NextResponse.json({ error: 'date is required' }, { status: 400 });
+  }
+
+  const fullDescription = personName ? `${personName}: ${description}` : String(description);
+  const statusStr = String(status || 'pending');
+  const validStatus = EXPENSE_STATUSES.includes(statusStr) ? statusStr : 'pending';
+
+  // Check database connection first
+  let isDbConnected = false;
+  try {
+    await prisma.$connect();
+    await prisma.$queryRaw`SELECT 1`;
+    isDbConnected = true;
+  } catch {
+    isDbConnected = false;
+  }
+
+  if (isDbConnected) {
+    try {
+      const expense = await prisma.expense.create({
+        data: {
+          projectId,
+          category: categoryStr,
+          description: fullDescription,
+          amount: Number(amount),
+          date: new Date(date as string),
+          vendor: vendor as string || null,
+          status: validStatus,
+          notes: notes as string || null,
+        },
+      });
+
+      await prisma.$disconnect();
+      
+      return NextResponse.json({
+        id: expense.id,
+        category: expense.category,
+        description: expense.description,
+        amount: Number(expense.amount),
+        date: expense.date.toISOString().split('T')[0],
+        vendor: expense.vendor || undefined,
+        status: expense.status,
+        notes: expense.notes || undefined,
+      });
+    } catch (error) {
+      console.error('[POST /api/travel] DB error:', error);
+      await prisma.$disconnect().catch(() => {});
+    }
+  }
+  
+  // Demo mode - add to in-memory storage
+  const expenses = demoExpenses.get(projectId) || [];
+  const newExpense: TravelExpense = {
+    id: `t${Date.now()}`,
+    category: categoryStr,
+    description: fullDescription,
+    amount: Number(amount),
+    date: date as string,
+    vendor: vendor as string || undefined,
+    status: validStatus,
+    notes: notes as string || undefined,
+  };
+  expenses.push(newExpense);
+  demoExpenses.set(projectId, expenses);
+  
+  return NextResponse.json({ ...newExpense, isDemoMode: true });
 }
 
 // PATCH /api/travel - Update an existing expense

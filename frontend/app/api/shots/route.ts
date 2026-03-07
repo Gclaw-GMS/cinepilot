@@ -54,12 +54,107 @@ function getDemoResponse(statsOnly: boolean) {
   };
 }
 
+async function handleExport(req: NextRequest, format: 'json' | 'csv') {
+  const { searchParams } = new URL(req.url);
+  const scriptId = searchParams.get('scriptId');
+  const sceneId = searchParams.get('sceneId');
+
+  // Get shots from database or demo
+  let shots: any[] = [];
+  
+  try {
+    const where: any = {};
+    if (sceneId) {
+      where.sceneId = sceneId;
+    } else if (scriptId) {
+      const dbScenes = await prisma.scene.findMany({
+        where: { scriptId },
+        select: { id: true },
+      });
+      where.sceneId = { in: dbScenes.map(s => s.id) };
+    }
+    
+    shots = await prisma.shot.findMany({
+      where,
+      include: {
+        scene: {
+          include: {
+            script: { select: { title: true } },
+          },
+        },
+      },
+      orderBy: [{ scene: { sceneNumber: 'asc' } }, { shotIndex: 'asc' }],
+    });
+  } catch (error) {
+    console.log('[GET /api/shots/export] Using demo data');
+    shots = DEMO_SHOTS.map(shot => ({
+      ...shot,
+      scene: DEMO_SCENES.find(s => s.id === shot.sceneId),
+    }));
+  }
+
+  const transformedShots = shots.map(shot => ({
+    scene_number: shot.scene?.sceneNumber || shot.sceneId,
+    scene_heading: shot.scene?.headingRaw || '',
+    shot_number: shot.shotIndex + 1,
+    beat_index: shot.beatIndex,
+    shot_description: shot.shotText,
+    characters: shot.characters?.join(', ') || '',
+    shot_size: shot.shotSize || '',
+    camera_angle: shot.cameraAngle || '',
+    camera_movement: shot.cameraMovement || '',
+    focal_length_mm: shot.focalLengthMm || '',
+    lens_type: shot.lensType || '',
+    lighting: shot.keyStyle || '',
+    color_temp: shot.colorTemp || '',
+    duration_seconds: shot.durationEstSec || '',
+    is_locked: shot.isLocked || false,
+    confidence: ((shot.confidenceCamera || 0) + (shot.confidenceLens || 0) + (shot.confidenceLight || 0) + (shot.confidenceDuration || 0)) / 4,
+  }));
+
+  if (format === 'csv') {
+    const headers = ['scene_number', 'scene_heading', 'shot_number', 'beat_index', 'shot_description', 'characters', 'shot_size', 'camera_angle', 'camera_movement', 'focal_length_mm', 'lens_type', 'lighting', 'color_temp', 'duration_seconds', 'is_locked', 'confidence'];
+    const csvRows = [headers.join(',')];
+    
+    for (const shot of transformedShots) {
+      const row = headers.map(h => {
+        const val = (shot as Record<string, unknown>)[h];
+        const strVal = String(val ?? '');
+        return strVal.includes(',') || strVal.includes('"') ? `"${strVal.replace(/"/g, '""')}"` : strVal;
+      });
+      csvRows.push(row.join(','));
+    }
+    
+    const csv = csvRows.join('\n');
+    return new NextResponse(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="shot_list_${new Date().toISOString().split('T')[0]}.csv"`,
+      },
+    });
+  }
+
+  return NextResponse.json({
+    exported_at: new Date().toISOString(),
+    total_shots: transformedShots.length,
+    shots: transformedShots,
+  });
+}
+
 // GET /api/shots?scriptId=xxx — get all shots for a script
 // GET /api/shots?stats=true — get stats for first active script (for dashboard)
+// GET /api/shots?export=json — export shots as JSON
+// GET /api/shots?export=csv — export shots as CSV
 export async function GET(req: NextRequest) {
   const scriptId = req.nextUrl.searchParams.get('scriptId');
   const sceneId = req.nextUrl.searchParams.get('sceneId');
   const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
+  const exportFormat = req.nextUrl.searchParams.get('export');
+
+  // Handle export requests
+  if (exportFormat === 'json' || exportFormat === 'csv') {
+    return handleExport(req, exportFormat);
+  }
 
   // If no scriptId provided, get the first active script for stats-only requests
   let targetScriptId = scriptId;

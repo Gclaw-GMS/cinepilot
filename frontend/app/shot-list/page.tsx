@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2 } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 
 interface ShotData {
@@ -64,6 +64,9 @@ export default function ShotHubPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
 
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null)
   const [directorStyle, setDirectorStyle] = useState<string>('maniRatnam')
@@ -179,6 +182,78 @@ export default function ShotHubPage() {
     }
   }
 
+  const handleSaveShots = async () => {
+    setSaving(true)
+    setSaveMessage(null)
+    try {
+      // Save each shot that has user edits
+      const editedShots = shots.filter(s => s.userEdited)
+      for (const shot of editedShots) {
+        await fetch('/api/shots', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shotId: shot.id,
+            shotSize: shot.shotSize,
+            cameraAngle: shot.cameraAngle,
+            cameraMovement: shot.cameraMovement,
+            focalLengthMm: shot.focalLengthMm,
+            lensType: shot.lensType,
+            keyStyle: shot.keyStyle,
+            colorTemp: shot.colorTemp,
+            isLocked: shot.isLocked,
+          }),
+        })
+      }
+      setSaveMessage({ type: 'success', text: `Saved ${editedShots.length} shots` })
+      // Refresh data
+      if (scriptId) await fetchShots(scriptId)
+    } catch (e) {
+      setSaveMessage({ type: 'error', text: 'Failed to save shots' })
+    }
+    setSaving(false)
+    // Clear message after 3 seconds
+    setTimeout(() => setSaveMessage(null), 3000)
+  }
+
+  const handleExportShots = async (format: 'json' | 'csv' = 'json') => {
+    setExporting(true)
+    try {
+      const url = `/api/shots?scriptId=${scriptId || ''}&export=${format}`
+      const res = await fetch(url)
+      
+      if (format === 'csv') {
+        const blob = await res.blob()
+        const downloadUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = `shot_list_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(downloadUrl)
+        setSaveMessage({ type: 'success', text: 'Exported to CSV' })
+      } else {
+        const data = await res.json()
+        const jsonStr = JSON.stringify(data, null, 2)
+        const blob = new Blob([jsonStr], { type: 'application/json' })
+        const downloadUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = `shot_list_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(downloadUrl)
+        setSaveMessage({ type: 'success', text: `Exported ${data.total_shots} shots` })
+      }
+    } catch (e) {
+      setSaveMessage({ type: 'error', text: 'Failed to export shots' })
+    }
+    setExporting(false)
+    setTimeout(() => setSaveMessage(null), 3000)
+  }
+
   const filteredScenes = scenes.filter(s => {
     if (!sceneFilter) return true
     return s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
@@ -267,8 +342,45 @@ export default function ShotHubPage() {
           >
             {generating ? genProgress : 'Generate All Shots'}
           </button>
+          <button
+            onClick={handleSaveShots}
+            disabled={saving || shots.length === 0}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded font-medium text-sm"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <div className="relative group">
+            <button
+              disabled={exporting || shots.length === 0}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded font-medium text-sm"
+            >
+              {exporting ? 'Exporting...' : 'Export'}
+            </button>
+            <div className="absolute right-0 mt-1 w-32 bg-gray-800 border border-gray-700 rounded shadow-lg hidden group-hover:block z-10">
+              <button
+                onClick={() => handleExportShots('json')}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+              >
+                JSON
+              </button>
+              <button
+                onClick={() => handleExportShots('csv')}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+              >
+                CSV
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {saveMessage && (
+        <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${
+          saveMessage.type === 'success' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700/30' : 'bg-red-900/30 text-red-400 border border-red-700/30'
+        }`}>
+          {saveMessage.text}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">

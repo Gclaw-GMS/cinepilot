@@ -91,6 +91,9 @@ export default function HealthPage() {
     try {
       const startTime = Date.now()
       const res = await fetch('/api/health')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
       const data: HealthResponse = await res.json()
       const responseTime = Date.now() - startTime
       
@@ -109,30 +112,73 @@ export default function HealthPage() {
       })
     } catch (error) {
       console.error('Failed to fetch health:', error)
+      // Set a default healthy state so UI doesn't break
+      setHealth({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        uptime: 0,
+        environment: 'unknown',
+        database: { status: 'disconnected' },
+        services: [],
+        system: { memory: { used: 0, total: 0, percentage: 0 }, cpu: { loadAverage: [] }, nodeVersion: '', platform: '', arch: '' },
+        endpoints: [],
+        responseTimeMs: 0
+      })
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-    setLoading(false)
-    setRefreshing(false)
   }, [])
 
   const checkEndpoints = useCallback(async () => {
-    setEndpoints(prev => prev.map(ep => ({ ...ep, status: 'checking' as const })))
+    // Reset all to checking first
+    setEndpoints(prev => prev.map(ep => ({ ...ep, status: 'checking' as const, error: undefined })))
     
-    for (let i = 0; i < CORE_ENDPOINTS.length; i++) {
-      const ep = CORE_ENDPOINTS[i]
-      const startTime = Date.now()
+    // Check all endpoints in parallel with timeout
+    const checkEndpoint = async (ep: { name: string; path: string }, index: number): Promise<EndpointStatus> => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      
       try {
-        const res = await fetch(ep.path, { method: 'HEAD' })
+        const startTime = Date.now()
+        const res = await fetch(ep.path, { 
+          method: 'GET',
+          signal: controller.signal,
+          cache: 'no-store'
+        })
         const latency = Date.now() - startTime
+        clearTimeout(timeoutId)
         
-        setEndpoints(prev => prev.map((e, idx) => 
-          idx === i ? { ...e, status: res.ok ? 'up' : 'down', latencyMs: latency } : e
-        ))
+        return { 
+          ...ep, 
+          status: res.ok ? 'up' as const : 'down' as const, 
+          latencyMs: latency 
+        }
       } catch (error) {
-        setEndpoints(prev => prev.map((e, idx) => 
-          idx === i ? { ...e, status: 'down', error: 'Connection failed' } : e
-        ))
+        clearTimeout(timeoutId)
+        return { 
+          ...ep, 
+          status: 'down' as const, 
+          error: error instanceof Error ? error.message : 'Connection failed' 
+        }
       }
     }
+    
+    // Run all checks in parallel
+    const results = await Promise.allSettled(
+      CORE_ENDPOINTS.map((ep, index) => checkEndpoint(ep, index))
+    )
+    
+    // Update state with results
+    const updatedEndpoints = results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value
+      }
+      return { ...CORE_ENDPOINTS[index], status: 'down' as const, error: 'Check failed' }
+    })
+    
+    setEndpoints(updatedEndpoints)
   }, [])
 
   useEffect(() => {

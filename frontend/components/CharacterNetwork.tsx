@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 interface CharacterNetworkProps {
@@ -10,9 +10,38 @@ interface CharacterNetworkProps {
 export default function CharacterNetwork({ scenes = [], characters = [] }: CharacterNetworkProps) {
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Auto-load demo data if no scenes provided
+  useEffect(() => {
+    if (scenes.length === 0 && !results) {
+      loadDemoData();
+    }
+  }, []);
+
+  const loadDemoData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/ai/character-network', {
+        method: 'GET',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data);
+      } else {
+        setError('Failed to load demo data');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to analyze characters');
+    }
+    setLoading(false);
+  };
 
   const analyze = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/ai/character-network', {
         method: 'POST',
@@ -20,9 +49,14 @@ export default function CharacterNetwork({ scenes = [], characters = [] }: Chara
         body: JSON.stringify({ scenes, characters }),
       });
       const data = await res.json();
-      setResults(data);
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setResults(data);
+      }
     } catch (err) {
       console.error(err);
+      setError('Failed to analyze characters');
     }
     setLoading(false);
   };
@@ -34,14 +68,25 @@ export default function CharacterNetwork({ scenes = [], characters = [] }: Chara
       className="bg-gray-800 rounded-xl p-6 border border-gray-700"
     >
       <h3 className="text-xl font-bold text-white mb-4">🔗 Character Network Analysis</h3>
+      {results?.demo && (
+        <div className="mb-3 px-3 py-1.5 bg-amber-500/20 text-amber-400 text-xs rounded-lg inline-block">
+          Demo Data - Upload a script for real analysis
+        </div>
+      )}
       
       <button
         onClick={analyze}
-        disabled={loading || scenes.length === 0}
+        disabled={loading}
         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 w-full mb-4"
       >
-        {loading ? 'Analyzing...' : 'Generate Character Network'}
+        {loading ? 'Analyzing...' : scenes.length > 0 ? 'Generate Character Network' : 'Load Demo Data'}
       </button>
+
+      {error && (
+        <div className="mb-4 px-3 py-2 bg-red-500/20 text-red-400 text-sm rounded-lg">
+          {error}
+        </div>
+      )}
       
       {results && (
         <div className="space-y-4">

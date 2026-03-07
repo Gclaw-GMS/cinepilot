@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 interface WeatherScheduleProps {
@@ -10,9 +10,34 @@ export default function WeatherSchedule({ schedule = [] }: WeatherScheduleProps)
   const [location, setLocation] = useState('Chennai');
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Auto-load demo data on mount
+  useEffect(() => {
+    loadDemoData();
+  }, []);
+
+  const loadDemoData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/ai/weather-schedule?location=${encodeURIComponent(location)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data);
+      } else {
+        setError('Failed to load weather data');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load weather data');
+    }
+    setLoading(false);
+  };
 
   const analyze = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/ai/weather-schedule', {
         method: 'POST',
@@ -20,9 +45,14 @@ export default function WeatherSchedule({ schedule = [] }: WeatherScheduleProps)
         body: JSON.stringify({ schedule, location }),
       });
       const data = await res.json();
-      setResults(data);
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setResults(data);
+      }
     } catch (err) {
       console.error(err);
+      setError('Failed to analyze schedule');
     }
     setLoading(false);
   };
@@ -43,6 +73,17 @@ export default function WeatherSchedule({ schedule = [] }: WeatherScheduleProps)
       className="bg-gray-800 rounded-xl p-6 border border-gray-700"
     >
       <h3 className="text-xl font-bold text-white mb-4">🌤️ Weather-Aware Scheduling</h3>
+      {results?.demo && (
+        <div className="mb-3 px-3 py-1.5 bg-amber-500/20 text-amber-400 text-xs rounded-lg inline-block">
+          Demo Data - Connect schedule for real recommendations
+        </div>
+      )}
+      
+      {error && (
+        <div className="mb-3 px-3 py-2 bg-red-500/20 text-red-400 text-sm rounded-lg">
+          {error}
+        </div>
+      )}
       
       <div className="flex gap-3 mb-4">
         <input
@@ -84,13 +125,13 @@ export default function WeatherSchedule({ schedule = [] }: WeatherScheduleProps)
               {results.forecast?.map((day: any, i: number) => (
                 <div key={i} className="bg-gray-800 rounded-lg p-2 flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-xs">{day.date.slice(5)}</p>
+                    <p className="text-gray-400 text-xs">{day.date?.slice(5) || day.dayName}</p>
                     <p className="text-lg">{getWeatherEmoji(day.condition)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white text-sm">{day.temp_high}°/{day.temp_low}°</p>
-                    <p className={`text-xs ${day.rain_chance > 30 ? 'text-red-400' : 'text-green-400'}`}>
-                      Rain: {day.rain_chance}%
+                    <p className="text-white text-sm">{day.tempHigh}°/{day.tempLow}°</p>
+                    <p className={`text-xs ${day.rainChance > 30 ? 'text-red-400' : 'text-green-400'}`}>
+                      Rain: {day.rainChance}%
                     </p>
                   </div>
                 </div>

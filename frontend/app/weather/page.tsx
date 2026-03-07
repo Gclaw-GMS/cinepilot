@@ -241,7 +241,61 @@ export default function WeatherPage() {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [filterCondition, setFilterCondition] = useState<string>('all');
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [locationLoaded, setLocationLoaded] = useState(false);
   const filterInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-detect location on mount
+  useEffect(() => {
+    if (locationLoaded) return;
+    
+    const detectLocation = async () => {
+      // Default to Chennai (common film production location)
+      const defaultLocation = LOCATIONS[0]; // Chennai
+      
+      if ('geolocation' in navigator) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 5000,
+              maximumAge: 3600000 // 1 hour cache
+            });
+          });
+          
+          const { latitude, longitude } = position.coords;
+          
+          // Find closest preset location
+          let closest = defaultLocation;
+          let minDist = Infinity;
+          
+          for (const loc of LOCATIONS) {
+            const dist = Math.sqrt(
+              Math.pow(loc.lat - latitude, 2) + 
+              Math.pow(loc.lng - longitude, 2)
+            );
+            if (dist < minDist) {
+              minDist = dist;
+              closest = loc;
+            }
+          }
+          
+          setSelectedLocation(closest);
+          fetchWeather(closest);
+        } catch (e) {
+          // Geolocation failed, use default
+          console.log('Geolocation not available, using default location');
+          setSelectedLocation(defaultLocation);
+          fetchWeather(defaultLocation);
+        }
+      } else {
+        // Browser doesn't support geolocation
+        setSelectedLocation(defaultLocation);
+        fetchWeather(defaultLocation);
+      }
+      setLocationLoaded(true);
+    };
+    
+    detectLocation();
+  }, [locationLoaded]);
 
   const fetchWeather = useCallback(async (location: (typeof LOCATIONS)[0]) => {
     setSelectedLocation(location);

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
   Film, Star, Clock, CheckCircle, MoreHorizontal, X, Edit2,
   Trash2, UserPlus, BarChart3, PieChart as PieChartIcon, Send,
-  Loader2, AlertCircle, Check
+  Loader2, AlertCircle, Check, Keyboard
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -118,6 +118,9 @@ export default function CollaborationPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
     name: '',
     role: '',
@@ -170,11 +173,70 @@ export default function CollaborationPage() {
     fetchData()
   }, [fetchData])
 
+  // Filtered members - computed after members is set
   const filtered = members.filter(m => 
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.role.toLowerCase().includes(search.toLowerCase()) ||
     m.email.toLowerCase().includes(search.toLowerCase())
   )
+
+  // Keyboard shortcuts handler
+  const filteredLengthRef = useRef(0)
+  filteredLengthRef.current = filtered.length
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    const maxIndex = filteredLengthRef.current - 1
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev => Math.min(prev + 1, maxIndex))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setSelectedIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setSelectedIndex(maxIndex)
+        break
+      case 'Escape':
+        setSelectedIndex(-1)
+        break
+      case 'n':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          openAddModal()
+        }
+        break
+      case 'f':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          searchInputRef.current?.focus()
+        }
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const statusData = [
     { name: 'Active', value: stats.active, color: STATUS_COLORS.active },
@@ -306,6 +368,13 @@ export default function CollaborationPage() {
           <UserPlus className="w-4 h-4" />
           Invite Member
         </button>
+        <button
+          onClick={() => setShowKeyboardHelp(true)}
+          className="flex items-center gap-1.5 px-2 py-2 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+          title="Keyboard Shortcuts"
+        >
+          <Keyboard className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -422,6 +491,7 @@ export default function CollaborationPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search by name, role, or email..."
               value={search}
@@ -682,6 +752,73 @@ export default function CollaborationPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-indigo-500/10" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                </div>
+                <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                  Keyboard Shortcuts
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { keys: ['↑', '↓'], desc: 'Navigate members', category: 'Navigation' },
+                { keys: ['Home'], desc: 'Go to first', category: 'Navigation' },
+                { keys: ['End'], desc: 'Go to last', category: 'Navigation' },
+                { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
+                { keys: ['N'], desc: 'New team member', category: 'Create' },
+                { keys: ['F'], desc: 'Focus search', category: 'Search' },
+                { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+              ].map((shortcut, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider w-20">
+                      {shortcut.category}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {shortcut.keys.map((key, i) => (
+                        <kbd 
+                          key={i} 
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-indigo-300 shadow-sm"
+                        >
+                          {key}
+                        </kbd>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Quick reference for power users</span>
+                <span className="flex items-center gap-2">
+                  Press 
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-indigo-400">?</kbd> 
+                  anytime to toggle
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}

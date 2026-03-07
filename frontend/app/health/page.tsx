@@ -50,6 +50,7 @@ interface HealthResponse {
     latencyMs?: number
   }[]
   responseTimeMs: number
+  isDemoMode?: boolean
 }
 
 interface EndpointStatus {
@@ -79,6 +80,7 @@ export default function HealthPage() {
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [endpoints, setEndpoints] = useState<EndpointStatus[]>(
     CORE_ENDPOINTS.map(ep => ({ ...ep, status: 'checking' as const }))
   )
@@ -98,6 +100,7 @@ export default function HealthPage() {
       const responseTime = Date.now() - startTime
       
       setHealth(data)
+      setIsDemoMode(data.isDemoMode === true)
       setLastRefresh(new Date())
       
       // Add to history
@@ -123,8 +126,10 @@ export default function HealthPage() {
         services: [],
         system: { memory: { used: 0, total: 0, percentage: 0 }, cpu: { loadAverage: [] }, nodeVersion: '', platform: '', arch: '' },
         endpoints: [],
-        responseTimeMs: 0
+        responseTimeMs: 0,
+        isDemoMode: true
       })
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -321,6 +326,11 @@ export default function HealthPage() {
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBg(health?.status || 'unhealthy')} ${getStatusColor(health?.status || 'unhealthy')}`}>
                 {health?.status?.toUpperCase() || 'UNKNOWN'}
               </span>
+              {isDemoMode && (
+                <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
+                  Demo Mode
+                </span>
+              )}
               <span className="text-xs text-gray-500 font-normal">
                 v{health?.version || '1.0.0'} • {health?.environment || 'dev'}
               </span>

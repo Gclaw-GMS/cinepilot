@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Search, Filter, MoreHorizontal, Trash2, Edit2, 
   Eye, Calendar, DollarSign, Video, FileText, Users,
-  Clock, ArrowRight, Loader2, FolderOpen, X, Save, Check
+  Clock, ArrowRight, Loader2, FolderOpen, X, Save, Check,
+  Keyboard
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -231,6 +232,8 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   
   // New project modal state
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
@@ -308,6 +311,61 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    
+    const key = e.key.toLowerCase();
+    
+    // N: New project
+    if (key === 'n' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      setShowNewProjectModal(true);
+    }
+    // R: Refresh projects
+    else if (key === 'r' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      fetchProjects();
+    }
+    // /: Focus search
+    else if (key === '/') {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    }
+    // G: Toggle grid/list view
+    else if (key === 'g' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      setViewMode(prev => prev === 'grid' ? 'list' : 'grid');
+    }
+    // 1-5: Quick filter by status
+    else if (['1', '2', '3', '4', '5'].includes(key)) {
+      e.preventDefault();
+      const filters = ['all', 'planning', 'pre_production', 'production', 'post_production'];
+      const idx = parseInt(key);
+      if (idx < filters.length) {
+        setStatusFilter(filters[idx]);
+      }
+    }
+    // ?: Show keyboard help
+    else if (key === '?' || (e.shiftKey && key === '/')) {
+      e.preventDefault();
+      setShowKeyboardHelp(prev => !prev);
+    }
+    // Escape: Close modals
+    else if (key === 'escape') {
+      e.preventDefault();
+      if (showNewProjectModal) setShowNewProjectModal(false);
+      if (showKeyboardHelp) setShowKeyboardHelp(false);
+    }
+  }, [fetchProjects, showNewProjectModal, showKeyboardHelp]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   // Create new project handler
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -444,6 +502,13 @@ export default function ProjectsPage() {
               <p className="text-slate-500 text-sm mt-1">Manage your film productions</p>
             </div>
             <button 
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors text-slate-400"
+              title="Keyboard shortcuts"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+            <button 
               onClick={() => setShowNewProjectModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors"
             >
@@ -481,8 +546,9 @@ export default function ProjectsPage() {
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search projects..."
+                placeholder="Search projects... (/)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
@@ -718,6 +784,54 @@ export default function ProjectsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <Keyboard className="w-5 h-5 text-indigo-400" />
+                <h2 className="text-lg font-semibold text-slate-100">Keyboard Shortcuts</h2>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              {[
+                { keys: ['N'], description: 'Create new project' },
+                { keys: ['R'], description: 'Refresh projects list' },
+                { keys: ['/'], description: 'Focus search input' },
+                { keys: ['G'], description: 'Toggle grid/list view' },
+                { keys: ['1-5'], description: 'Filter by status (All/Planning/Pre-Production/Production/Post-Production)' },
+                { keys: ['?'], description: 'Toggle this help menu' },
+                { keys: ['Esc'], description: 'Close modal' },
+              ].map((shortcut, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <span className="text-slate-400 text-sm">{shortcut.description}</span>
+                  <div className="flex gap-1">
+                    {shortcut.keys.map((key, j) => (
+                      <kbd key={j} className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 font-mono">
+                        {key}
+                      </kbd>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

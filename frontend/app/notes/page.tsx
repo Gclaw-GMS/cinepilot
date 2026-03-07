@@ -143,6 +143,15 @@ export default function NotesPage() {
         e.preventDefault()
         setShowKeyboardHelp(true)
       }
+      // N = New note
+      if (e.key === 'n' && !e.ctrlKey && !e.metaKey) {
+        const target = e.target as HTMLElement
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault()
+          setShowForm(true)
+          setEditingNote(null)
+        }
+      }
       // Escape = Close modal or clear search
       if (e.key === 'Escape') {
         if (showForm) {
@@ -197,6 +206,23 @@ export default function NotesPage() {
 
   const pinnedNotes = filteredNotes.filter(n => n.isPinned)
   const unpinnedNotes = filteredNotes.filter(n => !n.isPinned)
+
+  // Floating quick add button
+  const FloatingQuickAdd = () => (
+    <button
+      onClick={() => {
+        setShowForm(true)
+        setEditingNote(null)
+      }}
+      className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-600/30 flex items-center justify-center transition-all hover:scale-110 z-40 group"
+      title="Quick Add Note (N)"
+    >
+      <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+      <span className="absolute -top-8 right-0 bg-slate-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+        New Note (N)
+      </span>
+    </button>
+  )
 
   // Export handlers
   const handleExport = (format: 'json' | 'csv') => {
@@ -464,6 +490,9 @@ export default function NotesPage() {
         </div>
       )}
       
+      {/* Floating Quick Add Button */}
+      <FloatingQuickAdd />
+
       {/* Header */}
       <header className="bg-slate-900/50 backdrop-blur border-b border-slate-800 sticky top-0 z-10">
         <div className="px-8 py-5">
@@ -580,7 +609,7 @@ export default function NotesPage() {
             )}
           </div>
           <div className="text-xs text-slate-600 hidden md:block">
-            Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">⌘K</kbd> to search
+            Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">N</kbd> for new note • <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">/</kbd> to search
           </div>
         </div>
 

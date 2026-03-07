@@ -5,7 +5,7 @@ import {
   BarChart3, TrendingUp, Film, Clapperboard, 
   Clock, DollarSign, Users, MapPin, Zap, Target, Calendar,
   RefreshCw, Loader2, Activity, Gauge, AlertTriangle, CheckCircle,
-  Camera
+  Camera, Keyboard, X
 } from 'lucide-react'
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -91,6 +91,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'progress' | 'budget' | 'crew' | 'predictions'>('overview')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true)
@@ -106,6 +107,39 @@ export default function AnalyticsPage() {
   }, [])
 
   useEffect(() => { fetchAnalytics() }, [fetchAnalytics])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      const key = e.key.toLowerCase()
+      const mod = e.metaKey || e.ctrlKey
+      
+      if (key === '?' || (mod && key === 'k')) {
+        e.preventDefault()
+        setShowKeyboardHelp(prev => !prev)
+      } else if (key === 'r' && !mod) {
+        fetchAnalytics()
+      } else if (key === 'escape') {
+        setShowKeyboardHelp(false)
+      } else if (key === '1') {
+        setActiveTab('overview')
+      } else if (key === '2') {
+        setActiveTab('progress')
+      } else if (key === '3') {
+        setActiveTab('budget')
+      } else if (key === '4') {
+        setActiveTab('crew')
+      } else if (key === '5') {
+        setActiveTab('predictions')
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [fetchAnalytics])
 
   const formatCurrency = (v: number) => v >= 10000000 ? `₹${(v/10000000).toFixed(1)}Cr` : v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : `₹${(v/1000).toFixed(1)}K`
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
@@ -131,9 +165,14 @@ export default function AnalyticsPage() {
             </div>
             <p className="text-slate-400">{data.overview.activeProject} • Production Analytics Dashboard</p>
           </div>
-          <button onClick={fetchAnalytics} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowKeyboardHelp(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg" title="Keyboard Shortcuts (?)">
+              <Keyboard className="w-4 h-4 text-cyan-400" />
+            </button>
+            <button onClick={fetchAnalytics} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
+              <RefreshCw className="w-4 h-4" /> Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -383,6 +422,43 @@ export default function AnalyticsPage() {
           </div>
         </div>
       )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl max-w-lg w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-700">
+              <div className="flex items-center gap-3">
+                <Keyboard className="w-6 h-6 text-cyan-400" />
+                <h2 className="text-xl font-bold">Keyboard Shortcuts</h2>
+              </div>
+              <button onClick={() => setShowKeyboardHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-slate-400 mb-3">Navigation</h3>
+                <div className="space-y-2">
+                  <ShortcutRow keys={['1']} description="Go to Overview tab" />
+                  <ShortcutRow keys={['2']} description="Go to Progress tab" />
+                  <ShortcutRow keys={['3']} description="Go to Budget tab" />
+                  <ShortcutRow keys={['4']} description="Go to Crew & VFX tab" />
+                  <ShortcutRow keys={['5']} description="Go to Predictions tab" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-slate-400 mb-3">Actions</h3>
+                <div className="space-y-2">
+                  <ShortcutRow keys={['R']} description="Refresh analytics data" />
+                  <ShortcutRow keys={['?']} description="Toggle keyboard shortcuts" />
+                  <ShortcutRow keys={['Esc']} description="Close modal" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -439,6 +515,21 @@ function PredictionCard({ title, value, subtitle, icon: Icon, color }: { title: 
         <div><p className="text-sm text-slate-400">{title}</p><p className="text-2xl font-bold">{value}</p></div>
       </div>
       <p className="text-sm text-slate-400">{subtitle}</p>
+    </div>
+  )
+}
+
+function ShortcutRow({ keys, description }: { keys: string[]; description: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-slate-300">{description}</span>
+      <div className="flex gap-1">
+        {keys.map((key, idx) => (
+          <kbd key={idx} className="px-2 py-1 bg-slate-700 text-cyan-400 text-sm font-mono rounded border border-slate-600">
+            {key}
+          </kbd>
+        ))}
+      </div>
     </div>
   )
 }

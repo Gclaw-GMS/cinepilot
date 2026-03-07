@@ -46,6 +46,7 @@ interface HealthResponse {
     latencyMs?: number;
   }[];
   responseTimeMs: number;
+  isDemoMode: boolean;
 }
 
 // Helper to get memory usage
@@ -218,7 +219,8 @@ export async function GET(req: NextRequest) {
       arch: process.arch || 'unknown'
     },
     endpoints: [],
-    responseTimeMs: 0
+    responseTimeMs: 0,
+    isDemoMode: false
   };
 
   // Check database
@@ -308,6 +310,9 @@ export async function GET(req: NextRequest) {
 
   // Calculate response time
   health.responseTimeMs = Date.now() - start;
+
+  // Set demo mode based on database connection
+  health.isDemoMode = health.database.status !== 'connected';
 
   // Set appropriate status code
   const statusCode = health.status === 'healthy' ? 200 : 200; // Always return 200 for health checks, status is in body

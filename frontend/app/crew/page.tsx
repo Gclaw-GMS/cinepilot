@@ -603,6 +603,33 @@ export default function CrewPage() {
         </div>
       )}
 
+      {/* Demo Mode Banner */}
+      {isDemoMode && !loading && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Users className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="font-medium text-amber-400">Demo Data Active</h3>
+              <p className="text-sm text-slate-400">
+                Showing sample crew for demonstration. Add your real crew members to see your production data.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                // Scroll to add crew form
+                document.querySelector('button')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="ml-auto flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Crew
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">

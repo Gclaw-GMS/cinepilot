@@ -108,6 +108,23 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.days_left - b.days_left);
 
     if (summaryOnly) {
+      // Check if database has no data - use demo fallback
+      const hasNoData = phases.length === 0 && milestones.length === 0 && allTasks.length === 0;
+      
+      if (hasNoData) {
+        return NextResponse.json({
+          overall: DEMO_DATA.overall,
+          phases: DEMO_DATA.phases,
+          tasks: DEMO_DATA.tasks.slice(0, 5).map(t => ({
+            name: t.name,
+            complete: t.status === 'completed',
+            progress: t.progress,
+          })),
+          upcoming_deadlines: DEMO_DATA.upcoming_deadlines.slice(0, 5),
+          isDemoMode: true,
+        });
+      }
+      
       return NextResponse.json({
         overall: overallProgress,
         phases: phaseProgress,
@@ -118,6 +135,16 @@ export async function GET(req: NextRequest) {
         })),
         upcoming_deadlines: upcomingTasks.slice(0, 5),
         isDemoMode,
+      });
+    }
+
+    // Check if database has no data - use demo fallback
+    const hasNoData = phases.length === 0 && milestones.length === 0 && allTasks.length === 0;
+    
+    if (hasNoData) {
+      return NextResponse.json({
+        ...DEMO_DATA,
+        isDemoMode: true,
       });
     }
 

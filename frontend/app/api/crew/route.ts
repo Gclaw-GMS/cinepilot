@@ -75,6 +75,16 @@ export async function GET() {
     });
     
     clearTimeout(timeoutId);
+    
+    // Return demo data if database returns empty (no crew added yet)
+    if (crew.length === 0) {
+      return NextResponse.json({
+        crew: DEMO_CREW,
+        isDemoMode: true,
+        isEmptyFallback: true,
+      });
+    }
+    
     return NextResponse.json({
       crew,
       isDemoMode: false,

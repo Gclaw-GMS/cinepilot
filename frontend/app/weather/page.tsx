@@ -25,6 +25,8 @@ import {
   Gauge,
   Zap,
   Keyboard,
+  BarChart3,
+  Columns,
 } from 'lucide-react';
 import {
   LineChart,
@@ -242,6 +244,12 @@ export default function WeatherPage() {
   const [filterCondition, setFilterCondition] = useState<string>('all');
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [locationLoaded, setLocationLoaded] = useState(false);
+  
+  // Multi-location comparison feature
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareLocations, setCompareLocations] = useState<string[]>([]);
+  const [compareData, setCompareData] = useState<Record<string, WeatherData>>({});
+  const [compareLoading, setCompareLoading] = useState(false);
   const filterInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-detect location on mount
@@ -330,6 +338,58 @@ export default function WeatherPage() {
       fetchWeather(selectedLocation);
     }
   }, [selectedLocation, fetchWeather]);
+
+  // Fetch weather for multiple locations comparison
+  const fetchCompareWeather = useCallback(async (locations: string[]) => {
+    setCompareLoading(true);
+    setCompareData({});
+    
+    try {
+      const results: Record<string, WeatherData> = {};
+      await Promise.all(
+        locations.map(async (locName) => {
+          const loc = LOCATIONS.find(l => l.name === locName);
+          if (loc) {
+            const params = new URLSearchParams({
+              lat: String(loc.lat),
+              lng: String(loc.lng),
+              location: loc.name,
+            });
+            const res = await fetch(`/api/weather?${params}`);
+            const data = await res.json();
+            if (res.ok && data.forecast) {
+              results[locName] = data;
+            }
+          }
+        })
+      );
+      setCompareData(results);
+    } catch (e) {
+      console.error('Failed to fetch compare weather:', e);
+    } finally {
+      setCompareLoading(false);
+    }
+  }, []);
+
+  // Toggle location in comparison
+  const toggleCompareLocation = (locName: string) => {
+    setCompareLocations(prev => {
+      if (prev.includes(locName)) {
+        return prev.filter(l => l !== locName);
+      }
+      if (prev.length >= 4) {
+        return prev; // Max 4 locations
+      }
+      return [...prev, locName];
+    });
+  };
+
+  // Fetch comparison data when locations change
+  useEffect(() => {
+    if (compareLocations.length > 0 && compareMode) {
+      fetchCompareWeather(compareLocations);
+    }
+  }, [compareLocations, compareMode, fetchCompareWeather]);
 
   // Filter forecast based on condition (moved before keyboard handler)
   const filteredForecast = useMemo(() => {
@@ -459,6 +519,17 @@ export default function WeatherPage() {
                 </button>
               )}
               <button
+                onClick={() => setCompareMode(!compareMode)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  compareMode 
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                {compareMode ? 'Exit Compare' : 'Compare'}
+              </button>
+              <button
                 onClick={() => setShowKeyboardHelp(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
                 title="Keyboard shortcuts"
@@ -493,6 +564,105 @@ export default function WeatherPage() {
             </button>
           ))}
         </div>
+
+        {/* Compare Mode */}
+        {compareMode && (
+          <div className="mb-8">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Columns className="w-5 h-5 text-indigo-400" />
+                    Multi-Location Comparison
+                  </h3>
+                  <p className="text-sm text-slate-500">Select up to 4 locations to compare weather conditions</p>
+                </div>
+                <div className="text-sm text-slate-400">
+                  {compareLocations.length}/4 selected
+                </div>
+              </div>
+              
+              {/* Location Selection for Comparison */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
+                {LOCATIONS.map((loc) => (
+                  <button
+                    key={loc.name}
+                    onClick={() => toggleCompareLocation(loc.name)}
+                    disabled={!compareLocations.includes(loc.name) && compareLocations.length >= 4}
+                    className={`p-3 rounded-lg text-sm transition-all border ${
+                      compareLocations.includes(loc.name)
+                        ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600 disabled:opacity-40'
+                    }`}
+                  >
+                    {loc.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Comparison Results */}
+              {compareLocations.length > 0 && (
+                <div>
+                  {compareLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+                      <span className="ml-3 text-slate-400">Loading comparison data...</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {compareLocations.map((locName) => {
+                        const data = compareData[locName];
+                        const today = data?.forecast?.[0];
+                        if (!today) return null;
+                        
+                        const ConditionIcon = getConditionIcon(today.condition, today.iconCode);
+                        
+                        return (
+                          <div key={locName} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-semibold text-white">{locName}</span>
+                              <ConditionIcon className="w-6 h-6 text-amber-400" />
+                            </div>
+                            <div className="text-3xl font-bold text-white mb-1">
+                              {today.tempHigh}°/{today.tempLow}°
+                            </div>
+                            <div className="text-sm text-slate-400 mb-3">{today.condition}</div>
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Rain</span>
+                                <span className={today.precipitationChance > 30 ? 'text-amber-400' : 'text-slate-300'}>
+                                  {today.precipitationChance}%
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Wind</span>
+                                <span className="text-slate-300">{Math.round(today.windSpeed * 3.6)} km/h</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Humidity</span>
+                                <span className="text-slate-300">{today.humidity}%</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Shooting</span>
+                                <span className={
+                                  today.recommendationSeverity === 'green' ? 'text-emerald-400' :
+                                  today.recommendationSeverity === 'amber' ? 'text-amber-400' : 'text-red-400'
+                                }>
+                                  {today.recommendationSeverity === 'green' ? 'Good' : 
+                                   today.recommendationSeverity === 'amber' ? 'Caution' : 'Avoid'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && !weatherData && (

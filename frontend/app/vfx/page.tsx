@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -148,6 +148,24 @@ export default function VfxPage() {
   const [success, setSuccess] = useState('');
   const [isUsingDemo, setIsUsingDemo] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost'>('overview');
+  
+  // Form states for add/edit
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [editingNote, setEditingNote] = useState<VfxNote | null>(null);
+  const [formData, setFormData] = useState({
+    sceneNumber: '',
+    description: '',
+    vfxType: 'explicit',
+    confidence: 70,
+    estimatedDuration: 30,
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Filter and search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [complexityFilter, setComplexityFilter] = useState('all');
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -178,6 +196,158 @@ export default function VfxPage() {
         }
       });
   }, []);
+
+  // Filtered notes based on search and filters
+  const filteredNotes = useMemo(() => {
+    let notes = [...vfxNotes];
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      notes = notes.filter(n => 
+        n.description.toLowerCase().includes(query) ||
+        n.scene.sceneNumber.includes(query) ||
+        n.scene.headingRaw?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Type filter
+    if (typeFilter !== 'all') {
+      notes = notes.filter(n => n.vfxType === typeFilter);
+    }
+    
+    // Complexity filter
+    if (complexityFilter !== 'all') {
+      notes = notes.filter(n => getComplexity(n.confidence) === complexityFilter);
+    }
+    
+    return notes;
+  }, [vfxNotes, searchQuery, typeFilter, complexityFilter]);
+
+  // Group filtered notes by scene
+  const filteredSceneGroups = useMemo(() => {
+    const groups = new Map<string, { heading: string | null; notes: VfxNote[]; warnings: VfxWarning[]; props: VfxProp[] }>();
+    for (const note of filteredNotes) {
+      const key = note.scene.sceneNumber;
+      if (!groups.has(key)) {
+        groups.set(key, { heading: note.scene.headingRaw, notes: [], warnings: [], props: [] });
+      }
+      groups.get(key)!.notes.push(note);
+    }
+    // Add warnings and props
+    for (const warn of vfxWarnings) {
+      const key = warn.scene.sceneNumber;
+      if (!groups.has(key)) {
+        groups.set(key, { heading: warn.scene.headingRaw, notes: [], warnings: [], props: [] });
+      }
+      groups.get(key)!.warnings.push(warn);
+    }
+    for (const prop of vfxProps) {
+      const key = prop.scene.sceneNumber;
+      if (!groups.has(key)) {
+        groups.set(key, { heading: prop.scene.headingRaw, notes: [], warnings: [], props: [] });
+      }
+      groups.get(key)!.props.push(prop);
+    }
+    return [...groups.entries()].sort((a, b) => {
+      const aIdx = filteredNotes.find(n => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
+      const bIdx = filteredNotes.find(n => n.scene.sceneNumber === b[0])?.scene.sceneIndex ?? 0;
+      return aIdx - bIdx;
+    });
+  }, [filteredNotes, vfxWarnings, vfxProps]);
+
+  // Form handlers
+  const resetForm = () => {
+    setFormData({ sceneNumber: '', description: '', vfxType: 'explicit', confidence: 70, estimatedDuration: 30 });
+    setFormErrors({});
+    setEditingNote(null);
+  };
+
+  const openAddForm = () => {
+    resetForm();
+    setShowNoteForm(true);
+  };
+
+  const openEditForm = (note: VfxNote) => {
+    setEditingNote(note);
+    setFormData({
+      sceneNumber: note.scene.sceneNumber,
+      description: note.description,
+      vfxType: note.vfxType,
+      confidence: Math.round(note.confidence * 100),
+      estimatedDuration: note.estimatedDuration || 30,
+    });
+    setShowNoteForm(true);
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (!formData.sceneNumber.trim()) errors.sceneNumber = 'Scene number is required';
+    if (!formData.description.trim()) errors.description = 'Description is required';
+    if (formData.confidence < 0 || formData.confidence > 100) errors.confidence = 'Confidence must be 0-100';
+    if (formData.estimatedDuration < 1) errors.estimatedDuration = 'Duration must be at least 1 second';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSaveNote = async () => {
+    if (!validateForm()) return;
+    setSubmitting(true);
+    
+    try {
+      if (editingNote) {
+        // Update existing note
+        const updatedNotes = vfxNotes.map(n => 
+          n.id === editingNote.id 
+            ? { 
+                ...n, 
+                description: formData.description,
+                vfxType: formData.vfxType,
+                confidence: formData.confidence / 100,
+                estimatedDuration: formData.estimatedDuration,
+                scene: { ...n.scene, sceneNumber: formData.sceneNumber }
+              }
+            : n
+        );
+        setVfxNotes(updatedNotes);
+        setSummary(calculateSummaryCost(updatedNotes, vfxWarnings));
+        setSuccess('VFX note updated successfully!');
+      } else {
+        // Add new note
+        const newNote: VfxNote = {
+          id: `manual-${Date.now()}`,
+          sceneId: `scene-${formData.sceneNumber}`,
+          description: formData.description,
+          vfxType: formData.vfxType,
+          confidence: formData.confidence / 100,
+          estimatedDuration: formData.estimatedDuration,
+          scene: { 
+            sceneNumber: formData.sceneNumber, 
+            headingRaw: `Scene ${formData.sceneNumber}`, 
+            sceneIndex: parseInt(formData.sceneNumber) || 0 
+          }
+        };
+        const updatedNotes = [...vfxNotes, newNote];
+        setVfxNotes(updatedNotes);
+        setSummary(calculateSummaryCost(updatedNotes, vfxWarnings));
+        setSuccess('VFX note added successfully!');
+      }
+      setShowNoteForm(false);
+      resetForm();
+    } catch (err) {
+      setError('Failed to save VFX note');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    if (!confirm('Are you sure you want to delete this VFX note?')) return;
+    const updatedNotes = vfxNotes.filter(n => n.id !== noteId);
+    setVfxNotes(updatedNotes);
+    setSummary(calculateSummaryCost(updatedNotes, vfxWarnings));
+    setSuccess('VFX note deleted successfully!');
+  };
 
   // Calculate cost and duration from VFX notes
   const calculateSummaryCost = useCallback((notes: VfxNote[], warnings: VfxWarning[]) => {
@@ -271,7 +441,7 @@ export default function VfxPage() {
   // Export VFX data to CSV
   function handleExport() {
     const headers = ['Scene', 'Heading', 'Type', 'Description', 'Confidence', 'Severity', 'Warning'];
-    const rows = sortedScenes.map(([sceneNum, group]) => {
+    const rows = displayScenes.map(([sceneNum, group]) => {
       const notes = group.notes.map(n => ({
         scene: sceneNum,
         heading: group.heading || '',
@@ -329,11 +499,14 @@ export default function VfxPage() {
     sceneGroups.get(key)!.props.push(prop);
   }
 
-  const sortedScenes = [...sceneGroups.entries()].sort((a, b) => {
-    const aIdx = vfxNotes.find((n) => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
-    const bIdx = vfxNotes.find((n) => n.scene.sceneNumber === b[0])?.scene.sceneIndex ?? 0;
-    return aIdx - bIdx;
-  });
+  // Use filtered scenes for display when filters are active, otherwise use all scenes
+  const displayScenes = searchQuery || typeFilter !== 'all' || complexityFilter !== 'all' 
+    ? filteredSceneGroups 
+    : [...sceneGroups.entries()].sort((a, b) => {
+        const aIdx = vfxNotes.find((n) => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
+        const bIdx = vfxNotes.find((n) => n.scene.sceneNumber === b[0])?.scene.sceneIndex ?? 0;
+        return aIdx - bIdx;
+      });
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">
@@ -386,17 +559,78 @@ export default function VfxPage() {
               {analyzing ? 'Analyzing...' : 'Run VFX Analysis'}
             </button>
 
+            <button
+              onClick={openAddForm}
+              disabled={!selectedScript}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add VFX Shot
+            </button>
+
             {vfxNotes.length > 0 && (
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors ml-auto"
-              >
-                <Download className="w-4 h-4" />
-                Export CSV
-              </button>
+              <>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+                <button
+                  onClick={() => fetchVfxData(selectedScript)}
+                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </>
             )}
           </div>
         </div>
+
+        {/* Filters */}
+        {vfxNotes.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 w-48"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="all">All Types</option>
+                {VFX_CATEGORIES.map(cat => (
+                  <option key={cat.key} value={cat.key}>{cat.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={complexityFilter}
+                onChange={(e) => setComplexityFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="all">All Complexity</option>
+                <option value="simple">Simple</option>
+                <option value="moderate">Moderate</option>
+                <option value="complex">Complex</option>
+              </select>
+            </div>
+            <span className="text-xs text-slate-500 ml-auto">
+              Showing {filteredNotes.length} of {vfxNotes.length} notes
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-4 text-red-400 text-sm">
@@ -408,6 +642,122 @@ export default function VfxPage() {
           <div className="bg-emerald-900/20 border border-emerald-800/50 rounded-xl p-4 text-emerald-400 text-sm flex items-center gap-2">
             <CheckCircle className="w-4 h-4 shrink-0" />
             {success}
+          </div>
+        )}
+
+        {/* Add/Edit Note Modal */}
+        {showNoteForm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
+              <div className="flex items-center justify-between p-4 border-b border-slate-800">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                  {editingNote ? 'Edit VFX Shot' : 'Add VFX Shot'}
+                </h3>
+                <button
+                  onClick={() => { setShowNoteForm(false); resetForm(); }}
+                  className="p-1 hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Scene Number</label>
+                  <input
+                    type="text"
+                    value={formData.sceneNumber}
+                    onChange={(e) => setFormData({ ...formData, sceneNumber: e.target.value })}
+                    placeholder="e.g., 12"
+                    className={`w-full bg-slate-800 border ${formErrors.sceneNumber ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  />
+                  {formErrors.sceneNumber && <p className="text-red-400 text-xs mt-1">{formErrors.sceneNumber}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe the VFX requirements..."
+                    rows={3}
+                    className={`w-full bg-slate-800 border ${formErrors.description ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none`}
+                  />
+                  {formErrors.description && <p className="text-red-400 text-xs mt-1">{formErrors.description}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">VFX Type</label>
+                  <select
+                    value={formData.vfxType}
+                    onChange={(e) => setFormData({ ...formData, vfxType: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    {VFX_CATEGORIES.map(cat => (
+                      <option key={cat.key} value={cat.key}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Confidence ({formData.confidence}%)</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.confidence}
+                      onChange={(e) => setFormData({ ...formData, confidence: parseInt(e.target.value) })}
+                      className="w-full accent-purple-500"
+                    />
+                    {formErrors.confidence && <p className="text-red-400 text-xs mt-1">{formErrors.confidence}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Duration (seconds)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.estimatedDuration}
+                      onChange={(e) => setFormData({ ...formData, estimatedDuration: parseInt(e.target.value) || 30 })}
+                      className={`w-full bg-slate-800 border ${formErrors.estimatedDuration ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                    {formErrors.estimatedDuration && <p className="text-red-400 text-xs mt-1">{formErrors.estimatedDuration}</p>}
+                  </div>
+                </div>
+
+                {/* Complexity Preview */}
+                <div className="bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-400">Calculated Complexity:</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getComplexityStyle(getComplexity(formData.confidence / 100)).bg} ${getComplexityStyle(getComplexity(formData.confidence / 100)).text}`}>
+                      {getComplexity(formData.confidence / 100)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-800">
+                <button
+                  onClick={() => { setShowNoteForm(false); resetForm(); }}
+                  className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveNote}
+                  disabled={submitting}
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  {submitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {editingNote ? 'Update' : 'Add'} Shot
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -547,7 +897,7 @@ export default function VfxPage() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={sortedScenes.map(([sceneNum, group]) => {
+                        data={displayScenes.map(([sceneNum, group]) => {
                           const maxConf = Math.max(...group.notes.map(n => n.confidence), 0);
                           return {
                             scene: `S${sceneNum}`,
@@ -579,20 +929,20 @@ export default function VfxPage() {
           <div className="text-center py-12 text-slate-400">Loading VFX data...</div>
         )}
 
-        {!loading && selectedScript && sortedScenes.length === 0 && (
+        {!loading && selectedScript && displayScenes.length === 0 && (
           <div className="text-center py-12 text-slate-500">
             No VFX data found. Run a VFX analysis to scan this script.
           </div>
         )}
 
         {/* Tab Content */}
-        {sortedScenes.length > 0 && activeTab === 'overview' && (
+        {displayScenes.length > 0 && activeTab === 'overview' && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Film className="w-5 h-5 text-purple-400" />
               Scene-by-Scene Breakdown
             </h2>
-            {sortedScenes.map(([sceneNumber, group]) => {
+            {displayScenes.map(([sceneNumber, group]) => {
               const maxConfidence = Math.max(
                 ...group.notes.map((n) => n.confidence),
                 0,
@@ -623,7 +973,7 @@ export default function VfxPage() {
 
                   <div className="p-4 space-y-3">
                     {group.notes.map((note) => (
-                      <div key={note.id} className="flex items-start gap-3">
+                      <div key={note.id} className="flex items-start gap-3 group">
                         <Sparkles className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-slate-200">{note.description}</p>
@@ -635,6 +985,22 @@ export default function VfxPage() {
                               Confidence: {Math.round(note.confidence * 100)}%
                             </span>
                           </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEditForm(note)}
+                            className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteNote(note.id)}
+                            className="p-1.5 hover:bg-red-900/50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -672,7 +1038,7 @@ export default function VfxPage() {
         )}
 
         {/* Cost Analysis Tab */}
-        {sortedScenes.length > 0 && activeTab === 'cost' && summary && (
+        {displayScenes.length > 0 && activeTab === 'cost' && summary && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-900/10 border border-emerald-500/30 rounded-xl p-6">
@@ -698,7 +1064,7 @@ export default function VfxPage() {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={sortedScenes.map(([sceneNum, group]) => {
+                    data={displayScenes.map(([sceneNum, group]) => {
                       const cost = group.notes.reduce((sum, n) => {
                         const comp = getComplexity(n.confidence);
                         return sum + VFX_COST_PER_SECOND[comp as keyof typeof VFX_COST_PER_SECOND] * (n.estimatedDuration || 30);
@@ -735,7 +1101,7 @@ export default function VfxPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedScenes.map(([sceneNum, group]) => {
+                    {displayScenes.map(([sceneNum, group]) => {
                       const maxConf = Math.max(...group.notes.map(n => n.confidence), 0);
                       const complexity = getComplexity(maxConf);
                       const compStyle = getComplexityStyle(complexity);

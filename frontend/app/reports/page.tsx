@@ -18,7 +18,9 @@ import {
   BarChart3,
   Printer,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Keyboard,
+  X
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -123,6 +125,31 @@ export default function ReportsPage() {
   const [generatedReports, setGeneratedReports] = useState<Record<string, string>>({})
   const [isDemoMode, setIsDemoMode] = useState(true)
   const [productionData, setProductionData] = useState<ProductionData | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      const key = e.key.toLowerCase()
+      const mod = e.metaKey || e.ctrlKey
+      
+      if (mod && key === 'k') {
+        e.preventDefault()
+        setShowKeyboardHelp(true)
+      } else if (key === 'escape') {
+        setShowKeyboardHelp(false)
+      } else if (key === 'r' && !mod) {
+        e.preventDefault()
+        fetchReports()
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
@@ -453,6 +480,37 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Keyboard className="w-5 h-5" />
+                Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Refresh Reports</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Show Shortcuts</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">⌘ K</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Close Modal</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

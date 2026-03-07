@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
-  MoreHorizontal, Edit2, Trash2, BarChart3
+  MoreHorizontal, Edit2, Trash2, BarChart3, Keyboard, X
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 
@@ -78,6 +78,7 @@ export default function ProgressPage() {
   const [viewMode, setViewMode] = useState<'timeline' | 'kanban' | 'tasks'>('timeline')
   const [refreshKey, setRefreshKey] = useState(0)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
 
   // Demo data fallback - used when API fails
   const DEMO_PROGRESS: Progress = {
@@ -148,6 +149,35 @@ export default function ProgressPage() {
   useEffect(() => {
     fetchProgress()
   }, [fetchProgress, refreshKey])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      const key = e.key.toLowerCase()
+      const mod = e.metaKey || e.ctrlKey
+      
+      if (key === '?' || (mod && key === 'k')) {
+        e.preventDefault()
+        setShowKeyboardHelp(prev => !prev)
+      } else if (key === 'r' && !mod) {
+        fetchProgress()
+      } else if (key === 'escape') {
+        setShowKeyboardHelp(false)
+      } else if (key === '1') {
+        setViewMode('timeline')
+      } else if (key === '2') {
+        setViewMode('kanban')
+      } else if (key === '3') {
+        setViewMode('tasks')
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [fetchProgress])
 
   const handleInitialize = async () => {
     setInitializing(true)
@@ -250,6 +280,13 @@ export default function ProgressPage() {
               Demo Data
             </span>
           )}
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -722,6 +759,71 @@ export default function ProgressPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-cyan-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-1 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-slate-400 mb-2">View Modes</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                    <span className="text-sm">Timeline View</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                    <span className="text-sm">Kanban View</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                    <span className="text-sm">Tasks View</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">3</kbd>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-slate-400 mb-2">Actions</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                    <span className="text-sm">Refresh Data</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">R</kbd>
+                  </div>
+                  <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                    <span className="text-sm">Show Shortcuts</span>
+                    <div className="flex gap-1">
+                      <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">?</kbd>
+                      <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">⌘K</kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
+                    <span className="text-sm">Close Modal</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs font-mono">Esc</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 mt-6 text-center">
+              Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">?</kbd> or <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">⌘K</kbd> to toggle this menu
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )

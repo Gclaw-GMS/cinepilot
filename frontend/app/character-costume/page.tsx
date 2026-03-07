@@ -120,18 +120,46 @@ export default function CharacterCostumePage() {
     status: 'planning'
   })
 
+  // Demo data for fallback
+  const DEMO_CHARACTERS: Character[] = [
+    { id: 'c1', name: 'Arjun', age: 'Young Adult (20-35)', ageNumber: 28, gender: 'Male', role: 'protagonist', appearance: ['Tall', 'Athletic build', 'Short hair'], personality: ['Confident', 'Witty', 'Determined'], costumeStyle: ['Modern casual', 'Formal shirts'], fabrics: ['Cotton', 'Linen'], colorPalette: ['#1E3A5F', '#FFFFFF', '#C0C0C0'], description: 'Protagonist - a young software engineer from Chennai', moodBoardImages: [], costumeNotes: 'Transition from casual to formal as character arc develops', status: 'completed' },
+    { id: 'c2', name: 'Priya', age: 'Young Adult (20-35)', ageNumber: 25, gender: 'Female', role: 'protagonist', appearance: ['Graceful', 'Classical dancer physique'], personality: ['Independent', 'Artistic', 'Strong-willed'], costumeStyle: ['Traditional', 'Modern fusion'], fabrics: ['Silk', 'Cotton'], colorPalette: ['#E91E63', '#9C27B0', '#FFEB3B'], description: 'Female lead - a classical dancer', moodBoardImages: [], costumeNotes: 'Dance sequences require multiple costume changes', status: 'completed' },
+    { id: 'c3', name: 'Rahul', age: 'Young Adult (20-35)', ageNumber: 30, gender: 'Male', role: 'supporting', appearance: ['Professional look'], personality: ['Friendly', 'Supportive'], costumeStyle: ['Business casual'], fabrics: ['Cotton', 'Polyester'], colorPalette: ['#3F51B5', '#607D8B'], description: 'Arjun\'s best friend', moodBoardImages: [], costumeNotes: '', status: 'planning' },
+    { id: 'c4', name: 'Vikram', age: 'Adult (36-50)', ageNumber: 42, gender: 'Male', role: 'antagonist', appearance: ['Menacing', 'Sharp features'], personality: ['Calculating', 'Power-hungry'], costumeStyle: ['Formal suits'], fabrics: ['Premium wool', 'Silk'], colorPalette: ['#000000', '#B71C1C', '#FFD700'], description: 'Main antagonist - corporate villain', moodBoardImages: [], costumeNotes: 'Dark color palette to reflect character', status: 'completed' },
+    { id: 'c5', name: 'Priya\'s Mother', age: 'Adult (36-50)', ageNumber: 50, gender: 'Female', role: 'supporting', appearance: ['Traditional'], personality: ['Caring', 'Traditional values'], costumeStyle: ['Traditional Tamil'], fabrics: ['Silk', 'Cotton'], colorPalette: ['#FF9800', '#E91E63'], description: 'Supportive mother character', moodBoardImages: [], costumeNotes: 'Traditional wear only', status: 'planning' },
+  ]
+
+  const DEMO_SUMMARY: CostumeSummary = {
+    totalCharacters: 5,
+    byRole: { protagonist: 2, antagonist: 1, supporting: 2 },
+    byAgeGroup: { 'Young Adult (20-35)': 3, 'Adult (36-50)': 2 },
+    totalBudget: 250000
+  }
+
   const fetchCharacters = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch(`/api/character-costume?projectId=${DEMO_PROJECT_ID}`)
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setCharacters(data.characters || [])
-      setSummary(data.summary || null)
-      setIsDemoMode(!!data.isDemoMode)
+      
+      // Check if API returned valid data
+      if (data && data.characters && data.characters.length > 0) {
+        setCharacters(data.characters)
+        setSummary(data.summary || null)
+        setIsDemoMode(!!data.isDemoMode)
+      } else {
+        // Fallback to local demo data
+        setCharacters(DEMO_CHARACTERS)
+        setSummary(DEMO_SUMMARY)
+        setIsDemoMode(true)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch')
+      console.error('Character fetch error:', err)
+      // Use local demo data as fallback
+      setCharacters(DEMO_CHARACTERS)
+      setSummary(DEMO_SUMMARY)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }

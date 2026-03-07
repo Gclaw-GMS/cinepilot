@@ -83,19 +83,68 @@ export default function CateringPage() {
     budget: '', actualCost: '', notes: ''
   })
 
+  // Local fallback demo data
+  const DEMO_CATERING_PLAN: CateringPlan = {
+    id: 'demo-plan',
+    projectId: DEMO_PROJECT_ID,
+    catererId: 'cat-1',
+    dietaryRestrictions: { 'Vegetarian': 8, 'Non-Vegetarian': 42, 'Vegan': 3, 'Egg': 5, 'No Onion/Garlic': 2, 'Diabetic': 1 },
+    totalBudget: 150000,
+    totalSpent: 29500,
+    shootDays: [
+      {
+        date: '2026-03-07',
+        totalCrew: 45,
+        totalCast: 12,
+        meals: [
+          { id: 'm1', type: 'breakfast', menu: ['Idli', 'Sambar', 'Vada', 'Pongal', 'Coffee', 'Banana'], dietary: ['Vegetarian', 'Vegan Options'], budget: 3500, actualCost: 3200 },
+          { id: 'm2', type: 'lunch', menu: ['Rice', 'Sambar', 'Rasam', 'Chicken 65', 'Fish Fry', 'Poriyal', 'Pappad', 'Pickle', 'Buttermilk', 'Banana Leaf Special'], dietary: ['Non-Vegetarian', 'Vegetarian Options'], budget: 12000, actualCost: 11500 },
+          { id: 'm3', type: 'snacks', menu: ['Samosa', 'Bonda', 'Tea', 'Coffee', 'Murukku'], dietary: ['Vegetarian'], budget: 2000, notes: 'Evening pack-up' },
+          { id: 'm4', type: 'dinner', menu: ['Biriyani (Chicken)', 'Raitha', 'Pickle', 'Papad', 'Ice Cream', 'Fruits'], dietary: ['Non-Vegetarian'], budget: 15000, actualCost: 14800 }
+        ]
+      },
+      {
+        date: '2026-03-08',
+        totalCrew: 45,
+        totalCast: 12,
+        meals: [
+          { id: 'm5', type: 'breakfast', menu: ['Puri', 'Potato Masala', 'Dosa', 'Chutney', 'Coffee'], dietary: ['Vegetarian'], budget: 3500 },
+          { id: 'm6', type: 'lunch', menu: ['Rice', 'Dal', 'Vegetable Curry', 'Chicken Curry', 'Fish Curry', 'Salad'], dietary: ['Non-Vegetarian', 'Vegetarian'], budget: 12000 }
+        ]
+      }
+    ]
+  }
+
+  const DEMO_CATERERS: Caterer[] = [
+    { id: 'cat-1', name: 'Anna Curry Point', contactPerson: 'Ramasamy', phone: '+91 98430 12345', email: 'ramasamy@annacurry.com', specialty: 'South Indian & North Indian', rating: 4.5 },
+    { id: 'cat-2', name: 'Heritage Kitchen', contactPerson: 'Priya', phone: '+91 044 2345 6789', email: 'priya@heritagekitchen.in', specialty: 'Vegetarian South Indian', rating: 4.8 },
+    { id: 'cat-3', name: 'Star Caterers', contactPerson: 'Kumar', phone: '+91 99401 23456', email: 'kumar@starcaterers.com', specialty: 'Multi-cuisine', rating: 4.2 }
+  ]
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch(`/api/catering?projectId=${DEMO_PROJECT_ID}`)
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      // Check if API returned demo data
-      setIsDemoMode(data.isDemoMode === true)
-      setPlan(data.plan)
-      setCaterers(data.caterers || [])
+      
+      // Check if API returned valid data (includes demo mode)
+      if (data && data.plan) {
+        setIsDemoMode(data.isDemoMode === true)
+        setPlan(data.plan)
+        setCaterers(data.caterers || [])
+      } else {
+        // Fallback to local demo data
+        setPlan(DEMO_CATERING_PLAN)
+        setCaterers(DEMO_CATERERS)
+        setIsDemoMode(true)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch')
+      console.error('Catering fetch error:', err)
+      // Use local demo data as fallback
+      setPlan(DEMO_CATERING_PLAN)
+      setCaterers(DEMO_CATERERS)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }

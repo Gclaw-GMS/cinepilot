@@ -79,6 +79,43 @@ export default function ProgressPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [isDemoMode, setIsDemoMode] = useState(false)
 
+  // Demo data fallback - used when API fails
+  const DEMO_PROGRESS: Progress = {
+    overall: 42,
+    phases: [
+      { name: 'pre_production', displayName: 'Pre-Production', status: 'in_progress', progress: 75, order: 0 },
+      { name: 'production', displayName: 'Production', status: 'pending', progress: 15, order: 1 },
+      { name: 'post_production', displayName: 'Post-Production', status: 'pending', progress: 0, order: 2 },
+    ],
+    milestones: [
+      { id: '1', name: 'Script Lock', date: '2026-01-15', status: 'completed', tasks: 3 },
+      { id: '2', name: 'Casting Complete', date: '2026-02-20', status: 'in_progress', tasks: 3 },
+      { id: '3', name: 'Location Scouting', date: '2026-03-15', status: 'in_progress', tasks: 2 },
+      { id: '4', name: 'Pre-Production Complete', date: '2026-04-01', status: 'pending', tasks: 3 },
+      { id: '5', name: 'Principal Photography', date: '2026-05-01', status: 'pending', tasks: 0 },
+      { id: '6', name: 'First Cut', date: '2026-07-15', status: 'pending', tasks: 0 },
+      { id: '7', name: 'Final Delivery', date: '2026-09-01', status: 'pending', tasks: 0 },
+    ],
+    tasks: [
+      { id: 't1', name: 'Script Analysis', description: 'Initial script review and breakdown', status: 'completed', progress: 100, priority: 'critical', dueDate: '2026-01-10' },
+      { id: 't2', name: 'Script Revisions', description: 'Incorporate feedback', status: 'completed', progress: 100, priority: 'high', dueDate: '2026-01-15' },
+      { id: 't3', name: 'Character Breakdown', description: 'Detailed character analysis', status: 'completed', progress: 100, priority: 'high', dueDate: '2026-01-20' },
+      { id: 't4', name: 'Location Shortlist', description: 'Create list of potential locations', status: 'in_progress', progress: 75, priority: 'high', dueDate: '2026-03-10' },
+      { id: 't5', name: 'Casting Calls', description: 'Post casting calls and auditions', status: 'in_progress', progress: 50, priority: 'critical', dueDate: '2026-02-15' },
+      { id: 't6', name: 'Auditions', description: 'Conduct actor auditions', status: 'in_progress', progress: 30, priority: 'critical', dueDate: '2026-02-20' },
+      { id: 't7', name: 'Permits Application', description: 'Film permits for locations', status: 'in_progress', progress: 20, priority: 'high', dueDate: '2026-03-25' },
+      { id: 't8', name: 'Equipment Booking', description: 'Reserve cameras, lights, grip', status: 'pending', progress: 0, priority: 'high', dueDate: '2026-04-01' },
+      { id: 't9', name: 'Crew Hiring', description: 'Hire key crew members', status: 'pending', progress: 0, priority: 'high', dueDate: '2026-04-05' },
+      { id: 't10', name: 'Shot List Creation', description: 'Detailed shot list for production', status: 'pending', progress: 0, priority: 'medium', dueDate: '2026-04-10' },
+    ],
+    upcoming_deadlines: [
+      { task: 'Casting Calls', date: '2026-02-15', days_left: 14 },
+      { task: 'Auditions', date: '2026-02-20', days_left: 19 },
+      { task: 'Location Shortlist', date: '2026-03-10', days_left: 37 },
+      { task: 'Permits Application', date: '2026-03-25', days_left: 52 },
+    ],
+  }
+
   const fetchProgress = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -89,25 +126,20 @@ export default function ProgressPage() {
       // Detect demo mode from API response
       setIsDemoMode(!!data.isDemoMode)
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch progress')
+      // Use API data if available (includes demo data on error)
+      if (data && data.phases && data.phases.length > 0) {
+        setProgress(data)
+      } else {
+        // Fallback to local demo data
+        setProgress(DEMO_PROGRESS)
+        setIsDemoMode(true)
       }
-      setProgress(data)
     } catch (err) {
       console.error('Progress fetch error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load progress')
-      // Initialize with demo data if no data
-      setProgress({
-        overall: 0,
-        phases: [
-          { name: 'pre_production', displayName: 'Pre-Production', status: 'pending', progress: 0, order: 0 },
-          { name: 'production', displayName: 'Production', status: 'pending', progress: 0, order: 1 },
-          { name: 'post_production', displayName: 'Post-Production', status: 'pending', progress: 0, order: 2 },
-        ],
-        milestones: [],
-        tasks: [],
-        upcoming_deadlines: [],
-      })
+      // Use demo data as fallback
+      setProgress(DEMO_PROGRESS)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }

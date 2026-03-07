@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { FileText, Plus, Trash2, Calendar, Edit2, Save, X, Printer, Download, Cloud, Sun, CloudRain, Wind, Droplets, Thermometer } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { FileText, Plus, Trash2, Calendar, Edit2, Save, X, Printer, Download, Cloud, Sun, CloudRain, Wind, Droplets, Thermometer, Keyboard, RefreshCw } from 'lucide-react'
 
 // Weather types for call sheet
 type WeatherInfo = {
@@ -90,6 +90,13 @@ export default function CallSheetsPage() {
   const [weather, setWeather] = useState<WeatherInfo | null>(null)
   const [loadingWeather, setLoadingWeather] = useState(false)
 
+  // Keyboard shortcuts state
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  
+  // Ref for fetchCallSheets to use in keyboard handler before it's defined
+  const fetchCallSheetsRef = useRef<(() => Promise<void>) | null>(null)
+
   // Fetch weather for the call sheet date
   const fetchWeather = useCallback(async (date: string) => {
     if (!date) return
@@ -127,6 +134,115 @@ export default function CallSheetsPage() {
       fetchWeather(selected.date)
     }
   }, [selected?.date, fetchWeather])
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Ignore if typing in input/textarea
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return
+    }
+    
+    const key = e.key.toLowerCase()
+    const meta = e.metaKey || e.ctrlKey
+    
+    // ? or K - Show keyboard help
+    if (key === '?' || (key === 'k' && !meta)) {
+      e.preventDefault()
+      setShowKeyboardHelp(prev => !prev)
+      return
+    }
+    
+    // Escape - Close modals/help
+    if (key === 'escape') {
+      if (showKeyboardHelp) {
+        setShowKeyboardHelp(false)
+        return
+      }
+      if (isEditing) {
+        setIsEditing(false)
+        return
+      }
+      return
+    }
+    
+    // N - New call sheet
+    if (key === 'n' && !meta) {
+      e.preventDefault()
+      if (!creating) {
+        setCreating(true)
+      }
+      return
+    }
+    
+    // E - Edit selected
+    if (key === 'e' && !meta && selected) {
+      e.preventDefault()
+      if (!isEditing) {
+        setIsEditing(true)
+        if (selected.content) {
+          setEditingContent(selected.content)
+        }
+        if (selected.notes) {
+          setEditingNotes(selected.notes)
+        }
+        if (selected.title) {
+          setEditingTitle(selected.title)
+        }
+        setEditingDate(selected.date)
+      }
+      return
+    }
+    
+    // P - Print
+    if (key === 'p' && !meta) {
+      e.preventDefault()
+      handlePrint()
+      return
+    }
+    
+    // R - Refresh
+    if (key === 'r' && !meta) {
+      e.preventDefault()
+      fetchCallSheetsRef.current?.()
+      return
+    }
+    
+    // I - Export ICS
+    if (key === 'i' && !meta && selected) {
+      e.preventDefault()
+      handleExportICS()
+      return
+    }
+    
+    // Arrow keys - Navigate call sheets
+    if ((key === 'arrowup' || key === 'arrowdown') && callSheets.length > 0) {
+      e.preventDefault()
+      const currentIndex = selected ? callSheets.findIndex(cs => cs.id === selected.id) : -1
+      let newIndex: number
+      
+      if (key === 'arrowup') {
+        newIndex = currentIndex <= 0 ? callSheets.length - 1 : currentIndex - 1
+      } else {
+        newIndex = currentIndex >= callSheets.length - 1 ? 0 : currentIndex + 1
+      }
+      
+      setSelected(callSheets[newIndex])
+      return
+    }
+    
+    // Delete - Delete selected
+    if (key === 'delete' && selected && !deleting) {
+      e.preventDefault()
+      setDeleting(selected.id)
+      return
+    }
+  }, [showKeyboardHelp, isEditing, creating, selected, callSheets, deleting, isDemoMode, editingContent, editingNotes, editingTitle, editingDate])
+
+  // Add keyboard event listener
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   // Get weather icon based on condition
   const getWeatherIcon = (condition: string) => {
@@ -378,6 +494,11 @@ export default function CallSheetsPage() {
       setLoading(false)
     }
   }, [])
+  
+  // Store fetchCallSheets in ref for use in keyboard handler
+  useEffect(() => {
+    fetchCallSheetsRef.current = fetchCallSheets
+  }, [fetchCallSheets])
 
   const fetchCrew = useCallback(async () => {
     try {
@@ -576,6 +697,14 @@ export default function CallSheetsPage() {
           </span>
         )}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded text-sm"
+            title="Keyboard shortcuts (press ?)"
+          >
+            <Keyboard className="h-4 w-4" />
+            Shortcuts
+          </button>
           {selected && !isEditing && (
             <>
               <button
@@ -1089,6 +1218,74 @@ export default function CallSheetsPage() {
           display: none;
         }
       `}</style>
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-800 border border-slate-600 rounded-xl max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <div className="flex items-center gap-2">
+                <Keyboard className="h-5 w-5 text-cyan-400" />
+                <h2 className="text-lg font-bold">Keyboard Shortcuts</h2>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-1 hover:bg-slate-700 rounded"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">New call sheet</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">N</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Edit selected</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">E</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Print</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">P</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Refresh</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">R</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Export ICS</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">I</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Delete</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">Del</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Navigate up</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">↑</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded">
+                  <span className="text-slate-300">Navigate down</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">↓</kbd>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded col-span-2">
+                  <span className="text-slate-300">Show shortcuts</span>
+                  <div className="flex gap-1">
+                    <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">?</kbd>
+                    <span className="text-slate-500">or</span>
+                    <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">K</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded col-span-2">
+                  <span className="text-slate-300">Close modal / Cancel</span>
+                  <kbd className="px-2 py-0.5 bg-slate-600 rounded text-xs font-mono">Esc</kbd>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

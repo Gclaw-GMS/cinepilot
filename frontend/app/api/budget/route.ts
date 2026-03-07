@@ -68,7 +68,7 @@ const DEMO_FORECAST = {
   ]
 };
 
-// Helper to check if we're in demo mode (no database)
+// Helper to check if we're in demo mode (no database OR no data)
 async function checkDbConnection(): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -78,10 +78,23 @@ async function checkDbConnection(): Promise<boolean> {
   }
 }
 
+// Helper to check if there's budget data in the database
+async function hasBudgetData(projectId: string): Promise<boolean> {
+  try {
+    const itemCount = await prisma.budgetItem.count({ where: { projectId } });
+    return itemCount > 0;
+  } catch {
+    return false;
+  }
+}
+
 // GET /api/budget — get budget data
 // GET /api/budget?action=forecast — get forecast only (for dashboard)
 export async function GET(req: NextRequest) {
-  const isDemo = !(await checkDbConnection());
+  const isDbConnected = await checkDbConnection();
+  const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+  const hasData = isDbConnected && await hasBudgetData(projectId);
+  const isDemo = !hasData;
   
   if (isDemo) {
     const action = req.nextUrl.searchParams.get('action');
@@ -109,7 +122,7 @@ export async function GET(req: NextRequest) {
   try {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const action = req.nextUrl.searchParams.get('action');
-
+    
     // Handle action=forecast for dashboard compatibility
     if (action === 'forecast') {
       const forecast = await forecastBudget(projectId);
@@ -150,7 +163,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/budget — generate budget or add expense
 export async function POST(req: NextRequest) {
-  const isDemo = !(await checkDbConnection());
+  const isDbConnected = await checkDbConnection();
+  const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+  const hasData = isDbConnected && await hasBudgetData(projectId);
+  const isDemo = !hasData;
   
   if (isDemo) {
     // In demo mode, return simulated responses

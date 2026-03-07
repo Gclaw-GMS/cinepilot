@@ -27,6 +27,17 @@
 
 ## Fixes Applied
 
+### 2. Crew Feature - Enhanced Form Validation
+Added comprehensive field-level validation to the Crew member form:
+- **Name validation**: Required field check
+- **Role validation**: Required field check  
+- **Email validation**: Format validation (regex pattern)
+- **Phone validation**: Minimum 10 digits, accepts various formats (+91, spaces, dashes)
+- **Daily Rate validation**: Must be positive number
+- **Visual feedback**: Red border highlight on invalid fields
+- **Inline error messages**: Field-specific error text displayed below each input
+- **Error state clearing**: Field errors clear when user starts typing
+
 ### 1. Tailwind Config Update
 Added missing `border` color to `cinepilot` theme in `tailwind.config.js`:
 ```js

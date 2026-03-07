@@ -97,6 +97,7 @@ export default function CrewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
@@ -220,14 +221,63 @@ export default function CrewPage() {
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
+    setFieldErrors({});
+    setForm({ name: '', role: '', department: '', phone: '', email: '', dailyRate: '', notes: '' });
+  };
+
+  // Field-specific validation
+  const validateForm = (): string | null => {
+    const errors: Record<string, string> = {};
+    let firstError: string | null = null;
+    
+    if (!form.name.trim()) {
+      errors.name = 'Name is required';
+      firstError = firstError || errors.name;
+    }
+    if (!form.role.trim()) {
+      errors.role = 'Role is required';
+      firstError = firstError || errors.role;
+    }
+    
+    // Validate email format if provided
+    if (form.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        errors.email = 'Invalid email format';
+        firstError = firstError || errors.email;
+      }
+    }
+    
+    // Validate phone format if provided (accepts various formats)
+    if (form.phone.trim()) {
+      const phoneRegex = /^[\d\s\+\-\(\)]{10,}$/;
+      if (!phoneRegex.test(form.phone.trim())) {
+        errors.phone = 'Invalid phone number';
+        firstError = firstError || errors.phone;
+      }
+    }
+    
+    // Validate daily rate if provided
+    if (form.dailyRate.trim()) {
+      const rate = parseFloat(form.dailyRate);
+      if (isNaN(rate) || rate < 0) {
+        errors.dailyRate = 'Must be a positive number';
+        firstError = firstError || errors.dailyRate;
+      }
+    }
+    
+    setFieldErrors(errors);
+    return firstError;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     
-    if (!form.name.trim() || !form.role.trim()) {
-      setError('Name and role are required');
+    // Run validation
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -598,11 +648,26 @@ export default function CrewPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">Name *</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" required />
+                <input 
+                  type="text" 
+                  value={form.name} 
+                  onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors(prev => ({...prev, name: ''})); }}
+                  className={`w-full px-4 py-2 bg-slate-800 border rounded-lg text-sm focus:ring-2 ${fieldErrors.name ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-emerald-500'}`} 
+                  required 
+                />
+                {fieldErrors.name && <p className="text-red-400 text-xs mt-1">{fieldErrors.name}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">Role *</label>
-                <input type="text" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" placeholder="e.g., Director of Photography" required />
+                <input 
+                  type="text" 
+                  value={form.role} 
+                  onChange={(e) => { setForm({ ...form, role: e.target.value }); setFieldErrors(prev => ({...prev, role: ''})); }}
+                  className={`w-full px-4 py-2 bg-slate-800 border rounded-lg text-sm focus:ring-2 ${fieldErrors.role ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-emerald-500'}`} 
+                  placeholder="e.g., Director of Photography" 
+                  required 
+                />
+                {fieldErrors.role && <p className="text-red-400 text-xs mt-1">{fieldErrors.role}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">Department</label>
@@ -614,16 +679,38 @@ export default function CrewPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-1">Phone</label>
-                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" placeholder="+91 98765 43210" />
+                  <input 
+                    type="tel" 
+                    value={form.phone} 
+                    onChange={(e) => { setForm({ ...form, phone: e.target.value }); setFieldErrors(prev => ({...prev, phone: ''})); }}
+                    className={`w-full px-4 py-2 bg-slate-800 border rounded-lg text-sm focus:ring-2 ${fieldErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-emerald-500'}`} 
+                    placeholder="+91 98765 43210" 
+                  />
+                  {fieldErrors.phone && <p className="text-red-400 text-xs mt-1">{fieldErrors.phone}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-1">Email</label>
-                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" placeholder="name@email.com" />
+                  <input 
+                    type="email" 
+                    value={form.email} 
+                    onChange={(e) => { setForm({ ...form, email: e.target.value }); setFieldErrors(prev => ({...prev, email: ''})); }}
+                    className={`w-full px-4 py-2 bg-slate-800 border rounded-lg text-sm focus:ring-2 ${fieldErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-emerald-500'}`} 
+                    placeholder="name@email.com" 
+                  />
+                  {fieldErrors.email && <p className="text-amber-400 text-xs mt-1">{fieldErrors.email}</p>}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">Daily Rate (₹)</label>
-                <input type="number" value={form.dailyRate} onChange={(e) => setForm({ ...form, dailyRate: e.target.value })} className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" placeholder="25000" min="0" />
+                <input 
+                  type="number" 
+                  value={form.dailyRate} 
+                  onChange={(e) => { setForm({ ...form, dailyRate: e.target.value }); setFieldErrors(prev => ({...prev, dailyRate: ''})); }}
+                  className={`w-full px-4 py-2 bg-slate-800 border rounded-lg text-sm focus:ring-2 ${fieldErrors.dailyRate ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-emerald-500'}`} 
+                  placeholder="25000" 
+                  min="0" 
+                />
+                {fieldErrors.dailyRate && <p className="text-red-400 text-xs mt-1">{fieldErrors.dailyRate}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">Notes</label>

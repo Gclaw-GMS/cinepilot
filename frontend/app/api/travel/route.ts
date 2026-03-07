@@ -75,6 +75,12 @@ export async function GET(req: NextRequest) {
 
     // Get all expenses for summary
     const allExpenses = await prisma.expense.findMany({ where: { projectId } });
+    
+    // If no expenses in DB, fallback to demo data
+    if (allExpenses.length === 0) {
+      throw new Error('No expenses in database');
+    }
+    
     const totalAmount = allExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const byCategory: Record<string, number> = {};
     const byStatus: Record<string, number> = {};

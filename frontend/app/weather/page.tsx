@@ -17,6 +17,10 @@ import {
   CheckCircle,
   Calendar,
   BarChart3,
+  Download,
+  Plus,
+  X,
+  Search,
 } from 'lucide-react';
 import {
   LineChart,
@@ -173,6 +177,10 @@ export default function WeatherPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'forecast' | 'analytics' | 'schedule'>('forecast');
+  const [showCustomLocation, setShowCustomLocation] = useState(false);
+  const [customLocationInput, setCustomLocationInput] = useState('');
+  const [customLocationLoading, setCustomLocationLoading] = useState(false);
+  const [customLocationError, setCustomLocationError] = useState<string | null>(null);
 
   // Fetch schedule data for integration
   const fetchScheduleData = useCallback(async () => {
@@ -238,6 +246,75 @@ export default function WeatherPage() {
       fetchWeather(selectedLocation);
     }
   }, [selectedLocation, fetchWeather]);
+
+  // Geocode custom location using Nominatim (free API)
+  const handleCustomLocationSearch = useCallback(async () => {
+    if (!customLocationInput.trim()) return;
+    
+    setCustomLocationLoading(true);
+    setCustomLocationError(null);
+    
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(customLocationInput)}&limit=1`,
+        { headers: { 'User-Agent': 'CinePilot/1.0' } }
+      );
+      const data = await res.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        const newLocation: Location = {
+          name: result.display_name.split(',')[0] || customLocationInput,
+          lat: parseFloat(result.lat),
+          lng: parseFloat(result.lon),
+        };
+        
+        // Add to LOCATIONS if not already present
+        const exists = LOCATIONS.some(l => l.name === newLocation.name);
+        if (!exists) {
+          (LOCATIONS as Location[]).push(newLocation);
+        }
+        
+        setSelectedLocation(newLocation);
+        fetchWeather(newLocation);
+        setShowCustomLocation(false);
+        setCustomLocationInput('');
+      } else {
+        setCustomLocationError('Location not found. Try a different search term.');
+      }
+    } catch (e) {
+      setCustomLocationError('Failed to search location. Please try again.');
+    } finally {
+      setCustomLocationLoading(false);
+    }
+  }, [customLocationInput, fetchWeather]);
+
+  // Export forecast to CSV
+  const exportToCSV = useCallback(() => {
+    if (!weatherData?.forecast?.length) return;
+    
+    const headers = ['Date', 'Condition', 'Temp High (°C)', 'Temp Low (°C)', 'Humidity (%)', 'Wind Speed (km/h)', 'Precipitation (mm)', 'Production Score', 'Recommendation'];
+    const rows = weatherData.forecast.map(day => [
+      day.date,
+      day.condition,
+      day.tempHigh.toString(),
+      day.tempLow.toString(),
+      day.humidity.toString(),
+      day.windSpeed.toString(),
+      day.precipitation.toString(),
+      day.productionScore.toString(),
+      day.recommendation,
+    ]);
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `weather-forecast-${weatherData.location}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [weatherData]);
 
   // Analytics calculations
   const analytics = useMemo(() => {
@@ -375,10 +452,68 @@ export default function WeatherPage() {
                   )}
                   Refresh
                 </button>
+                <button
+                  onClick={exportToCSV}
+                  disabled={!weatherData?.forecast?.length}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
               </>
             )}
+            <button
+              onClick={() => setShowCustomLocation(!showCustomLocation)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Custom Location
+            </button>
           </div>
         </div>
+
+        {/* Custom Location Input */}
+        {showCustomLocation && (
+          <div className="mb-6 p-4 bg-slate-900 border border-slate-700 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={customLocationInput}
+                  onChange={(e) => setCustomLocationInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCustomLocationSearch()}
+                  placeholder="Enter city or location name..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleCustomLocationSearch}
+                disabled={customLocationLoading || !customLocationInput.trim()}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
+              >
+                {customLocationLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                Search
+              </button>
+              <button
+                onClick={() => { setShowCustomLocation(false); setCustomLocationInput(''); setCustomLocationError(null); }}
+                className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {customLocationError && (
+              <p className="mt-2 text-sm text-red-400">{customLocationError}</p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              Powered by OpenStreetMap Nominatim (free geocoding)
+            </p>
+          </div>
+        )}
 
         {/* Location Selection */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">

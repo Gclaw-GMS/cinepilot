@@ -88,6 +88,18 @@ type ViewMode = 'list' | 'board' | 'calendar'
 type FilterStatus = 'all' | 'overdue' | 'pending' | 'in_progress' | 'completed' | 'blocked'
 type FilterPriority = 'all' | 'high' | 'medium' | 'low'
 
+// Demo data fallback for when database is not connected
+const DEMO_TASKS: Task[] = [
+  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'in_progress', priority: 'high', assignee: 'Director', dueDate: '2026-03-08', createdAt: '2026-03-01' },
+  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'pending', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-09', createdAt: '2026-03-01' },
+  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-05', createdAt: '2026-02-28' },
+  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-10', createdAt: '2026-03-02' },
+  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-12', createdAt: '2026-03-01' },
+  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'pending', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-07', createdAt: '2026-03-01' },
+  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-04', createdAt: '2026-02-27' },
+  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-06', createdAt: '2026-03-01' },
+]
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -121,13 +133,24 @@ export default function TasksPage() {
       const res = await fetch('/api/tasks?projectId=default-project')
       const data = await res.json()
       console.log('[Tasks] Received data:', data)
-      console.log('[Tasks] Setting tasks:', data.data?.length || 0)
-      setTasks(data.data || [])
-      setIsDemoMode(data.isDemoMode === true)
-      console.log('[Tasks] Tasks state updated, length:', (data.data || []).length)
+      
+      // Use demo data if API returns empty or error
+      if (!data.data || data.data.length === 0) {
+        console.log('[Tasks] No data from API, using demo data')
+        setTasks(DEMO_TASKS)
+        setIsDemoMode(true)
+      } else {
+        console.log('[Tasks] Setting tasks:', data.data.length)
+        setTasks(data.data)
+        setIsDemoMode(data.isDemoMode === true)
+      }
+      console.log('[Tasks] Tasks state updated')
     } catch (err) {
       console.error('[Tasks] Error fetching tasks:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks')
+      // Fall back to demo data on error
+      console.log('[Tasks] Using demo data due to error')
+      setTasks(DEMO_TASKS)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
       console.log('[Tasks] Loading complete')

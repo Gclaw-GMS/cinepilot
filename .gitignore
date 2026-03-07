@@ -25,3 +25,4 @@ frontend/prisma/migrations/**/migration_lock.toml
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.tsbuildinfo

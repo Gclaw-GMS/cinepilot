@@ -5,7 +5,7 @@ import {
   Activity, Server, Database, Wifi, WifiOff, 
   Clock, CheckCircle, XCircle, AlertTriangle, 
   RefreshCw, Cpu, HardDrive, Globe, Zap,
-  Package, Calendar, FileText, Code
+  Package, Calendar, FileText, Code, Keyboard, X
 } from 'lucide-react'
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -84,6 +84,7 @@ export default function HealthPage() {
   )
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [history, setHistory] = useState<{time: string, responseTime: number, status: string}[]>([])
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
 
   const fetchHealth = useCallback(async () => {
     setRefreshing(true)
@@ -146,6 +147,38 @@ export default function HealthPage() {
     
     return () => clearInterval(interval)
   }, [fetchHealth, checkEndpoints])
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      return
+    }
+
+    switch (e.key) {
+      case 'r':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          fetchHealth()
+          checkEndpoints()
+        }
+        break
+      case '?':
+        if (e.shiftKey) {
+          e.preventDefault()
+          setShowKeyboardHelp(prev => !prev)
+        }
+        break
+      case 'Escape':
+        setShowKeyboardHelp(false)
+        break
+    }
+  }, [fetchHealth, checkEndpoints])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const formatUptime = (seconds: number): string => {
     const days = Math.floor(seconds / 86400)
@@ -263,7 +296,73 @@ export default function HealthPage() {
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
         </button>
+        
+        <button
+          onClick={() => setShowKeyboardHelp(true)}
+          className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg font-medium transition-colors"
+          title="Keyboard shortcuts"
+        >
+          <Keyboard className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-cyan-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl shadow-cyan-500/10">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-cyan-500/20">
+                  <Keyboard className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                  Keyboard Shortcuts
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { keys: ['R'], desc: 'Refresh health data', category: 'Action' },
+                { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
+                { keys: ['Esc'], desc: 'Close modal', category: 'Navigation' },
+              ].map((shortcut, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider w-20">
+                      {shortcut.category}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <kbd className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-cyan-300 shadow-sm">
+                        {shortcut.keys}
+                      </kbd>
+                    </div>
+                  </div>
+                  <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Quick reference for power users</span>
+                <span className="flex items-center gap-2">
+                  Press 
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-cyan-400">?</kbd> 
+                  anytime to toggle
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

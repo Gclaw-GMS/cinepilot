@@ -1,4 +1,3 @@
-// @ts-nocheck
 // CinePilot - Script Uploader Component
 // Enhanced script upload with format detection
 
@@ -180,7 +179,7 @@ export default function ScriptUploader({ onUploadComplete, onMultipleUpload }: S
             </div>
             <div>
               <p className="text-gray-500 dark:text-gray-400">File Size</p>
-              <p className="font-medium">{(result.size / 1024).toFixed(1)} KB</p>
+              <p className="font-medium">{(result.size || 0 / 1024).toFixed(1)} KB</p>
             </div>
           </div>
 

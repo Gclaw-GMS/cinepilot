@@ -106,8 +106,70 @@ export const aiAnalysis = {
 };
 
 export const scriptUpload = {
-  upload: noop,
-  getVersions: noopArray,
+  upload: async (file: File): Promise<ScriptUploadResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const res = await fetch('/api/scripts', {
+      method: 'POST',
+      body: formData,
+    })
+    
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Upload failed' }))
+      return { success: false, error: error.error || 'Upload failed' }
+    }
+    
+    return res.json()
+  },
+  
+  uploadAdvanced: async (file: File): Promise<ScriptUploadResult> => {
+    // Use the same endpoint but return formatted result
+    const result = await scriptUpload.upload(file)
+    return {
+      ...result,
+      format_detected: result.format_detected || 'fdx',
+      metadata: result.metadata || {
+        scene_count: 0,
+        estimated_pages: 0,
+        total_lines: 0,
+      },
+      size: file.size,
+    }
+  },
+  
+  uploadMultiple: async (files: File[]): Promise<MultiScriptResult> => {
+    const results = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const result = await scriptUpload.upload(file)
+          return {
+            filename: file.name,
+            status: result.success ? 'processed' : 'error',
+            scene_count: result.metadata?.scene_count || 0,
+          }
+        } catch {
+          return {
+            filename: file.name,
+            status: 'error',
+            scene_count: 0,
+          }
+        }
+      })
+    )
+    
+    return {
+      total_files: files.length,
+      total_scenes: results.reduce((sum, r) => sum + r.scene_count, 0),
+      files: results,
+    }
+  },
+  
+  getVersions: async (scriptId: string) => {
+    const res = await fetch(`/api/scripts/${scriptId}`)
+    if (!res.ok) throw new Error('Failed to fetch versions')
+    return res.json()
+  },
 };
 
 export const scriptVersions = {
@@ -179,6 +241,42 @@ export const utils = {
   formatCurrency: (n: number) => `₹${n.toLocaleString('en-IN')}`,
 };
 
+// Type definitions for API responses
+export interface ScriptUploadResult {
+  success: boolean
+  scriptId?: string
+  versionId?: string
+  format_detected?: string
+  metadata?: {
+    scene_count?: number
+    estimated_pages?: number
+    total_lines?: number
+    locations?: string[]
+    characters?: string[]
+  }
+  size?: number
+  error?: string
+}
+
+export interface MultiScriptResult {
+  total_files: number
+  total_scenes: number
+  files: Array<{
+    filename: string
+    status: string
+    scene_count: number
+  }>
+}
+
+export interface WhatsAppTemplate {
+  id: string
+  name: string
+  category: string
+  language: string
+  components: any[]
+  status: string
+}
+
 // Type re-exports for components that import types from here
 export type Project = any;
 export type Scene = any;
@@ -196,6 +294,3 @@ export type ScriptVersion = any;
 export type ScheduleReminderRequest = any;
 export type LocationUpdateRequest = any;
 export type CastCallRequest = any;
-export type ScriptUploadResult = any;
-export type MultiScriptResult = any;
-export type WhatsAppTemplate = any;

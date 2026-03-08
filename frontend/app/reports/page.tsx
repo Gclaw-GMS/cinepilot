@@ -2,486 +2,464 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { 
-  Shield, AlertTriangle, AlertCircle, CheckCircle, 
-  Film, RefreshCw, Loader2, Download, ChevronRight,
-  Settings, TrendingUp, Target
+  FileText, BarChart3, Download, RefreshCw, Loader2, 
+  ChevronRight, TrendingUp, Target, Film, Users, 
+  MapPin, DollarSign, Calendar, PieChart, Shield,
+  AlertTriangle, CheckCircle
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  PieChart as RePieChart, Pie, Cell, AreaChart, Area, Legend
 } from 'recharts'
 
-interface SceneFlagData {
-  id: string
-  category: string
-  severity: number
-  context: string | null
-  evidence: any
-  scene: { sceneNumber: string; headingRaw: string | null }
+interface ReportData {
+  production: {
+    totalScenes: number
+    totalCharacters: number
+    totalLocations: number
+    shootingDays: number
+    budget: number
+    spent: number
+  }
+  schedule: {
+    completedDays: number
+    totalDays: number
+    scenesShot: number
+    totalScenes: number
+  }
+  crew: {
+    totalMembers: number
+    departments: number
+    totalDailyRate: number
+  }
+  censor: {
+    certificate: string
+    score: number
+    issues: number
+  }
 }
 
-interface SuggestionData {
-  id: string
-  sceneNumber: string
-  rank: number
-  issue: string
-  suggestedChange: string
-  why: string | null
-  expectedSeverityDelta: number | null
-  effort: string | null
-  creativeRisk: string | null
-  expectedCertImpact: string | null
-}
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 
-interface AnalysisData {
-  id: string
-  predictedCertificate: string | null
-  confidence: string | null
-  deterministicScore: number | null
-  topDrivers: string[]
-  highRiskScenes: any
-  uncertainties: string[]
-  sceneFlags: SceneFlagData[]
-  suggestions: SuggestionData[]
-}
+type ReportTab = 'overview' | 'production' | 'schedule' | 'crew' | 'censor'
 
-const CERTIFICATES = ['U', 'UA 7+', 'UA 13+', 'UA 16+', 'A', 'S']
-const CATEGORIES = ['violence', 'profanity', 'drugs', 'sexual_content', 'hate', 'child_harm']
-const CATEGORY_COLORS: Record<string, string> = {
-  violence: 'bg-red-900/30 text-red-400 border-red-800/30',
-  profanity: 'bg-orange-900/30 text-orange-400 border-orange-800/30',
-  drugs: 'bg-purple-900/30 text-purple-400 border-purple-800/30',
-  sexual_content: 'bg-pink-900/30 text-pink-400 border-pink-800/30',
-  hate: 'bg-yellow-900/30 text-yellow-400 border-yellow-800/30',
-  child_harm: 'bg-red-900/50 text-red-300 border-red-800/50',
-}
-
-const CERT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  'U': { bg: 'bg-green-900/40', border: 'border-green-700/50', text: 'text-green-400' },
-  'UA 7+': { bg: 'bg-emerald-900/40', border: 'border-emerald-700/50', text: 'text-emerald-400' },
-  'UA 13+': { bg: 'bg-yellow-900/40', border: 'border-yellow-700/50', text: 'text-yellow-400' },
-  'UA 16+': { bg: 'bg-orange-900/40', border: 'border-orange-700/50', text: 'text-orange-400' },
-  'A': { bg: 'bg-red-900/40', border: 'border-red-700/50', text: 'text-red-400' },
-  'S': { bg: 'bg-red-900/60', border: 'border-red-600/50', text: 'text-red-300' },
-}
-
-const CHART_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e']
-
-type ActiveTab = 'overview' | 'flags' | 'suggestions'
-
-export default function CensorBoardPage() {
-  const [analysis, setAnalysis] = useState<AnalysisData | null>(null)
+export default function ReportsPage() {
+  const [reportData, setReportData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
-  const [targetCert, setTargetCert] = useState('UA 13+')
+  const [generating, setGenerating] = useState(false)
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview')
   const [error, setError] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchReport = useCallback(async () => {
     try {
-      const res = await fetch('/api/censor')
+      const res = await fetch('/api/reports')
       const data = await res.json()
-      setAnalysis(data.analysis || null)
+      if (data.success) {
+        setReportData(data.data)
+        setIsDemoMode(data.isDemoMode === true)
+      }
     } catch (e) {
       console.error(e)
+      setError('Failed to load report')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchReport() }, [fetchReport])
 
-  const handleAnalyze = async () => {
-    setAnalyzing(true)
+  const handleGenerate = async () => {
+    setGenerating(true)
     setError(null)
     try {
-      const res = await fetch('/api/censor', {
+      const res = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'analyze' }),
+        body: JSON.stringify({ action: 'generate' }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      await fetchData()
+      if (data.success) {
+        setReportData(data.data)
+        setIsDemoMode(data.isDemoMode === true)
+      } else {
+        throw new Error(data.error || 'Generation failed')
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
-      setAnalyzing(false)
+      setGenerating(false)
     }
   }
 
-  const handleSuggestCuts = async () => {
-    if (!analysis) return
-    setError(null)
-    try {
-      const res = await fetch('/api/censor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'suggestCuts', analysisId: analysis.id, targetCertificate: targetCert }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      await fetchData()
-      setActiveTab('suggestions')
-    } catch (e: any) {
-      setError(e.message)
-    }
+  const handleExport = () => {
+    if (!reportData) return
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `production-report-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
   }
 
-  const categoryCounts = analysis?.sceneFlags.reduce<Record<string, number>>((acc, f) => {
-    acc[f.category] = (acc[f.category] || 0) + 1
-    return acc
-  }, {}) || {}
+  const budgetData = reportData ? [
+    { name: 'Budget', value: reportData.production.budget },
+    { name: 'Spent', value: reportData.production.spent },
+    { name: 'Remaining', value: reportData.production.budget - reportData.production.spent },
+  ] : []
 
-  const maxSeverityByCategory = analysis?.sceneFlags.reduce<Record<string, number>>((acc, f) => {
-    acc[f.category] = Math.max(acc[f.category] || 0, f.severity)
-    return acc
-  }, {}) || {}
+  const scheduleData = reportData ? [
+    { name: 'Completed', value: reportData.schedule.completedDays },
+    { name: 'Remaining', value: reportData.schedule.totalDays - reportData.schedule.completedDays },
+  ] : []
 
-  // Chart data
-  const pieData = Object.entries(categoryCounts).map(([name, value], idx) => ({
-    name: name.replace('_', ' '),
-    value,
-    color: CHART_COLORS[idx % CHART_COLORS.length]
-  }))
+  const scenesData = reportData ? [
+    { name: 'Shot', value: reportData.schedule.scenesShot },
+    { name: 'Remaining', value: reportData.schedule.totalScenes - reportData.schedule.scenesShot },
+  ] : []
 
-  const tabs: { key: ActiveTab; label: string }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'flags', label: `Scene Flags (${analysis?.sceneFlags.length || 0})` },
-    { key: 'suggestions', label: `Cut Suggestions (${analysis?.suggestions.length || 0})` },
+  const productionPercentage = reportData ? Math.round((reportData.production.spent / reportData.production.budget) * 100) : 0
+  const schedulePercentage = reportData ? Math.round((reportData.schedule.completedDays / reportData.schedule.totalDays) * 100) : 0
+
+  const tabs: { key: ReportTab; label: string; icon: typeof FileText }[] = [
+    { key: 'overview', label: 'Overview', icon: FileText },
+    { key: 'production', label: 'Production', icon: Film },
+    { key: 'schedule', label: 'Schedule', icon: Calendar },
+    { key: 'crew', label: 'Crew', icon: Users },
+    { key: 'censor', label: 'Censor', icon: Shield },
   ]
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-red-500" />
-          <p className="text-slate-400">Loading censor board...</p>
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
+          <p className="text-gray-400">Loading reports...</p>
         </div>
       </div>
     )
   }
 
-  const certStyle = analysis?.predictedCertificate ? CERT_COLORS[analysis.predictedCertificate] : null
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-orange-600 rounded-lg flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold">Censor Board Analysis</h1>
-              <p className="text-slate-400 text-sm mt-0.5">CBFC certificate prediction + content sensitivity analysis</p>
-            </div>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+            <BarChart3 className="w-6 h-6 text-white" />
           </div>
-          <button
-            onClick={handleAnalyze}
-            disabled={analyzing}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-          >
-            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Film className="w-4 h-4" />}
-            {analyzing ? 'Analyzing...' : 'Run Analysis'}
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-white">Production Reports</h1>
+              {isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Data</span>}
+            </div>
+            <p className="text-gray-500 text-sm mt-1">Comprehensive production analytics</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleExport} disabled={!reportData} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 rounded-lg flex items-center gap-2">
+            <Download className="w-4 h-4" />Export
+          </button>
+          <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white rounded-lg flex items-center gap-2">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {generating ? 'Generating...' : 'Refresh'}
           </button>
         </div>
-
-        {error && (
-          <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-5 py-3 mb-6 text-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {error}
-          </div>
-        )}
-
-        {/* Certificate Prediction Card */}
-        {analysis && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className={`rounded-xl p-6 border text-center ${certStyle?.bg || 'bg-slate-900'} ${certStyle?.border || 'border-slate-800'} ${certStyle?.text || 'text-slate-400'}`}>
-              <div className="text-4xl font-bold">{analysis.predictedCertificate || '—'}</div>
-              <div className="text-xs mt-1 opacity-70">Predicted Certificate</div>
-              {analysis.confidence && (
-                <div className="text-xs mt-2 opacity-60">Confidence: {analysis.confidence}</div>
-              )}
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-yellow-400" />
-                <span className="text-xs text-slate-400">Sensitivity Score</span>
-              </div>
-              <div className="text-3xl font-bold text-yellow-400">{analysis.deterministicScore?.toFixed(1) || '0'}</div>
-              <div className="text-xs text-slate-500 mt-1">out of 100</div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span className="text-xs text-slate-400">Content Flags</span>
-              </div>
-              <div className="text-3xl font-bold text-red-400">{analysis.sceneFlags.length}</div>
-              <div className="text-xs text-slate-500 mt-1">issues detected</div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <AlertCircle className="w-4 h-4 text-orange-400" />
-                <span className="text-xs text-slate-400">High Severity</span>
-              </div>
-              <div className="text-3xl font-bold text-orange-400">
-                {analysis.sceneFlags.filter(f => f.severity >= 4).length}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">requires attention</div>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-slate-800 pb-px">
-          {tabs.map(tab => (
-            <button 
-              key={tab.key} 
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
-                activeTab === tab.key 
-                  ? 'bg-slate-900 text-red-400 border border-b-0 border-slate-800' 
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {!analysis ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
-                <Shield className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-                <p className="text-slate-400 mb-2">No censor analysis yet</p>
-                <p className="text-sm text-slate-500">Upload a script first, then click "Run Analysis" to predict the CBFC certificate.</p>
-              </div>
-            ) : (
-              <>
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Category Breakdown Chart */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h3 className="font-medium mb-4 text-slate-300 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-400" />
-                      Category Distribution
-                    </h3>
-                    {pieData.length > 0 ? (
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={pieData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={90}
-                              paddingAngle={3}
-                              dataKey="value"
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {pieData.map((entry, i) => (
-                                <Cell key={i} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="h-64 flex items-center justify-center text-slate-500">
-                        No flags detected
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Severity Distribution */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h3 className="font-medium mb-4 text-slate-300 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-yellow-400" />
-                      Severity Distribution
-                    </h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={CATEGORIES.map(cat => ({
-                            category: cat.replace('_', ' '),
-                            count: categoryCounts[cat] || 0,
-                            severity: maxSeverityByCategory[cat] || 0
-                          }))}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                          <XAxis type="number" stroke="#64748b" fontSize={12} />
-                          <YAxis type="category" dataKey="category" stroke="#64748b" fontSize={11} width={70} />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                          />
-                          <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Category Cards */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                  <h3 className="font-medium mb-4 text-slate-300">Category Breakdown</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    {CATEGORIES.map(cat => (
-                      <div key={cat} className="bg-slate-800/50 rounded-lg p-3">
-                        <span className={`text-xs px-2 py-0.5 rounded ${CATEGORY_COLORS[cat]}`}>
-                          {cat.replace('_', ' ')}
-                        </span>
-                        <div className="flex justify-between items-end mt-2">
-                          <div className="text-xl font-bold text-slate-200">{categoryCounts[cat] || 0}</div>
-                          <div className="text-[10px] text-slate-500">max: {maxSeverityByCategory[cat] || 0}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Top Drivers */}
-                {analysis.topDrivers.length > 0 && (
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h3 className="font-medium mb-3 text-slate-300 flex items-center gap-2">
-                      <Target className="w-4 h-4 text-purple-400" />
-                      Top Drivers
-                    </h3>
-                    <ul className="space-y-2">
-                      {analysis.topDrivers.map((d, i) => (
-                        <li key={i} className="text-sm text-slate-400 flex items-start gap-2">
-                          <ChevronRight className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                          {d}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Target Optimizer */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                  <h3 className="font-medium mb-3 text-slate-300 flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-indigo-400" />
-                    Target Certificate Optimizer
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm text-slate-400">Target:</span>
-                    <select 
-                      value={targetCert} 
-                      onChange={e => setTargetCert(e.target.value)} 
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
-                    >
-                      {CERTIFICATES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <button 
-                      onClick={handleSuggestCuts} 
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium"
-                    >
-                      <Download className="w-4 h-4" />
-                      Generate Cut Suggestions
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Flags Tab */}
-        {activeTab === 'flags' && (
-          <div className="space-y-2">
-            {(!analysis || analysis.sceneFlags.length === 0) ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-500">
-                <CheckCircle className="w-10 h-10 mx-auto mb-3 text-emerald-500/50" />
-                <p>No flags found. Your script is clean!</p>
-              </div>
-            ) : (
-              analysis.sceneFlags.map(flag => (
-                <div key={flag.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4 hover:border-slate-700 transition-colors">
-                  <SeverityDots severity={flag.severity} />
-                  <span className={`text-xs px-2 py-0.5 rounded ${CATEGORY_COLORS[flag.category] || 'bg-slate-800 text-slate-500'}`}>
-                    {flag.category.replace('_', ' ')}
-                  </span>
-                  <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-300">{flag.scene.sceneNumber}</span>
-                  <span className="text-sm text-slate-400 flex-1 truncate">{flag.scene.headingRaw || 'Untitled'}</span>
-                  {flag.context && <span className="text-xs text-slate-600">{flag.context}</span>}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Suggestions Tab */}
-        {activeTab === 'suggestions' && (
-          <div className="space-y-3">
-            {(!analysis || analysis.suggestions.length === 0) ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-500">
-                <Target className="w-10 h-10 mx-auto mb-3 text-slate-700" />
-                <p>No suggestions yet.</p>
-                <p className="text-sm mt-1">Run analysis and use the Target Optimizer.</p>
-              </div>
-            ) : (
-              analysis.suggestions.map(sug => (
-                <div key={sug.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs font-bold bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded">#{sug.rank}</span>
-                    <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-300">Scene {sug.sceneNumber}</span>
-                    {sug.effort && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded ${
-                        sug.effort === 'low' ? 'bg-green-900/30 text-green-400' :
-                        sug.effort === 'med' ? 'bg-yellow-900/30 text-yellow-400' :
-                        'bg-red-900/30 text-red-400'
-                      }`}>Effort: {sug.effort}</span>
-                    )}
-                    {sug.creativeRisk && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded ${
-                        sug.creativeRisk === 'low' ? 'bg-green-900/30 text-green-400' :
-                        sug.creativeRisk === 'med' ? 'bg-yellow-900/30 text-yellow-400' :
-                        'bg-red-900/30 text-red-400'
-                      }`}>Creative Risk: {sug.creativeRisk}</span>
-                    )}
-                  </div>
-                  <div className="text-sm text-slate-200 mb-1"><strong>Issue:</strong> {sug.issue}</div>
-                  <div className="text-sm text-slate-400 mb-2"><strong>Suggestion:</strong> {sug.suggestedChange}</div>
-                  {sug.why && <div className="text-xs text-slate-500 mb-2"><strong>Why:</strong> {sug.why}</div>}
-                  {sug.expectedCertImpact && (
-                    <div className="text-xs text-indigo-400 mt-2 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" />
-                      Expected impact: {sug.expectedCertImpact}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
-    </div>
-  )
-}
 
-function SeverityDots({ severity }: { severity: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map(i => (
-        <div 
-          key={i} 
-          className={`w-2 h-2 rounded-full ${
-            i <= severity
-              ? severity >= 4 ? 'bg-red-500' : severity >= 3 ? 'bg-orange-500' : 'bg-yellow-500'
-              : 'bg-slate-700'
-          }`} 
-        />
-      ))}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-400" />
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
+      <div className="flex gap-2 border-b border-gray-800 pb-2">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === tab.key 
+                ? 'bg-indigo-500/20 text-indigo-400' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && reportData && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <Film className="w-5 h-5 text-indigo-400" />
+                <span className="text-xs text-gray-500">Production</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{reportData.production.totalScenes}</p>
+              <p className="text-sm text-gray-500">Total Scenes</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <Users className="w-5 h-5 text-emerald-400" />
+                <span className="text-xs text-gray-500">Crew</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{reportData.crew.totalMembers}</p>
+              <p className="text-sm text-gray-500">Team Members</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <MapPin className="w-5 h-5 text-amber-400" />
+                <span className="text-xs text-gray-500">Locations</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{reportData.production.totalLocations}</p>
+              <p className="text-sm text-gray-500">Locations</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <DollarSign className="w-5 h-5 text-purple-400" />
+                <span className="text-xs text-gray-500">Budget</span>
+              </div>
+              <p className="text-2xl font-bold text-white">₹{(reportData.production.budget / 10000000).toFixed(1)}Cr</p>
+              <p className="text-sm text-gray-500">Total Budget</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Budget Utilization</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RePieChart>
+                    <Pie
+                      data={budgetData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {budgetData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      formatter={(value: number) => `₹${(value / 10000000).toFixed(1)}Cr`}
+                    />
+                    <Legend />
+                  </RePieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-4 flex justify-between text-sm">
+                <div>
+                  <p className="text-gray-400">Spent</p>
+                  <p className="text-white font-semibold">₹{(reportData.production.spent / 10000000).toFixed(1)}Cr</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-400">{productionPercentage}%</p>
+                  <p className="text-white font-semibold">of budget</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Schedule Progress</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    { name: 'Days', completed: reportData.schedule.completedDays, remaining: reportData.schedule.totalDays - reportData.schedule.completedDays },
+                    { name: 'Scenes', completed: reportData.schedule.scenesShot, remaining: reportData.schedule.totalScenes - reportData.schedule.scenesShot },
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="name" stroke="#9ca3af" />
+                    <YAxis stroke="#9ca3af" />
+                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
+                    <Bar dataKey="completed" fill="#10b981" name="Completed" />
+                    <Bar dataKey="remaining" fill="#374151" name="Remaining" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-4 flex justify-between text-sm">
+                <div>
+                  <p className="text-gray-400">Completed</p>
+                  <p className="text-white font-semibold">{reportData.schedule.completedDays} days / {reportData.schedule.scenesShot} scenes</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-400">{schedulePercentage}%</p>
+                  <p className="text-white font-semibold">on schedule</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Quick Overview</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <p className="text-3xl font-bold text-indigo-400">{reportData.production.totalCharacters}</p>
+                <p className="text-sm text-gray-400 mt-1">Characters</p>
+              </div>
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <p className="text-3xl font-bold text-emerald-400">{reportData.crew.departments}</p>
+                <p className="text-sm text-gray-400 mt-1">Departments</p>
+              </div>
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <p className="text-3xl font-bold text-amber-400">{reportData.censor.certificate}</p>
+                <p className="text-sm text-gray-400 mt-1">Censor Rating</p>
+              </div>
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <p className="text-3xl font-bold text-purple-400">{reportData.censor.score}</p>
+                <p className="text-sm text-gray-400 mt-1">Censor Score</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'production' && reportData && (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-6">Production Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Total Scenes</span>
+                  <span className="text-white font-semibold">{reportData.production.totalScenes}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Total Characters</span>
+                  <span className="text-white font-semibold">{reportData.production.totalCharacters}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Locations</span>
+                  <span className="text-white font-semibold">{reportData.production.totalLocations}</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Shooting Days</span>
+                  <span className="text-white font-semibold">{reportData.production.shootingDays}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Total Budget</span>
+                  <span className="text-white font-semibold">₹{(reportData.production.budget / 10000000).toFixed(1)}Cr</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Spent</span>
+                  <span className="text-emerald-400 font-semibold">₹{(reportData.production.spent / 10000000).toFixed(1)}Cr</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Remaining</span>
+                  <span className="text-amber-400 font-semibold">₹{((reportData.production.budget - reportData.production.spent) / 10000000).toFixed(1)}Cr</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Utilization</span>
+                  <span className={`font-semibold ${productionPercentage > 80 ? 'text-red-400' : productionPercentage > 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{productionPercentage}%</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                  <span className="text-gray-400">Daily Rate</span>
+                  <span className="text-white font-semibold">₹{(reportData.crew.totalDailyRate).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'schedule' && reportData && (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-6">Schedule Overview</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={[
+                  { day: 1, progress: 5 }, { day: 5, progress: 15 }, { day: 10, progress: 20 },
+                  { day: 15, progress: 25 }, { day: 20, progress: 25 }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="day" stroke="#9ca3af" />
+                  <YAxis stroke="#9ca3af" />
+                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }} />
+                  <Area type="monotone" dataKey="progress" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <div className="text-center p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                <p className="text-2xl font-bold text-emerald-400">{reportData.schedule.completedDays}</p>
+                <p className="text-sm text-gray-400">Days Completed</p>
+              </div>
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <p className="text-2xl font-bold text-white">{reportData.schedule.totalDays - reportData.schedule.completedDays}</p>
+                <p className="text-sm text-gray-400">Days Remaining</p>
+              </div>
+              <div className="text-center p-4 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                <p className="text-2xl font-bold text-indigo-400">{reportData.schedule.scenesShot}</p>
+                <p className="text-sm text-gray-400">Scenes Shot</p>
+              </div>
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <p className="text-2xl font-bold text-white">{reportData.schedule.totalScenes - reportData.schedule.scenesShot}</p>
+                <p className="text-sm text-gray-400">Scenes Remaining</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'crew' && reportData && (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-6">Crew Statistics</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-6 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                <Users className="w-8 h-8 text-indigo-400 mx-auto mb-3" />
+                <p className="text-3xl font-bold text-white">{reportData.crew.totalMembers}</p>
+                <p className="text-sm text-gray-400 mt-1">Total Crew</p>
+              </div>
+              <div className="text-center p-6 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                <BarChart3 className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
+                <p className="text-3xl font-bold text-white">{reportData.crew.departments}</p>
+                <p className="text-sm text-gray-400 mt-1">Departments</p>
+              </div>
+              <div className="text-center p-6 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <DollarSign className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+                <p className="text-3xl font-bold text-white">₹{(reportData.crew.totalDailyRate / 1000).toFixed(0)}K</p>
+                <p className="text-sm text-gray-400 mt-1">Daily Rate</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'censor' && reportData && (
+        <div className="space-y-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-6">Censor Status</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-6 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                <Shield className="w-8 h-8 text-purple-400 mx-auto mb-3" />
+                <p className="text-3xl font-bold text-white">{reportData.censor.certificate}</p>
+                <p className="text-sm text-gray-400 mt-1">Predicted Certificate</p>
+              </div>
+              <div className="text-center p-6 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
+                <p className="text-3xl font-bold text-white">{reportData.censor.score}</p>
+                <p className="text-sm text-gray-400 mt-1">Safety Score</p>
+              </div>
+              <div className="text-center p-6 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+                <p className="text-3xl font-bold text-white">{reportData.censor.issues}</p>
+                <p className="text-sm text-gray-400 mt-1">Issues Found</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

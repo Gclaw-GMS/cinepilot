@@ -2,9 +2,20 @@
 
 ## Build Status: ✅ PASSING
 
-- **Build Date:** March 7, 2026 10:14 AM
+- **Build Date:** March 8, 2026 12:51 AM
 - **Next.js Build:** Successful (73 routes)
 - **All Features Present:** Scripts, Shots, Schedule, Budget, Crew, Locations, Tasks, VFX, Weather, Chat, Reports, DOOD, Call Sheets, Exports, etc.
+
+## Enhancements This Build (March 8, 2026)
+- **Notifications API:** Added complete demo data fallback with 6 sample notifications across all channels (app, email, WhatsApp, SMS)
+  - Demo data includes production-relevant notifications: schedule updates, equipment confirmation, call time reminders, budget alerts
+  - All CRUD operations (GET, POST, PATCH, DELETE) now work in demo mode
+  - API returns consistent `{ notifications: [...], isDemoMode: true }` response format
+  - Properly handles priority levels (high, medium, low) and statuses (read, unread, sent, failed)
+  - Frontend already handles the new response format correctly
+
+## Bug Fixes This Build (March 8, 2026)
+- **Equipment Page:** Fixed incorrect useCallback usage - changed to useMemo for category data calculation
 
 ## Features Verified
 - Dashboard with stats and charts

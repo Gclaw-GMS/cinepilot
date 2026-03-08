@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 
@@ -110,13 +110,13 @@ export default function EquipmentPage() {
   })
 
   // Calculate category breakdown for chart
-  const categoryData = useCallback(() => {
+  const categoryData = useMemo(() => {
     const breakdown: Record<string, number> = {}
     equipment.forEach(eq => {
       breakdown[eq.category] = (breakdown[eq.category] || 0) + eq.dailyRate
     })
     return Object.entries(breakdown).map(([name, value]) => ({ name, value }))
-  }, [equipment])()
+  }, [equipment])
 
   const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 

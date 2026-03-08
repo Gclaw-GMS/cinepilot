@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
   Film, Star, Clock, CheckCircle, MoreHorizontal, Loader2,
   Trash2, Edit2, X, DollarSign, Briefcase, Send, RefreshCw,
-  TrendingUp, UserPlus, AlertCircle
+  TrendingUp, UserPlus, AlertCircle, HelpCircle
 } from 'lucide-react'
 
 interface TeamMember {
@@ -80,6 +80,11 @@ export default function CollaborationPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -118,6 +123,51 @@ export default function CollaborationPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          setRefreshing(true)
+          fetchData().finally(() => setRefreshing(false))
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          if (!showForm) {
+            openNewForm()
+          }
+          break
+        case 'd':
+          e.preventDefault()
+          // Focus department dropdown (simulated with cycling)
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearch('')
+          setDeptFilter('all')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showForm])
 
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -233,13 +283,40 @@ export default function CollaborationPage() {
           </h1>
           <p className="text-slate-400 mt-1">Manage your production team and communications</p>
         </div>
-        <button
-          onClick={openNewForm}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
-        >
-          <UserPlus className="w-4 h-4" />
-          Invite Member
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search members... (/)"
+              className="pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
+            />
+          </div>
+          <button
+            onClick={() => { setRefreshing(true); fetchData().finally(() => setRefreshing(false)) }}
+            disabled={refreshing}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors"
+            title="Keyboard shortcuts (?)"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+          <button
+            onClick={openNewForm}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
+          >
+            <UserPlus className="w-4 h-4" />
+            Invite Member
+          </button>
+        </div>
       </div>
 
       {isDemoMode && (
@@ -326,6 +403,23 @@ export default function CollaborationPage() {
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-6">
+        <select
+          value={deptFilter}
+          onChange={(e) => setDeptFilter(e.target.value)}
+          className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="all">All Departments</option>
+          {DEPARTMENTS.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+        <span className="text-slate-400 text-sm">
+          {filteredMembers.length} member{filteredMembers.length !== 1 ? 's' : ''} found
+        </span>
       </div>
 
       {/* Team Grid */}
@@ -569,6 +663,54 @@ export default function CollaborationPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-indigo-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Refresh data</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">R</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Focus search</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Add new member</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">N</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by department</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">D</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Show shortcuts</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">?</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-300">Close / Clear filters</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">Esc</kbd>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <p className="text-sm text-slate-500">Press <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs">?</kbd> anytime to show this help</p>
+            </div>
           </div>
         </div>
       )}

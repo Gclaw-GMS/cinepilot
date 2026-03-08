@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
-  TrendingUp, Activity
+  TrendingUp, Activity, Search, X, Keyboard
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -92,6 +92,10 @@ export default function ProgressPage() {
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'timeline' | 'kanban' | 'tasks'>('timeline')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showHelp, setShowHelp] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchProgress = useCallback(async () => {
     setLoading(true)
@@ -152,6 +156,54 @@ export default function ProgressPage() {
     fetchProgress()
   }, [fetchProgress, refreshKey])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          setIsRefreshing(true)
+          setRefreshKey(k => k + 1)
+          setTimeout(() => setIsRefreshing(false), 1000)
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('timeline')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('tasks')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('kanban')
+          break
+        case '?':
+          e.preventDefault()
+          setShowHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowHelp(false)
+          setSearchQuery('')
+          searchInputRef.current?.blur()
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Compute chart data from progress
   const chartData = useMemo(() => {
     if (!progress) return null
@@ -188,6 +240,28 @@ export default function ProgressPage() {
 
     return { taskStatus, priorityDist, milestoneProgress, phaseProgress }
   }, [progress])
+
+  // Filter tasks based on search query
+  const filteredTasks = useMemo(() => {
+    if (!progress?.tasks || !searchQuery) return progress?.tasks || []
+    const query = searchQuery.toLowerCase()
+    return progress.tasks.filter(task => 
+      task.name.toLowerCase().includes(query) ||
+      task.description?.toLowerCase().includes(query) ||
+      task.status.toLowerCase().includes(query) ||
+      task.priority.toLowerCase().includes(query)
+    )
+  }, [progress?.tasks, searchQuery])
+
+  // Filter milestones based on search query
+  const filteredMilestones = useMemo(() => {
+    if (!progress?.milestones || !searchQuery) return progress?.milestones || []
+    const query = searchQuery.toLowerCase()
+    return progress.milestones.filter(milestone => 
+      milestone.name.toLowerCase().includes(query) ||
+      milestone.status.toLowerCase().includes(query)
+    )
+  }, [progress?.milestones, searchQuery])
 
   const handleInitialize = async () => {
     setInitializing(true)
@@ -261,9 +335,29 @@ export default function ProgressPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search tasks... (/)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-48 transition-all focus:w-64"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded"
+              >
+                <X className="w-3 h-3 text-slate-500" />
+              </button>
+            )}
+          </div>
           {/* View Toggle */}
           <div className="flex bg-slate-800 rounded-lg p-1">
-            {(['timeline', 'tasks', 'kanban'] as const).map((mode) => (
+            {(['timeline', 'tasks', 'kanban'] as const).map((mode, idx) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -273,19 +367,64 @@ export default function ProgressPage() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {mode === 'timeline' ? '📅' : mode === 'tasks' ? '✅' : '📋'} {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {idx + 1} {mode.charAt(0).toUpperCase() + mode.slice(1)}
               </button>
             ))}
           </div>
           <button
-            onClick={() => setRefreshKey(k => k + 1)}
+            onClick={() => setIsRefreshing(true)}
             className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-            title="Refresh"
+            title="Refresh (R)"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setShowHelp(true)}
+            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-5 h-5" />
           </button>
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-cyan-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowHelp(false)}
+                className="p-1 hover:bg-slate-800 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { key: 'R', action: 'Refresh data' },
+                { key: '/', action: 'Focus search' },
+                { key: '1', action: 'Timeline view' },
+                { key: '2', action: 'Tasks view' },
+                { key: '3', action: 'Kanban view' },
+                { key: '?', action: 'Show shortcuts' },
+                { key: 'Esc', action: 'Close modal / Clear search' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">
+                  <span className="text-slate-300">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm font-mono text-cyan-400">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6 text-red-400 flex items-center justify-between">
@@ -496,13 +635,13 @@ export default function ProgressPage() {
                 Milestone Timeline
               </h2>
               <div className="space-y-0">
-                {progress?.milestones?.map((milestone, i) => {
+                {filteredMilestones?.map((milestone, i) => {
                   const statusColors = getStatusColor(milestone.status)
                   return (
                     <div key={milestone.id} className="flex gap-4">
                       <div className="flex flex-col items-center">
                         <div className={`w-4 h-4 rounded-full ${milestone.status === 'completed' ? 'bg-green-500' : milestone.status === 'in_progress' ? 'bg-cyan-500 animate-pulse' : 'bg-slate-600'}`} />
-                        {i < (progress.milestones?.length || 0) - 1 && (
+                        {i < (filteredMilestones?.length || 0) - 1 && (
                           <div className="w-0.5 h-16 bg-slate-700 mt-1" />
                         )}
                       </div>
@@ -519,9 +658,9 @@ export default function ProgressPage() {
                     </div>
                   )
                 })}
-                {(!progress?.milestones || progress.milestones.length === 0) && (
+                {(!filteredMilestones || filteredMilestones.length === 0) && (
                   <div className="text-center py-8 text-slate-500">
-                    No milestones yet. Initialize progress tracking to get started.
+                    {searchQuery ? 'No milestones match your search.' : 'No milestones yet. Initialize progress tracking to get started.'}
                   </div>
                 )}
               </div>
@@ -568,7 +707,7 @@ export default function ProgressPage() {
                   All Tasks
                 </h2>
                 <div className="space-y-2">
-                  {progress?.tasks?.map((task) => {
+                  {filteredTasks?.map((task) => {
                     const statusColors = getStatusColor(task.status)
                     const priorityColor = getPriorityColor(task.priority)
                     return (
@@ -620,9 +759,9 @@ export default function ProgressPage() {
                       </div>
                     )
                   })}
-                  {(!progress?.tasks || progress.tasks.length === 0) && (
+                  {(!filteredTasks || filteredTasks.length === 0) && (
                     <div className="text-center py-8 text-slate-500">
-                      No tasks yet. Initialize progress tracking to get started.
+                      {searchQuery ? 'No tasks match your search.' : 'No tasks yet. Initialize progress tracking to get started.'}
                     </div>
                   )}
                 </div>
@@ -634,7 +773,7 @@ export default function ProgressPage() {
           {viewMode === 'kanban' && (
             <div className="grid grid-cols-4 gap-4">
               {['pending', 'in_progress', 'completed', 'blocked'].map((status) => {
-                const statusTasks = progress?.tasks?.filter(t => t.status === status) || []
+                const statusTasks = filteredTasks?.filter(t => t.status === status) || []
                 const statusColors = getStatusColor(status)
                 return (
                   <div key={status} className="bg-slate-900 border border-slate-800 rounded-xl p-4">

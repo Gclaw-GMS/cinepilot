@@ -31,7 +31,8 @@ import {
   ListChecks,
   LayoutGrid,
   Keyboard,
-  ChevronDown
+  ChevronDown,
+  Download,
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -372,6 +373,33 @@ export default function TasksPage() {
     }
   }
 
+  // Export tasks to CSV
+  const handleExportCSV = () => {
+    const headers = ['Title', 'Description', 'Status', 'Priority', 'Assignee', 'Due Date', 'Created']
+    const rows = filteredTasks.map(task => [
+      task.title,
+      task.description || '',
+      task.status,
+      task.priority,
+      task.assignee || '',
+      task.dueDate || '',
+      task.createdAt,
+    ])
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `tasks-export-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Open edit form
   const openEditForm = (task: Task) => {
     setEditingTask(task)
@@ -456,6 +484,15 @@ export default function TasksPage() {
                 <span className="hidden sm:inline">Clear Done</span>
               </button>
             )}
+            <button
+              onClick={handleExportCSV}
+              disabled={filteredTasks.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-emerald-900/30 border border-slate-700 hover:border-emerald-700/50 rounded-lg text-sm text-slate-400 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export filtered tasks to CSV"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
             <button
               onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"

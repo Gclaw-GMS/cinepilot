@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   StickyNote, Plus, Search, Edit2, Trash2, X, Save, 
   Calendar, Tag, User, Clock, CheckCircle, AlertCircle,
-  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download
+  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
@@ -131,6 +131,11 @@ export default function NotesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -165,6 +170,70 @@ export default function NotesPage() {
 
   useEffect(() => {
     fetchNotes()
+  }, [fetchNotes])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in form inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        if (e.key === 'Escape') {
+          if (showForm) {
+            setShowForm(false)
+            setEditingId(null)
+          } else if (search || filterCategory !== 'all') {
+            setSearch('')
+            setFilterCategory('all')
+          } else {
+            setShowKeyboardHelp(false)
+          }
+        }
+        return
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          setShowForm(true)
+          setEditingId(null)
+          setFormData({ title: '', content: '', category: 'general', tags: '', isPinned: false })
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          if (showKeyboardHelp) {
+            setShowKeyboardHelp(false)
+          } else if (showForm) {
+            setShowForm(false)
+            setEditingId(null)
+          } else {
+            setSearch('')
+            setFilterCategory('all')
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showForm, showKeyboardHelp, search, filterCategory])
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchNotes()
+    setRefreshing(false)
   }, [fetchNotes])
 
   const filteredNotes = notes.filter(note => {
@@ -350,12 +419,19 @@ export default function NotesPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={fetchNotes}
-              disabled={loading}
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
               className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
               Refresh
+            </button>
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+            >
+              <HelpCircle className="w-4 h-4" />
+              Shortcuts
             </button>
             <div className="relative group">
               <button
@@ -398,8 +474,9 @@ export default function NotesPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search notes..."
+              placeholder="Search notes... (/)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
@@ -742,6 +819,45 @@ export default function NotesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-1 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'R', action: 'Refresh notes' },
+                { key: '/', action: 'Focus search' },
+                { key: 'N', action: 'Create new note' },
+                { key: '?', action: 'Show shortcuts' },
+                { key: 'Esc', action: 'Close modal / Clear filters' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

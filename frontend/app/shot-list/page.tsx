@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 
 interface ShotData {
@@ -74,6 +74,11 @@ export default function ShotHubPage() {
 
   const [scriptId, setScriptId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void | Promise<void>>()
 
   const fetchScriptId = useCallback(async () => {
     try {
@@ -110,6 +115,68 @@ export default function ShotHubPage() {
       else setLoading(false)
     })()
   }, [fetchScriptId, fetchShots])
+
+  // Set up fetch data ref for keyboard shortcut
+  useEffect(() => {
+    fetchDataRef.current = async () => {
+      if (scriptId) {
+        setLoading(true)
+        await fetchShots(scriptId)
+      }
+    }
+  }, [scriptId, fetchShots])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'g':
+          e.preventDefault()
+          if (scriptId && !generating) {
+            handleGenerateAll()
+          }
+          break
+        case 's':
+          e.preventDefault()
+          if (!saving && shots.length > 0) {
+            handleSaveShots()
+          }
+          break
+        case 'e':
+          e.preventDefault()
+          if (!exporting && shots.length > 0) {
+            handleExportShots('csv')
+          }
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSceneFilter('')
+          setSelectedSceneId(null)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [scriptId, generating, saving, exporting, shots.length])
 
   const handleGenerateAll = async () => {
     if (!scriptId) return
@@ -371,6 +438,13 @@ export default function ShotHubPage() {
               </button>
             </div>
           </div>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="p-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-gray-400 hover:text-white"
+            title="Keyboard shortcuts (?)"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -418,13 +492,17 @@ export default function ShotHubPage() {
         <div className="grid grid-cols-4 gap-6">
           {/* Left Panel: Scene List */}
           <div className="col-span-1 space-y-3">
-            <input
-              type="text"
-              placeholder="Filter scenes..."
-              value={sceneFilter}
-              onChange={e => setSceneFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-cinepilot-accent"
-            />
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Filter scenes..."
+                value={sceneFilter}
+                onChange={e => setSceneFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-cinepilot-accent"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">(/)</span>
+            </div>
             <button
               onClick={() => setSelectedSceneId(null)}
               className={`w-full text-left px-3 py-2 rounded text-sm ${
@@ -488,6 +566,53 @@ export default function ShotHubPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-purple-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Refresh data</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Search scenes</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Generate all shots</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">G</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Save shots</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">S</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Export CSV</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">?</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-300">Close / Clear filters</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">Esc</kbd>
+              </div>
+            </div>
           </div>
         </div>
       )}

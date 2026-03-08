@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts'
 import { 
   Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -230,6 +230,11 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'timeline' | 'chart'>('timeline')
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  
+  // Refs
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -272,6 +277,51 @@ export default function SchedulePage() {
 
   useEffect(() => { 
     fetchData() 
+  }, [fetchData])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchData()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('timeline')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('chart')
+          break
+        case 'o':
+          e.preventDefault()
+          handleOptimize()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [fetchData])
 
   const handleOptimize = async () => {
@@ -342,6 +392,20 @@ export default function SchedulePage() {
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.scenes - a.scenes)
   }, [shootingDays])
+
+  // Filter shooting days by search query
+  const filteredShootingDays = useMemo(() => {
+    if (!searchQuery.trim()) return shootingDays
+    const query = searchQuery.toLowerCase()
+    return shootingDays.filter(day => 
+      day.location?.name?.toLowerCase().includes(query) ||
+      day.dayScenes.some(ds => 
+        ds.scene.sceneNumber.toLowerCase().includes(query) ||
+        ds.scene.headingRaw?.toLowerCase().includes(query) ||
+        ds.scene.location?.toLowerCase().includes(query)
+      )
+    )
+  }, [shootingDays, searchQuery])
 
   // Night vs Day breakdown
   const dayNightData = useMemo(() => {
@@ -416,28 +480,50 @@ export default function SchedulePage() {
           </div>
           <p className="text-gray-500 text-sm mt-1">AI-powered shooting schedule with TFPC compliance</p>
         </div>
-        <div className="flex items-center gap-2 bg-gray-800/50 p-1 rounded-lg">
+        <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search... (/)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48"
+            />
+          </div>
+          <div className="flex items-center gap-2 bg-gray-800/50 p-1 rounded-lg">
+            <button
+              onClick={() => setViewMode('timeline')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                viewMode === 'timeline' 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4 inline-block mr-1.5" />
+              Timeline
+            </button>
+            <button
+              onClick={() => setViewMode('chart')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                viewMode === 'chart' 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 inline-block mr-1.5" />
+              Analytics
+            </button>
+          </div>
+          {/* Keyboard Help Button */}
           <button
-            onClick={() => setViewMode('timeline')}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              viewMode === 'timeline' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-gray-400 hover:text-white'
-            }`}
+            onClick={() => setShowKeyboardHelp(true)}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-300 flex items-center gap-2 transition-colors"
+            title="Keyboard Shortcuts (?)"
           >
-            <LayoutGrid className="w-4 h-4 inline-block mr-1.5" />
-            Timeline
-          </button>
-          <button
-            onClick={() => setViewMode('chart')}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              viewMode === 'chart' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4 inline-block mr-1.5" />
-            Analytics
+            <Keyboard className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -557,7 +643,7 @@ export default function SchedulePage() {
       </div>
 
       {/* Chart View */}
-      {viewMode === 'chart' && shootingDays.length > 0 && (
+      {viewMode === 'chart' && filteredShootingDays.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Scenes per Day Bar Chart */}
           <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-5">
@@ -728,17 +814,21 @@ export default function SchedulePage() {
 
       {/* Timeline View */}
       {viewMode === 'timeline' && (
-        shootingDays.length === 0 ? (
+        filteredShootingDays.length === 0 ? (
           <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-12 text-center">
             <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <div className="text-gray-400 text-lg mb-2">No Schedule Generated</div>
+            <div className="text-gray-400 text-lg mb-2">
+              {searchQuery ? 'No Matching Days' : 'No Schedule Generated'}
+            </div>
             <p className="text-gray-500 text-sm max-w-md mx-auto">
-              Upload and parse a script first, then click "Optimize Schedule" to create your shooting plan with AI-powered scene clustering and TFPC compliance.
+              {searchQuery 
+                ? 'No shooting days match your search. Try a different query.' 
+                : 'Upload and parse a script first, then click "Optimize Schedule" to create your shooting plan with AI-powered scene clustering and TFPC compliance.'}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {shootingDays.map(day => {
+            {filteredShootingDays.map(day => {
               const hours = Number(day.estimatedHours || 0)
               const utilizationPct = Math.min(100, (hours / 12) * 100)
               const isOvertime = hours > 10
@@ -870,6 +960,50 @@ export default function SchedulePage() {
             })}
           </div>
         )
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-indigo-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button 
+                onClick={() => setShowKeyboardHelp(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'R', desc: 'Refresh schedule data' },
+                { key: '/', desc: 'Focus search input' },
+                { key: '1', desc: 'Switch to Timeline view' },
+                { key: '2', desc: 'Switch to Analytics view' },
+                { key: 'O', desc: 'Open optimize schedule' },
+                { key: '?', desc: 'Show this help modal' },
+                { key: 'Esc', desc: 'Close modal / Clear search' },
+              ].map(({ key, desc }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-700/50 transition-colors">
+                  <span className="text-gray-300">{desc}</span>
+                  <span className="text-sm font-mono bg-gray-900 px-3 py-1.5 rounded text-indigo-400 border border-gray-700">{key}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 pt-4 border-t border-gray-700 text-center">
+              <button 
+                onClick={() => setShowKeyboardHelp(false)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

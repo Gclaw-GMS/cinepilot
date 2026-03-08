@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Shield, 
   AlertTriangle, 
@@ -18,7 +18,9 @@ import {
   X,
   Download,
   Printer,
-  Filter
+  Filter,
+  HelpCircle,
+  Search
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell
@@ -158,6 +160,47 @@ export default function CensorPage() {
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterSeverity, setFilterSeverity] = useState<string>('all')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void | Promise<void>>()
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          setFilterCategory('all')
+          setFilterSeverity('all')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const fetchAnalysis = useCallback(async () => {
     setLoading(true)
@@ -190,6 +233,9 @@ export default function CensorPage() {
       setLoading(false)
     }
   }, [selectedProject])
+
+  // Assign to ref for keyboard shortcuts
+  fetchDataRef.current = fetchAnalysis
 
   useEffect(() => {
     fetchAnalysis()
@@ -391,6 +437,15 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                 Run Analysis
               </>
             )}
+          </button>
+          
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-400 transition-colors"
+            title="Keyboard shortcuts (?)"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span className="text-xs">?</span>
           </button>
         </div>
       </div>
@@ -677,6 +732,41 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
         <p>Last analysis: {analysis?.createdAt ? new Date(analysis.createdAt).toLocaleString() : 'Never'}</p>
         <p className="mt-1">Powered by CinePilot AI • For reference only</p>
       </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-cyan-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Refresh analysis</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Focus search</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">?</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-300">Close / Clear filters</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">Esc</kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

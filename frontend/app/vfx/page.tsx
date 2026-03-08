@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -166,6 +166,66 @@ export default function VfxPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [complexityFilter, setComplexityFilter] = useState('all');
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const fetchDataRef = useRef<() => void | Promise<void>>();
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          if (selectedScript && !showNoteForm) {
+            setShowNoteForm(true)
+            setEditingNote(null)
+            setFormData({ sceneNumber: '', description: '', vfxType: 'explicit', confidence: 70, estimatedDuration: 30 })
+          }
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          setTypeFilter('all')
+          setComplexityFilter('all')
+          break
+        case '1':
+          e.preventDefault()
+          setActiveTab('overview')
+          break
+        case '2':
+          e.preventDefault()
+          setActiveTab('scenes')
+          break
+        case '3':
+          e.preventDefault()
+          setActiveTab('cost')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedScript, showNoteForm])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -375,6 +435,7 @@ export default function VfxPage() {
     };
   }, []);
 
+  // Assign fetchVfxData to ref for keyboard shortcuts
   const fetchVfxData = useCallback(async (scriptId: string) => {
     if (!scriptId) return;
     setLoading(true);
@@ -411,6 +472,11 @@ export default function VfxPage() {
       setLoading(false);
     }
   }, []);
+
+  // Assign to ref for keyboard shortcuts
+  fetchDataRef.current = () => {
+    if (selectedScript) fetchVfxData(selectedScript);
+  };
 
   useEffect(() => {
     if (selectedScript) fetchVfxData(selectedScript);
@@ -531,6 +597,14 @@ export default function VfxPage() {
                 Scene-by-scene visual effects requirements and complexity analysis
               </p>
             </div>
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span className="text-xs">?</span>
+            </button>
           </div>
         </div>
 
@@ -594,8 +668,9 @@ export default function VfxPage() {
             <div className="flex items-center gap-2">
               <Search className="w-4 h-4 text-slate-400" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search notes..."
+                placeholder="Search notes... (/)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 w-48"
@@ -1134,6 +1209,57 @@ export default function VfxPage() {
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Keyboard Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-purple-400" />
+                  Keyboard Shortcuts
+                </h2>
+                <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Refresh data</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Search notes</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Add new VFX shot</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Overview tab</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Scenes tab</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Cost Analysis tab</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Show shortcuts</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-slate-300">Close / Clear filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+                </div>
               </div>
             </div>
           </div>

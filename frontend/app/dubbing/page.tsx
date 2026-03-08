@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -61,6 +61,45 @@ export default function DubbingPage() {
   const [loadingScripts, setLoadingScripts] = useState(true)
   const [loadingVersions, setLoadingVersions] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void | Promise<void>>()
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     async function loadScripts() {
@@ -121,6 +160,11 @@ export default function DubbingPage() {
       setLoadingVersions(false)
     }
   }, [])
+
+  // Assign to ref for keyboard shortcuts
+  fetchDataRef.current = () => {
+    if (selectedScriptId) loadDubbedVersions(selectedScriptId)
+  }
 
   useEffect(() => {
     if (selectedScriptId) {
@@ -228,12 +272,22 @@ export default function DubbingPage() {
               </p>
             </div>
           </div>
-          {isDemoMode && (
-            <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 rounded-lg px-3 py-1.5">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-medium text-amber-400">Demo Mode</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {isDemoMode && (
+              <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 rounded-lg px-3 py-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-medium text-amber-400">Demo Mode</span>
+              </div>
+            )}
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span className="text-xs">?</span>
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -468,6 +522,41 @@ export default function DubbingPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
             <FileText className="w-12 h-12 text-slate-700 mx-auto mb-3" />
             <p className="text-slate-400">No scripts found. Upload a script first.</p>
+          </div>
+        )}
+        
+        {/* Keyboard Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-indigo-400" />
+                  Keyboard Shortcuts
+                </h2>
+                <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Refresh data</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Focus search</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Show shortcuts</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-slate-300">Close modal</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

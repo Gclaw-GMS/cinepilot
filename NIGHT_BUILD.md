@@ -2,14 +2,17 @@
 
 ## Build Status: ✅ PASSING
 
-- **Build Date:** March 8, 2026 1:12 PM
-- **Next.js Build:** Successful (75 routes)
+- **Build Date:** March 8, 2026 1:52 PM
+- **Next.js Build:** Successful (76 routes)
 - **TypeScript:** No errors
-- **All Features Present:** Scripts, Shots, Schedule, Budget, Crew, Locations, Tasks, VFX, Weather, Chat, Reports, DOOD, Call Sheets, Exports, Notifications, Analytics, Health, Mission Control, Dubbing, Continuity, AI Tools, Equipment, Audience Sentiment, etc.
+- **All Features Present:** Scripts, Shots, Schedule, Budget, Crew, Locations, Tasks, VFX, Weather, Chat, Reports, DOOD, Call Sheets, Exports, Notifications, Analytics, Health, Mission Control, Dubbing, Continuity, AI Tools, Equipment, Audience Sentiment, Censor Board, etc.
 
-## Night Build (1:12 PM)
+## Night Build (1:52 PM)
 
 ### Features Perfected This Build
+- **VFX Breakdown**: Added keyboard shortcuts (R, /, N, 1-3, ?, Esc), search input with hint, add VFX shot shortcut, tab navigation (Overview/Scenes/Cost), keyboard help modal
+- **Dubbing**: Added keyboard shortcuts (R, /, ?, Esc), refresh button, keyboard help modal
+- **Censor Board**: Added keyboard shortcuts (R, /, ?, Esc), keyboard help modal
 - **Scripts**: Added keyboard shortcuts (R, /, 1-6, ?, Esc), refresh button, search input focus, keyboard help modal, tab navigation
 
 ### Previous Build (12:42 PM)

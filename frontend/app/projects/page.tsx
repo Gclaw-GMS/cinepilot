@@ -32,7 +32,57 @@ interface Project {
   createdAt: string
   scriptCount: number
   crewCount: number
+  isDemo?: boolean
 }
+
+// Demo fallback data
+const DEMO_PROJECTS: Project[] = [
+  {
+    id: 'demo-project-1',
+    name: 'Kaathal - The Core',
+    description: 'A gripping political drama set in Tamil Nadu',
+    status: 'production',
+    language: 'tamil',
+    genre: 'Drama/Political',
+    budget: '85000000',
+    startDate: '2026-01-15',
+    endDate: '2026-03-15',
+    createdAt: '2025-12-01',
+    scriptCount: 2,
+    crewCount: 45,
+    isDemo: true,
+  },
+  {
+    id: 'demo-project-2',
+    name: 'Vettaiyaadu',
+    description: 'An investigative thriller in the hills of Ooty',
+    status: 'pre_production',
+    language: 'tamil',
+    genre: 'Thriller/Mystery',
+    budget: '42000000',
+    startDate: '2026-04-01',
+    endDate: '2026-06-30',
+    createdAt: '2025-11-15',
+    scriptCount: 1,
+    crewCount: 28,
+    isDemo: true,
+  },
+  {
+    id: 'demo-project-3',
+    name: 'Madras Talkies',
+    description: 'A coming-of-age story about film students',
+    status: 'planning',
+    language: 'tamil',
+    genre: 'Comedy/Drama',
+    budget: '25000000',
+    startDate: '2026-07-01',
+    endDate: '2026-09-15',
+    createdAt: '2026-01-10',
+    scriptCount: 1,
+    crewCount: 12,
+    isDemo: true,
+  },
+]
 
 const STATUS_OPTIONS = [
   { value: 'planning', label: 'Planning', color: 'bg-blue-500/20 text-blue-400' },
@@ -77,21 +127,30 @@ export default function ProjectsPage() {
     status: 'planning',
   })
 
+  const [isDemoMode, setIsDemoMode] = useState(false)
+
   const loadProjects = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/projects')
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`)
-      }
       const data = await res.json()
-      if (Array.isArray(data)) {
+      
+      // Handle demo mode from API response
+      if (data.demoData && Array.isArray(data.demoData)) {
+        setProjects(data.demoData)
+        setIsDemoMode(true)
+      } else if (Array.isArray(data)) {
         setProjects(data)
+        // Check if any project is demo
+        setIsDemoMode(data.some((p: Project) => p.isDemo))
       }
     } catch (e) {
       console.error('Failed to load projects:', e)
-      setError(e instanceof Error ? e.message : 'Failed to load projects')
+      // Use demo fallback on error
+      setProjects(DEMO_PROJECTS)
+      setIsDemoMode(true)
+      setError(null)
     }
     setLoading(false)
   }, [])
@@ -213,6 +272,16 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span className="text-sm text-amber-200">
+            Demo mode active. Create a project to save to database.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

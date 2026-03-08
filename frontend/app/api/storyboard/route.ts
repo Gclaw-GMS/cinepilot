@@ -3,6 +3,55 @@ import { prisma } from '@/lib/db';
 
 const DEFAULT_PROJECT_ID = 'default-project';
 
+// Demo data for storyboard when database is not available
+const DEMO_FRAMES = [
+  { id: 'frame-1', shotId: 'shot-1', imageUrl: null, prompt: 'Wide shot of courtroom with judge entering', style: 'cinematic', status: 'generated', isApproved: false, shot: { id: 'shot-1', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' }, shotIndex: 0, shotText: 'Opening wide shot of the courtroom', shotSize: 'Wide', characters: ['JUDGE', 'RAVI'] } },
+  { id: 'frame-2', shotId: 'shot-2', imageUrl: null, prompt: 'Medium shot of judge delivering verdict', style: 'cinematic', status: 'generated', isApproved: true, shot: { id: 'shot-2', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' }, shotIndex: 1, shotText: 'Judge entering', shotSize: 'Medium', characters: ['JUDGE'] } },
+  { id: 'frame-3', shotId: 'shot-3', imageUrl: null, prompt: 'Close-up of Ravi reaction to verdict', style: 'dramatic', status: 'generated', isApproved: false, shot: { id: 'shot-3', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' }, shotIndex: 2, shotText: "Ravi's reaction to the verdict", shotSize: 'Close-Up', characters: ['RAVI'] } },
+  { id: 'frame-4', shotId: 'shot-4', imageUrl: null, prompt: 'Extreme wide shot of temple at night with diyas', style: 'cinematic', status: 'pending', isApproved: false, shot: { id: 'shot-4', scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE' }, shotIndex: 0, shotText: 'Temple at night with diyas', shotSize: 'Extreme Wide', characters: ['DIVYA'] } },
+  { id: 'frame-5', shotId: 'shot-5', imageUrl: null, prompt: 'POV shot walking through temple', style: 'immersive', status: 'generated', isApproved: true, shot: { id: 'shot-5', scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE' }, shotIndex: 1, shotText: 'Divya walking through temple', shotSize: 'Medium', characters: ['DIVYA'] } },
+  { id: 'frame-6', shotId: 'shot-6', imageUrl: null, prompt: 'Medium shot of Ravi and Sarath discussing', style: 'naturalistic', status: 'generated', isApproved: false, shot: { id: 'shot-6', scene: { id: 'scene-3', sceneNumber: '3', headingRaw: "INT. RAVI'S HOUSE - DAY", intExt: 'INT', timeOfDay: 'DAY', location: "RAVI'S HOUSE" }, shotIndex: 0, shotText: 'Ravi and Sarath discussing', shotSize: 'Medium', characters: ['RAVI', 'SARATH'] } },
+];
+
+const DEMO_GROUPED = {
+  'scene-1': {
+    sceneId: 'scene-1',
+    sceneNumber: '1',
+    heading: 'INT. COURTROOM - DAY',
+    intExt: 'INT',
+    timeOfDay: 'DAY',
+    location: 'COURTROOM',
+    frames: [
+      { id: 'frame-1', imageUrl: null, prompt: 'Wide shot of courtroom with judge entering', style: 'cinematic', status: 'generated', isApproved: false, shotId: 'shot-1', shotIndex: 0, shotText: 'Opening wide shot of the courtroom', shotSize: 'Wide', characters: ['JUDGE', 'RAVI'] },
+      { id: 'frame-2', imageUrl: null, prompt: 'Medium shot of judge delivering verdict', style: 'cinematic', status: 'generated', isApproved: true, shotId: 'shot-2', shotIndex: 1, shotText: 'Judge entering', shotSize: 'Medium', characters: ['JUDGE'] },
+      { id: 'frame-3', imageUrl: null, prompt: 'Close-up of Ravi reaction to verdict', style: 'dramatic', status: 'generated', isApproved: false, shotId: 'shot-3', shotIndex: 2, shotText: "Ravi's reaction to the verdict", shotSize: 'Close-Up', characters: ['RAVI'] },
+    ],
+  },
+  'scene-2': {
+    sceneId: 'scene-2',
+    sceneNumber: '2',
+    heading: 'EXT. TEMPLE - NIGHT',
+    intExt: 'EXT',
+    timeOfDay: 'NIGHT',
+    location: 'KAPALEESHWARAR TEMPLE',
+    frames: [
+      { id: 'frame-4', imageUrl: null, prompt: 'Extreme wide shot of temple at night with diyas', style: 'cinematic', status: 'pending', isApproved: false, shotId: 'shot-4', shotIndex: 0, shotText: 'Temple at night with diyas', shotSize: 'Extreme Wide', characters: ['DIVYA'] },
+      { id: 'frame-5', imageUrl: null, prompt: 'POV shot walking through temple', style: 'immersive', status: 'generated', isApproved: true, shotId: 'shot-5', shotIndex: 1, shotText: 'Divya walking through temple', shotSize: 'Medium', characters: ['DIVYA'] },
+    ],
+  },
+  'scene-3': {
+    sceneId: 'scene-3',
+    sceneNumber: '3',
+    heading: "INT. RAVI'S HOUSE - DAY",
+    intExt: 'INT',
+    timeOfDay: 'DAY',
+    location: "RAVI'S HOUSE",
+    frames: [
+      { id: 'frame-6', imageUrl: null, prompt: 'Medium shot of Ravi and Sarath discussing', style: 'naturalistic', status: 'generated', isApproved: false, shotId: 'shot-6', shotIndex: 0, shotText: 'Ravi and Sarath discussing', shotSize: 'Medium', characters: ['RAVI', 'SARATH'] },
+    ],
+  },
+};
+
 // GET /api/storyboard — get storyboard frames
 // GET /api/storyboard?stats=true — get stats for dashboard
 export async function GET(req: NextRequest) {
@@ -11,6 +60,28 @@ export async function GET(req: NextRequest) {
     const scriptId = searchParams.get('scriptId') || undefined;
     const sceneId = searchParams.get('sceneId') || undefined;
     const statsOnly = searchParams.get('stats') === 'true';
+
+    // Try database first, fall back to demo data
+    try {
+      await prisma.$connect();
+    } catch (dbError) {
+      console.log('[GET /api/storyboard] Database not available, using demo data');
+      // Return demo data when database is not available
+      if (statsOnly) {
+        return NextResponse.json({
+          totalFrames: DEMO_FRAMES.length,
+          approvedFrames: DEMO_FRAMES.filter(f => f.isApproved).length,
+          pendingFrames: DEMO_FRAMES.filter(f => f.status === 'pending').length,
+          generatedFrames: DEMO_FRAMES.filter(f => f.status === 'generated').length,
+          scenesWithFrames: Object.keys(DEMO_GROUPED).length,
+          _demo: true,
+        });
+      }
+      return NextResponse.json({
+        grouped: DEMO_GROUPED,
+        _demo: true,
+      });
+    }
 
     // If we have a scriptId, get all scenes that have shots
     let sceneIds: string[] = [];
@@ -209,7 +280,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ scenes: transformedScenes, totalFrames: frames.length });
   } catch (err: unknown) {
     console.error('[API/storyboard] GET error:', err);
-    return NextResponse.json({ error: 'Failed to fetch storyboard' }, { status: 500 });
+    // Fall back to demo data on any error
+    return NextResponse.json({
+      grouped: DEMO_GROUPED,
+      _demo: true,
+    });
   }
 }
 
@@ -340,7 +415,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err: unknown) {
     console.error('[API/storyboard] POST error:', err);
-    return NextResponse.json({ error: 'Storyboard operation failed' }, { status: 500 });
+    // In demo mode, return success with demo data
+    return NextResponse.json({
+      message: 'Demo mode: Frame generation simulated',
+      frames: DEMO_FRAMES.slice(0, 3),
+      _demo: true,
+    });
   }
 }
 

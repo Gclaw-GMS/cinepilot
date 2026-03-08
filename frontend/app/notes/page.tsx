@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { 
   StickyNote, Plus, Search, Edit2, Trash2, X, Save, 
   Calendar, Tag, User, Clock, CheckCircle, AlertCircle,
-  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp
+  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
@@ -262,6 +262,39 @@ export default function NotesPage() {
     setShowForm(true)
   }
 
+  const handleExport = (format: 'csv' | 'json') => {
+    const data = filteredNotes.map(note => ({
+      title: note.title,
+      content: note.content,
+      category: note.category,
+      tags: note.tags.join(', '),
+      pinned: note.isPinned,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    }))
+    
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `production-notes-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      const csv = ['Title,Content,Category,Tags,Pinned,Created,Updated']
+        .concat(data.map(n => `"${n.title}","${n.content.replace(/"/g, '""')}","${n.category}","${n.tags}","${n.pinned}","${n.createdAt}","${n.updatedAt}"`))
+        .join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `production-notes-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return
     try {
@@ -324,6 +357,28 @@ export default function NotesPage() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+            <div className="relative group">
+              <button
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap"
+                >
+                  Export as CSV
+                </button>
+                <button
+                  onClick={() => handleExport('json')}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap"
+                >
+                  Export as JSON
+                </button>
+              </div>
+            </div>
             <button
               onClick={() => {
                 setShowForm(true)

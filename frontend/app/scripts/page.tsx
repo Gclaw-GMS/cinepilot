@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
 
 interface ScriptData {
@@ -12,6 +13,120 @@ interface ScriptData {
   createdAt: string
   scenes: SceneData[]
   scriptVersions: { id: string; versionNumber: number; extractionScore: number | null }[]
+  isDemo?: boolean
+}
+
+// Demo fallback data for scripts page
+const DEMO_SCRIPT_DATA = {
+  scripts: [
+    {
+      id: 'demo-script-1',
+      title: 'Kaathal - The Core (Final Draft)',
+      fileSize: null,
+      mimeType: null,
+      version: 3,
+      createdAt: '2025-12-15T00:00:00.000Z',
+      scenes: [
+        {
+          id: 'scene-1',
+          sceneNumber: '1',
+          sceneIndex: 0,
+          headingRaw: 'INT. COURTROOM - DAY',
+          intExt: 'INT',
+          timeOfDay: 'DAY',
+          location: 'COURTROOM',
+          startLine: 1,
+          endLine: 10,
+          confidence: 0.95,
+          sceneCharacters: [
+            { character: { id: 'char-1', name: 'JUDGE', aliases: [] } },
+            { character: { id: 'char-2', name: 'RAVI', aliases: [] } },
+          ],
+          sceneLocations: [{ name: 'COURTROOM', details: 'A high court in Chennai' }],
+          sceneProps: [],
+          vfxNotes: [],
+          warnings: [],
+        },
+        {
+          id: 'scene-2',
+          sceneNumber: '2',
+          sceneIndex: 1,
+          headingRaw: 'EXT. TEMPLE - NIGHT',
+          intExt: 'EXT',
+          timeOfDay: 'NIGHT',
+          location: 'KAPALEESHWARAR TEMPLE',
+          startLine: 11,
+          endLine: 20,
+          confidence: 0.92,
+          sceneCharacters: [
+            { character: { id: 'char-3', name: 'DIVYA', aliases: [] } },
+          ],
+          sceneLocations: [{ name: 'KAPALEESHWARAR TEMPLE', details: 'Mylapore, Chennai' }],
+          sceneProps: [{ prop: { name: 'DIYA' } }],
+          vfxNotes: [],
+          warnings: [{ warningType: 'VFX', description: 'Night shooting requires permits', severity: 'medium' }],
+        },
+        {
+          id: 'scene-3',
+          sceneNumber: '3',
+          sceneIndex: 2,
+          headingRaw: "INT. RAVI'S HOUSE - DAY",
+          intExt: 'INT',
+          timeOfDay: 'DAY',
+          location: "RAVI'S HOUSE",
+          startLine: 21,
+          endLine: 30,
+          confidence: 0.98,
+          sceneCharacters: [
+            { character: { id: 'char-2', name: 'RAVI', aliases: [] } },
+            { character: { id: 'char-4', name: 'SARATH', aliases: [] } },
+          ],
+          sceneLocations: [{ name: "RAVI'S HOUSE", details: 'A modest apartment in Adyar' }],
+          sceneProps: [{ prop: { name: 'PHOTOGRAPH' } }, { prop: { name: 'COFFEE CUP' } }],
+          vfxNotes: [],
+          warnings: [],
+        },
+      ],
+      scriptVersions: [{ id: 'v1', versionNumber: 3, extractionScore: 0.94 }],
+      isDemo: true,
+    },
+    {
+      id: 'demo-script-2',
+      title: 'Kaathal - Scene Extensions',
+      fileSize: null,
+      mimeType: null,
+      version: 1,
+      createdAt: '2026-01-05T00:00:00.000Z',
+      scenes: [],
+      scriptVersions: [{ id: 'v2', versionNumber: 1, extractionScore: 0.88 }],
+      isDemo: true,
+    },
+  ] as ScriptData[],
+  characters: [
+    { id: 'char-1', name: 'JUDGE', aliases: [], roleHint: 'Honorable Judge', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }] },
+    { id: 'char-2', name: 'RAVI', aliases: ['Ravi Kumar'], roleHint: 'Protagonist', sceneCharacters: [{ sceneId: 'scene-1', isSpeaking: true }, { sceneId: 'scene-3', isSpeaking: true }] },
+    { id: 'char-3', name: 'DIVYA', aliases: [], roleHint: 'Female Lead', sceneCharacters: [{ sceneId: 'scene-2', isSpeaking: true }] },
+    { id: 'char-4', name: 'SARATH', aliases: [], roleHint: 'Antagonist', sceneCharacters: [{ sceneId: 'scene-3', isSpeaking: true }] },
+    { id: 'char-5', name: 'KANMANI', aliases: ['Kani'], roleHint: 'Comic Relief', sceneCharacters: [] },
+  ] as CharacterData[],
+  analyses: [
+    {
+      id: 'analysis-1',
+      analysisType: 'breakdown_summary',
+      result: {
+        totalScenes: 3,
+        intScenes: 2,
+        extScenes: 1,
+        dayScenes: 2,
+        nightScenes: 1,
+        locations: ['COURTROOM', 'KAPALEESHWARAR TEMPLE', "RAVI'S HOUSE"],
+        characters: ['JUDGE', 'RAVI', 'DIVYA', 'SARATH'],
+        props: ['DIYA', 'PHOTOGRAPH', 'COFFEE CUP'],
+      },
+      modelUsed: 'gpt-4',
+      createdAt: '2025-12-20T00:00:00.000Z',
+    },
+  ] as AnalysisData[],
 }
 
 interface SceneData {
@@ -68,17 +183,34 @@ export default function ScriptsPage() {
   const [selectedScene, setSelectedScene] = useState<SceneData | null>(null)
   const [runningAnalysis, setRunningAnalysis] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState('')
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch('/api/scripts')
-      if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
-      setScripts(data.scripts || [])
-      setCharacters(data.characters || [])
-      setAnalyses(data.analyses || [])
+      
+      // Handle demo mode from API
+      if (data.demoData) {
+        setScripts(data.demoData.scripts || [])
+        setCharacters(data.demoData.characters || [])
+        setAnalyses(data.demoData.analyses || [])
+        setIsDemoMode(true)
+      } else if (data.scripts) {
+        setScripts(data.scripts)
+        setCharacters(data.characters || [])
+        setAnalyses(data.analyses || [])
+        setIsDemoMode(data.scripts.some((s: ScriptData) => s.isDemo))
+      } else if (Array.isArray(data)) {
+        setScripts(data)
+      }
     } catch (e) {
       console.error('Fetch scripts error:', e)
+      // Use demo fallback
+      setScripts(DEMO_SCRIPT_DATA.scripts)
+      setCharacters(DEMO_SCRIPT_DATA.characters)
+      setAnalyses(DEMO_SCRIPT_DATA.analyses)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -197,6 +329,16 @@ export default function ScriptsPage() {
 
   return (
     <div className="p-6">
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span className="text-sm text-amber-200">
+            Demo mode active. Upload a script to analyze your own content.
+          </span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Script Management</h1>

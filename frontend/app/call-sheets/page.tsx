@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
-  Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2
+  Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2,
+  Keyboard, Search
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -60,11 +61,17 @@ export default function CallSheetsPage() {
   const [crew, setCrew] = useState<CrewMember[]>([])
   const [selected, setSelected] = useState<CallSheet | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  
+  // Refs
+  const searchInputRef = useRef<HTMLInputElement>(null)
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -95,6 +102,7 @@ export default function CallSheetsPage() {
       setError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
@@ -114,6 +122,78 @@ export default function CallSheetsPage() {
     fetchCallSheets()
     fetchCrew()
   }, [fetchCallSheets, fetchCrew])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          setRefreshing(true)
+          fetchCallSheets()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          if (!creating && !isEditing) {
+            createNew()
+          }
+          break
+        case 'e':
+          e.preventDefault()
+          if (selected && !isEditing) {
+            startEditing()
+          }
+          break
+        case 'd':
+          e.preventDefault()
+          if (selected && !isEditing && !deleting) {
+            deleteSheet(selected.id)
+          }
+          break
+        case 'p':
+          e.preventDefault()
+          if (selected && !isEditing) {
+            handlePrint()
+          }
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          if (showKeyboardHelp) {
+            setShowKeyboardHelp(false)
+          } else if (isEditing) {
+            cancelEditing()
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selected, isEditing, creating, deleting, showKeyboardHelp, fetchCallSheets])
+
+  // Filter call sheets by search
+  const filteredCallSheets = useMemo(() => {
+    if (!searchQuery) return callSheets
+    const query = searchQuery.toLowerCase()
+    return callSheets.filter(sheet => 
+      (sheet.title?.toLowerCase() || '').includes(query) ||
+      sheet.date?.toLowerCase().includes(query) ||
+      (sheet.content?.location?.toLowerCase() || '').includes(query)
+    )
+  }, [callSheets, searchQuery])
 
   const createNew = async () => {
     try {
@@ -436,18 +516,38 @@ export default function CallSheetsPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={createNew}
-          disabled={creating}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-        >
-          {creating ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          New Call Sheet
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setRefreshing(true)
+              fetchCallSheets()
+            }}
+            disabled={refreshing}
+            className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-400 hover:text-white rounded-lg transition-colors"
+            title="Refresh (R)"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
+          <button
+            onClick={createNew}
+            disabled={creating}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+          >
+            {creating ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+            New Call Sheet
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -564,17 +664,36 @@ export default function CallSheetsPage() {
       <div className="grid grid-cols-3 gap-6 p-6">
         {/* Sidebar - Call Sheet List */}
         <div className="col-span-1 bg-slate-900/50 rounded-xl border border-slate-800 p-4">
-          <h3 className="font-semibold mb-3 flex items-center gap-2 text-slate-300">
-            <Calendar className="w-4 h-4 text-cyan-400" />
-            Call Sheets
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold flex items-center gap-2 text-slate-300">
+              <Calendar className="w-4 h-4 text-cyan-400" />
+              Call Sheets
+            </h3>
+            <span className="text-xs text-slate-500">{filteredCallSheets.length}</span>
+          </div>
+          
+          {/* Search Input */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search... (/)"
+              className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          
           {loading ? (
             <p className="text-slate-400 text-sm">Loading...</p>
-          ) : callSheets.length === 0 ? (
-            <p className="text-slate-500 text-sm">No call sheets yet</p>
+          ) : filteredCallSheets.length === 0 ? (
+            <p className="text-slate-500 text-sm">
+              {searchQuery ? 'No matching call sheets' : 'No call sheets yet'}
+            </p>
           ) : (
             <div className="space-y-2">
-              {callSheets.map((sheet) => (
+              {filteredCallSheets.map((sheet) => (
                 <div
                   key={sheet.id}
                   className={`flex items-center justify-between gap-2 rounded-lg p-3 cursor-pointer transition-all ${
@@ -1034,6 +1153,66 @@ export default function CallSheetsPage() {
           )}
         </div>
       </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                  <Keyboard className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+                  <p className="text-sm text-slate-400">Call Sheets</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { key: 'R', description: 'Refresh call sheets' },
+                { key: '/', description: 'Focus search input' },
+                { key: 'N', description: 'New call sheet' },
+                { key: 'E', description: 'Edit selected sheet' },
+                { key: 'D', description: 'Delete selected sheet' },
+                { key: 'P', description: 'Print selected sheet' },
+                { key: '?', description: 'Show keyboard shortcuts' },
+                { key: 'Esc', description: 'Close modal / Cancel editing' },
+              ].map((shortcut) => (
+                <div 
+                  key={shortcut.key}
+                  className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                >
+                  <span className="text-slate-300">{shortcut.description}</span>
+                  <kbd className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-cyan-400 font-mono text-sm font-medium">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-700">
+              <p className="text-xs text-slate-500 text-center">
+                Press <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400">?</kbd> anytime to show this help
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

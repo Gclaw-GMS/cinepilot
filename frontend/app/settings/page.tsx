@@ -12,6 +12,8 @@ import {
   Check,
   AlertCircle,
   Loader2,
+  DollarSign,
+  Shield,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -28,6 +30,12 @@ const DEFAULT_SETTINGS: SettingsState = {
   notificationsPush: true,
   notificationsEmail: false,
   analyticsEnabled: false,
+  defaultCurrency: 'INR',
+  budgetAlerts: true,
+  scheduleReminders: true,
+  censorMode: 'standard',
+  autoSave: true,
+  autoSaveInterval: 30,
 };
 
 // Load settings from localStorage
@@ -326,6 +334,94 @@ export default function SettingsPage() {
                 checked={(get('analyticsEnabled') as boolean) ?? false}
                 onChange={(v) => set('analyticsEnabled', v)}
               />
+            </div>
+          </section>
+
+          {/* Production Settings */}
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <DollarSign className="h-4 w-4" />
+              Production
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Default Currency</label>
+                <select
+                  value={(get('defaultCurrency') as string) ?? 'INR'}
+                  onChange={(e) => set('defaultCurrency', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                >
+                  <option value="INR">₹ INR (Indian Rupee)</option>
+                  <option value="USD">$ USD (US Dollar)</option>
+                  <option value="EUR">€ EUR (Euro)</option>
+                  <option value="GBP">£ GBP (British Pound)</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">Budget alerts</span>
+                <Toggle
+                  checked={(get('budgetAlerts') as boolean) ?? true}
+                  onChange={(v) => set('budgetAlerts', v)}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">Schedule reminders</span>
+                <Toggle
+                  checked={(get('scheduleReminders') as boolean) ?? true}
+                  onChange={(v) => set('scheduleReminders', v)}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Shield className="h-4 w-4" />
+              Censor Board
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Analysis Mode</label>
+                <select
+                  value={(get('censorMode') as string) ?? 'standard'}
+                  onChange={(e) => set('censorMode', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                >
+                  <option value="standard">Standard (CBFC)</option>
+                  <option value="strict">Strict (Conservative)</option>
+                  <option value="relaxed">Relaxed (Minimal)</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
+            <h2 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
+              <Save className="h-4 w-4" />
+              Auto-Save
+            </h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">Enable auto-save</span>
+                <Toggle
+                  checked={(get('autoSave') as boolean) ?? true}
+                  onChange={(v) => set('autoSave', v)}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Auto-save interval (seconds)</label>
+                <select
+                  value={(get('autoSaveInterval') as number) ?? 30}
+                  onChange={(e) => set('autoSaveInterval', parseInt(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm"
+                  disabled={!(get('autoSave') as boolean)}
+                >
+                  <option value="15">15 seconds</option>
+                  <option value="30">30 seconds</option>
+                  <option value="60">1 minute</option>
+                  <option value="120">2 minutes</option>
+                </select>
+              </div>
             </div>
           </section>
         </div>

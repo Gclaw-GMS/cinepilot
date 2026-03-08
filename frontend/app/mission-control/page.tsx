@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw
+  Loader2, RefreshCw, HelpCircle, X
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -143,6 +143,10 @@ export default function MissionControl() {
   const [refreshing, setRefreshing] = useState(false)
   const [time, setTime] = useState(new Date())
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+
+  // Ref for keyboard shortcut access
+  const fetchDataRef = useRef<() => void>(() => {})
 
   const fetchData = useCallback(async () => {
     try {
@@ -180,6 +184,42 @@ export default function MissionControl() {
     setRefreshing(true)
     fetchData()
   }
+
+  // Set up fetch data ref for keyboard shortcut
+  useEffect(() => {
+    fetchDataRef.current = () => {
+      setRefreshing(true)
+      fetchData()
+    }
+  }, [fetchData])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`
@@ -258,8 +298,16 @@ export default function MissionControl() {
                 onClick={handleRefresh}
                 disabled={refreshing}
                 className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all disabled:opacity-50"
+                title="Refresh (R)"
               >
                 <RefreshCw className={`w-5 h-5 text-cyan-400 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <button 
+                onClick={() => setShowKeyboardHelp(true)}
+                className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all"
+                title="Keyboard shortcuts (?)"
+              >
+                <HelpCircle className="w-5 h-5 text-cyan-400" />
               </button>
               <button className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all">
                 <Download className="w-5 h-5 text-cyan-400" />
@@ -272,6 +320,31 @@ export default function MissionControl() {
       {error && (
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg px-4 py-2 mb-4 text-sm">
           ⚠️ Using cached data: {error}
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+              <button 
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <ShortcutRow keys={['R']} description="Refresh mission data" />
+              <ShortcutRow keys={['?']} description="Show this help modal" />
+              <ShortcutRow keys={['Esc']} description="Close modal" />
+            </div>
+            <div className="mt-6 pt-4 border-t border-white/10">
+              <p className="text-xs text-slate-500 text-center">Press the keys to trigger actions</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -613,6 +686,21 @@ function SummaryItem({ label, value, icon: Icon, format }: { label: string; valu
       <Icon className="w-6 h-6 text-cyan-400 mx-auto mb-2" />
       <p className="text-2xl font-bold">{displayValue}</p>
       <p className="text-xs text-slate-500">{label}</p>
+    </div>
+  )
+}
+
+function ShortcutRow({ keys, description }: { keys: string[], description: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
+      <span className="text-slate-300">{description}</span>
+      <div className="flex gap-1">
+        {keys.map((key, i) => (
+          <kbd key={i} className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono text-cyan-400">
+            {key}
+          </kbd>
+        ))}
+      </div>
     </div>
   )
 }

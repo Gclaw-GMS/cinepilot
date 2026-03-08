@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from 'recharts'
 import { 
   DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
-  RefreshCw, Loader2, Download, Filter, Plus, X
+  RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard
 } from 'lucide-react'
 
 interface BudgetItemData {
@@ -125,6 +125,8 @@ export default function BudgetPage() {
 
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [newExpense, setNewExpense] = useState({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -153,6 +155,55 @@ export default function BudgetPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case 'n':
+          e.preventDefault()
+          setShowAddExpense(true)
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setShowAddExpense(false)
+          break
+        case '1':
+          e.preventDefault()
+          setActiveTab('overview')
+          break
+        case '2':
+          e.preventDefault()
+          setActiveTab('breakdown')
+          break
+        case '3':
+          e.preventDefault()
+          setActiveTab('expenses')
+          break
+        case '4':
+          e.preventDefault()
+          setActiveTab('forecast')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const handleGenerate = async () => {
     setGenerating(true)
     setError(null)
@@ -170,6 +221,17 @@ export default function BudgetPage() {
       setError(e.message)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await fetchData()
+    } catch (e) {
+      console.error('Refresh failed:', e)
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -224,6 +286,14 @@ export default function BudgetPage() {
           <p className="text-gray-500 text-sm mt-0.5">AI-powered production budgeting</p>
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+            className="p-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded text-sm flex items-center gap-2"
+            title="Refresh (R)"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
           <select value={region} onChange={e => setRegion(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -232,6 +302,13 @@ export default function BudgetPage() {
           </select>
           <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded font-medium text-sm">
             {generating ? 'Generating...' : 'Generate Budget'}
+          </button>
+          <button 
+            onClick={() => setShowKeyboardHelp(true)}
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded text-sm"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -632,6 +709,40 @@ export default function BudgetPage() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Keyboard className="w-5 h-5" />
+                Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-500 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { key: 'R', action: 'Refresh budget data' },
+                { key: 'N', action: 'Add new expense' },
+                { key: '1', action: 'Switch to Overview tab' },
+                { key: '2', action: 'Switch to Breakdown tab' },
+                { key: '3', action: 'Switch to Expenses tab' },
+                { key: '4', action: 'Switch to Forecast tab' },
+                { key: '?', action: 'Show this help' },
+                { key: 'Esc', action: 'Close modal' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                  <span className="text-gray-400">{action}</span>
+                  <kbd className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm font-mono text-white">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

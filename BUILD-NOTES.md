@@ -1,4 +1,4 @@
-# CinePilot Night Build Notes - March 7, 2026
+# CinePilot Night Build Notes - March 8, 2026
 
 ## Build Status: ✅ PASSING
 
@@ -26,6 +26,16 @@
 - AI Chat, Weather, Notifications
 
 ## Fixes Applied
+
+### 3. Scripts Feature - Added Keyboard Shortcuts
+Added comprehensive keyboard navigation to the Scripts page:
+- **R**: Refresh scripts data
+- **/**: Focus search input
+- **1-6**: Switch between tabs (Upload, Scenes, Characters, Quality, Warnings, Compare)
+- **?**: Show keyboard shortcuts help modal
+- **Esc**: Close modal / Clear search filters
+- **Added**: Refresh button and keyboard help button in header
+- **Added**: Professional keyboard shortcuts modal with all shortcuts listed
 
 ### 2. Crew Feature - Enhanced Form Validation
 Added comprehensive field-level validation to the Crew member form:

@@ -15,10 +15,10 @@ export default function FilmComparison({ projectId }: FilmComparisonProps) {
   const analyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/ai/film-comparison', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script_content: scriptContent, genre }),
+        body: JSON.stringify({ action: 'analyzeScript', scriptContent: scriptContent, genre }),
       });
       const data = await res.json();
       setResults(data);

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap } from 'lucide-react'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
 
 interface ScriptData {
@@ -184,6 +184,67 @@ export default function ScriptsPage() {
   const [runningAnalysis, setRunningAnalysis] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState('')
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => Promise<void>>()
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSceneFilter('')
+          setIntExtFilter('all')
+          break
+        case '1':
+          e.preventDefault()
+          setActiveTab('upload')
+          break
+        case '2':
+          e.preventDefault()
+          setActiveTab('scenes')
+          break
+        case '3':
+          e.preventDefault()
+          setActiveTab('characters')
+          break
+        case '4':
+          e.preventDefault()
+          setActiveTab('quality')
+          break
+        case '5':
+          e.preventDefault()
+          setActiveTab('warnings')
+          break
+        case '6':
+          e.preventDefault()
+          setActiveTab('compare')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -215,6 +276,9 @@ export default function ScriptsPage() {
       setLoading(false)
     }
   }, [])
+  
+  // Store fetchData in ref for keyboard shortcuts
+  fetchDataRef.current = fetchData
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -360,6 +424,22 @@ export default function ScriptsPage() {
             )}
           </div>
         )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchData()}
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
+            title="Refresh (R)"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -476,8 +556,9 @@ export default function ScriptsPage() {
         <div className="space-y-4">
           <div className="flex gap-3 items-center">
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search scenes..."
+              placeholder="Search scenes... (/)"
               value={sceneFilter}
               onChange={e => setSceneFilter(e.target.value)}
               className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:border-cinepilot-accent focus:outline-none"
@@ -788,6 +869,41 @@ export default function ScriptsPage() {
 
       {/* Compare Tab */}
       {activeTab === 'compare' && <ScriptComparison />}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Keyboard className="w-5 h-5" /> Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              {[
+                { key: 'R', action: 'Refresh scripts' },
+                { key: '/', action: 'Focus search' },
+                { key: '1', action: 'Upload tab' },
+                { key: '2', action: 'Scenes tab' },
+                { key: '3', action: 'Characters tab' },
+                { key: '4', action: 'Quality tab' },
+                { key: '5', action: 'Warnings tab' },
+                { key: '6', action: 'Compare tab' },
+                { key: '?', action: 'Show this help' },
+                { key: 'Esc', action: 'Close modal / Clear filters' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
+                  <span className="text-gray-400">{action}</span>
+                  <kbd className="px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs font-mono">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

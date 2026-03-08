@@ -14,10 +14,10 @@ export default function CharacterNetwork({ scenes = [], characters = [] }: Chara
   const analyze = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/ai/character-network', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes, characters }),
+        body: JSON.stringify({ action: 'analyzeCharacters', scenes, characters }),
       });
       const data = await res.json();
       setResults(data);

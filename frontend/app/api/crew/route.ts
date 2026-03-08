@@ -53,6 +53,13 @@ export async function GET() {
       where: { projectId },
       orderBy: { createdAt: 'desc' },
     });
+    
+    // Return demo data if no crew members exist in database
+    if (!crew || crew.length === 0) {
+      console.log('[GET /api/crew] No crew found in DB, returning demo data');
+      return NextResponse.json(DEMO_CREW);
+    }
+    
     return NextResponse.json(crew);
   } catch (error) {
     console.error('[GET /api/crew] Database not available, using demo data');

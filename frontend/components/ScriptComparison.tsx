@@ -35,7 +35,7 @@ export default function ScriptComparison() {
       // Try backend comparison first
       let res: any = null;
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/scripts/compare`, {
+        const response = await fetch('/api/scripts/compare', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ version1, version2 })

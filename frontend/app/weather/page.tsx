@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Cloud,
   Sun,
@@ -21,6 +21,7 @@ import {
   Plus,
   X,
   Search,
+  HelpCircle,
 } from 'lucide-react';
 import {
   LineChart,
@@ -181,6 +182,14 @@ export default function WeatherPage() {
   const [customLocationInput, setCustomLocationInput] = useState('');
   const [customLocationLoading, setCustomLocationLoading] = useState(false);
   const [customLocationError, setCustomLocationError] = useState<string | null>(null);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const refreshWeatherRef = useRef<() => void>(() => {});
+  const exportToCSVRef = useRef<() => void>(() => {});
 
   // Fetch schedule data for integration
   const fetchScheduleData = useCallback(async () => {
@@ -243,9 +252,63 @@ export default function WeatherPage() {
 
   const refreshWeather = useCallback(() => {
     if (selectedLocation) {
-      fetchWeather(selectedLocation);
+      setRefreshing(true);
+      fetchWeather(selectedLocation).finally(() => setRefreshing(false));
     }
   }, [selectedLocation, fetchWeather]);
+
+  // Set up refresh ref for keyboard shortcuts
+  useEffect(() => {
+    refreshWeatherRef.current = refreshWeather;
+  }, [refreshWeather]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          refreshWeatherRef.current()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('forecast')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('schedule')
+          break
+        case 'e':
+          e.preventDefault()
+          if (weatherData?.forecast?.length) exportToCSVRef.current()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [weatherData]);
 
   // Geocode custom location using Nominatim (free API)
   const handleCustomLocationSearch = useCallback(async () => {
@@ -316,6 +379,11 @@ export default function WeatherPage() {
     URL.revokeObjectURL(url);
   }, [weatherData]);
 
+  // Set up export ref for keyboard shortcuts
+  useEffect(() => {
+    exportToCSVRef.current = exportToCSV;
+  }, [exportToCSV]);
+
   // Analytics calculations
   const analytics = useMemo(() => {
     if (!weatherData?.forecast?.length) return null;
@@ -385,6 +453,37 @@ export default function WeatherPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
+
+        {/* Keyboard Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+            <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+                <button 
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <ShortcutRow keys={['R']} description="Refresh weather data" />
+                <ShortcutRow keys={['/']} description="Search locations" />
+                <ShortcutRow keys={['1']} description="Switch to Forecast view" />
+                <ShortcutRow keys={['2']} description="Switch to Analytics view" />
+                <ShortcutRow keys={['3']} description="Switch to Schedule view" />
+                <ShortcutRow keys={['E']} description="Export forecast to CSV" />
+                <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
+                <ShortcutRow keys={['Esc']} description="Close modal" />
+              </div>
+              <div className="mt-6 pt-4 border-t border-white/10">
+                <p className="text-xs text-slate-500 text-center">Press the keys to trigger actions</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -442,10 +541,11 @@ export default function WeatherPage() {
                 </div>
                 <button
                   onClick={refreshWeather}
-                  disabled={loading}
+                  disabled={loading || refreshing}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-50 transition-colors"
+                  title="Refresh (R)"
                 >
-                  {loading ? (
+                  {loading || refreshing ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <RefreshCw className="w-4 h-4" />
@@ -456,9 +556,25 @@ export default function WeatherPage() {
                   onClick={exportToCSV}
                   disabled={!weatherData?.forecast?.length}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+                  title="Export CSV (E)"
                 >
                   <Download className="w-4 h-4" />
                   Export
+                </button>
+                <button
+                  onClick={() => searchInputRef.current?.focus()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                  title="Search (/)"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="text-sm">Search</span>
+                </button>
+                <button
+                  onClick={() => setShowKeyboardHelp(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                  title="Keyboard shortcuts (?)"
+                >
+                  <HelpCircle className="w-4 h-4" />
                 </button>
               </>
             )}
@@ -516,8 +632,25 @@ export default function WeatherPage() {
         )}
 
         {/* Location Selection */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
-          {LOCATIONS.map((loc) => (
+        <div className="mb-6">
+          {/* Search Input */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search locations... (/)"
+              className="w-full pl-10 pr-16 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs bg-slate-800 text-slate-400 rounded">/</kbd>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            {LOCATIONS.filter(loc => 
+              loc.name.toLowerCase().includes(searchQuery.toLowerCase())
+            ).map((loc) => (
             <button
               key={loc.name}
               onClick={() => fetchWeather(loc)}
@@ -536,6 +669,7 @@ export default function WeatherPage() {
               </p>
             </button>
           ))}
+        </div>
         </div>
 
         {/* Loading State */}
@@ -1140,6 +1274,21 @@ export default function WeatherPage() {
             </p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ShortcutRow({ keys, description }: { keys: string[], description: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
+      <span className="text-slate-300">{description}</span>
+      <div className="flex gap-1">
+        {keys.map((key, i) => (
+          <kbd key={i} className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono text-cyan-400">
+            {key}
+          </kbd>
+        ))}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { 
   Calendar, 
@@ -97,6 +97,10 @@ export default function DOODPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'analytics'>('analytics')
   const [filterRole, setFilterRole] = useState<'all' | 'main' | 'supporting'>('all')
+  
+  // Keyboard shortcuts
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const loadDOOD = useCallback(async () => {
     setLoading(true)
@@ -132,6 +136,49 @@ export default function DOODPage() {
   useEffect(() => {
     loadDOOD()
   }, [loadDOOD])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          document.querySelector<HTMLButtonElement>('[data-refresh-btn]')?.click()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('calendar')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Filter report based on role
   const filteredReport = useMemo(() => {
@@ -490,10 +537,20 @@ export default function DOODPage() {
             onClick={handleRefresh}
             disabled={refreshing}
             className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
-            title="Refresh Data"
+            title="Refresh Data (R)"
+            data-refresh-btn
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </button>
+          
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+            title="Keyboard Shortcuts (?)"
+          >
+            <span className="text-xs">⌨️</span>
+            Help
           </button>
           
           <select
@@ -682,6 +739,52 @@ export default function DOODPage() {
           Last updated: {new Date().toLocaleString()}
         </div>
       </div>
+
+      {/* Keyboard Help Dialog */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <span className="text-xl">⌨️</span> Keyboard Shortcuts
+              </h3>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white transition-colors">
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Refresh data</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">R</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Focus search</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">/</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Analytics view</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Calendar view</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">List view</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Show help</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">?</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Close dialog</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">Esc</kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

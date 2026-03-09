@@ -4,6 +4,22 @@
 
 ## Features Perfected This Session
 
+### 8. Weather Feature - Keyboard Shortcuts & Search (March 8, 2026 10:15 PM)
+Added comprehensive keyboard navigation and search to the Weather page:
+- **R**: Refresh weather data
+- **/**: Focus search input
+- **1**: Switch to Forecast view
+- **2**: Switch to Analytics view
+- **3**: Switch to Schedule view
+- **E**: Export forecast to CSV
+- **?**: Show keyboard shortcuts help modal
+- **Esc**: Close modal
+- **Search Input**: Added search box above location grid with hint "(/)"
+- **Search Filtering**: Real-time filtering of locations by name
+- **Keyboard Help Button**: Added help button in header for easy access
+- **Professional Modal**: Styled modal with all shortcuts listed with hover effects
+- **Refresh State**: Visual feedback during refresh with spinning icon
+
 ### 7. Progress Feature - Keyboard Shortcuts & Search (March 8, 2026 3:52 PM)
 Added comprehensive keyboard navigation and search to the Progress page:
 - **R**: Refresh progress data

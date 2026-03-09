@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ProductionTimeline from '../components/production-timeline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, Download, Plus, Layers, Grid3X3, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Target, CheckCircle, Zap, Clock, Film, MapPin,
-  Filter, RefreshCw
+  Filter, RefreshCw, Search, X, HelpCircle
 } from 'lucide-react';
 
 interface Project {
@@ -39,6 +39,9 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
@@ -116,6 +119,46 @@ export default function TimelinePage() {
     setRefreshing(false);
   };
 
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          handleRefresh();
+          break;
+        case '/':
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          break;
+        case '1':
+          setViewMode('timeline');
+          break;
+        case '2':
+          setViewMode('gantt');
+          break;
+        case '3':
+          setViewMode('calendar');
+          break;
+        case '?':
+          setShowKeyboardHelp(true);
+          break;
+        case 'escape':
+          setShowKeyboardHelp(false);
+          setSearchQuery('');
+          setShowFilters(false);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const projectOptions = DEMO_PROJECTS;
 
   return (
@@ -141,6 +184,42 @@ export default function TimelinePage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search timeline... (/)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 w-64"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+              {/* Keyboard Help Button */}
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                <HelpCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">Shortcuts</span>
+              </button>
               <select
                 value={selectedProject}
                 onChange={(e) => setSelectedProject(e.target.value)}
@@ -455,6 +534,78 @@ export default function TimelinePage() {
             <div className="text-sm text-slate-400">Team assignments</div>
           </motion.button>
         </div>
+
+        {/* Keyboard Shortcuts Help Modal */}
+        <AnimatePresence>
+          {showKeyboardHelp && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setShowKeyboardHelp(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-white">Keyboard Shortcuts</h2>
+                  <button
+                    onClick={() => setShowKeyboardHelp(false)}
+                    className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Refresh timeline data</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">R</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Focus search input</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">/</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Switch to Timeline view</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Switch to Gantt view</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Switch to Calendar view</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Toggle filters</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">F</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Show keyboard shortcuts</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">?</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-slate-300">Close modal / Clear search</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">Esc</kbd>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-800">
+                  <p className="text-xs text-slate-500 text-center">
+                    Press <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-xs">?</kbd> anytime to show this help
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

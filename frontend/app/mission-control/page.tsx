@@ -5,7 +5,7 @@ import {
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw, HelpCircle, X
+  Loader2, RefreshCw, HelpCircle, X, Search
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -144,9 +144,11 @@ export default function MissionControl() {
   const [time, setTime] = useState(new Date())
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -206,6 +208,10 @@ export default function MissionControl() {
           e.preventDefault()
           fetchDataRef.current()
           break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -213,6 +219,7 @@ export default function MissionControl() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setSearchQuery('')
           break
       }
     }
@@ -235,6 +242,23 @@ export default function MissionControl() {
   ]
 
   const productionHealth = data?.production.overall ?? 0
+
+  // Filter departments, risks, and locations based on search
+  const filteredDepartments = data?.departments.filter(d => 
+    d.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) ?? []
+  
+  const filteredRisks = data?.risks.filter(r => 
+    r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.level.toLowerCase().includes(searchQuery.toLowerCase())
+  ) ?? []
+  
+  const filteredLocations = data?.locations.filter(l => 
+    l.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) ?? []
+
+  const hasActiveFilters = searchQuery.trim().length > 0
+  const totalFiltered = filteredDepartments.length + filteredRisks.length + filteredLocations.length
 
   if (loading) {
     return (
@@ -293,6 +317,32 @@ export default function MissionControl() {
                 DAY {data?.production.schedule.daysElapsed ?? 0}
               </p>
             </div>
+            <div className="w-px h-10 bg-white/10" />
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search... (/)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-48 pl-9 pr-8 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+              {hasActiveFilters && (
+                <div className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-cyan-500 text-white text-[10px] font-bold rounded-full">
+                  {totalFiltered}
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
               <button 
                 onClick={handleRefresh}
@@ -317,6 +367,22 @@ export default function MissionControl() {
         </div>
       </header>
 
+      {/* Search Filter Status */}
+      {hasActiveFilters && (
+        <div className="mb-4 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg flex items-center gap-3">
+          <Search className="w-4 h-4 text-cyan-400" />
+          <span className="text-sm text-cyan-300">
+            Filtering: <span className="font-semibold">{totalFiltered}</span> results for "<span className="font-semibold">{searchQuery}</span>"
+          </span>
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="ml-auto text-xs text-cyan-400 hover:text-cyan-300 underline"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg px-4 py-2 mb-4 text-sm">
           ⚠️ Using cached data: {error}
@@ -338,8 +404,9 @@ export default function MissionControl() {
             </div>
             <div className="space-y-3">
               <ShortcutRow keys={['R']} description="Refresh mission data" />
+              <ShortcutRow keys={['/']} description="Focus search input" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
-              <ShortcutRow keys={['Esc']} description="Close modal" />
+              <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
             </div>
             <div className="mt-6 pt-4 border-t border-white/10">
               <p className="text-xs text-slate-500 text-center">Press the keys to trigger actions</p>
@@ -507,8 +574,8 @@ export default function MissionControl() {
               RISK ALERTS
             </h3>
             <div className="space-y-2">
-              {data?.risks && data.risks.length > 0 ? (
-                data.risks.map((risk, i) => (
+              {filteredRisks && filteredRisks.length > 0 ? (
+                filteredRisks.map((risk, i) => (
                   <div key={i} className={`p-3 rounded-lg border ${
                     risk.level === 'high' ? 'bg-rose-500/10 border-rose-500/30' :
                     risk.level === 'medium' ? 'bg-amber-500/10 border-amber-500/30' :
@@ -548,8 +615,8 @@ export default function MissionControl() {
               DEPT HEALTH
             </h3>
             <div className="space-y-2">
-              {data?.departments && data.departments.length > 0 ? (
-                data.departments.slice(0, 5).map((dept, i) => (
+              {filteredDepartments && filteredDepartments.length > 0 ? (
+                filteredDepartments.slice(0, 5).map((dept, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-400">{dept.name}</span>
@@ -609,8 +676,8 @@ export default function MissionControl() {
               LOCATION PROGRESS
             </h3>
             <div className="space-y-2">
-              {data?.locations && data.locations.length > 0 ? (
-                data.locations.slice(0, 4).map((loc, i) => (
+              {filteredLocations && filteredLocations.length > 0 ? (
+                filteredLocations.slice(0, 4).map((loc, i) => (
                   <div key={i} className="p-3 bg-slate-800/50 rounded-lg">
                     <div className="flex justify-between mb-2">
                       <span className="font-medium">{loc.name}</span>

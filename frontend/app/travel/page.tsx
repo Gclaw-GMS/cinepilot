@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plane,
   Train,
@@ -19,6 +19,9 @@ import {
   AlertCircle,
   Calendar,
   X,
+  Search,
+  HelpCircle,
+  RefreshCw,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -90,6 +93,12 @@ export default function TravelExpensesPage() {
     status: 'pending',
     notes: '',
   })
+  
+  // Search and keyboard shortcuts
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void | Promise<void>>()
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
@@ -117,6 +126,47 @@ export default function TravelExpensesPage() {
   useEffect(() => {
     fetchExpenses()
   }, [fetchExpenses])
+
+  // Assign to ref for keyboard shortcuts
+  fetchDataRef.current = fetchExpenses
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          setShowForm(true)
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          setShowForm(false)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // CSV Export function
   const exportToCSV = () => {
@@ -241,6 +291,18 @@ export default function TravelExpensesPage() {
     color: STATUS_COLORS[name] || '#64748b',
   }))
 
+  // Filter expenses by search query
+  const filteredExpenses = expenses.filter(exp => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      exp.description.toLowerCase().includes(query) ||
+      exp.category.toLowerCase().includes(query) ||
+      exp.vendor?.toLowerCase().includes(query) ||
+      exp.status.toLowerCase().includes(query)
+    )
+  })
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -256,13 +318,44 @@ export default function TravelExpensesPage() {
               </h1>
               <p className="text-slate-500 text-sm mt-1">Track cast & crew travel costs</p>
             </div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Expense
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search expenses (/)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 w-64"
+                />
+              </div>
+              {/* Refresh Button */}
+              <button
+                onClick={fetchExpenses}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition-colors disabled:opacity-50"
+                title="Refresh (R)"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              {/* Keyboard Help Button */}
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+                title="Keyboard shortcuts (?)"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Expense
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -473,7 +566,7 @@ export default function TravelExpensesPage() {
             )}
             <button
               onClick={exportToCSV}
-              disabled={expenses.length === 0}
+              disabled={filteredExpenses.length === 0}
               className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-sm transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -492,9 +585,9 @@ export default function TravelExpensesPage() {
             <div className="p-12 flex items-center justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
             </div>
-          ) : expenses.length === 0 ? (
+          ) : filteredExpenses.length === 0 ? (
             <div className="p-12 text-center text-slate-500">
-              No travel expenses yet. Click "Add Expense" to get started.
+              {searchQuery ? 'No expenses match your search.' : 'No travel expenses yet. Click "Add Expense" to get started.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -512,7 +605,7 @@ export default function TravelExpensesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {expenses.map((expense) => {
+                  {filteredExpenses.map((expense) => {
                     const cat = CATEGORIES.find(c => c.key === expense.category)
                     const match = expense.description.match(/^([^:]+):\s*(.*)$/)
                     const personName = match ? match[1] : ''
@@ -686,6 +779,45 @@ export default function TravelExpensesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-indigo-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Refresh data</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Focus search</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Add new expense</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-slate-300">Close modal</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+              </div>
+            </div>
           </div>
         </div>
       )}

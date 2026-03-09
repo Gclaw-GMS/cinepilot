@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   User, Shirt, Palette, Sparkles, Plus, Edit2, Trash2, 
   Users, Calendar, Download, Filter, Search, Loader2,
   Image, MessageSquare, TrendingUp, Save, X, Copy,
   Palette as PaletteIcon, Crown, Heart, Zap, Shield, Star,
-  DollarSign
+  DollarSign, RefreshCw, HelpCircle
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -115,6 +115,13 @@ export default function CharacterCostumePage() {
     status: 'planning'
   })
 
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void | Promise<void>>()
+
   const fetchCharacters = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -134,6 +141,63 @@ export default function CharacterCostumePage() {
   useEffect(() => {
     fetchCharacters()
   }, [fetchCharacters])
+
+  // Set up fetch data ref for keyboard shortcut
+  useEffect(() => {
+    fetchDataRef.current = async () => {
+      setRefreshing(true)
+      await fetchCharacters()
+      setRefreshing(false)
+    }
+  }, [fetchCharacters])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          if (!showForm) {
+            resetForm()
+            setEditingId(null)
+            setShowForm(true)
+          }
+          break
+        case 'd':
+          e.preventDefault()
+          // Focus the role filter dropdown
+          const roleSelect = document.querySelector('select') as HTMLSelectElement
+          roleSelect?.focus()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchTerm('')
+          setFilterRole('all')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showForm])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -306,13 +370,30 @@ export default function CharacterCostumePage() {
             </h1>
             <p className="text-slate-400 mt-1">Design and track character costumes for your film</p>
           </div>
-          <button
-            onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Character
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchDataRef.current?.()}
+              disabled={refreshing}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh (R)"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg transition-colors"
+              title="Keyboard Shortcuts (?)"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Character
+            </button>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -484,8 +565,9 @@ export default function CharacterCostumePage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search characters..."
+              placeholder="Search characters... (/)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
@@ -983,6 +1065,52 @@ export default function CharacterCostumePage() {
                     <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Keyboard Help Modal */}
+        {showKeyboardHelp && (
+          <div 
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowKeyboardHelp(false)}
+          >
+            <div 
+              className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 border-b border-slate-700">
+                <h2 className="text-xl font-semibold text-white">Keyboard Shortcuts</h2>
+                <button onClick={() => setShowKeyboardHelp(false)}>
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Refresh data</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Focus search</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">/</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Add new character</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">N</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by role</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">D</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Show shortcuts</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">?</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Close modal / Clear</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
                 </div>
               </div>
             </div>

@@ -35,6 +35,9 @@ import {
   Heart,
   Phone,
   Bot,
+  FileEdit,
+  Download,
+  FileBarChart,
 } from 'lucide-react'
 
 type NavItem = {
@@ -54,6 +57,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Core',
     items: [
       { href: '/', icon: Home, label: 'Dashboard' },
+      { href: '/analytics', icon: Gauge, label: 'Analytics' },
       { href: '/scripts', icon: FileText, label: 'Script Breakdown' },
       { href: '/shot-list', icon: Video, label: 'Shot Hub' },
       { href: '/storyboard', icon: ImageIcon, label: 'Storyboard' },
@@ -88,6 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Command',
     items: [
       { href: '/mission-control', icon: Gauge, label: 'Mission Control' },
+      { href: '/reports', icon: FileBarChart, label: 'Reports' },
     ],
   },
   {
@@ -104,6 +109,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/projects', icon: Folder, label: 'Projects' },
       { href: '/tasks', icon: ListChecks, label: 'Tasks' },
+      { href: '/notes', icon: FileEdit, label: 'Notes' },
+      { href: '/exports', icon: Download, label: 'Exports' },
     ],
   },
   {

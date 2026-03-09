@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
-  TrendingUp
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -70,6 +70,13 @@ export default function CateringPage() {
   const [showMealForm, setShowMealForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void>(() => {})
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -95,6 +102,75 @@ export default function CateringPage() {
       setLoading(false)
     }
   }, [])
+
+  // Set up fetch data ref for keyboard shortcuts
+  useEffect(() => {
+    fetchDataRef.current = fetchData
+  }, [fetchData])
+
+  // Handle refresh
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchData()
+    setTimeout(() => setRefreshing(false), 500)
+  }, [fetchData])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          setShowDayForm(true)
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleRefresh])
+
+  // Filter shoot days by search query
+  const filteredShootDays = plan?.shootDays.filter(sd => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
+    const mealMatch = sd.meals.some(m => 
+      m.menu.some(item => item.toLowerCase().includes(query)) ||
+      m.type.toLowerCase().includes(query) ||
+      m.dietary.some(d => d.toLowerCase().includes(query))
+    )
+    return dateMatch || mealMatch
+  }) || []
+
+  // Stats for filtered data
+  const filteredStats = {
+    shootDays: filteredShootDays.length,
+    meals: filteredShootDays.reduce((sum, sd) => sum + sd.meals.length, 0),
+    totalPeople: filteredShootDays.length > 0 ? filteredShootDays.reduce((sum, sd) => sum + sd.totalCast + sd.totalCrew, 0) : 0,
+  }
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -220,6 +296,30 @@ export default function CateringPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+              <button onClick={() => setShowKeyboardHelp(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <ShortcutRow keys={['R']} description="Refresh catering data" />
+              <ShortcutRow keys={['/']} description="Search shoot days or meals" />
+              <ShortcutRow keys={['N']} description="Add new shoot day" />
+              <ShortcutRow keys={['?']} description="Show this help modal" />
+              <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
+            </div>
+            <div className="mt-6 pt-4 border-t border-white/10">
+              <p className="text-xs text-slate-500 text-center">Press the keys to trigger actions</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-10">
         <div className="px-8 py-5">
           <div className="flex items-center justify-between">
@@ -232,10 +332,46 @@ export default function CateringPage() {
               </h1>
               <p className="text-slate-500 text-sm mt-1">Meal planning & budget tracking</p>
             </div>
-            <button onClick={() => setShowDayForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium">
-              <Plus className="w-4 h-4" /> Add Shoot Day
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm w-40 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600">/</kbd>
+              </div>
+              
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                title="Refresh (R)"
+              >
+                <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              
+              {/* Keyboard Help Button */}
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors"
+                title="Keyboard shortcuts (?)"
+              >
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+              </button>
+              
+              {/* Add Shoot Day Button */}
+              <button onClick={() => setShowDayForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium">
+                <Plus className="w-4 h-4" /> Add Shoot Day
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -265,6 +401,14 @@ export default function CateringPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Search Results Info */}
+            {searchQuery && (
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 text-sm flex items-center gap-3">
+                <Search className="w-4 h-4 shrink-0" />
+                Found {filteredStats.shootDays} shoot day(s) and {filteredStats.meals} meal(s) matching "{searchQuery}"
+              </div>
+            )}
+
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
@@ -373,14 +517,24 @@ export default function CateringPage() {
 
             {/* Meal Schedule */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2"><Calendar className="w-5 h-5 text-blue-400" /> Meal Schedule</h3>
-              {plan.shootDays.length === 0 ? (
+              <h3 className="text-lg font-semibold flex items-center gap-2"><Calendar className="w-5 h-5 text-blue-400" /> 
+                Meal Schedule
+                {searchQuery && <span className="text-sm font-normal text-amber-400">({filteredStats.shootDays} of {plan.shootDays.length} days)</span>}
+              </h3>
+              {filteredShootDays.length === 0 ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-                  <p className="text-slate-500">No shoot days added yet</p>
+                  {searchQuery ? (
+                    <>
+                      <Search className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                      <p className="text-slate-500">No shoot days match your search</p>
+                    </>
+                  ) : (
+                    <p className="text-slate-500">No shoot days added yet</p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {plan.shootDays.map((shootDay) => (
+                  {filteredShootDays.map((shootDay) => (
                     <div key={shootDay.date} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
                       <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-800">
                         <div className="flex items-center gap-4">
@@ -552,6 +706,21 @@ export default function CateringPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ShortcutRow({ keys, description }: { keys: string[], description: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
+      <span className="text-slate-300">{description}</span>
+      <div className="flex gap-1">
+        {keys.map((key, i) => (
+          <kbd key={i} className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono text-cyan-400">
+            {key}
+          </kbd>
+        ))}
+      </div>
     </div>
   )
 }

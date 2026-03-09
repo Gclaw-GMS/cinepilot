@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard } from 'lucide-react'
 
 interface WhatsAppTemplate { id: string; name: string; category: string; content: string; variables: string[]; createdAt: string }
 interface SentMessage { id: string; recipient: string; recipientName?: string; message: string; status: string; timestamp: string }
@@ -44,6 +44,11 @@ export default function WhatsAppPage() {
   const [templateFormData, setTemplateFormData] = useState({ name: '', category: 'schedule', content: '' })
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -62,6 +67,69 @@ export default function WhatsAppPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Handle refresh with loading state
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await fetchData()
+    setTimeout(() => setIsRefreshing(false), 500)
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'c':
+          e.preventDefault()
+          setActiveTab('compose')
+          break
+        case 't':
+          e.preventDefault()
+          setActiveTab('templates')
+          break
+        case 'h':
+          e.preventDefault()
+          setActiveTab('history')
+          break
+        case 'o':
+          e.preventDefault()
+          setActiveTab('contacts')
+          break
+        case 'n':
+          e.preventDefault()
+          setEditingTemplate(null)
+          setTemplateFormData({ name: '', category: 'schedule', content: '' })
+          setShowTemplateEditor(true)
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setShowTemplateEditor(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleTemplateSelect = (template: WhatsAppTemplate) => {
     setSelectedTemplate(template); setMessage(template.content)
@@ -155,16 +223,76 @@ export default function WhatsAppPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header with search and keyboard help */}
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg"><MessageCircle className="w-6 h-6 text-white" /></div>
           <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
         </div>
-        <button onClick={fetchData} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"><RefreshCw className="w-5 h-5 text-gray-400" /></button>
+        
+        <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search (/)"
+              className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm w-48 placeholder-gray-500 focus:outline-none focus:border-green-500"
+            />
+          </div>
+          
+          {/* Refresh Button */}
+          <button 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
+          >
+            <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+          
+          {/* Keyboard Help Button */}
+          <button 
+            onClick={() => setShowKeyboardHelp(true)}
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-800 pb-2">
-        {[{ key: 'compose', label: 'Compose', icon: Send }, { key: 'templates', label: 'Templates', icon: FileText }, { key: 'history', label: 'History', icon: Clock }, { key: 'contacts', label: 'Contacts', icon: Users }].map(tab => (<button key={tab.key} onClick={() => setActiveTab(tab.key as typeof activeTab)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.key ? 'bg-green-500/20 text-green-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}><tab.icon className="w-4 h-4" />{tab.label}</button>))}
+      {/* Tabs with keyboard shortcut hints */}
+      <div className="flex items-center justify-between gap-4 border-b border-gray-800 pb-2">
+        <div className="flex gap-2">
+          {[
+            { key: 'compose', label: 'Compose', icon: Send, shortcut: 'C' }, 
+            { key: 'templates', label: 'Templates', icon: FileText, shortcut: 'T' }, 
+            { key: 'history', label: 'History', icon: Clock, shortcut: 'H' }, 
+            { key: 'contacts', label: 'Contacts', icon: Users, shortcut: 'O' }
+          ].map(tab => (
+            <button 
+              key={tab.key} 
+              onClick={() => setActiveTab(tab.key as typeof activeTab)} 
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.key ? 'bg-green-500/20 text-green-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+              <span className="text-xs text-gray-600 ml-1">({tab.shortcut})</span>
+            </button>
+          ))}
+        </div>
+        
+        {/* Active tab stats */}
+        <div className="text-sm text-gray-500">
+          {activeTab === 'templates' && `${filteredTemplates.length} templates`}
+          {activeTab === 'history' && `${filteredMessages.length} messages`}
+          {activeTab === 'contacts' && `${filteredContacts.length} contacts`}
+          {activeTab === 'compose' && `${templates.length} templates available`}
+          {searchQuery && ` (filtered)`}
+        </div>
       </div>
 
       {activeTab === 'compose' && (
@@ -204,6 +332,46 @@ export default function WhatsAppPage() {
       {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>))}</div></div>)}
 
       {showTemplateEditor && (<div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"><div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6"><div className="flex items-center justify-between mb-6"><h3 className="text-xl font-semibold text-white">{editingTemplate ? 'Edit' : 'New'} Template</h3><button onClick={() => setShowTemplateEditor(false)}><X className="w-5 h-5 text-gray-400" /></button></div><div className="space-y-4"><div><label className="block text-sm text-gray-400 mb-1">Name</label><input type="text" value={templateFormData.name} onChange={(e) => setTemplateFormData(p => ({...p, name: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><select value={templateFormData.category} onChange={(e) => setTemplateFormData(p => ({...p, category: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white"><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option><option value="update">Update</option></select></div><div><label className="block text-sm text-gray-400 mb-1">Content (use {'{var}'})</label><textarea value={templateFormData.content} onChange={(e) => setTemplateFormData(p => ({...p, content: e.target.value}))} rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white resize-none" /></div><button onClick={handleSaveTemplate} disabled={savingTemplate} className="w-full py-3 bg-green-500 hover:bg-green-400 disabled:opacity-50 text-black font-semibold rounded-lg flex items-center justify-center gap-2">{savingTemplate ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Save Template</button></div></div></div>)}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Keyboard className="w-6 h-6 text-green-400" />
+                <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+              </div>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {[
+                { key: 'R', description: 'Refresh data' },
+                { key: '/', description: 'Focus search input' },
+                { key: 'C', description: 'Switch to Compose tab' },
+                { key: 'T', description: 'Switch to Templates tab' },
+                { key: 'H', description: 'Switch to History tab' },
+                { key: 'O', description: 'Switch to Contacts tab' },
+                { key: 'N', description: 'Create new template' },
+                { key: '?', description: 'Show this help' },
+                { key: 'Esc', description: 'Close modal / Clear search' },
+              ].map(({ key, description }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                  <span className="text-gray-300">{description}</span>
+                  <kbd className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-sm font-mono text-green-400">{key}</kbd>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-gray-800">
+              <p className="text-xs text-gray-500 text-center">Press <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-400">?</kbd> anytime to show/hide this help</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

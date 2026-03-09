@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { 
   DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
-  RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard
+  RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard, Search
 } from 'lucide-react'
 
 interface BudgetItemData {
@@ -127,6 +127,8 @@ export default function BudgetPage() {
   const [newExpense, setNewExpense] = useState({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -168,6 +170,10 @@ export default function BudgetPage() {
           e.preventDefault()
           handleRefresh()
           break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
         case 'n':
           e.preventDefault()
           setShowAddExpense(true)
@@ -180,6 +186,8 @@ export default function BudgetPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowAddExpense(false)
+          setSearchQuery('')
+          searchInputRef.current?.blur()
           break
         case '1':
           e.preventDefault()
@@ -257,11 +265,28 @@ export default function BudgetPage() {
     return `₹${n.toLocaleString('en-IN')}`
   }
 
-  const totalPlanned = items.reduce((s, i) => s + Number(i.total || 0), 0)
-  const totalActual = expenses.reduce((s, e) => s + Number(e.amount), 0)
+  // Filter items and expenses based on search query
+  const filteredItems = searchQuery 
+    ? items.filter(item => 
+        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.subcategory?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (item.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+      )
+    : items
+
+  const filteredExpenses = searchQuery
+    ? expenses.filter(exp =>
+        exp.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        exp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (exp.vendor?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+      )
+    : expenses
+
+  const totalPlanned = filteredItems.reduce((s, i) => s + Number(i.total || 0), 0)
+  const totalActual = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const variance = totalPlanned - totalActual
 
-  const categoryGroups = items.reduce<Record<string, BudgetItemData[]>>((acc, item) => {
+  const categoryGroups = filteredItems.reduce<Record<string, BudgetItemData[]>>((acc, item) => {
     if (!acc[item.category]) acc[item.category] = []
     acc[item.category].push(item)
     return acc
@@ -269,8 +294,8 @@ export default function BudgetPage() {
 
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
-    { key: 'breakdown', label: `Breakdown (${items.length})` },
-    { key: 'expenses', label: `Expenses (${expenses.length})` },
+    { key: 'breakdown', label: `Breakdown (${filteredItems.length})` },
+    { key: 'expenses', label: `Expenses (${filteredExpenses.length})` },
     { key: 'forecast', label: 'Forecast' },
   ]
 
@@ -286,6 +311,19 @@ export default function BudgetPage() {
           <p className="text-gray-500 text-sm mt-0.5">AI-powered production budgeting</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search budget..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 py-2 bg-gray-800 border border-gray-700 rounded text-sm w-48 focus:outline-none focus:border-cinepilot-accent"
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">/</span>
+          </div>
           <button 
             onClick={handleRefresh} 
             disabled={refreshing}
@@ -317,6 +355,13 @@ export default function BudgetPage() {
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-4 text-red-400 text-sm flex justify-between">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="text-red-500">Dismiss</button>
+        </div>
+      )}
+
+      {/* Filtered Count */}
+      {searchQuery && (
+        <div className="mb-4 text-sm text-gray-400">
+          Showing {filteredItems.length} budget items and {filteredExpenses.length} expenses matching "{searchQuery}"
         </div>
       )}
 
@@ -428,13 +473,13 @@ export default function BudgetPage() {
           </div>
 
           {/* Category Cards */}
-          {items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-12 text-center">
-              <div className="text-slate-400 mb-3">No budget generated yet</div>
-              <p className="text-slate-500 text-sm mb-4">Upload a script first, then click "Generate Budget" to create an AI-powered budget from your script breakdown.</p>
-              <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm font-medium">
+              <div className="text-slate-400 mb-3">{searchQuery ? `No items match "${searchQuery}"` : 'No budget generated yet'}</div>
+              {!searchQuery && <p className="text-slate-500 text-sm mb-4">Upload a script first, then click "Generate Budget" to create an AI-powered budget from your script breakdown.</p>}
+              {!searchQuery && <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded text-sm font-medium">
                 Generate Budget from Script
-              </button>
+              </button>}
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -529,13 +574,13 @@ export default function BudgetPage() {
             </div>
           )}
 
-          {expenses.length === 0 ? (
+          {filteredExpenses.length === 0 ? (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-8 text-center text-gray-500">
-              No expenses recorded yet.
+              {searchQuery ? `No expenses match "${searchQuery}"` : 'No expenses recorded yet.'}
             </div>
           ) : (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg overflow-hidden divide-y divide-gray-800">
-              {expenses.map(exp => (
+              {filteredExpenses.map(exp => (
                 <div key={exp.id} className="px-4 py-3 flex items-center gap-4">
                   <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-400 rounded">{exp.category}</span>
                   <div className="flex-1 text-sm text-gray-300">{exp.description}</div>
@@ -728,13 +773,14 @@ export default function BudgetPage() {
             <div className="space-y-2">
               {[
                 { key: 'R', action: 'Refresh budget data' },
+                { key: '/', action: 'Search budget items' },
                 { key: 'N', action: 'Add new expense' },
                 { key: '1', action: 'Switch to Overview tab' },
                 { key: '2', action: 'Switch to Breakdown tab' },
                 { key: '3', action: 'Switch to Expenses tab' },
                 { key: '4', action: 'Switch to Forecast tab' },
                 { key: '?', action: 'Show this help' },
-                { key: 'Esc', action: 'Close modal' },
+                { key: 'Esc', action: 'Close modal / Clear search' },
               ].map(({ key, action }) => (
                 <div key={key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
                   <span className="text-gray-400">{action}</span>

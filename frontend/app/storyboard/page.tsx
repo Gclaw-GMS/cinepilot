@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
+import { Search, RefreshCw, HelpCircle, X } from 'lucide-react'
 
 interface FrameData {
   id: string
@@ -58,6 +59,12 @@ export default function StoryboardPage() {
   const [noteText, setNoteText] = useState('')
   const [loading, setLoading] = useState(true)
   const [maxFrames, setMaxFrames] = useState(3)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -91,6 +98,78 @@ export default function StoryboardPage() {
   useEffect(() => {
     fetchFrames()
   }, [fetchFrames])
+
+  // Handle refresh with animation
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await fetchFrames()
+    setIsRefreshing(false)
+  }
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in form inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setSelectedStyle('cleanLineArt')
+          break
+        case '2':
+          e.preventDefault()
+          setSelectedStyle('pencilSketch')
+          break
+        case '3':
+          e.preventDefault()
+          setSelectedStyle('markerLine')
+          break
+        case '4':
+          e.preventDefault()
+          setSelectedStyle('blueprint')
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Filter scenes based on search query
+  const filteredScenes = useMemo(() => {
+    if (!searchQuery.trim()) return scenes
+    const query = searchQuery.toLowerCase()
+    return scenes.filter(scene => 
+      scene.sceneNumber.toString().includes(query) ||
+      (scene.heading?.toLowerCase().includes(query)) ||
+      scene.frames.some(frame => 
+        frame.shot.shotText?.toLowerCase().includes(query) ||
+        frame.shot.shotSize?.toLowerCase().includes(query) ||
+        frame.directorNotes?.toLowerCase().includes(query)
+      )
+    )
+  }, [scenes, searchQuery])
 
   const handleGenerateScene = async (sceneId: string) => {
     setGeneratingScene(sceneId)
@@ -166,6 +245,10 @@ export default function StoryboardPage() {
   const failedCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0)
   const sceneIds = scenes.map(s => s.sceneId)
 
+  // Calculate filtered stats
+  const filteredApprovedCount = filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0)
+  const filteredFailedCount = filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0)
+
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white">
       <div className="max-w-[1600px] mx-auto px-6 py-8">
@@ -183,6 +266,26 @@ export default function StoryboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search scenes, shots... (/)"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="bg-[#1a1a1a] border border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-gray-600"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <select
               value={selectedScript}
               onChange={e => setSelectedScript(e.target.value)}
@@ -192,29 +295,51 @@ export default function StoryboardPage() {
                 <option key={s.id} value={s.id}>{s.title}</option>
               ))}
             </select>
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg hover:bg-[#222] transition-colors disabled:opacity-50"
+              title="Refresh (R)"
+            >
+              <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            {/* Keyboard Help Button */}
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg hover:bg-[#222] transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <HelpCircle className="w-5 h-5 text-gray-400" />
+            </button>
           </div>
         </div>
 
         {/* Stats Bar */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Frames', value: totalFrames, color: 'text-violet-400' },
-            { label: 'Scenes Covered', value: scenes.length, color: 'text-blue-400' },
-            { label: 'Approved', value: approvedCount, color: 'text-emerald-400' },
-            { label: 'Failed', value: failedCount, color: 'text-red-400' },
+            { label: 'Total Frames', value: searchQuery ? filteredScenes.reduce((sum, s) => sum + s.frames.length, 0) : totalFrames, color: 'text-violet-400' },
+            { label: 'Scenes Covered', value: searchQuery ? filteredScenes.length : scenes.length, color: 'text-blue-400' },
+            { label: 'Approved', value: searchQuery ? filteredApprovedCount : approvedCount, color: 'text-emerald-400' },
+            { label: 'Failed', value: searchQuery ? filteredFailedCount : failedCount, color: 'text-red-400' },
           ].map(stat => (
             <div key={stat.label} className="bg-[#141414] border border-gray-800 rounded-xl p-4">
               <p className="text-xs text-gray-500 uppercase tracking-wider">{stat.label}</p>
               <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
             </div>
           ))}
+          {searchQuery && (
+            <div className="col-span-4 text-center text-sm text-gray-500">
+              Showing {filteredScenes.length} of {scenes.length} scenes
+            </div>
+          )}
         </div>
 
         {/* Controls */}
         <div className="flex items-center gap-4 mb-8 bg-[#141414] border border-gray-800 rounded-xl p-4">
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 uppercase tracking-wider mr-2">Style</span>
-            {STYLES.map(s => (
+            {STYLES.map((s, idx) => (
               <button
                 key={s.key}
                 onClick={() => setSelectedStyle(s.key)}
@@ -223,9 +348,11 @@ export default function StoryboardPage() {
                     ? 'bg-violet-600 text-white'
                     : 'bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-white'
                 }`}
+                title={`Press ${idx + 1} to select`}
               >
                 <span className="mr-1">{s.icon}</span>
                 {s.label}
+                <span className="ml-2 text-xs text-gray-600">({idx + 1})</span>
               </button>
             ))}
           </div>
@@ -252,6 +379,19 @@ export default function StoryboardPage() {
               Upload a script first
             </Link>
           </div>
+        ) : filteredScenes.length === 0 && searchQuery ? (
+          <div className="text-center py-20">
+            <p className="text-gray-500 mb-2">No scenes match your search</p>
+            <p className="text-gray-600 text-sm mb-4">
+              Try searching for a different scene number, shot text, or director notes.
+            </p>
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="text-violet-400 hover:text-violet-300 underline"
+            >
+              Clear search
+            </button>
+          </div>
         ) : scenes.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-gray-500 mb-2">No storyboard frames yet</p>
@@ -264,7 +404,7 @@ export default function StoryboardPage() {
           </div>
         ) : (
           <div className="space-y-10">
-            {scenes.map(scene => (
+            {filteredScenes.map(scene => (
               <div key={scene.sceneId} className="bg-[#141414] border border-gray-800 rounded-xl overflow-hidden">
                 {/* Scene Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
@@ -424,6 +564,42 @@ export default function StoryboardPage() {
                 >
                   Save Note
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-[#1a1a1a] border border-gray-700 rounded-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">Keyboard Shortcuts</h3>
+                <button
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="p-1 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { key: 'R', action: 'Refresh storyboard data' },
+                  { key: '/', action: 'Focus search input' },
+                  { key: '1', action: 'Switch to Clean Line Art style' },
+                  { key: '2', action: 'Switch to Pencil Sketch style' },
+                  { key: '3', action: 'Switch to Marker & Ink style' },
+                  { key: '4', action: 'Switch to Blueprint style' },
+                  { key: '?', action: 'Show this help modal' },
+                  { key: 'Esc', action: 'Close modal / Clear search' },
+                ].map(shortcut => (
+                  <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                    <span className="text-gray-400 text-sm">{shortcut.action}</span>
+                    <kbd className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded font-mono">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

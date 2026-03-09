@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Bell,
   Mail,
@@ -21,6 +21,7 @@ import {
   Smartphone,
   Users,
   Zap,
+  Keyboard,
 } from 'lucide-react';
 
 type Notification = {
@@ -184,6 +185,9 @@ export default function NotificationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     channel: 'app' as 'app' | 'email' | 'whatsapp' | 'sms',
@@ -216,6 +220,75 @@ export default function NotificationsPage() {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  // Handle refresh with loading state
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await fetchNotifications()
+    setTimeout(() => setIsRefreshing(false), 500)
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        if (e.key === 'Escape') {
+          (e.target as HTMLInputElement).blur()
+          setSearchQuery('')
+        }
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setFilterTab('all')
+          break
+        case '2':
+          e.preventDefault()
+          setFilterTab('unread')
+          break
+        case '3':
+          e.preventDefault()
+          setFilterTab('sent')
+          break
+        case '4':
+          e.preventDefault()
+          setFilterTab('failed')
+          break
+        case 'c':
+          e.preventDefault()
+          setActiveTab('compose')
+          break
+        case 'i':
+          e.preventDefault()
+          setActiveTab('inbox')
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          setShowFilters(false)
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Calculate stats
   const stats: NotificationStats = {
@@ -381,14 +454,23 @@ export default function NotificationsPage() {
               Send and manage production notifications across all channels
             </p>
           </div>
-          <button
-            onClick={fetchNotifications}
-            disabled={loading}
-            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Refresh (R)"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard className="h-4 w-4 text-slate-400" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -612,7 +694,8 @@ export default function NotificationsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search notifications..."
+                  ref={searchInputRef}
+                  placeholder="Search notifications... (/)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -758,6 +841,77 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardHelp && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <Keyboard className="h-5 w-5 text-indigo-400" />
+                </div>
+                <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Refresh notifications</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">R</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Focus search</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">/</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Filter: All</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">1</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Filter: Unread</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">2</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Filter: Sent</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">3</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Filter: Failed</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">4</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Go to Inbox</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">I</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Go to Compose</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">C</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">?</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Close modal / Clear</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">Esc</kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

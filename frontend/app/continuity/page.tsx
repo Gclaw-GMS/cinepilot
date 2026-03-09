@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard } from 'lucide-react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -90,6 +90,12 @@ export default function ContinuityPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [selectedWarning, setSelectedWarning] = useState<Warning | null>(null);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Refs
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const fetchDataRef = useRef<() => void | Promise<void>>();
   
   // Historical and breakdown data
   const [historicalData] = useState(DEMO_HISTORICAL_DATA);
@@ -222,6 +228,62 @@ export default function ContinuityPage() {
   useEffect(() => {
     if (selectedScript) fetchWarnings(selectedScript);
   }, [selectedScript, fetchWarnings]);
+
+  // Assign fetch function to ref for keyboard shortcuts
+  fetchDataRef.current = () => {
+    if (selectedScript) {
+      setRefreshing(true);
+      fetchWarnings(selectedScript);
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return;
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault();
+          fetchDataRef.current?.();
+          break;
+        case '/':
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          break;
+        case '1':
+          setActiveTab('overview');
+          break;
+        case '2':
+          setActiveTab('breakdown');
+          break;
+        case '3':
+          setActiveTab('trends');
+          break;
+        case '?':
+          e.preventDefault();
+          setShowKeyboardHelp(true);
+          break;
+        case 'escape':
+          e.preventDefault();
+          setShowKeyboardHelp(false);
+          setFilter('');
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    if (selectedScript) fetchWarnings(selectedScript);
+    setTimeout(() => setRefreshing(false), 500);
+  };
 
   async function runCheck() {
     if (!selectedScript) return;
@@ -366,6 +428,21 @@ export default function ContinuityPage() {
                 <span className="text-xs text-cyan-400">Demo Data</span>
               </div>
             )}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="p-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg transition-colors"
+              title="Refresh (R)"
+            >
+              <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowKeyboardHelp(true)}
+              className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Keyboard Shortcuts (?)"
+            >
+              <Keyboard className="w-4 h-4 text-slate-400" />
+            </button>
           </div>
         </div>
 
@@ -437,12 +514,14 @@ export default function ContinuityPage() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Filter warnings..."
+                placeholder="Filter warnings... (/)"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-16 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600 font-mono">/</span>
             </div>
 
             <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
@@ -878,6 +957,65 @@ export default function ContinuityPage() {
           </div>
         )}
       </div>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+                  <p className="text-sm text-slate-400">Continuity Tracker</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { key: 'R', description: 'Refresh continuity data' },
+                { key: '/', description: 'Focus search input' },
+                { key: '1', description: 'Switch to Overview tab' },
+                { key: '2', description: 'Switch to Breakdown tab' },
+                { key: '3', description: 'Switch to Trends tab' },
+                { key: '?', description: 'Show keyboard shortcuts' },
+                { key: 'Esc', description: 'Close modal / Clear search' },
+              ].map((shortcut) => (
+                <div 
+                  key={shortcut.key}
+                  className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                >
+                  <span className="text-slate-300">{shortcut.description}</span>
+                  <kbd className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-indigo-400 font-mono text-sm font-medium">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-700">
+              <p className="text-xs text-slate-500 text-center">
+                Press <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400">?</kbd> anytime to show this help
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

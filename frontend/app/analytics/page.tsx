@@ -9,7 +9,7 @@ import {
   BarChart3, TrendingUp, DollarSign, Calendar, 
   Users, Video, MapPin, Clapperboard, RefreshCw, Loader2, 
   Activity, Target, AlertTriangle,
-  Clock, Film
+  Clock, Film, Search, X, HelpCircle
 } from 'lucide-react'
 
 interface DashboardData {
@@ -171,6 +171,9 @@ export default function AnalyticsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
   const [refreshing, setRefreshing] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -201,6 +204,51 @@ export default function AnalyticsPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('overview')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('performance')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('forecast')
+          break
+        case '?':
+          e.preventDefault()
+          setShowShortcuts(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowShortcuts(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -241,6 +289,35 @@ export default function AnalyticsPage() {
 
   const deptData = metrics?.department_stats || []
 
+  // Filter data based on search query
+  const filteredActivities = dashboard?.recent_activities.filter(activity => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      activity.user.toLowerCase().includes(query) ||
+      activity.type.toLowerCase().includes(query) ||
+      activity.location?.toLowerCase().includes(query) ||
+      activity.crew?.toLowerCase().includes(query) ||
+      activity.scene?.toString().includes(query)
+    )
+  }) || []
+
+  const filteredUpcomingShoots = dashboard?.upcoming_shoots.filter(shoot => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      shoot.location.toLowerCase().includes(query) ||
+      shoot.scenes.some(s => s.toString().includes(query)) ||
+      shoot.date.includes(query)
+    )
+  }) || []
+
+  const filteredDeptStats = metrics?.department_stats.filter(dept => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return dept.name.toLowerCase().includes(query)
+  }) || []
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
@@ -267,22 +344,63 @@ export default function AnalyticsPage() {
           </p>
         </div>
         
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search analytics... (/)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-64"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded"
+              >
+                <X className="w-3 h-3 text-slate-400" />
+              </button>
+            )}
+          </div>
+          
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+            title="Keyboard shortcuts (?)"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
+      {/* Filtered Count */}
+      {searchQuery && (
+        <div className="mb-4 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-indigo-300 text-sm">
+          Filtering by: "{searchQuery}" 
+          <span className="ml-2 text-slate-400">
+            (Press Esc to clear)
+          </span>
+        </div>
+      )}
 
       {/* View Mode Tabs */}
       <div className="flex gap-2 mb-6">
         {[
-          { key: 'overview', label: 'Overview', icon: Target },
-          { key: 'performance', label: 'Performance', icon: Activity },
-          { key: 'forecast', label: 'Forecast', icon: TrendingUp },
+          { key: 'overview', label: 'Overview', icon: Target, shortcut: '1' },
+          { key: 'performance', label: 'Performance', icon: Activity, shortcut: '2' },
+          { key: 'forecast', label: 'Forecast', icon: TrendingUp, shortcut: '3' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -295,6 +413,7 @@ export default function AnalyticsPage() {
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
+            <span className="ml-1 text-xs opacity-60">({tab.shortcut})</span>
           </button>
         ))}
       </div>
@@ -436,23 +555,27 @@ export default function AnalyticsPage() {
                 Recent Activity
               </h3>
               <div className="space-y-3">
-                {dashboard.recent_activities.map((activity, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-                    <div className="p-2 bg-slate-600 rounded-lg text-slate-300">
-                      {getActivityIcon(activity.type)}
+                {filteredActivities.length === 0 && searchQuery ? (
+                  <p className="text-slate-500 text-center py-4">No activities match "{searchQuery}"</p>
+                ) : (
+                  filteredActivities.map((activity, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="p-2 bg-slate-600 rounded-lg text-slate-300">
+                        {getActivityIcon(activity.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm truncate">
+                          {activity.type === 'scene_shot' && `Scene ${activity.scene} shot by ${activity.user}`}
+                          {activity.type === 'schedule_updated' && `${activity.user} updated schedule`}
+                          {activity.type === 'budget_approved' && `${activity.user} approved ${formatCurrency(activity.amount!)}`}
+                          {activity.type === 'location_added' && `Added ${activity.location}`}
+                          {activity.type === 'crew_assigned' && `${activity.user} assigned ${activity.crew}`}
+                        </p>
+                        <p className="text-slate-500 text-xs">{formatDate(activity.timestamp)}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm truncate">
-                        {activity.type === 'scene_shot' && `Scene ${activity.scene} shot by ${activity.user}`}
-                        {activity.type === 'schedule_updated' && `${activity.user} updated schedule`}
-                        {activity.type === 'budget_approved' && `${activity.user} approved ${formatCurrency(activity.amount!)}`}
-                        {activity.type === 'location_added' && `Added ${activity.location}`}
-                        {activity.type === 'crew_assigned' && `${activity.user} assigned ${activity.crew}`}
-                      </p>
-                      <p className="text-slate-500 text-xs">{formatDate(activity.timestamp)}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -463,21 +586,25 @@ export default function AnalyticsPage() {
                 Upcoming Shoots
               </h3>
               <div className="space-y-3">
-                {dashboard.upcoming_shoots.map((shoot, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
-                      <Calendar className="w-4 h-4" />
+                {filteredUpcomingShoots.length === 0 && searchQuery ? (
+                  <p className="text-slate-500 text-center py-4">No shoots match "{searchQuery}"</p>
+                ) : (
+                  filteredUpcomingShoots.map((shoot, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white text-sm font-medium">{formatDate(shoot.date)}</p>
+                        <p className="text-slate-400 text-xs">Scenes {shoot.scenes.join(', ')}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white text-sm">{shoot.location}</p>
+                        <p className="text-slate-500 text-xs">Call: {shoot.call_time}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-white text-sm font-medium">{formatDate(shoot.date)}</p>
-                      <p className="text-slate-400 text-xs">Scenes {shoot.scenes.join(', ')}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-white text-sm">{shoot.location}</p>
-                      <p className="text-slate-500 text-xs">Call: {shoot.call_time}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -539,21 +666,30 @@ export default function AnalyticsPage() {
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-indigo-400" />
               Department Performance
+              {searchQuery && (
+                <span className="ml-2 text-sm text-slate-400">
+                  ({filteredDeptStats.length} of {deptData.length})
+                </span>
+              )}
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={deptData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="name" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" domain={[0, 100]} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
-                  formatter={(value: number) => `${value}%`}
-                />
-                <Legend />
-                <Bar dataKey="efficiency" fill="#6366f1" name="Efficiency %" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="utilization" fill="#10b981" name="Utilization %" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {filteredDeptStats.length === 0 && searchQuery ? (
+              <p className="text-slate-500 text-center py-8">No departments match "{searchQuery}"</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={filteredDeptStats}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" domain={[0, 100]} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
+                    formatter={(value: number) => `${value}%`}
+                  />
+                  <Legend />
+                  <Bar dataKey="efficiency" fill="#6366f1" name="Efficiency %" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="utilization" fill="#10b981" name="Utilization %" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Timeline Stats */}
@@ -676,6 +812,58 @@ export default function AnalyticsPage() {
                 {dashboard.overview.completed_shots} / {dashboard.overview.total_shots} shots completed
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div 
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div 
+            className="bg-slate-800 rounded-xl border border-slate-700 p-6 max-w-md w-full mx-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-indigo-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {[
+                { key: 'R', description: 'Refresh analytics data' },
+                { key: '/', description: 'Focus search input' },
+                { key: '1', description: 'Switch to Overview view' },
+                { key: '2', description: 'Switch to Performance view' },
+                { key: '3', description: 'Switch to Forecast view' },
+                { key: '?', description: 'Show this help modal' },
+                { key: 'Esc', description: 'Close modal or clear search' },
+              ].map((shortcut) => (
+                <div 
+                  key={shortcut.key}
+                  className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
+                >
+                  <span className="text-slate-300">{shortcut.description}</span>
+                  <kbd className="px-3 py-1 bg-slate-600 text-white text-sm font-mono rounded border border-slate-500">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-slate-500 text-sm text-center mt-6">
+              Press <kbd className="px-2 py-0.5 bg-slate-700 rounded text-xs">?</kbd> anytime to show this help
+            </p>
           </div>
         </div>
       )}

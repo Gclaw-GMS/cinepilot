@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Settings,
   Globe,
@@ -14,6 +14,8 @@ import {
   Loader2,
   DollarSign,
   Shield,
+  RefreshCw,
+  Keyboard,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -109,6 +111,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     // First load from localStorage for instant display
@@ -139,6 +143,44 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
+  }, [fetchSettings]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in form inputs
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // R: Refresh settings
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        setRefreshing(true);
+        fetchSettings().finally(() => setRefreshing(false));
+      }
+
+      // S: Save settings
+      if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        save();
+      }
+
+      // ?: Show shortcuts
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(true);
+      }
+
+      // Escape: Close modal
+      if (e.key === 'Escape') {
+        setShowShortcuts(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fetchSettings]);
 
   const set = (key: string, value: unknown) => {
@@ -197,6 +239,26 @@ export default function SettingsPage() {
             <Settings className="h-6 w-6" />
             Settings
           </h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setRefreshing(true);
+                fetchSettings().finally(() => setRefreshing(false));
+              }}
+              disabled={refreshing}
+              className="p-2 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh settings (R)"
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard className="w-5 h-5" />
+            </button>
+          </div>
           {dbConnected === false && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg">
               <AlertCircle className="w-4 h-4 text-amber-400" />
@@ -452,6 +514,50 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Keyboard className="w-5 h-5" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="text-slate-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { key: 'R', action: 'Refresh settings' },
+                { key: 'S', action: 'Save settings' },
+                { key: '?', action: 'Show shortcuts' },
+                { key: 'Esc', action: 'Close modal' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-xs font-mono text-slate-300 border border-slate-700">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-4 text-center">
+              Press Esc or click outside to close
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

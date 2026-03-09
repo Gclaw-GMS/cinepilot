@@ -33,6 +33,8 @@ import {
   Utensils,
   MessageSquare,
   Heart,
+  Phone,
+  Bot,
 } from 'lucide-react'
 
 type NavItem = {
@@ -94,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/crew', icon: Users, label: 'Crew' },
       { href: '/collaboration', icon: Briefcase, label: 'Team Collaboration' },
       { href: '/call-sheets', icon: FileText, label: 'Call Sheets' },
+      { href: '/whatsapp', icon: Phone, label: 'WhatsApp' },
     ],
   },
   {
@@ -108,6 +111,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/health', icon: Heart, label: 'System Health' },
       { href: '/chat', icon: MessageSquare, label: 'AI Chat', badge: 'NEW' },
+      { href: '/ai-tools', icon: Bot, label: 'AI Tools' },
       { href: '/weather', icon: Cloud, label: 'Weather' },
       { href: '/notifications', icon: Bell, label: 'Notifications' },
       { href: '/settings', icon: Settings, label: 'Settings' },

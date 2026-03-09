@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Brain, Sparkles, FileText, Clapperboard, DollarSign, 
-  Calendar, AlertTriangle, MessageSquare, Wand2, Search,
+  Calendar, AlertTriangle, MessageSquare, Wand2,
   Play, ArrowRight, TrendingUp, Target, Zap, Loader2,
   BarChart3, PieChart, Activity, Gauge, AlertOctagon,
-  CheckCircle, XCircle, Info, RefreshCw
+  CheckCircle, XCircle, Info, RefreshCw, Keyboard, Search, X
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -365,6 +365,13 @@ export default function AIToolsPage() {
     is_outdoor: true,
     is_night_shoots: false,
   })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchToolsRef = useRef<() => void>(() => {})
 
   // Fetch tools from API on mount
   useEffect(() => {
@@ -387,8 +394,61 @@ export default function AIToolsPage() {
     fetchTools()
   }, [])
 
-  // Convert tools to renderable format
-  const aiFeatures = tools.map(apiToolToFeature)
+  // Set up fetch tools ref for keyboard shortcut
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      const res = await fetch('/api/ai-tools')
+      const data = await res.json()
+      if (data.tools && Array.isArray(data.tools) && data.tools.length > 0) {
+        setTools(data.tools)
+        if (data.categories) {
+          setCategories(data.categories)
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to refresh AI tools:', e)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [])
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+      
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        handleRefresh()
+      } else if (e.key === '/') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      } else if (e.key === '?') {
+        e.preventDefault()
+        setShowKeyboardHelp(true)
+      } else if (e.key === 'Escape') {
+        setShowKeyboardHelp(false)
+        setSearchQuery('')
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleRefresh])
+
+  // Convert tools to renderable format with search filtering
+  const filteredTools = searchQuery.trim()
+    ? tools.filter(t => 
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : tools
+  const aiFeatures = filteredTools.map(apiToolToFeature)
 
   const runAnalysis = async (featureId: string) => {
     setSelected(featureId)
@@ -432,9 +492,42 @@ export default function AIToolsPage() {
               </div>
               <p className="text-slate-500 text-sm mt-1">Powered by AIML API — Intelligent film production analysis</p>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className={`px-2 py-1 rounded-full ${result?.source === 'ai' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                {result?.source === 'ai' ? '🤖 AI Powered' : '📊 Demo Mode'}
+            <div className="flex items-center gap-3">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search tools..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600">(/)</span>
+              </div>
+              
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                title="Refresh (R)"
+              >
+                <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              
+              {/* Keyboard Help Button */}
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors"
+                title="Keyboard Shortcuts (?)"
+              >
+                <Keyboard className="w-4 h-4 text-slate-400" />
+              </button>
+              
+              <span className={`px-2 py-1 rounded-full text-xs ${result?.source === 'ai' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                {result?.source === 'ai' ? '🤖 AI' : '📊 Demo'}
               </span>
             </div>
           </div>
@@ -448,8 +541,8 @@ export default function AIToolsPage() {
             <div className="flex items-center gap-3">
               <Brain className="w-8 h-8 text-indigo-400" />
               <div>
-                <p className="text-2xl font-bold text-white">{loadingTools ? '-' : tools.length}</p>
-                <p className="text-xs text-slate-400">AI Tools</p>
+                <p className="text-2xl font-bold text-white">{loadingTools ? '-' : filteredTools.length}</p>
+                <p className="text-xs text-slate-400">AI Tools {searchQuery ? `(filtered from ${tools.length})` : ''}</p>
               </div>
             </div>
           </div>
@@ -721,6 +814,49 @@ export default function AIToolsPage() {
             <p className="text-slate-500 text-sm max-w-md mx-auto">
               Select an AI tool above to analyze your production. Results will appear here with detailed insights and recommendations.
             </p>
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts Help Modal */}
+        {showKeyboardHelp && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Keyboard className="w-5 h-5 text-indigo-400" />
+                  <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
+                </div>
+                <button
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="p-1 hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Refresh tools</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">R</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Focus search</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">/</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Show shortcuts</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">?</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-slate-400">Close / Clear</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">Esc</kbd>
+                </div>
+              </div>
+              
+              <p className="text-xs text-slate-500 mt-6 text-center">
+                Press the key to trigger the action instantly
+              </p>
+            </div>
           </div>
         )}
       </main>

@@ -141,8 +141,9 @@ const FEATURES = [
 ]
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS)
-  const [loading, setLoading] = useState(true)
+  // Use demo stats as initial state so dashboard shows data immediately
+  const [stats, setStats] = useState<DashboardStats>(DEMO_STATS)
+  const [loading, setLoading] = useState(false) // Start with loading=false since we have demo data
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking')
 
@@ -206,6 +207,15 @@ export default function Dashboard() {
         r.status === 'fulfilled' ? r.value : null
       )
 
+      // Check database status - if disconnected, always use demo mode
+      if (dbStatus === 'disconnected') {
+        console.log('[Dashboard] Database disconnected, using demo stats')
+        setStats(DEMO_STATS)
+        setIsDemoMode(true)
+        setLoading(false)
+        return
+      }
+
       console.log('[Dashboard] Data received:', { 
         scriptsData: scriptsData ? `${scriptsData.scripts?.length} scripts` : 'null',
         shotsData: shotsData ? `${shotsData.totalShots} shots` : 'null', 
@@ -225,8 +235,9 @@ export default function Dashboard() {
 
       const hasRealData = scriptsLen > 0 || shotsCount > 0 || budgetTotal > 0 || scheduleDays > 0 || tasksCount > 0
       
+      // Use demo stats when no real data found
       if (!hasRealData) {
-        console.log('[Dashboard] No real data found, using demo mode')
+        console.log('[Dashboard] No real data found, using demo stats')
         setStats(DEMO_STATS)
         setIsDemoMode(true)
         setLoading(false)

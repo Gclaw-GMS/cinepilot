@@ -2,7 +2,52 @@
 
 ## Build Status: ✅ PASSING
 
-- **Build Date:** March 9, 2026 5:59 AM
+- **Build Date:** March 9, 2026 7:59 AM
+
+## Night Build (7:59 AM)
+
+### Features Perfected This Build
+- **Locations Page**: Added keyboard shortcuts and search functionality
+  - **R**: Refresh location data
+  - **/**: Focus search input
+  - **1**: Switch to Cards view
+  - **2**: Switch to Analysis view
+  - **?**: Show keyboard shortcuts help modal
+  - **Esc**: Close modal / Clear search
+  - **Search Input**: Added search box in header with hint "(/)"
+  - **Search Filtering**: Real-time filtering by scene number, heading, location, int/ext, or time of day
+  - **Refresh Button**: Added dedicated refresh button in header with spinning animation
+  - **Keyboard Help Button**: Added help button in header for easy access
+  - **Professional Modal**: Styled modal with all shortcuts listed with hover effects
+  - **Filtered Stats**: Scene list shows filtered count when search is active
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Night Build (6:59 AM)
+
+### Features Perfected This Build
+- **Equipment Page**: Added keyboard shortcuts and enhanced functionality
+  - **R**: Refresh equipment data
+  - **/**: Focus search input
+  - **N**: Add new equipment
+  - **?**: Show keyboard shortcuts help modal
+  - **Esc**: Close modal / Clear filters
+  - **Search Input**: Added search box in header with hint "(/)"
+  - **Search Filtering**: Real-time filtering by name, vendor, or category
+  - **Status Filter**: Added dropdown to filter by equipment status (Available/In Use/Maintenance/Returned)
+  - **Refresh Button**: Added dedicated refresh button in header with spinning animation
+  - **Keyboard Help Button**: Added help button in header for easy access
+  - **Professional Modal**: Styled modal with all shortcuts listed with hover effects
+  - **Success Messages**: Added success toast notifications for add/edit/delete operations
+  - **Enhanced Stats**: Added Maintenance and Returned stat cards for better overview
+  - **Status Chart**: Added bar chart showing equipment status distribution
+  - **Filtered Stats**: Stats display shows filtered count when search is active
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
 
 ## Night Build (5:59 AM)
 

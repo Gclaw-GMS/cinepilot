@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   MapPin, Search, Filter, RefreshCw, Loader2, 
   Star, ExternalLink, TrendingUp, AlertTriangle,
   Building2, Trees, Warehouse, Waves, Users,
-  ChevronRight, Info, Target, Award
+  ChevronRight, Info, Target, Award, X, Keyboard
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -121,8 +121,13 @@ export default function LocationsPage() {
   const [filterScore, setFilterScore] = useState<number>(0)
   const [sortBy, setSortBy] = useState<'score' | 'name'>('score')
   const [viewMode, setViewMode] = useState<'cards' | 'chart'>('cards')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const fetchScenes = useCallback(async () => {
+  const fetchScenes = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
     try {
       const res = await fetch('/api/locations')
       const data = await res.json()
@@ -137,10 +142,54 @@ export default function LocationsPage() {
       setScenes(DEMO_SCENES)
     } finally {
       setLoading(false)
+      if (isRefresh) setRefreshing(false)
     }
   }, [])
 
-  useEffect(() => { fetchScenes() }, [fetchScenes])
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    fetchScenes(true)
+  }, [fetchScenes])
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        if (e.key === 'Escape') {
+          (e.target as HTMLInputElement).blur()
+          setSearchQuery('')
+        }
+        return
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          handleRefresh()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '1':
+          setViewMode('cards')
+          break
+        case '2':
+          setViewMode('chart')
+          break
+        case '?':
+          setShowShortcuts(true)
+          break
+        case 'escape':
+          setShowShortcuts(false)
+          setSearchQuery('')
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleRefresh])
 
   const handleSelectScene = async (sceneId: string) => {
     setSelectedSceneId(sceneId)
@@ -197,8 +246,19 @@ export default function LocationsPage() {
   }
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId)
-  const extScenes = scenes.filter(s => s.intExt === 'EXT')
-  const intScenes = scenes.filter(s => s.intExt !== 'EXT')
+  const filteredScenes = useMemo(() => {
+    if (!searchQuery.trim()) return scenes
+    const query = searchQuery.toLowerCase()
+    return scenes.filter(s => 
+      s.sceneNumber?.toLowerCase().includes(query) ||
+      s.headingRaw?.toLowerCase().includes(query) ||
+      s.location?.toLowerCase().includes(query) ||
+      s.intExt?.toLowerCase().includes(query) ||
+      s.timeOfDay?.toLowerCase().includes(query)
+    )
+  }, [scenes, searchQuery])
+  const extScenes = filteredScenes.filter(s => s.intExt === 'EXT')
+  const intScenes = filteredScenes.filter(s => s.intExt !== 'EXT')
 
   // Filter and sort candidates
   const filteredCandidates = useMemo(() => {
@@ -263,6 +323,46 @@ export default function LocationsPage() {
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search scenes... (/)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm w-64 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-all disabled:opacity-50"
+            title="Refresh (R)"
+          >
+            <RefreshCw className={`w-5 h-5 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+
+          {/* Keyboard Shortcuts Button */}
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-all"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Keyboard className="w-5 h-5 text-slate-400" />
+          </button>
+
           <div className="flex bg-slate-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('cards')}
@@ -291,9 +391,41 @@ export default function LocationsPage() {
             <AlertTriangle className="w-5 h-5 text-red-400" />
             <span className="text-red-300 text-sm">{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300">
+           <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300">
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowShortcuts(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-emerald-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowShortcuts(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'R', action: 'Refresh location data' },
+                { key: '/', action: 'Focus search input' },
+                { key: '1', action: 'Switch to Cards view' },
+                { key: '2', action: 'Switch to Analysis view' },
+                { key: '?', action: 'Show keyboard shortcuts' },
+                { key: 'Esc', action: 'Close modal / Clear search' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50">
+                  <span className="text-slate-400">{action}</span>
+                  <kbd className="bg-slate-800 border border-slate-700 text-slate-300 px-3 py-1 rounded-lg text-sm font-mono">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -312,7 +444,14 @@ export default function LocationsPage() {
           {/* Scene List Panel */}
           <div className="col-span-3 space-y-4">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-              <h3 className="text-xs font-medium text-slate-500 mb-3 uppercase tracking-wider">Script Scenes</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Script Scenes</h3>
+                {searchQuery && (
+                  <span className="text-xs text-emerald-400">
+                    {filteredScenes.length} found
+                  </span>
+                )}
+              </div>
               
               {extScenes.length > 0 && (
                 <div className="mb-4">

@@ -67,11 +67,17 @@ export default function AudienceSentimentPage() {
   const [error, setError] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [formData, setFormData] = useState({
     title: '',
     platform: 'youtube',
     videoUrl: '',
   })
+
+  // Filter analyses by platform
+  const filteredAnalyses = platformFilter === 'all' 
+    ? analyses 
+    : analyses.filter(a => a.platform === platformFilter)
 
   const fetchAnalyses = useCallback(async () => {
     setLoading(true)
@@ -155,7 +161,7 @@ export default function AudienceSentimentPage() {
     }
   }
 
-  const selectedAnalysis = analyses[0]
+  const selectedAnalysis = filteredAnalyses[0]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -169,16 +175,52 @@ export default function AudienceSentimentPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-white">Audience Sentiment</h1>
-                <p className="text-sm text-slate-400">Analyze trailer & first look reactions</p>
+                <p className="text-sm text-slate-400">
+                  {filteredAnalyses.length === analyses.length 
+                    ? `${analyses.length} analyses total`
+                    : `${filteredAnalyses.length} of ${analyses.length} analyses`}
+                </p>
               </div>
             </div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              New Analysis
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Platform Filter */}
+              <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
+                {PLATFORMS.map((platform) => {
+                  const Icon = platform.icon
+                  return (
+                    <button
+                      key={platform.key}
+                      onClick={() => setPlatformFilter(platform.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        platformFilter === platform.key
+                          ? 'bg-slate-700 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: platform.color }} />
+                      <span className="hidden sm:inline">{platform.label}</span>
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setPlatformFilter('all')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    platformFilter === 'all'
+                      ? 'bg-slate-700 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                >
+                  All
+                </button>
+              </div>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                New Analysis
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -193,7 +235,7 @@ export default function AudienceSentimentPage() {
             <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
             <p className="text-red-400">{error}</p>
           </div>
-        ) : analyses.length === 0 ? (
+        ) : filteredAnalyses.length === 0 ? (
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-12 text-center">
             <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
               <MessageCircle className="w-8 h-8 text-slate-500" />

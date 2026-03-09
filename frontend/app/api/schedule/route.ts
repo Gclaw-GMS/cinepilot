@@ -74,6 +74,41 @@ export async function GET(req: NextRequest) {
     const totalHours = shootingDays.reduce((s, d) => s + Number(d.estimatedHours || 0), 0);
     const totalScenes = shootingDays.reduce((s, d) => s + d.dayScenes.length, 0);
 
+    // If no shooting days found in database, fall back to demo data
+    if (shootingDays.length === 0) {
+      console.log('[GET /api/schedule] No shooting days in database, using demo data');
+      if (statsOnly) {
+        return NextResponse.json({
+          days: DEMO_SHOOTING_DAYS.map(d => ({
+            dayNumber: d.dayNumber,
+            scheduledDate: d.scheduledDate,
+            scenes: d.dayScenes.map(ds => ({
+              sceneNumber: ds.scene.sceneNumber,
+              headingRaw: ds.scene.headingRaw,
+              location: ds.scene.location,
+            })),
+          })),
+          stats: {
+            totalDays: DEMO_SHOOTING_DAYS.length,
+            totalHours: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.estimatedHours, 0),
+            totalScenes: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.dayScenes.length, 0),
+          },
+          _demo: true,
+        });
+      }
+
+      return NextResponse.json({
+        shootingDays: DEMO_SHOOTING_DAYS,
+        versions: DEMO_VERSIONS,
+        stats: {
+          totalDays: DEMO_SHOOTING_DAYS.length,
+          totalHours: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.estimatedHours, 0),
+          totalScenes: DEMO_SHOOTING_DAYS.reduce((s, d) => s + d.dayScenes.length, 0),
+        },
+        _demo: true,
+      });
+    }
+
     // For stats-only requests (dashboard), return flat format with days array
     if (statsOnly) {
       return NextResponse.json({

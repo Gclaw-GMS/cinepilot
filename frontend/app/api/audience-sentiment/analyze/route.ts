@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// Check if database is available
+let dbAvailable = true
+try {
+  await prisma.$connect()
+  await prisma.$disconnect()
+} catch {
+  dbAvailable = false
+}
+
 // Sample comments for demo (in production, this would scrape from YouTube/Social media)
 const DEMO_COMMENTS = [
   { author: "MovieLoverChennai", text: "First look looks amazing! The visuals are stunning 🔥", likes: 234 },
@@ -75,7 +84,100 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing sentiment ID' }, { status: 400 })
     }
 
-    // Update status to analyzing
+    // Demo mode fallback - simulate analysis without database
+    if (!dbAvailable || sentimentId.startsWith('demo-')) {
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Analyze demo comments
+      let positiveCount = 0
+      let negativeCount = 0
+      let neutralCount = 0
+      let totalScore = 0
+
+      const analyzedComments = DEMO_COMMENTS.map((comment) => {
+        const analysis = analyzeSentiment(comment.text)
+        
+        if (analysis.sentiment === 'positive') positiveCount++
+        else if (analysis.sentiment === 'negative') negativeCount++
+        else neutralCount++
+        
+        totalScore += analysis.score
+
+        return {
+          sentimentId,
+          commentText: comment.text,
+          author: comment.author,
+          sentiment: analysis.sentiment,
+          sentimentScore: analysis.score,
+          emotions: analysis.emotions,
+          language: 'en',
+          likes: comment.likes,
+          replies: Math.floor(comment.likes * 0.2),
+        }
+      })
+
+      const total = analyzedComments.length
+      const avgSentiment = totalScore / total
+
+      // Get top positive and negative comments
+      const sortedByLikes = [...analyzedComments].sort((a, b) => b.likes - a.likes)
+      const topPositive = sortedByLikes.filter(c => c.sentiment === 'positive').slice(0, 5).map(c => ({
+        text: c.commentText,
+        author: c.author,
+        likes: c.likes
+      }))
+      const topNegative = sortedByLikes.filter(c => c.sentiment === 'negative').slice(0, 3).map(c => ({
+        text: c.commentText,
+        author: c.author,
+        likes: c.likes
+      }))
+
+      // Generate takeaways and poster tips
+      const takeaways = [
+        positiveCount > total * 0.6 ? "Strong positive reception - audiences are excited about the content" : "Mixed reception - consider addressing concerns in marketing",
+        "Music and BGM receiving high praise - emphasize in promotions",
+        "Lead actors' performances generating buzz - feature prominently in posters",
+        avgSentiment > 0.3 ? "High enthusiasm levels - capitalize with early bookings" : "Moderate interest - increase promotional activities"
+      ]
+
+      const posterTips = [
+        "Feature lead actor in dynamic pose - receiving most engagement",
+        "Highlight music/composer name prominently - BGM is a major draw",
+        "Use vibrant colors - positive sentiment correlates with visual appeal",
+        "Include key action moments - audiences respond to dynamic imagery",
+        "Consider regional language elements in poster design",
+        negativeCount > total * 0.2 ? "Address VFX concerns - consider improving in final cut" : "VFX quality not a major concern"
+      ]
+
+      return NextResponse.json({ 
+        sentiment: {
+          id: sentimentId,
+          status: 'completed',
+          totalComments: total,
+          analyzedCount: total,
+          positiveCount,
+          negativeCount,
+          neutralCount,
+          avgSentiment,
+          topPositive,
+          topNegative,
+          takeaways,
+          posterTips
+        },
+        comments: analyzedComments,
+        _demo: true
+      })
+    }
+
+    // Database mode - update status to analyzing
+    await prisma.audienceSentiment.update({
+      where: { id: sentimentId },
+      data: { status: 'analyzing' }
+    })
+
+    // Simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 1500))
     await prisma.audienceSentiment.update({
       where: { id: sentimentId },
       data: { status: 'analyzing' }

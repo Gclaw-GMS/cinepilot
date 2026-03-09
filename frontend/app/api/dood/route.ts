@@ -120,6 +120,16 @@ export async function GET(req: NextRequest) {
       ? Math.round((totalCalls / report.length) * 10) / 10 
       : 0;
 
+    // If no characters found in database, fall back to demo data
+    if (characters.length === 0) {
+      console.log('[GET /api/dood] No characters in database, using demo data');
+      return NextResponse.json({
+        report: DEMO_DOOD_REPORT,
+        stats: DEMO_STATS,
+        isDemoMode: true,
+      });
+    }
+
     return NextResponse.json({
       report,
       stats: {

@@ -211,6 +211,12 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // If no shots found in database, fall back to demo data
+    if (shots.length === 0) {
+      console.log('[GET /api/shots] No shots in database, using demo data');
+      return NextResponse.json(getDemoResponse(statsOnly));
+    }
+
     const totalDuration = shots.reduce(
       (sum, s) => sum + (s.durationEstSec || 3),
       0

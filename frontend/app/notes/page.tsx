@@ -912,6 +912,7 @@ export default function NotesPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', action: 'Refresh notes' },
+                { key: 'R', action: 'Refresh notes' },
                 { key: 'E', action: 'Export notes' },
                 { key: '/', action: 'Focus search' },
                 { key: 'N', action: 'Create new note' },

@@ -6,7 +6,8 @@ import {
   Calendar, AlertTriangle, MessageSquare, Wand2,
   Play, ArrowRight, TrendingUp, Target, Zap, Loader2,
   BarChart3, PieChart, Activity, Gauge, AlertOctagon,
-  CheckCircle, XCircle, Info, RefreshCw, Keyboard, Search, X
+  CheckCircle, XCircle, Info, RefreshCw, Keyboard, Search, X,
+  Download
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -368,6 +369,8 @@ export default function AIToolsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -413,6 +416,20 @@ export default function AIToolsPage() {
     }
   }, [])
 
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.export-dropdown')) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showExportMenu])
+
   // Keyboard shortcuts handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -433,6 +450,10 @@ export default function AIToolsPage() {
       } else if (e.key === 'Escape') {
         setShowKeyboardHelp(false)
         setSearchQuery('')
+        setShowExportMenu(false)
+      } else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault()
+        setShowExportMenu(prev => !prev)
       }
     }
     
@@ -449,6 +470,48 @@ export default function AIToolsPage() {
       )
     : tools
   const aiFeatures = filteredTools.map(apiToolToFeature)
+
+  // Export handlers
+  const handleExport = useCallback(async (format: 'csv' | 'json') => {
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    try {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        tools: filteredTools,
+        stats: {
+          totalTools: filteredTools.length,
+          categories: [...new Set(filteredTools.map(t => t.category))].length,
+        }
+      }
+
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ai-tools-${new Date().toISOString().split('T')[0]}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        const headers = ['Name', 'Description', 'Category', 'Endpoint']
+        const rows = filteredTools.map(t => [t.name, t.desc, t.category, t.endpoint])
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ai-tools-${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (e) {
+      console.error('Export failed:', e)
+    } finally {
+      setExporting(false)
+    }
+  }, [filteredTools])
 
   const runAnalysis = async (featureId: string) => {
     setSelected(featureId)
@@ -516,6 +579,40 @@ export default function AIToolsPage() {
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+              
+              {/* Export Dropdown */}
+              <div className="relative export-dropdown">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  disabled={exporting}
+                  className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  title="Export (E)"
+                >
+                  {exporting ? (
+                    <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 text-slate-400" />
+                  )}
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50">
+                    <button
+                      onClick={() => handleExport('csv')}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 rounded-t-lg flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={() => handleExport('json')}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
               
               {/* Keyboard Help Button */}
               <button
@@ -844,11 +941,15 @@ export default function AIToolsPage() {
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">/</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Export tools</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">E</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Show shortcuts</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">?</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-slate-400">Close / Clear</span>
+                  <span className="text-slate-400">Close / Clear / Export</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">Esc</kbd>
                 </div>
               </div>

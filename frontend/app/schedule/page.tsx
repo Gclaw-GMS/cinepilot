@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { 
   Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -232,6 +232,9 @@ export default function SchedulePage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [copied, setCopied] = useState(false)
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -315,7 +318,12 @@ export default function SchedulePage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
           break
       }
     }
@@ -323,6 +331,85 @@ export default function SchedulePage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [fetchData])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (showExportMenu && !target.closest('.export-menu')) {
+        setShowExportMenu(false)
+      }
+    }
+    
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showExportMenu])
+
+  // Export functions
+  const handleExportCSV = () => {
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    const headers = ['Day', 'Date', 'Location', 'Status', 'Scenes', 'Call Time', 'Hours']
+    const rows = shootingDays.map(day => [
+      day.dayNumber,
+      day.scheduledDate || '',
+      day.location?.name || 'TBD',
+      day.status,
+      day.dayScenes.map(ds => ds.scene.sceneNumber).join('; '),
+      day.callTime || '',
+      day.estimatedHours || ''
+    ])
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `schedule-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExporting(false)
+  }
+
+  const handleExportJSON = () => {
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalDays: shootingDays.length,
+      stats,
+      shootingDays: shootingDays.map(day => ({
+        dayNumber: day.dayNumber,
+        date: day.scheduledDate,
+        callTime: day.callTime,
+        estimatedHours: day.estimatedHours,
+        status: day.status,
+        location: day.location?.name,
+        scenes: day.dayScenes.map(ds => ({
+          sceneNumber: ds.scene.sceneNumber,
+          heading: ds.scene.headingRaw,
+          intExt: ds.scene.intExt,
+          timeOfDay: ds.scene.timeOfDay,
+          location: ds.scene.location,
+          duration: ds.estimatedMinutes
+        }))
+      }))
+    }
+    
+    const json = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `schedule-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExporting(false)
+  }
 
   const handleOptimize = async () => {
     setOptimizing(true)
@@ -340,6 +427,27 @@ export default function SchedulePage() {
       setError(e.message)
     } finally {
       setOptimizing(false)
+    }
+  }
+
+  // Copy schedule to clipboard
+  const handleCopyToClipboard = async () => {
+    if (shootingDays.length === 0) return
+    
+    const scheduleText = shootingDays.map(day => {
+      const date = day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' }) : `Day ${day.dayNumber}`
+      const scenes = day.dayScenes.map(ds => `  ${ds.orderNumber}. ${ds.scene.sceneNumber}: ${ds.scene.headingRaw || 'Unknown'} (${ds.scene.timeOfDay || '?'}) - ${ds.scene.location || 'Unknown Location'}`).join('\n')
+      return `DAY ${day.dayNumber} - ${date}\nLocation: ${day.location?.name || 'TBD'}\nCall Time: ${day.callTime || 'TBD'}\nEst. Hours: ${day.estimatedHours || '?'}\n\nScenes:\n${scenes}\n`
+    }).join('\n' + '='.repeat(50) + '\n\n')
+
+    const header = `SHOOTING SCHEDULE - ${isDemoMode ? 'DEMO' : 'CinePilot'}\nGenerated: ${new Date().toLocaleString()}\nTotal Days: ${shootingDays.length}\n\n${'='.repeat(50)}\n\n`
+    
+    try {
+      await navigator.clipboard.writeText(header + scheduleText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (e) {
+      setError('Failed to copy to clipboard')
     }
   }
 
@@ -516,6 +624,64 @@ export default function SchedulePage() {
               <TrendingUp className="w-4 h-4 inline-block mr-1.5" />
               Analytics
             </button>
+          </div>
+          {/* Copy to Clipboard Button */}
+          <button
+            onClick={handleCopyToClipboard}
+            disabled={shootingDays.length === 0}
+            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+              copied 
+                ? 'bg-emerald-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
+            title="Copy Schedule to Clipboard"
+          >
+            {copied ? (
+              <>
+                <Check className="w-4 h-4" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                Copy
+              </>
+            )}
+          </button>
+          {/* Export Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={exporting}
+              className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 rounded-lg text-sm text-white flex items-center gap-2 transition-colors"
+              title="Export Schedule (E)"
+            >
+              {exporting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export
+            </button>
+            {/* Export Dropdown */}
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export JSON
+                </button>
+              </div>
+            )}
           </div>
           {/* Keyboard Help Button */}
           <button
@@ -985,6 +1151,7 @@ export default function SchedulePage() {
                 { key: '1', desc: 'Switch to Timeline view' },
                 { key: '2', desc: 'Switch to Analytics view' },
                 { key: 'O', desc: 'Open optimize schedule' },
+                { key: 'E', desc: 'Export schedule (CSV/JSON)' },
                 { key: '?', desc: 'Show this help modal' },
                 { key: 'Esc', desc: 'Close modal / Clear search' },
               ].map(({ key, desc }) => (

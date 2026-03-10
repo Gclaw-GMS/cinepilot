@@ -411,6 +411,20 @@ export default function WeatherPage() {
       precipitation: d.precipitation,
     }));
 
+    // Humidity data for production impact
+    const humidityData = forecast.map((d) => ({
+      date: new Date(d.date).toLocaleDateString('en-IN', { weekday: 'short' }),
+      humidity: d.humidity,
+      impact: d.humidity > 85 ? 3 : d.humidity > 75 ? 2 : 1, // 1=good, 2=moderate, 3=challenging
+    }));
+
+    // Wind data for production impact
+    const windData = forecast.map((d) => ({
+      date: new Date(d.date).toLocaleDateString('en-IN', { weekday: 'short' }),
+      wind: d.windSpeed,
+      impact: d.windSpeed > 30 ? 3 : d.windSpeed > 20 ? 2 : 1, // 1=good, 2=moderate, 3=challenging
+    }));
+
     // Conditions breakdown
     const conditions: Record<string, number> = {};
     forecast.forEach((d) => {
@@ -435,6 +449,8 @@ export default function WeatherPage() {
       tempData,
       scoreData,
       precipData,
+      humidityData,
+      windData,
       conditionData,
       stats: {
         avgTemp,
@@ -942,6 +958,66 @@ export default function WeatherPage() {
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Production Impact Analysis - Humidity & Wind */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Humidity Impact */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <Droplets className="w-5 h-5 text-cyan-400" />
+                        Humidity Impact on Production
+                      </h3>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.humidityData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                            <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                            <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                              formatter={(value: number, name: string) => [
+                                name === 'humidity' ? `${value}%` : `${Math.max(0, 100 - value * 2)}%`,
+                                name === 'humidity' ? 'Humidity' : 'Impact Score'
+                              ]}
+                            />
+                            <Bar dataKey="humidity" name="Humidity %" fill={COLORS.info} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="mt-3 flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400"></span> &lt;75% Ideal</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> 75-85% Moderate</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400"></span> &gt;85% Challenging</span>
+                      </div>
+                    </div>
+
+                    {/* Wind Speed Impact */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <Wind className="w-5 h-5 text-slate-400" />
+                        Wind Speed Impact on Production
+                      </h3>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.windData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                            <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                            <YAxis stroke="#64748b" fontSize={12} domain={[0, 50]} />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                              formatter={(value: number) => [`${value} km/h`, 'Wind Speed']}
+                            />
+                            <Bar dataKey="wind" name="Wind (km/h)" fill={COLORS.muted} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="mt-3 flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> &lt;20 km/h Ideal</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> 20-30 km/h Moderate</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400"></span> &gt;30 km/h Challenging</span>
+                      </div>
                     </div>
                   </div>
 

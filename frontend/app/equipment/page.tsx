@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -119,9 +119,12 @@ export default function EquipmentPage() {
     vendor: '',
     notes: '',
   })
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   // Calculate category breakdown for chart
@@ -230,9 +233,14 @@ export default function EquipmentPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearch('')
           setFilterCat('all')
           setFilterStatus('all')
@@ -242,7 +250,22 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalOpen, editModalOpen])
+  }, [modalOpen, editModalOpen, showExportMenu])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   const filtered = equipment.filter(eq => {
     const matchSearch = eq.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -295,6 +318,78 @@ export default function EquipmentPage() {
     } catch (err) {
       setError('Failed to delete equipment')
     }
+  }
+
+  // Export functions
+  const handleExportCSV = () => {
+    setExporting(true)
+    const headers = ['Name', 'Category', 'Start Date', 'End Date', 'Daily Rate', 'Vendor', 'Status', 'Quantity', 'Notes']
+    const rows = filtered.map(eq => [
+      eq.name,
+      eq.category,
+      eq.dateStart.split('T')[0],
+      eq.dateEnd.split('T')[0],
+      eq.dailyRate.toString(),
+      eq.vendor || '',
+      eq.status,
+      eq.quantity.toString(),
+      eq.notes || ''
+    ])
+    
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `equipment-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+    setSuccess('Equipment exported to CSV!')
+    setTimeout(() => setSuccess(null), 3000)
+  }
+
+  const handleExportJSON = () => {
+    setExporting(true)
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalItems: filtered.length,
+      totalDailyRate: filtered.reduce((acc, eq) => acc + eq.dailyRate, 0),
+      stats: {
+        available: filtered.filter(eq => eq.status === 'available').length,
+        inUse: filtered.filter(eq => eq.status === 'in-use').length,
+        maintenance: filtered.filter(eq => eq.status === 'maintenance').length,
+        returned: filtered.filter(eq => eq.status === 'returned').length,
+      },
+      items: filtered.map(eq => ({
+        name: eq.name,
+        category: eq.category,
+        dateStart: eq.dateStart,
+        dateEnd: eq.dateEnd,
+        dailyRate: eq.dailyRate,
+        vendor: eq.vendor,
+        status: eq.status,
+        quantity: eq.quantity,
+        notes: eq.notes,
+      }))
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `equipment-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+    setSuccess('Equipment exported to JSON!')
+    setTimeout(() => setSuccess(null), 3000)
   }
 
   const handleEdit = (eq: EquipmentRental) => {
@@ -388,6 +483,35 @@ export default function EquipmentPage() {
               <HelpCircle className="w-4 h-4" />
               <span className="text-xs">?</span>
             </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
+                title="Export (E)"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportCSV}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-violet-400" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => { setModalOpen(true); setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' }) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
@@ -849,6 +973,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Add new equipment</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">N</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Export dropdown</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Show shortcuts</span>

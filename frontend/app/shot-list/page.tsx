@@ -496,7 +496,7 @@ export default function ShotHubPage() {
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Filter scenes..."
+                placeholder="Filter scenes... (/)"
                 value={sceneFilter}
                 onChange={e => setSceneFilter(e.target.value)}
                 className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-cinepilot-accent"

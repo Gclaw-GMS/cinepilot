@@ -5,7 +5,7 @@ import {
   Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
   Film, Star, Clock, CheckCircle, MoreHorizontal, Loader2,
   Trash2, Edit2, X, DollarSign, Briefcase, Send, RefreshCw,
-  TrendingUp, UserPlus, AlertCircle, HelpCircle
+  TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText
 } from 'lucide-react'
 
 interface TeamMember {
@@ -82,9 +82,12 @@ export default function CollaborationPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -142,6 +145,12 @@ export default function CollaborationPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'e':
+          e.preventDefault()
+          if (filteredMembers.length > 0) {
+            setShowExportMenu(!showExportMenu)
+          }
+          break
         case 'n':
           e.preventDefault()
           if (!showForm) {
@@ -159,6 +168,7 @@ export default function CollaborationPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearch('')
           setDeptFilter('all')
           break
@@ -270,6 +280,69 @@ export default function CollaborationPage() {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
   }
 
+  // Export functions
+  const handleExportCSV = () => {
+    const headers = ['Name', 'Role', 'Email', 'Phone', 'Department', 'Status', 'Daily Rate', 'Skills']
+    const rows = filteredMembers.map(m => [
+      m.name,
+      m.role,
+      m.email || '',
+      m.phone || '',
+      m.department || '',
+      m.status,
+      m.dailyRate?.toString() || '',
+      m.skills?.join('; ') || ''
+    ])
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `team-members-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    const data = {
+      exportDate: new Date().toISOString(),
+      totalMembers: filteredMembers.length,
+      members: filteredMembers.map(m => ({
+        name: m.name,
+        role: m.role,
+        email: m.email,
+        phone: m.phone,
+        department: m.department,
+        status: m.status,
+        dailyRate: m.dailyRate,
+        skills: m.skills,
+        notes: m.notes
+      }))
+    }
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `team-members-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Click outside handler for export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       {/* Header */}
@@ -302,6 +375,38 @@ export default function CollaborationPage() {
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+          
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={exporting || filteredMembers.length === 0}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
+              title="Export (E)"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-colors text-left"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Export CSV</span>
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-colors text-left border-t border-slate-700"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Export JSON</span>
+                </button>
+              </div>
+            )}
+          </div>
+          
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors"
@@ -689,6 +794,10 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Focus search</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export team data</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">E</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Add new member</span>

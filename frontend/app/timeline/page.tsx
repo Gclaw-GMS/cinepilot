@@ -43,6 +43,9 @@ export default function TimelinePage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -119,6 +122,62 @@ export default function TimelinePage() {
     setRefreshing(false);
   };
 
+  // Export handlers
+  const handleExport = async (format: 'csv' | 'json') => {
+    setExporting(true);
+    setShowExportMenu(false);
+    
+    try {
+      const projectId = selectedProject === 'all' ? 'default-project' : selectedProject;
+      const res = await fetch(`/api/schedule?projectId=${projectId}`);
+      const data = await res.json();
+      
+      const shootingDays = data.shootingDays || [];
+      
+      if (format === 'csv') {
+        // Create CSV content
+        const headers = ['Day', 'Date', 'Location', 'Status', 'Scenes', 'Call Time', 'Hours'];
+        const rows = shootingDays.map((day: any) => [
+          day.dayNumber || '',
+          day.scheduledDate || '',
+          day.location?.name || '',
+          day.status || '',
+          (day.dayScenes || []).length,
+          day.callTime || '',
+          day.estimatedHours || ''
+        ]);
+        
+        const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `timeline_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // Create JSON content
+        const jsonContent = {
+          exportDate: new Date().toISOString(),
+          projectId,
+          totalDays: shootingDays.length,
+          shootingDays
+        };
+        const blob = new Blob([JSON.stringify(jsonContent, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `timeline_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('Export failed:', e);
+    }
+    
+    setExporting(false);
+  };
+
   // Keyboard shortcuts handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,6 +210,12 @@ export default function TimelinePage() {
           setShowKeyboardHelp(false);
           setSearchQuery('');
           setShowFilters(false);
+          setShowExportMenu(false);
+          break;
+        case 'e':
+          if (!exporting) {
+            setShowExportMenu(!showExportMenu);
+          }
           break;
       }
     };
@@ -405,11 +470,35 @@ export default function TimelinePage() {
               </button>
             </div>
 
-            {/* Export */}
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm">
-              <Download className="w-4 h-4" />
-              Export
-            </button>
+            {/* Export Dropdown */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" />
+                {exporting ? 'Exporting...' : 'Export'}
+              </button>
+              
+              {/* Export Dropdown Menu */}
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 w-32 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
+                  <button
+                    onClick={() => handleExport('csv')}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-t-lg"
+                  >
+                    CSV
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-b-lg"
+                  >
+                    JSON
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Filter Panel */}
@@ -586,6 +675,10 @@ export default function TimelinePage() {
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Toggle filters</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">F</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Export timeline</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">E</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Show keyboard shortcuts</span>

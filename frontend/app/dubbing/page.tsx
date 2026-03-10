@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -63,6 +63,8 @@ export default function DubbingPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -85,6 +87,10 @@ export default function DubbingPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -93,6 +99,7 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setSearchQuery('')
+          setShowExportMenu(false)
           break
       }
     }
@@ -256,6 +263,64 @@ export default function DubbingPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [dubbedVersions])
 
+  // Click outside to close export menu
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
+
+  // Export functions
+  const handleExport = (format: 'csv' | 'json') => {
+    const timestamp = new Date().toISOString().split('T')[0]
+    
+    if (format === 'csv') {
+      // CSV export of dubbed versions
+      const headers = ['Title', 'Language', 'Created At']
+      const rows = dubbedVersions.map(dub => [
+        `"${dub.title}"`,
+        dub.language,
+        new Date(dub.createdAt).toLocaleDateString()
+      ])
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dubbed-scripts-${timestamp}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      // JSON export
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        totalDubbedVersions: dubbedVersions.length,
+        languages: [...new Set(dubbedVersions.map(d => d.language))],
+        dubbedVersions: dubbedVersions.map(dub => ({
+          title: dub.title,
+          language: dub.language,
+          createdAt: dub.createdAt,
+          preview: preview.filter(p => p.sceneNumber)
+        })),
+        previewScenes: preview
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dubbed-scripts-${timestamp}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    setShowExportMenu(false)
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -279,6 +344,35 @@ export default function DubbingPage() {
                 <span className="text-xs font-medium text-amber-400">Demo Mode</span>
               </div>
             )}
+            {/* Export Dropdown */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+                title="Export (E)"
+              >
+                <Download className="w-4 h-4" />
+                <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => handleExport('csv')}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowKeyboardHelp(true)}
               className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
@@ -546,6 +640,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Focus search</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Export menu</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Show shortcuts</span>

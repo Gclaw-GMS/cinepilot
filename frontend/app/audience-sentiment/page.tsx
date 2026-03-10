@@ -25,6 +25,7 @@ import {
   HelpCircle,
   X,
   Search,
+  Download,
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -74,6 +75,7 @@ export default function AudienceSentimentPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     platform: 'youtube',
@@ -131,6 +133,10 @@ export default function AudienceSentimentPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -163,6 +169,7 @@ export default function AudienceSentimentPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowForm(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           break
       }
@@ -171,6 +178,17 @@ export default function AudienceSentimentPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Click outside handler for export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && !(e.target as HTMLElement).closest('.export-menu')) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showExportMenu])
 
   useEffect(() => {
     fetchAnalyses()
@@ -240,6 +258,69 @@ export default function AudienceSentimentPage() {
   }
 
   const selectedAnalysis = filteredAnalyses[0]
+
+  // Export functions
+  const exportToCSV = () => {
+    if (filteredAnalyses.length === 0) return
+    const headers = ['Title', 'Platform', 'Status', 'Total Comments', 'Positive', 'Negative', 'Neutral', 'Avg Sentiment', 'Created At']
+    const rows = filteredAnalyses.map(a => [
+      a.title,
+      a.platform,
+      a.status,
+      a.totalComments.toString(),
+      a.positiveCount.toString(),
+      a.negativeCount.toString(),
+      a.neutralCount.toString(),
+      a.avgSentiment.toString(),
+      a.createdAt
+    ])
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audience-sentiment-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const exportToJSON = () => {
+    if (filteredAnalyses.length === 0) return
+    const data = {
+      exportDate: new Date().toISOString(),
+      projectId: DEMO_PROJECT_ID,
+      totalAnalyses: filteredAnalyses.length,
+      platformFilter,
+      searchQuery,
+      analyses: filteredAnalyses.map(a => ({
+        id: a.id,
+        title: a.title,
+        platform: a.platform,
+        status: a.status,
+        totalComments: a.totalComments,
+        analyzedCount: a.analyzedCount,
+        positiveCount: a.positiveCount,
+        negativeCount: a.neutralCount,
+        neutralCount: a.neutralCount,
+        avgSentiment: a.avgSentiment,
+        topPositive: a.topPositive,
+        topNegative: a.topNegative,
+        takeaways: a.takeaways,
+        posterTips: a.posterTips,
+        createdAt: a.createdAt
+      }))
+    }
+    const json = JSON.stringify(data, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audience-sentiment-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -314,6 +395,36 @@ export default function AudienceSentimentPage() {
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+              
+              {/* Export Dropdown */}
+              <div className="relative export-menu">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="flex items-center gap-2 p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  title="Export (E)"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                    <button
+                      onClick={exportToCSV}
+                      className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-3 h-3" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={exportToJSON}
+                      className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-3 h-3" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+              
               <button
                 onClick={() => setShowKeyboardHelp(true)}
                 className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
@@ -741,6 +852,10 @@ export default function AudienceSentimentPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Search analyses</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export data</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">New analysis</span>

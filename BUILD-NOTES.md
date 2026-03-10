@@ -1,5 +1,22 @@
 # CinePilot Night Build Notes - March 10, 2026
 
+## Build Status: ✅ PASSING (12:25 PM)
+
+### 17. Audience Sentiment Page - Export Feature (March 10, 2026 12:25 PM)
+Added export functionality to the Audience Sentiment page:
+- **Export CSV**: One-click export of sentiment analyses to CSV file
+- **Export JSON**: Full sentiment export including all details to JSON
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (audience-sentiment-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export
+- **Filtered Export**: Exports respect current search and filter settings
+
+- **Export Data Includes**:
+  - CSV: Title, Platform, Status, Total Comments, Positive, Negative, Neutral, Avg Sentiment, Created At
+  - JSON: Full data with export date, filters applied, and all analysis details including top comments, takeaways, and poster tips
+
 ## Build Status: ✅ PASSING (8:43 AM)
 
 ### 16. Mission Control Page - Export Feature (March 10, 2026 8:43 AM)

@@ -1,6 +1,90 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (8:43 AM)
+## Build Status: ✅ PASSING (12:25 PM)
+
+## Night Build (12:25 PM) - Audience Sentiment Export Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Audience Sentiment Page**: Added export functionality to Audience Sentiment
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+  - **CSV Export**: Export sentiment analyses to CSV (Title, Platform, Status, Total Comments, Positive, Negative, Neutral, Avg Sentiment, Created At)
+  - **JSON Export**: Full sentiment export including all details with export date, filters, and all analysis data including top comments, takeaways, and poster tips
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Timestamped Filenames**: Exports include date (audience-sentiment-2026-03-10.csv/json)
+  - **Filtered Export**: Exports respect current search and platform filter settings
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Build Status: ✅ PASSING (11:45 AM)
+
+## Night Build (11:45 AM) - Call Sheets Export Enhancement (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Call Sheets Page**: Enhanced export functionality to match other pages
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+  - **CSV Export**: Export crew calls to CSV (Role, Name, Department, Call Time)
+  - **JSON Export**: Full call sheet export including content, stats, and metadata with timestamps
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu (was edit, now export)
+  - **"I" Shortcut**: New keyboard shortcut for edit (previously E)
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with new shortcuts (E=export, I=edit)
+  - **Loading State**: Visual feedback during export with spinning icon
+  - **Consistency**: Now matches other pages in the app with export dropdown and keyboard shortcuts
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Night Build (10:24 AM) - VFX Export Enhancement (IMPLEMENTED)
+
+### Features Perfected This Build
+- **VFX Page**: Enhanced export functionality to VFX Breakdown
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+  - **CSV Export**: Export VFX notes, warnings, and props to CSV (Scene, Heading, Type, Description, Confidence, Severity, Warning)
+  - **JSON Export**: Full VFX export including summary stats, all notes, warnings, and props with timestamps
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Timestamped Filenames**: Exports include date (vfx-breakdown-2026-03-10.csv/json)
+  - **Summary Stats**: JSON export includes total scenes, notes, warnings, complexity breakdown, and cost estimates
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Night Build (10:04 AM) - Dubbing Export Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Dubbing Page**: Added export functionality to Dubbing Script Generator
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header
+  - **CSV Export**: Export dubbed versions to CSV (Title, Language, Created At)
+  - **JSON Export**: Full dubbing export including all versions, languages, and preview scenes
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Timestamped Filenames**: Exports include date (dubbed-scripts-2026-03-10.csv/json)
+  - **Summary Stats**: JSON export includes total versions, language list, and preview scenes
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Night Build (9:43 AM) - Progress Filter Enhancement (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Progress Page**: Enhanced filter functionality
+  - **Filter Toggle Button**: Added visual filter toggle button in the header
+  - **"F" Keyboard Shortcut**: Press F to toggle filters on/off
+  - **Updated Help Modal**: Added "F" shortcut for filters to keyboard shortcuts help
+  - **Filter State Persistence**: Filter toggle state is maintained during session
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
 
 ## Night Build (8:43 AM) - Mission Control Export Feature (IMPLEMENTED)
 

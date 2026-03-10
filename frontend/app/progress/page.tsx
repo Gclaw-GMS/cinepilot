@@ -6,7 +6,7 @@ import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
-  TrendingUp, Activity, Search, X, Keyboard
+  TrendingUp, Activity, Search, X, Keyboard, Filter
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -94,6 +94,7 @@ export default function ProgressPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [showHelp, setShowHelp] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -195,7 +196,12 @@ export default function ProgressPage() {
           e.preventDefault()
           setShowHelp(false)
           setSearchQuery('')
+          setShowFilters(false)
           searchInputRef.current?.blur()
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
       }
     }
@@ -355,6 +361,18 @@ export default function ProgressPage() {
               </button>
             )}
           </div>
+          {/* Filter Toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-2 rounded-lg border transition-colors ${
+              showFilters 
+                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' 
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+            }`}
+            title="Toggle filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+          </button>
           {/* View Toggle */}
           <div className="flex bg-slate-800 rounded-lg p-1">
             {(['timeline', 'tasks', 'kanban'] as const).map((mode, idx) => (
@@ -408,6 +426,7 @@ export default function ProgressPage() {
               {[
                 { key: 'R', action: 'Refresh data' },
                 { key: '/', action: 'Focus search' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: '1', action: 'Timeline view' },
                 { key: '2', action: 'Tasks view' },
                 { key: '3', action: 'Kanban view' },

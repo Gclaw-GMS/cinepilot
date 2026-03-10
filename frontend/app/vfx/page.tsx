@@ -167,9 +167,11 @@ export default function VfxPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
 
   // Keyboard shortcuts
@@ -204,9 +206,16 @@ export default function VfxPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           setTypeFilter('all')
           setComplexityFilter('all')
+          break
+        case 'e':
+          e.preventDefault()
+          if (vfxNotes.length > 0) {
+            setShowExportMenu(!showExportMenu)
+          }
           break
         case '1':
           e.preventDefault()
@@ -225,7 +234,7 @@ export default function VfxPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedScript, showNoteForm])
+  }, [selectedScript, showNoteForm, showExportMenu])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -256,6 +265,19 @@ export default function VfxPage() {
         }
       });
   }, []);
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   // Filtered notes based on search and filters
   const filteredNotes = useMemo(() => {
@@ -505,7 +527,7 @@ export default function VfxPage() {
   }
 
   // Export VFX data to CSV
-  function handleExport() {
+  function handleExportCSV() {
     const headers = ['Scene', 'Heading', 'Type', 'Description', 'Confidence', 'Severity', 'Warning'];
     const rows = displayScenes.map(([sceneNum, group]) => {
       const notes = group.notes.map(n => ({
@@ -537,6 +559,54 @@ export default function VfxPage() {
     a.download = `vfx-breakdown-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  }
+
+  // Export VFX data to JSON
+  function handleExportJSON() {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      project: selectedScript,
+      summary: summary ? {
+        totalScenes: summary.totalScenes,
+        totalNotes: summary.totalNotes,
+        totalWarnings: summary.totalWarnings,
+        complexityBreakdown: summary.complexityBreakdown,
+        estimatedTotalCost: summary.estimatedTotalCost,
+        estimatedTotalDuration: summary.estimatedTotalDuration,
+      } : null,
+      vfxNotes: vfxNotes.map(n => ({
+        id: n.id,
+        sceneNumber: n.scene.sceneNumber,
+        heading: n.scene.headingRaw,
+        type: n.vfxType,
+        description: n.description,
+        confidence: n.confidence,
+        estimatedDuration: n.estimatedDuration,
+      })),
+      vfxWarnings: vfxWarnings.map(w => ({
+        id: w.id,
+        sceneNumber: w.scene.sceneNumber,
+        heading: w.scene.headingRaw,
+        type: w.warningType,
+        description: w.description,
+        severity: w.severity,
+      })),
+      vfxProps: vfxProps.map(p => ({
+        sceneNumber: p.scene.sceneNumber,
+        heading: p.scene.headingRaw,
+        propName: p.prop.name,
+        propDescription: p.prop.description,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vfx-breakdown-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
   }
 
   const sceneGroups = new Map<
@@ -644,13 +714,36 @@ export default function VfxPage() {
 
             {vfxNotes.length > 0 && (
               <>
-                <button
-                  onClick={handleExport}
-                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
+                <div className="relative" ref={exportMenuRef}>
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                    <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                      <button
+                        onClick={handleExportCSV}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        CSV
+                      </button>
+                      <button
+                        onClick={handleExportJSON}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        JSON
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => fetchVfxData(selectedScript)}
                   className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
@@ -1239,6 +1332,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Add new VFX shot</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Export data</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Overview tab</span>

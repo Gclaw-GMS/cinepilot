@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import api from '@/lib/api'
+import { useState, useEffect, useCallback } from 'react'
+import { Loader2, AlertCircle, FileText, Search, Filter, Eye, Code } from 'lucide-react'
 
 interface ScriptElement {
   type: 'scene_heading' | 'action' | 'character' | 'dialogue' | 'parenthetical' | 'transition'
@@ -13,14 +13,46 @@ interface ScriptElement {
 interface ScriptViewerProps {
   content?: string
   filename?: string
+  scriptId?: string
 }
 
-export default function ScriptViewer({ content: initialContent, filename }: ScriptViewerProps) {
+export default function ScriptViewer({ content: initialContent, filename, scriptId }: ScriptViewerProps) {
   const [content, setContent] = useState(initialContent || '')
   const [parsedScript, setParsedScript] = useState<ScriptElement[]>([])
   const [viewMode, setViewMode] = useState<'parsed' | 'raw'>('parsed')
   const [filter, setFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch script content if scriptId is provided
+  const fetchScript = useCallback(async () => {
+    if (!scriptId) return
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch(`/api/scripts/${scriptId}`)
+      if (!response.ok) {
+        throw new Error('Failed to load script')
+      }
+      const data = await response.json()
+      if (data.content) {
+        setContent(data.content)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }, [scriptId])
+
+  useEffect(() => {
+    if (scriptId) {
+      fetchScript()
+    }
+  }, [scriptId, fetchScript])
 
   // Parse script content into elements
   useEffect(() => {
@@ -102,17 +134,6 @@ export default function ScriptViewer({ content: initialContent, filename }: Scri
     return true
   })
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'scene_heading': return 'text-cyan-400 bg-cyan-900/20'
-      case 'character': return 'text-yellow-400 bg-yellow-900/20'
-      case 'dialogue': return 'text-green-400 bg-green-900/20'
-      case 'parenthetical': return 'text-gray-400 bg-gray-800'
-      case 'transition': return 'text-purple-400 bg-purple-900/20'
-      default: return 'text-gray-300'
-    }
-  }
-
   const getTypeLabel = (type: string) => {
     switch (type) {
       case 'scene_heading': return 'SCENE'
@@ -133,109 +154,180 @@ export default function ScriptViewer({ content: initialContent, filename }: Scri
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-xl font-bold">📜 Script Viewer</h2>
-          {filename && <p className="text-sm text-gray-500">{filename}</p>}
+      <div className="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-900/50">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
+            <FileText className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-white">Script Viewer</h2>
+            {filename && <p className="text-xs text-slate-500">{filename}</p>}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1 bg-slate-800 p-1 rounded-lg">
           <button
             onClick={() => setViewMode('parsed')}
-            className={`px-3 py-1 rounded text-sm ${
-              viewMode === 'parsed' ? 'bg-purple-600' : 'bg-gray-800'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all ${
+              viewMode === 'parsed' 
+                ? 'bg-indigo-600 text-white shadow-md' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
             }`}
           >
+            <Eye className="w-3.5 h-3.5" />
             Parsed
           </button>
           <button
             onClick={() => setViewMode('raw')}
-            className={`px-3 py-1 rounded text-sm ${
-              viewMode === 'raw' ? 'bg-purple-600' : 'bg-gray-800'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all ${
+              viewMode === 'raw' 
+                ? 'bg-indigo-600 text-white shadow-md' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
             }`}
           >
+            <Code className="w-3.5 h-3.5" />
             Raw
           </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        <div className="bg-gray-900/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-cyan-400">{stats.scenes}</div>
-          <div className="text-xs text-gray-500">Scenes</div>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Loading script...</p>
+          </div>
         </div>
-        <div className="bg-gray-900/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-yellow-400">{stats.characters}</div>
-          <div className="text-xs text-gray-500">Characters</div>
-        </div>
-        <div className="bg-gray-900/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-green-400">{stats.dialogue}</div>
-          <div className="text-xs text-gray-500">Dialogue</div>
-        </div>
-        <div className="bg-gray-900/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-purple-400">{stats.lines}</div>
-          <div className="text-xs text-gray-500">Lines</div>
-        </div>
-      </div>
+      )}
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          placeholder="Search script..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white"
-        />
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white"
-        >
-          <option value="all">All Elements</option>
-          <option value="scene_heading">Scene Headings</option>
-          <option value="action">Action</option>
-          <option value="character">Characters</option>
-          <option value="dialogue">Dialogue</option>
-          <option value="transition">Transitions</option>
-        </select>
-      </div>
+      {/* Error State */}
+      {error && !loading && (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center bg-red-500/10 border border-red-500/20 rounded-xl p-6 max-w-md">
+            <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <p className="text-red-400 font-medium mb-1">Failed to load script</p>
+            <p className="text-slate-500 text-sm">{error}</p>
+            <button 
+              onClick={fetchScript}
+              className="mt-4 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Script Content */}
-      <div className="flex-1 overflow-auto bg-gray-950 rounded-lg p-4 font-mono text-sm">
-        {viewMode === 'parsed' ? (
-          <div className="space-y-1">
-            {filteredScript.map((el, i) => (
-              <div 
-                key={i} 
-                className={`flex gap-2 p-1 rounded ${getTypeColor(el.type)} ${
-                  searchQuery && el.content.toLowerCase().includes(searchQuery.toLowerCase()) 
-                    ? 'bg-yellow-900/50' : ''
-                }`}
+      {/* Content */}
+      {!loading && !error && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-px bg-slate-800 border-b border-slate-800">
+            <div className="bg-slate-900 p-3 text-center">
+              <div className="text-xl font-bold text-cyan-400">{stats.scenes}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Scenes</div>
+            </div>
+            <div className="bg-slate-900 p-3 text-center">
+              <div className="text-xl font-bold text-yellow-400">{stats.characters}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Characters</div>
+            </div>
+            <div className="bg-slate-900 p-3 text-center">
+              <div className="text-xl font-bold text-green-400">{stats.dialogue}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Dialogue</div>
+            </div>
+            <div className="bg-slate-900 p-3 text-center">
+              <div className="text-xl font-bold text-purple-400">{stats.lines}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Lines</div>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2 p-4 border-b border-slate-800 bg-slate-900/30">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search script..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
+              />
+            </div>
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-8 py-2 text-sm text-white appearance-none cursor-pointer focus:outline-none focus:border-indigo-500/50"
               >
-                <span className="text-xs text-gray-600 w-8 text-right opacity-50">
-                  {el.line_number}
-                </span>
-                <span className="text-xs text-gray-500 w-10 shrink-0 opacity-50">
-                  {getTypeLabel(el.type)}
-                </span>
-                <span className="flex-1 whitespace-pre-wrap">
-                  {el.type === 'character' && '                    '}
-                  {el.type === 'dialogue' && '          '}
-                  {el.content}
-                </span>
-                {el.scene_number && el.type === 'scene_heading' && (
-                  <span className="text-xs text-cyan-600">[{el.scene_number}]</span>
+                <option value="all">All Elements</option>
+                <option value="scene_heading">Scene Headings</option>
+                <option value="action">Action</option>
+                <option value="character">Characters</option>
+                <option value="dialogue">Dialogue</option>
+                <option value="transition">Transitions</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Script Content */}
+          <div className="flex-1 overflow-auto p-4 bg-slate-950">
+            {viewMode === 'parsed' ? (
+              <div className="space-y-0.5 font-mono text-sm">
+                {filteredScript.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No script content to display</p>
+                    {scriptId && <p className="text-sm mt-1">Select a script to view</p>}
+                  </div>
+                ) : (
+                  filteredScript.map((el, i) => (
+                    <div 
+                      key={i} 
+                      className={`flex gap-3 p-1.5 rounded transition-colors ${
+                        searchQuery && el.content.toLowerCase().includes(searchQuery.toLowerCase()) 
+                          ? 'bg-yellow-500/20' : 'hover:bg-slate-900'
+                      }`}
+                    >
+                      <span className="text-xs text-slate-600 w-8 text-right shrink-0 select-none">
+                        {el.line_number}
+                      </span>
+                      <span className={`text-xs w-10 shrink-0 font-medium px-1.5 py-0.5 rounded ${
+                        el.type === 'scene_heading' ? 'bg-cyan-500/20 text-cyan-400' :
+                        el.type === 'character' ? 'bg-yellow-500/20 text-yellow-400' :
+                        el.type === 'dialogue' ? 'bg-green-500/20 text-green-400' :
+                        el.type === 'parenthetical' ? 'bg-slate-700 text-slate-400' :
+                        el.type === 'transition' ? 'bg-purple-500/20 text-purple-400' :
+                        'text-slate-500'
+                      }`}>
+                        {getTypeLabel(el.type)}
+                      </span>
+                      <span className={`flex-1 whitespace-pre-wrap ${
+                        el.type === 'scene_heading' ? 'text-cyan-400 font-semibold' :
+                        el.type === 'character' ? 'text-yellow-400' :
+                        el.type === 'dialogue' ? 'text-green-400' :
+                        el.type === 'parenthetical' ? 'text-slate-400 italic' :
+                        el.type === 'transition' ? 'text-purple-400' :
+                        'text-slate-300'
+                      }`}>
+                        {el.type === 'character' && '               '}
+                        {el.type === 'dialogue' && '     '}
+                        {el.content}
+                      </span>
+                      {el.scene_number && el.type === 'scene_heading' && (
+                        <span className="text-xs text-cyan-600 shrink-0">#{el.scene_number}</span>
+                      )}
+                    </div>
+                  ))
                 )}
               </div>
-            ))}
+            ) : (
+              <pre className="whitespace-pre-wrap text-sm text-slate-300 font-mono">{content || 'No script loaded'}</pre>
+            )}
           </div>
-        ) : (
-          <pre className="whitespace-pre-wrap">{content || 'No script loaded'}</pre>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }

@@ -175,6 +175,15 @@ export default function NotesPage() {
     fetchNotes()
   }, [fetchNotes])
 
+  // Refs for keyboard shortcuts
+  const selectedNoteRef = useRef<Note | null>(null)
+  const handleTogglePinRef = useRef<((note: Note) => Promise<void>) | null>(null)
+
+  // Update refs when values change
+  useEffect(() => {
+    selectedNoteRef.current = selectedNote
+  }, [selectedNote])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -217,6 +226,12 @@ export default function NotesPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
+          break
+        case 'p':
+          e.preventDefault()
+          if (selectedNoteRef.current && handleTogglePinRef.current) {
+            handleTogglePinRef.current(selectedNoteRef.current)
+          }
           break
         case 'escape':
           e.preventDefault()
@@ -429,7 +444,7 @@ export default function NotesPage() {
     }
   }
 
-  const handleTogglePin = async (note: Note) => {
+  const handleTogglePin = useCallback(async (note: Note) => {
     try {
       await fetch('/api/notes', {
         method: 'PUT',
@@ -440,7 +455,14 @@ export default function NotesPage() {
     } catch (err) {
       console.error('Failed to toggle pin:', err)
     }
-  }
+  }, [fetchNotes])
+
+  // Update ref when handleTogglePin changes
+  useEffect(() => {
+    handleTogglePinRef.current = handleTogglePin
+  }, [handleTogglePin])
+
+  // Refs for keyboard shortcuts
 
   const getCategoryStyle = (category: string) => {
     return CATEGORIES.find(c => c.value === category)?.color || CATEGORIES[0].color
@@ -488,6 +510,19 @@ export default function NotesPage() {
               <HelpCircle className="w-4 h-4" />
               Shortcuts
             </button>
+            {selectedNote && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+                <StickyNote className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm text-cyan-300">"{selectedNote.title.slice(0, 20)}{selectedNote.title.length > 20 ? '...' : ''}" selected</span>
+                <button
+                  onClick={() => handleTogglePin(selectedNote)}
+                  className="ml-1 p-1 hover:bg-cyan-500/20 rounded"
+                  title={selectedNote.isPinned ? 'Unpin note' : 'Pin note'}
+                >
+                  <StickyNote className={`w-3.5 h-3.5 ${selectedNote.isPinned ? 'text-amber-400' : 'text-slate-400'}`} />
+                </button>
+              </div>
+            )}
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -763,6 +798,8 @@ export default function NotesPage() {
                       getCategoryStyle={getCategoryStyle}
                       formatDate={formatDate}
                       searchTerm={search}
+                      isSelected={selectedNote?.id === note.id}
+                      onSelect={setSelectedNote}
                     />
                   ))}
                 </div>
@@ -784,6 +821,8 @@ export default function NotesPage() {
                       getCategoryStyle={getCategoryStyle}
                       formatDate={formatDate}
                       searchTerm={search}
+                      isSelected={selectedNote?.id === note.id}
+                      onSelect={setSelectedNote}
                     />
                   ))}
                 </div>
@@ -912,10 +951,10 @@ export default function NotesPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', action: 'Refresh notes' },
-                { key: 'R', action: 'Refresh notes' },
-                { key: 'E', action: 'Export notes' },
                 { key: '/', action: 'Focus search' },
                 { key: 'N', action: 'Create new note' },
+                { key: 'P', action: 'Pin/unpin selected note' },
+                { key: 'E', action: 'Export notes' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear filters' },
               ].map((shortcut) => (
@@ -941,7 +980,9 @@ function NoteCard({
   onTogglePin,
   getCategoryStyle,
   formatDate,
-  searchTerm = ''
+  searchTerm = '',
+  isSelected = false,
+  onSelect
 }: { 
   note: Note
   onEdit: (note: Note) => void
@@ -950,9 +991,18 @@ function NoteCard({
   getCategoryStyle: (category: string) => string
   formatDate: (date: string) => string
   searchTerm?: string
+  isSelected?: boolean
+  onSelect?: (note: Note) => void
 }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-600 transition-colors group">
+    <div 
+      className={`bg-slate-900 border rounded-xl p-4 transition-colors group cursor-pointer ${
+        isSelected 
+          ? 'border-cyan-500 ring-1 ring-cyan-500/30' 
+          : 'border-slate-800 hover:border-slate-600'
+      }`}
+      onClick={() => onSelect?.(note)}
+    >
       <div className="flex items-start justify-between mb-2">
         <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryStyle(note.category)}`}>
           {note.category}

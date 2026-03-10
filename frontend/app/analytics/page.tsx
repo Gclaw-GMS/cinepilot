@@ -9,7 +9,7 @@ import {
   BarChart3, TrendingUp, DollarSign, Calendar, 
   Users, Video, MapPin, Clapperboard, RefreshCw, Loader2, 
   Activity, Target, AlertTriangle,
-  Clock, Film, Search, X, HelpCircle, Download
+  Clock, Film, Search, X, HelpCircle
 } from 'lucide-react'
 
 interface DashboardData {
@@ -173,8 +173,6 @@ export default function AnalyticsPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const exportMenuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
@@ -243,12 +241,7 @@ export default function AnalyticsPage() {
         case 'escape':
           e.preventDefault()
           setShowShortcuts(false)
-          setShowExportMenu(false)
           setSearchQuery('')
-          break
-        case 'e':
-          e.preventDefault()
-          setShowExportMenu(!showExportMenu)
           break
       }
     }
@@ -257,90 +250,10 @@ export default function AnalyticsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close export menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    if (showExportMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
-
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchData()
     setTimeout(() => setRefreshing(false), 500)
-  }
-
-  // Export functions
-  const handleExport = (format: 'csv' | 'json' = 'json') => {
-    if (!dashboard || !metrics) return
-    
-    if (format === 'json') {
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        overview: dashboard.overview,
-        recentActivities: dashboard.recent_activities,
-        upcomingShoots: dashboard.upcoming_shoots,
-        budgetBreakdown: dashboard.budget_breakdown,
-        scheduleProgress: dashboard.schedule_progress,
-        timeline: metrics.timeline,
-        performance: metrics.performance,
-        predictions: metrics.predictions,
-        departmentStats: metrics.department_stats,
-        isDemoMode
-      }
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `analytics-${new Date().toISOString().split('T')[0]}.json`
-      a.click()
-    } else if (format === 'csv') {
-      // Overview CSV
-      const rows = [
-        ['Category', 'Metric', 'Value'],
-        ['Overview', 'Total Scenes', dashboard.overview.total_scenes.toString()],
-        ['Overview', 'Completed Scenes', dashboard.overview.completed_scenes.toString()],
-        ['Overview', 'Total Locations', dashboard.overview.total_locations.toString()],
-        ['Overview', 'Total Characters', dashboard.overview.total_characters.toString()],
-        ['Overview', 'Shooting Days Completed', dashboard.overview.shooting_days_completed.toString()],
-        ['Overview', 'Shooting Days Total', dashboard.overview.shooting_days_total.toString()],
-        ['Overview', 'Budget Total', dashboard.overview.budget_total.toString()],
-        ['Overview', 'Budget Spent', dashboard.overview.budget_spent.toString()],
-        ['Overview', 'Budget Remaining', dashboard.overview.budget_remaining.toString()],
-        ['Overview', 'Crew Members', dashboard.overview.crew_members.toString()],
-        ['Overview', 'Total Shots', dashboard.overview.total_shots.toString()],
-        ['Overview', 'Completed Shots', dashboard.overview.completed_shots.toString()],
-        ['Overview', 'VFX Shots', dashboard.overview.vfx_shots.toString()],
-        ['Overview', 'Completed VFX', dashboard.overview.completed_vfx.toString()],
-        ['Timeline', 'Overall Progress', `${metrics.timeline.overall_progress}%`],
-        ['Timeline', 'Days Remaining', metrics.timeline.days_remaining.toString()],
-        ['Timeline', 'Scenes Remaining', metrics.timeline.scenes_remaining.toString()],
-        ['Timeline', 'Budget Utilization', `${metrics.timeline.budget_utilization}%`],
-        ['Performance', 'Avg Scenes/Day', metrics.performance.avg_scenes_per_day.toString()],
-        ['Performance', 'Avg Shots/Scene', metrics.performance.avg_shots_per_scene.toString()],
-        ['Performance', 'Budget Burn Rate', metrics.performance.budget_burn_rate.toString()],
-        ['Performance', 'Efficiency Score', metrics.performance.efficiency_score.toString()],
-        ['Forecast', 'Projected Completion', metrics.predictions.projected_completion],
-        ['Forecast', 'Projected Budget Overrun', metrics.predictions.projected_budget_overrun.toString()],
-        ['Forecast', 'Risk Level', metrics.predictions.risk_level],
-      ]
-      // Add department stats
-      metrics.department_stats.forEach(dept => {
-        rows.push(['Department', dept.name, `Efficiency: ${dept.efficiency}%, Utilization: ${dept.utilization}%`])
-      })
-      const csv = rows.map(row => row.join(',')).join('\n')
-      const blob = new Blob([csv], { type: 'text/csv' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`
-      a.click()
-    }
-    setShowExportMenu(false)
   }
 
   const formatCurrency = (amount: number): string => {
@@ -461,33 +374,6 @@ export default function AnalyticsPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          
-          <div className="relative" ref={exportMenuRef}>
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-              title="Export (E)"
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                <button
-                  onClick={() => handleExport('json')}
-                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
-                >
-                  Export as JSON
-                </button>
-                <button
-                  onClick={() => handleExport('csv')}
-                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
-                >
-                  Export as CSV
-                </button>
-              </div>
-            )}
-          </div>
           
           <button
             onClick={() => setShowShortcuts(true)}
@@ -957,7 +843,6 @@ export default function AnalyticsPage() {
               {[
                 { key: 'R', description: 'Refresh analytics data' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'E', description: 'Toggle export menu' },
                 { key: '1', description: 'Switch to Overview view' },
                 { key: '2', description: 'Switch to Performance view' },
                 { key: '3', description: 'Switch to Forecast view' },

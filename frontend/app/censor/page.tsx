@@ -162,12 +162,9 @@ export default function CensorPage() {
   const [filterSeverity, setFilterSeverity] = useState<string>('all')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const [exporting, setExporting] = useState(false)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const exportMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   // Keyboard shortcuts
@@ -183,10 +180,6 @@ export default function CensorPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
-        case 'e':
-          e.preventDefault()
-          setShowExportMenu(prev => !prev)
-          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -198,7 +191,6 @@ export default function CensorPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
-          setShowExportMenu(false)
           setSearchQuery('')
           setFilterCategory('all')
           setFilterSeverity('all')
@@ -209,18 +201,6 @@ export default function CensorPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-
-  // Click outside to close export menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
 
   const fetchAnalysis = useCallback(async () => {
     setLoading(true)
@@ -279,31 +259,6 @@ export default function CensorPage() {
     } finally {
       setAnalyzing(false)
     }
-  }
-
-  // CSV Export
-  const handleExportCSV = () => {
-    if (!analysis) return
-    setExporting(true)
-    
-    const headers = ['Scene', 'Category', 'Severity', 'Context']
-    const rows = (analysis.sceneFlags || []).map(flag => [
-      flag.scene.sceneNumber,
-      flag.category,
-      flag.severity.toString(),
-      flag.context
-    ])
-    
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `censor-flags-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    setShowExportMenu(false)
-    setExporting(false)
   }
 
   const handleExport = (format: 'json' | 'pdf') => {
@@ -448,45 +403,22 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
           </select>
           
           <div className="flex items-center gap-2">
-            <div className="relative" ref={exportMenuRef}>
-              <button
-                onClick={() => setShowExportMenu(prev => !prev)}
-                disabled={!analysis || exporting}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                title="Export (E)"
-              >
-                <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
-                Export
-              </button>
-              {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                  <button
-                    onClick={handleExportCSV}
-                    disabled={exporting}
-                    className="w-full px-4 py-2 text-left text-sm text-white hover:bg-gray-700 transition-colors flex items-center gap-2"
-                  >
-                    <Download className="w-3 h-3" />
-                    Export CSV
-                  </button>
-                  <button
-                    onClick={() => handleExport('json')}
-                    disabled={exporting}
-                    className="w-full px-4 py-2 text-left text-sm text-white hover:bg-gray-700 transition-colors flex items-center gap-2"
-                  >
-                    <Download className="w-3 h-3" />
-                    Export JSON
-                  </button>
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    disabled={exporting}
-                    className="w-full px-4 py-2 text-left text-sm text-white hover:bg-gray-700 transition-colors flex items-center gap-2"
-                  >
-                    <Printer className="w-3 h-3" />
-                    Export PDF
-                  </button>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => handleExport('json')}
+              disabled={!analysis}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              title="Export JSON"
+            >
+              <Download className="w-4 h-4 text-gray-400" />
+            </button>
+            <button
+              onClick={() => handleExport('pdf')}
+              disabled={!analysis}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              title="Export PDF"
+            >
+              <Printer className="w-4 h-4 text-gray-400" />
+            </button>
           </div>
           
           <button
@@ -818,10 +750,6 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Refresh analysis</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                <span className="text-gray-300">Toggle export menu</span>
-                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Focus search</span>

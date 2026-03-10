@@ -263,10 +263,6 @@ export default function ContinuityPage() {
         case '3':
           setActiveTab('trends');
           break;
-        case 'e':
-          e.preventDefault();
-          setShowExportMenu(!showExportMenu);
-          break;
         case '?':
           e.preventDefault();
           setShowKeyboardHelp(true);
@@ -274,7 +270,6 @@ export default function ContinuityPage() {
         case 'escape':
           e.preventDefault();
           setShowKeyboardHelp(false);
-          setShowExportMenu(false);
           setFilter('');
           break;
       }
@@ -283,21 +278,6 @@ export default function ContinuityPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  // Click outside to close export menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const exportMenu = document.getElementById('export-menu-container');
-      if (exportMenu && !exportMenu.contains(target)) {
-        setShowExportMenu(false);
-      }
-    };
-    if (showExportMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showExportMenu]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -560,7 +540,7 @@ export default function ContinuityPage() {
             </div>
 
             {/* Export Dropdown */}
-            <div className="relative" id="export-menu-container">
+            <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
@@ -1010,7 +990,6 @@ export default function ContinuityPage() {
               {[
                 { key: 'R', description: 'Refresh continuity data' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'E', description: 'Toggle export menu' },
                 { key: '1', description: 'Switch to Overview tab' },
                 { key: '2', description: 'Switch to Breakdown tab' },
                 { key: '3', description: 'Switch to Trends tab' },

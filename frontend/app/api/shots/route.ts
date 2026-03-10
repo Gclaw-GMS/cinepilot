@@ -1,269 +1,187 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import {
+  generateShotsForScene,
+  generateShotsForScript,
+  updateShot,
+  fillShotFields,
+  type DirectorStyleKey,
+} from '@/lib/shots/pipeline';
 
-// Demo shot data for seeding
+// Demo data for when database is not available
 const DEMO_SHOTS = [
-  {
-    id: 'shot-1',
-    sceneId: 'scene-1',
-    shotIndex: 1,
-    beatIndex: 1,
-    shotText: 'CLOSE UP - RAJI enters the courtroom with determination',
-    characters: ['RAVI'],
-    shotSize: 'CU',
-    cameraAngle: 'eye',
-    cameraMovement: 'static',
-    focalLengthMm: 85,
-    lensType: 'prime',
-    keyStyle: 'motivated',
-    colorTemp: '5600K',
-    durationEstSec: 4,
-    confidenceCamera: 0.9,
-    confidenceLens: 0.85,
-    confidenceLight: 0.8,
-    confidenceDuration: 0.75,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-2',
-    sceneId: 'scene-1',
-    shotIndex: 2,
-    beatIndex: 2,
-    shotText: 'MEDIUM SHOT - RAVI stands before the judge',
-    characters: ['RAVI', 'JUDGE'],
-    shotSize: 'MS',
-    cameraAngle: 'eye',
-    cameraMovement: 'steadicam',
-    focalLengthMm: 50,
-    lensType: 'prime',
-    keyStyle: 'documentary',
-    colorTemp: '5600K',
-    durationEstSec: 6,
-    confidenceCamera: 0.88,
-    confidenceLens: 0.82,
-    confidenceLight: 0.78,
-    confidenceDuration: 0.7,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-3',
-    sceneId: 'scene-1',
-    shotIndex: 3,
-    beatIndex: 1,
-    shotText: 'WIDE SHOT - The crowded courtroom gallery',
-    characters: [],
-    shotSize: 'WS',
-    cameraAngle: 'high',
-    cameraMovement: 'dolly',
-    focalLengthMm: 24,
-    lensType: 'zoom',
-    keyStyle: 'establishing',
-    colorTemp: '5600K',
-    durationEstSec: 5,
-    confidenceCamera: 0.92,
-    confidenceLens: 0.9,
-    confidenceLight: 0.85,
-    confidenceDuration: 0.8,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-4',
-    sceneId: 'scene-2',
-    shotIndex: 4,
-    beatIndex: 1,
-    shotText: 'EXTREME CLOSE UP - DIVYA\'s eyes welling with tears',
-    characters: ['DIVYA'],
-    shotSize: 'ECU',
-    cameraAngle: 'low',
-    cameraMovement: 'static',
-    focalLengthMm: 135,
-    lensType: 'prime',
-    keyStyle: 'emotional',
-    colorTemp: '4300K',
-    durationEstSec: 3,
-    confidenceCamera: 0.85,
-    confidenceLens: 0.88,
-    confidenceLight: 0.75,
-    confidenceDuration: 0.7,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-5',
-    sceneId: 'scene-2',
-    shotIndex: 5,
-    beatIndex: 2,
-    shotText: 'MEDIUM WIDE SHOT - DIVYA walks through temple corridor',
-    characters: ['DIVYA'],
-    shotSize: 'MWS',
-    cameraAngle: 'eye',
-    cameraMovement: 'handheld',
-    focalLengthMm: 35,
-    lensType: 'zoom',
-    keyStyle: 'realistic',
-    colorTemp: '4300K',
-    durationEstSec: 8,
-    confidenceCamera: 0.8,
-    confidenceLens: 0.78,
-    confidenceLight: 0.72,
-    confidenceDuration: 0.65,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-6',
-    sceneId: 'scene-3',
-    shotIndex: 6,
-    beatIndex: 1,
-    shotText: 'CLOSE UP - RAVI receives the verdict document',
-    characters: ['RAVI'],
-    shotSize: 'CU',
-    cameraAngle: 'eye',
-    cameraMovement: 'track',
-    focalLengthMm: 85,
-    lensType: 'prime',
-    keyStyle: 'motivated',
-    colorTemp: '5600K',
-    durationEstSec: 4,
-    confidenceCamera: 0.87,
-    confidenceLens: 0.84,
-    confidenceLight: 0.8,
-    confidenceDuration: 0.75,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-7',
-    sceneId: 'scene-3',
-    shotIndex: 7,
-    beatIndex: 2,
-    shotText: 'OVER THE SHOULDER - RAVI looks at the opposing counsel',
-    characters: ['RAVI', 'ADVOCATE'],
-    shotSize: 'MS',
-    cameraAngle: 'over-shoulder',
-    cameraMovement: 'static',
-    focalLengthMm: 50,
-    lensType: 'prime',
-    keyStyle: 'confrontational',
-    colorTemp: '5600K',
-    durationEstSec: 5,
-    confidenceCamera: 0.85,
-    confidenceLens: 0.82,
-    confidenceLight: 0.78,
-    confidenceDuration: 0.72,
-    isLocked: false,
-    userEdited: false,
-  },
-  {
-    id: 'shot-8',
-    sceneId: 'scene-3',
-    shotIndex: 8,
-    beatIndex: 3,
-    shotText: 'WIDE SHOT - RAVI exits the courtroom triumphantly',
-    characters: ['RAVI'],
-    shotSize: 'WS',
-    cameraAngle: 'low',
-    cameraMovement: 'crane',
-    focalLengthMm: 24,
-    lensType: 'zoom',
-    keyStyle: 'triumphant',
-    colorTemp: '5600K',
-    durationEstSec: 6,
-    confidenceCamera: 0.9,
-    confidenceLens: 0.88,
-    confidenceLight: 0.85,
-    confidenceDuration: 0.8,
-    isLocked: false,
-    userEdited: false,
-  },
+  { id: 'shot-1', sceneId: 'scene-1', shotIndex: 0, shotSize: 'Wide', shotType: 'Establishing', cameraAngle: 'Eye Level', cameraMovement: 'Static', durationEstSec: 5, focalLengthMm: 35, keyStyle: 'Naturalistic', lighting: 'Natural', notes: 'Opening wide shot of the courtroom', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' } },
+  { id: 'shot-2', sceneId: 'scene-1', shotIndex: 1, shotSize: 'Medium', shotType: 'Dialogue', cameraAngle: 'Over Shoulder', cameraMovement: 'Dolly', durationEstSec: 8, focalLengthMm: 50, keyStyle: 'Naturalistic', lighting: 'Three-Point', notes: 'Judge entering', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' } },
+  { id: 'shot-3', sceneId: 'scene-1', shotIndex: 2, shotSize: 'Close-Up', shotType: 'Reaction', cameraAngle: 'Straight On', cameraMovement: 'Static', durationEstSec: 4, focalLengthMm: 85, keyStyle: 'Dramatic', lighting: 'Rembrandt', notes: 'Ravi\'s reaction to the verdict', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' } },
+  { id: 'shot-4', sceneId: 'scene-2', shotIndex: 0, shotSize: 'Extreme Wide', shotType: 'Establishing', cameraAngle: 'Low Angle', cameraMovement: 'Crane', durationEstSec: 6, focalLengthMm: 24, keyStyle: 'Cinematic', lighting: 'Moonlight', notes: 'Temple at night with diyas', scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE' } },
+  { id: 'shot-5', sceneId: 'scene-2', shotIndex: 1, shotSize: 'Medium', shotType: 'POV', cameraAngle: 'POV', cameraMovement: 'Steadicam', durationEstSec: 10, focalLengthMm: 35, keyStyle: 'Immersive', lighting: 'Practical', notes: 'Divya walking through temple', scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE' } },
+  { id: 'shot-6', sceneId: 'scene-3', shotIndex: 0, shotSize: 'Medium', shotType: 'Dialogue', cameraAngle: 'Two Shot', cameraMovement: 'Tracking', durationEstSec: 12, focalLengthMm: 50, keyStyle: 'Naturalistic', lighting: 'Soft Natural', notes: 'Ravi and Sarath discussing', scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' } },
+  { id: 'shot-7', sceneId: 'scene-3', shotIndex: 1, shotSize: 'Close-Up', shotType: 'Insert', cameraAngle: 'Straight On', cameraMovement: 'Static', durationEstSec: 3, focalLengthMm: 100, keyStyle: 'Naturalistic', lighting: 'Practical', notes: 'Coffee cup on table', scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' } },
 ];
 
-// Demo scenes for shot context
 const DEMO_SCENES = [
   { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM', _count: { shots: 3 } },
-  { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'TEMPLE', _count: { shots: 2 } },
-  { id: 'scene-3', sceneNumber: '3', headingRaw: "INT. COURTROOM - DAY", intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM', _count: { shots: 3 } },
+  { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE', _count: { shots: 2 } },
+  { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE', _count: { shots: 2 } },
 ];
 
-const DEMO_SHOT_RESPONSE = {
-  shots: DEMO_SHOTS,
-  scenes: DEMO_SCENES,
-  stats: {
-    totalShots: DEMO_SHOTS.length,
-    totalDuration: DEMO_SHOTS.reduce((acc, s) => acc + (s.durationEstSec || 0), 0),
-    missingFields: DEMO_SHOTS.filter(s => !s.shotSize || !s.focalLengthMm || !s.keyStyle || !s.durationEstSec).length,
-  },
-  isDemo: true,
-};
-
-// Check if database model exists
-async function checkShotModel() {
-  try {
-    await prisma.shot.count();
-    return true;
-  } catch {
-    return false;
+function getDemoResponse(statsOnly: boolean) {
+  const totalDuration = DEMO_SHOTS.reduce((sum, s) => sum + (s.durationEstSec || 3), 0);
+  
+  if (statsOnly) {
+    return {
+      totalShots: DEMO_SHOTS.length,
+      totalDurationSec: Math.round(totalDuration),
+      missingFields: 0,
+      scenes: DEMO_SCENES.map(s => ({
+        sceneNumber: s.sceneNumber,
+        headingRaw: s.headingRaw,
+        shotCount: s._count.shots,
+      })),
+      _demo: true,
+    };
   }
+
+  return {
+    shots: DEMO_SHOTS,
+    scenes: DEMO_SCENES,
+    stats: {
+      totalShots: DEMO_SHOTS.length,
+      totalDuration: Math.round(totalDuration),
+      missingFields: 0,
+    },
+    _demo: true,
+  };
 }
 
-// GET /api/shots - list all shots with optional filtering
-export async function GET(req: NextRequest) {
-  const sceneId = req.nextUrl.searchParams.get('sceneId');
-  const scriptId = req.nextUrl.searchParams.get('scriptId');
-  const action = req.nextUrl.searchParams.get('action');
+async function handleExport(req: NextRequest, format: 'json' | 'csv') {
+  const { searchParams } = new URL(req.url);
+  const scriptId = searchParams.get('scriptId');
+  const sceneId = searchParams.get('sceneId');
 
-  const dbAvailable = await checkShotModel();
-
-  if (!dbAvailable) {
-    console.log('[GET /api/shots] Database not available, returning demo data');
-    return NextResponse.json(DEMO_SHOT_RESPONSE);
+  // Get shots from database or demo
+  let shots: any[] = [];
+  
+  try {
+    const where: any = {};
+    if (sceneId) {
+      where.sceneId = sceneId;
+    } else if (scriptId) {
+      const dbScenes = await prisma.scene.findMany({
+        where: { scriptId },
+        select: { id: true },
+      });
+      where.sceneId = { in: dbScenes.map(s => s.id) };
+    }
+    
+    shots = await prisma.shot.findMany({
+      where,
+      include: {
+        scene: {
+          include: {
+            script: { select: { title: true } },
+          },
+        },
+      },
+      orderBy: [{ scene: { sceneNumber: 'asc' } }, { shotIndex: 'asc' }],
+    });
+  } catch (error) {
+    console.log('[GET /api/shots/export] Using demo data');
+    shots = DEMO_SHOTS.map(shot => ({
+      ...shot,
+      scene: DEMO_SCENES.find(s => s.id === shot.sceneId),
+    }));
   }
 
-  try {
-    // Check if we should seed data
-    const existingCount = await prisma.shot.count();
+  const transformedShots = shots.map(shot => ({
+    scene_number: shot.scene?.sceneNumber || shot.sceneId,
+    scene_heading: shot.scene?.headingRaw || '',
+    shot_number: shot.shotIndex + 1,
+    beat_index: shot.beatIndex,
+    shot_description: shot.shotText,
+    characters: shot.characters?.join(', ') || '',
+    shot_size: shot.shotSize || '',
+    camera_angle: shot.cameraAngle || '',
+    camera_movement: shot.cameraMovement || '',
+    focal_length_mm: shot.focalLengthMm || '',
+    lens_type: shot.lensType || '',
+    lighting: shot.keyStyle || '',
+    color_temp: shot.colorTemp || '',
+    duration_seconds: shot.durationEstSec || '',
+    is_locked: shot.isLocked || false,
+    confidence: ((shot.confidenceCamera || 0) + (shot.confidenceLens || 0) + (shot.confidenceLight || 0) + (shot.confidenceDuration || 0)) / 4,
+  }));
 
-    if (existingCount === 0 && action !== 'noseed') {
-      // Auto-seed demo data if empty
-      for (const shot of DEMO_SHOTS) {
-        await prisma.shot.create({
-          data: {
-            sceneId: shot.sceneId,
-            shotIndex: shot.shotIndex,
-            beatIndex: shot.beatIndex,
-            shotText: shot.shotText,
-            characters: shot.characters,
-            shotSize: shot.shotSize,
-            cameraAngle: shot.cameraAngle,
-            cameraMovement: shot.cameraMovement,
-            focalLengthMm: shot.focalLengthMm,
-            lensType: shot.lensType,
-            keyStyle: shot.keyStyle,
-            colorTemp: shot.colorTemp,
-            durationEstSec: shot.durationEstSec,
-            confidenceCamera: shot.confidenceCamera,
-            confidenceLens: shot.confidenceLens,
-            confidenceLight: shot.confidenceLight,
-            confidenceDuration: shot.confidenceDuration,
-            isLocked: shot.isLocked,
-            userEdited: shot.userEdited,
-          },
-        });
+  if (format === 'csv') {
+    const headers = ['scene_number', 'scene_heading', 'shot_number', 'beat_index', 'shot_description', 'characters', 'shot_size', 'camera_angle', 'camera_movement', 'focal_length_mm', 'lens_type', 'lighting', 'color_temp', 'duration_seconds', 'is_locked', 'confidence'];
+    const csvRows = [headers.join(',')];
+    
+    for (const shot of transformedShots) {
+      const row = headers.map(h => {
+        const val = (shot as Record<string, unknown>)[h];
+        const strVal = String(val ?? '');
+        return strVal.includes(',') || strVal.includes('"') ? `"${strVal.replace(/"/g, '""')}"` : strVal;
+      });
+      csvRows.push(row.join(','));
+    }
+    
+    const csv = csvRows.join('\n');
+    return new NextResponse(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="shot_list_${new Date().toISOString().split('T')[0]}.csv"`,
+      },
+    });
+  }
+
+  return NextResponse.json({
+    exported_at: new Date().toISOString(),
+    total_shots: transformedShots.length,
+    shots: transformedShots,
+  });
+}
+
+// GET /api/shots?scriptId=xxx — get all shots for a script
+// GET /api/shots?stats=true — get stats for first active script (for dashboard)
+// GET /api/shots?export=json — export shots as JSON
+// GET /api/shots?export=csv — export shots as CSV
+export async function GET(req: NextRequest) {
+  const scriptId = req.nextUrl.searchParams.get('scriptId');
+  const sceneId = req.nextUrl.searchParams.get('sceneId');
+  const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
+  const exportFormat = req.nextUrl.searchParams.get('export');
+
+  // Handle export requests
+  if (exportFormat === 'json' || exportFormat === 'csv') {
+    return handleExport(req, exportFormat);
+  }
+
+  // If no scriptId provided, get the first active script for stats-only requests
+  let targetScriptId = scriptId;
+  
+  try {
+    if (!targetScriptId && !sceneId && statsOnly) {
+      const firstScript = await prisma.script.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (firstScript) {
+        targetScriptId = firstScript.id;
       }
     }
 
-    // Build query - shots are linked to scenes
-    const where: Record<string, unknown> = {};
-    if (sceneId) {
-      where.sceneId = sceneId;
+    if (!targetScriptId && !sceneId) {
+      // No scriptId provided and not statsOnly - check if we can use demo data
+      return NextResponse.json(getDemoResponse(statsOnly));
     }
+
+    const where = sceneId
+      ? { sceneId }
+      : { scene: { scriptId: targetScriptId! } };
 
     const shots = await prisma.shot.findMany({
       where,
-      orderBy: [{ sceneId: 'asc' }, { shotIndex: 'asc' }],
       include: {
         scene: {
           select: {
@@ -276,11 +194,12 @@ export async function GET(req: NextRequest) {
           },
         },
       },
+      orderBy: [{ scene: { sceneIndex: 'asc' } }, { shotIndex: 'asc' }],
     });
 
-    // Get unique scenes with shot counts
     const scenes = await prisma.scene.findMany({
-      where: scriptId ? { scriptId } : undefined,
+      where: targetScriptId ? { id: targetScriptId } : { id: sceneId! },
+      orderBy: { sceneIndex: 'asc' },
       select: {
         id: true,
         sceneNumber: true,
@@ -288,249 +207,120 @@ export async function GET(req: NextRequest) {
         intExt: true,
         timeOfDay: true,
         location: true,
-        _count: {
-          select: { shots: true },
-        },
+        _count: { select: { shots: true } },
       },
-      orderBy: { sceneNumber: 'asc' },
     });
 
-    // Calculate stats
-    const totalDuration = shots.reduce((acc, s) => acc + (s.durationEstSec || 0), 0);
+    // If no shots found in database, fall back to demo data
+    if (shots.length === 0) {
+      console.log('[GET /api/shots] No shots in database, using demo data');
+      return NextResponse.json(getDemoResponse(statsOnly));
+    }
+
+    const totalDuration = shots.reduce(
+      (sum, s) => sum + (s.durationEstSec || 3),
+      0
+    );
     const missingFields = shots.filter(
-      s => !s.shotSize || !s.focalLengthMm || !s.keyStyle || !s.durationEstSec
+      (s) => !s.shotSize || !s.focalLengthMm || !s.keyStyle || !s.durationEstSec
     ).length;
+
+    // For stats-only requests (dashboard), return flat format
+    if (statsOnly) {
+      return NextResponse.json({
+        totalShots: shots.length,
+        totalDurationSec: Math.round(totalDuration),
+        missingFields,
+        scenes: scenes.map(s => ({
+          sceneNumber: s.sceneNumber,
+          headingRaw: s.headingRaw,
+          shotCount: s._count.shots,
+        })),
+      });
+    }
 
     return NextResponse.json({
       shots,
-      scenes: scenes.length > 0 ? scenes : DEMO_SCENES,
+      scenes,
       stats: {
-        totalShots: shots.length || DEMO_SHOTS.length,
-        totalDuration: totalDuration || DEMO_SHOTS.reduce((acc, s) => acc + (s.durationEstSec || 0), 0),
-        missingFields: missingFields || 0,
+        totalShots: shots.length,
+        totalDuration: Math.round(totalDuration),
+        missingFields,
       },
     });
   } catch (error) {
-    console.error('[GET /api/shots] Database error, using demo data:', error);
-    return NextResponse.json(DEMO_SHOT_RESPONSE);
+    console.error('[GET /api/shots] Database not available, using demo data');
+    // Use demo data when database is not available
+    return NextResponse.json(getDemoResponse(statsOnly));
   }
 }
 
-// POST /api/shots - create new shot
+// POST /api/shots — generate shots
 export async function POST(req: NextRequest) {
-  let body: Record<string, unknown> = {};
-
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    const body = await req.json();
+    const { action, sceneId, scriptId, directorStyle, customStylePrompt, availableLenses, genre } = body;
 
-  const {
-    sceneId,
-    shotIndex,
-    beatIndex,
-    shotText,
-    characters,
-    shotSize,
-    cameraAngle,
-    cameraMovement,
-    focalLengthMm,
-    lensType,
-    keyStyle,
-    colorTemp,
-    durationEstSec,
-  } = body;
+    const style: DirectorStyleKey = directorStyle || 'maniRatnam';
 
-  if (!sceneId || shotIndex === undefined) {
-    return NextResponse.json(
-      { error: 'Missing required fields: sceneId, shotIndex' },
-      { status: 400 }
-    );
-  }
+    if (action === 'generateScene' && sceneId) {
+      const result = await generateShotsForScene({
+        sceneId,
+        directorStyle: style,
+        customStylePrompt,
+        availableLenses,
+        genre,
+      });
 
-  const dbAvailable = await checkShotModel();
+      return NextResponse.json({
+        message: `Generated ${result.shotCount} shots`,
+        ...result,
+      });
+    }
 
-  if (!dbAvailable) {
-    // Return success in demo mode
-    return NextResponse.json({
-      shot: {
-        id: `demo-shot-${Date.now()}`,
-        sceneId: String(sceneId),
-        shotIndex: Number(shotIndex),
-        beatIndex: beatIndex ? Number(beatIndex) : 1,
-        shotText: shotText ? String(shotText) : '',
-        characters: (Array.isArray(characters) ? characters : []) as string[],
-        shotSize: shotSize ? String(shotSize) : null,
-        cameraAngle: cameraAngle ? String(cameraAngle) : null,
-        cameraMovement: cameraMovement ? String(cameraMovement) : null,
-        focalLengthMm: focalLengthMm ? Number(focalLengthMm) : null,
-        lensType: lensType ? String(lensType) : null,
-        keyStyle: keyStyle ? String(keyStyle) : null,
-        colorTemp: colorTemp ? String(colorTemp) : null,
-        durationEstSec: durationEstSec ? Number(durationEstSec) : null,
-        isLocked: false,
-        userEdited: true,
-      },
-      _demo: true,
-    });
-  }
+    if (action === 'generateScript' && scriptId) {
+      const result = await generateShotsForScript(
+        scriptId,
+        style,
+        customStylePrompt,
+        availableLenses,
+        genre
+      );
 
-  try {
-    const shot = await prisma.shot.create({
-      data: {
-        sceneId: String(sceneId),
-        shotIndex: Number(shotIndex),
-        beatIndex: beatIndex ? Number(beatIndex) : 1,
-        shotText: shotText ? String(shotText) : '',
-        characters: (Array.isArray(characters) ? characters : []) as string[],
-        shotSize: shotSize ? String(shotSize) : null,
-        cameraAngle: cameraAngle ? String(cameraAngle) : null,
-        cameraMovement: cameraMovement ? String(cameraMovement) : null,
-        focalLengthMm: focalLengthMm ? Number(focalLengthMm) : null,
-        lensType: lensType ? String(lensType) : null,
-        keyStyle: keyStyle ? String(keyStyle) : null,
-        colorTemp: colorTemp ? String(colorTemp) : null,
-        durationEstSec: durationEstSec ? Number(durationEstSec) : null,
-        isLocked: false,
-        userEdited: true,
-      },
-    });
+      return NextResponse.json({
+        message: `Generated ${result.totalShots} shots across all scenes`,
+        totalShots: result.totalShots,
+        totalDuration: result.totalDuration,
+      });
+    }
 
-    return NextResponse.json({ shot });
+    if (action === 'fillNull' && body.shotId) {
+      await fillShotFields(body.shotId, style);
+      return NextResponse.json({ message: 'Shot fields filled' });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error('[POST /api/shots] Database error:', error);
-    return NextResponse.json({
-      shot: {
-        id: `demo-shot-${Date.now()}`,
-        sceneId: String(sceneId),
-        shotIndex: Number(shotIndex),
-        beatIndex: beatIndex ? Number(beatIndex) : 1,
-        shotText: shotText ? String(shotText) : '',
-        characters: (Array.isArray(characters) ? characters : []) as string[],
-        shotSize: shotSize ? String(shotSize) : null,
-        cameraAngle: cameraAngle ? String(cameraAngle) : null,
-        cameraMovement: cameraMovement ? String(cameraMovement) : null,
-        focalLengthMm: focalLengthMm ? Number(focalLengthMm) : null,
-        lensType: lensType ? String(lensType) : null,
-        keyStyle: keyStyle ? String(keyStyle) : null,
-        colorTemp: colorTemp ? String(colorTemp) : null,
-        durationEstSec: durationEstSec ? Number(durationEstSec) : null,
-        isLocked: false,
-        userEdited: true,
-      },
-      _demo: true,
-    });
+    console.error('[POST /api/shots]', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-// PATCH /api/shots - update a shot
+// PATCH /api/shots — update a shot
 export async function PATCH(req: NextRequest) {
-  let body: Record<string, unknown> = {};
-
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    const body = await req.json();
+    const { shotId, ...updates } = body;
 
-  const { id, ...updateData } = body;
-
-  if (!id) {
-    return NextResponse.json({ error: 'Shot ID is required' }, { status: 400 });
-  }
-
-  // Build update object
-  const dataToUpdate: Record<string, unknown> = {};
-  const allowedFields = [
-    'sceneId', 'shotIndex', 'beatIndex', 'shotText', 'characters',
-    'shotSize', 'cameraAngle', 'cameraMovement', 'focalLengthMm',
-    'lensType', 'keyStyle', 'colorTemp', 'durationEstSec',
-    'confidenceCamera', 'confidenceLens', 'confidenceLight', 'confidenceDuration',
-    'isLocked', 'userEdited'
-  ];
-
-  for (const field of allowedFields) {
-    if (updateData[field] !== undefined) {
-      if (field === 'characters') {
-        dataToUpdate[field] = updateData[field];
-      } else if (['shotIndex', 'beatIndex', 'focalLengthMm', 'durationEstSec'].includes(field)) {
-        dataToUpdate[field] = Number(updateData[field]);
-      } else {
-        dataToUpdate[field] = updateData[field];
-      }
+    if (!shotId) {
+      return NextResponse.json({ error: 'shotId required' }, { status: 400 });
     }
-  }
 
-  dataToUpdate.userEdited = true;
-
-  const dbAvailable = await checkShotModel();
-
-  if (!dbAvailable) {
-    return NextResponse.json({
-      shot: {
-        id: String(id),
-        ...dataToUpdate,
-        scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' },
-      },
-      _demo: true,
-    });
-  }
-
-  try {
-    const shot = await prisma.shot.update({
-      where: { id: String(id) },
-      data: dataToUpdate,
-      include: {
-        scene: {
-          select: {
-            id: true,
-            sceneNumber: true,
-            headingRaw: true,
-            intExt: true,
-            timeOfDay: true,
-            location: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json({ shot });
+    await updateShot(shotId, updates);
+    return NextResponse.json({ message: 'Shot updated' });
   } catch (error) {
-    console.error('[PATCH /api/shots] Database error:', error);
-    return NextResponse.json({
-      shot: {
-        id: String(id),
-        ...dataToUpdate,
-        scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' },
-      },
-      _demo: true,
-    });
-  }
-}
-
-// DELETE /api/shots - delete a shot
-export async function DELETE(req: NextRequest) {
-  try {
-    const id = req.nextUrl.searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json({ error: 'Shot ID is required' }, { status: 400 });
-    }
-
-    const dbAvailable = await checkShotModel();
-
-    if (!dbAvailable) {
-      return NextResponse.json({ success: true, _demo: true });
-    }
-
-    await prisma.shot.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('[DELETE /api/shots] Database error:', error);
-    return NextResponse.json({ success: true, _demo: true });
+    console.error('[PATCH /api/shots]', error);
+    return NextResponse.json({ error: 'Failed to update shot' }, { status: 500 });
   }
 }

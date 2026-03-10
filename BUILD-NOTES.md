@@ -1,5 +1,22 @@
 # CinePilot Night Build Notes - March 10, 2026
 
+## Build Status: ✅ PASSING (8:43 AM)
+
+### 16. Mission Control Page - Export Feature (March 10, 2026 8:43 AM)
+Added export functionality to the Mission Control page:
+- **Export CSV**: One-click export of mission control data to CSV file
+- **Export JSON**: Full mission control export including all production data to JSON
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (mission-control-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export
+- **Filtered Export**: Exports respect current search and filter settings
+
+- **Export Data Includes**:
+  - CSV: Category, Name, Value format for production, today, departments, risks, locations
+  - JSON: Full data with export date, production stats, departments, risks, locations, and summary stats
+
 ## Build Status: ✅ PASSING (4:23 AM)
 
 ### 15. Collaboration Page - Export Feature (March 10, 2026 4:23 AM)

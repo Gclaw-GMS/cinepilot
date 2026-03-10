@@ -209,7 +209,7 @@ async function checkShotModel() {
   }
 }
 
-// GET /api/shots - list all shots with optional filtering
+// GET /api/shot-list - list all shots with optional filtering
 export async function GET(req: NextRequest) {
   const sceneId = req.nextUrl.searchParams.get('sceneId');
   const scriptId = req.nextUrl.searchParams.get('scriptId');
@@ -218,7 +218,7 @@ export async function GET(req: NextRequest) {
   const dbAvailable = await checkShotModel();
 
   if (!dbAvailable) {
-    console.log('[GET /api/shots] Database not available, returning demo data');
+    console.log('[GET /api/shot-list] Database not available, returning demo data');
     return NextResponse.json(DEMO_SHOT_RESPONSE);
   }
 
@@ -311,12 +311,12 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[GET /api/shots] Database error, using demo data:', error);
+    console.error('[GET /api/shot-list] Database error, using demo data:', error);
     return NextResponse.json(DEMO_SHOT_RESPONSE);
   }
 }
 
-// POST /api/shots - create new shot
+// POST /api/shot-list - create new shot
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown> = {};
 
@@ -399,7 +399,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ shot });
   } catch (error) {
-    console.error('[POST /api/shots] Database error:', error);
+    console.error('[POST /api/shot-list] Database error:', error);
     return NextResponse.json({
       shot: {
         id: `demo-shot-${Date.now()}`,
@@ -424,7 +424,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH /api/shots - update a shot
+// PATCH /api/shot-list - update a shot
 export async function PATCH(req: NextRequest) {
   let body: Record<string, unknown> = {};
 
@@ -497,7 +497,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ shot });
   } catch (error) {
-    console.error('[PATCH /api/shots] Database error:', error);
+    console.error('[PATCH /api/shot-list] Database error:', error);
     return NextResponse.json({
       shot: {
         id: String(id),
@@ -509,7 +509,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE /api/shots - delete a shot
+// DELETE /api/shot-list - delete a shot
 export async function DELETE(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get('id');
@@ -530,7 +530,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[DELETE /api/shots] Database error:', error);
+    console.error('[DELETE /api/shot-list] Database error:', error);
     return NextResponse.json({ success: true, _demo: true });
   }
 }

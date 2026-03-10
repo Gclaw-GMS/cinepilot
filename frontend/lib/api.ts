@@ -592,6 +592,20 @@ export const notifications = {
     if (!res.ok) throw new Error('Failed to mark notification as read');
     return res.json();
   },
+  sendWhatsApp: async (phone: string, message: string) => {
+    const res = await fetch('/api/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, message }),
+    });
+    if (!res.ok) throw new Error('Failed to send WhatsApp message');
+    return res.json();
+  },
+  getTemplates: async () => {
+    const res = await fetch('/api/whatsapp/templates');
+    if (!res.ok) throw new Error('Failed to fetch WhatsApp templates');
+    return res.json();
+  },
 };
 
 export const scheduleRecommendations = {

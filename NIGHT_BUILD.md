@@ -1,40 +1,59 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (7:29 PM)
+## Build Status: ✅ PASSING (10:32 PM)
 
-## Night Build (7:29 PM) - AI Tools Export Feature (IMPLEMENTED)
+## Night Build (10:32 PM) - Notes Export Enhancement (IMPLEMENTED)
 
 ### Features Perfected This Build
-- **AI Tools Page**: Added export functionality to AI Production Tools
-  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options
-  - **CSV Export**: Export AI tools to CSV (Name, Description, Category, Endpoint)
-  - **JSON Export**: Full AI tools export including summary stats (total tools, categories), all tools with details and export timestamp
+- **Notes Page**: Enhanced export functionality to Production Notes
+  - **Export Dropdown**: Click-based dropdown UI with CSV/JSON options (replaces hover-only menu)
+  - **CSV Export**: Export notes to CSV (Title, Content, Category, Tags, Pinned, Created, Updated)
+  - **JSON Export**: Full notes export including export date, summary stats (total, filtered, pinned, categories, tags), category breakdown, and top tags
   - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
-  - **Click Outside**: Export menu closes when clicking outside
+  - **Click Outside**: Export menu closes when clicking outside the dropdown
   - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Esc to Close**: Escape key now closes export dropdown menu when open
   - **Loading State**: Visual feedback during export with spinning icon
-  - **Timestamped Filenames**: Exports include date (ai-tools-2026-03-10.csv/json)
-  - **Summary Stats**: JSON export includes total tools count and category count
-  - **Filtered Export**: Exports respect current search filter settings
+  - **Timestamped Filenames**: Exports include date (production-notes-2026-03-10.csv/json)
 
 - **Build**: Clean build with 78 routes
 - **Next.js Build:** Successful
 - **TypeScript:** No errors
 
-## Night Build (7:09 PM) - Scripts Export Feature (IMPLEMENTED)
+## Build Status: ✅ PASSING (9:51 PM)
+
+## Night Build (9:51 PM) - Weather Export Enhancement (IMPLEMENTED)
 
 ### Features Perfected This Build
-- **Scripts Page**: Added export functionality to Script Management
-  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header (only visible when script is loaded)
-  - **CSV Export**: Export scenes to CSV (Scene #, Heading, Int/Ext, Time, Location, Characters, Confidence)
-  - **JSON Export**: Full script export including summary stats (total scripts, scenes, characters), all scripts with scenes, and character data
+- **Weather Page**: Enhanced export functionality to Weather Forecast
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+  - **CSV Export**: Export forecast data to CSV (Date, Condition, Temp High/Low, Humidity, Wind Speed, Precipitation, Production Score, Recommendation)
+  - **JSON Export**: Full forecast export including export date, location, coordinates, forecast data, and summary stats (total days, avg score, best/worst days)
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu (was direct CSV export, now menu toggle)
+  - **Click Outside**: Export menu closes when clicking outside the dropdown
+  - **Keyboard Help Modal**: Updated with "E" shortcut description for export menu
+  - **Esc to Close**: Escape key now closes export dropdown menu when open
+  - **Timestamped Filenames**: Exports include date and location (weather-forecast-Chennai-2026-03-10.csv/json)
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Build Status: ✅ PASSING (8:57 PM)
+
+## Night Build (8:57 PM) - Censor Export Enhancement (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Censor Page**: Enhanced export functionality to Censor Certification Analysis
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON/PDF options (replaces separate buttons)
+  - **CSV Export**: Export scene flags to CSV (Scene, Category, Severity, Context)
+  - **JSON Export**: Full analysis export including certificate, sensitivity score, confidence, top drivers, high risk scenes, flags, suggestions
+  - **PDF Export**: Formatted PDF report with certificate, stats table, and suggestions
   - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
   - **Click Outside**: Export menu closes when clicking outside
   - **Keyboard Help Modal**: Updated with "E" shortcut for export
   - **Loading State**: Visual feedback during export with spinning icon
-  - **Timestamped Filenames**: Exports include date (scripts-2026-03-10.csv/json)
-  - **Summary Stats**: JSON export includes total scripts, scenes, and character counts
-  - **Filtered Export**: CSV export respects current scene search and int/ext filter settings
+  - **Timestamped Filenames**: Exports include date (censor-flags-2026-03-10.csv/json/pdf)
 
 - **Build**: Clean build with 78 routes
 - **Next.js Build:** Successful

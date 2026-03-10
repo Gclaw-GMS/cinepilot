@@ -185,6 +185,8 @@ export default function WeatherPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -293,7 +295,7 @@ export default function WeatherPage() {
           break
         case 'e':
           e.preventDefault()
-          if (weatherData?.forecast?.length) exportToCSVRef.current()
+          if (weatherData?.forecast?.length) setShowExportMenu(prev => !prev)
           break
         case '?':
           e.preventDefault()
@@ -302,6 +304,7 @@ export default function WeatherPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           break
       }
     }
@@ -309,6 +312,21 @@ export default function WeatherPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [weatherData]);
+
+  // Click outside to close export menu
+  useEffect(() => {
+    if (!showExportMenu) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.export-menu-container')) {
+        setShowExportMenu(false);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showExportMenu]);
 
   // Geocode custom location using Nominatim (free API)
   const handleCustomLocationSearch = useCallback(async () => {
@@ -377,6 +395,44 @@ export default function WeatherPage() {
     a.download = `weather-forecast-${weatherData.location}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  }, [weatherData]);
+
+  // Export forecast to JSON
+  const exportToJSON = useCallback(() => {
+    if (!weatherData?.forecast?.length) return;
+    
+    const data = {
+      exportDate: new Date().toISOString(),
+      location: weatherData.location,
+      coordinates: { lat: weatherData.lat, lng: weatherData.lng },
+      forecast: weatherData.forecast.map(day => ({
+        date: day.date,
+        condition: day.condition,
+        temperature: { high: day.tempHigh, low: day.tempLow },
+        humidity: day.humidity,
+        windSpeed: day.windSpeed,
+        precipitation: day.precipitation,
+        productionScore: day.productionScore,
+        recommendation: day.recommendation,
+      })),
+      summary: {
+        totalDays: weatherData.forecast.length,
+        avgScore: Math.round(weatherData.forecast.reduce((sum, d) => sum + d.productionScore, 0) / weatherData.forecast.length),
+        bestDay: weatherData.forecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, weatherData.forecast[0])?.date,
+        worstDay: weatherData.forecast.reduce((worst, d) => d.productionScore < worst.productionScore ? d : worst, weatherData.forecast[0])?.date,
+      },
+    };
+    
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `weather-forecast-${weatherData.location}-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
   }, [weatherData]);
 
   // Set up export ref for keyboard shortcuts
@@ -489,7 +545,7 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['1']} description="Switch to Forecast view" />
                 <ShortcutRow keys={['2']} description="Switch to Analytics view" />
                 <ShortcutRow keys={['3']} description="Switch to Schedule view" />
-                <ShortcutRow keys={['E']} description="Export forecast to CSV" />
+                <ShortcutRow keys={['E']} description="Toggle export menu" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
                 <ShortcutRow keys={['Esc']} description="Close modal" />
               </div>
@@ -568,15 +624,48 @@ export default function WeatherPage() {
                   )}
                   Refresh
                 </button>
-                <button
-                  onClick={exportToCSV}
-                  disabled={!weatherData?.forecast?.length}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
-                  title="Export CSV (E)"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
+                {/* Export Dropdown */}
+                <div className="relative export-menu-container">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    disabled={!weatherData?.forecast?.length}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+                    title="Export (E)"
+                  >
+                    {exporting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Export
+                  </button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                      <button
+                        onClick={exportToCSV}
+                        disabled={!weatherData?.forecast?.length}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-slate-200 hover:bg-slate-700 disabled:opacity-50 transition-colors text-left"
+                      >
+                        <Download className="w-4 h-4" />
+                        <div>
+                          <div className="font-medium">CSV</div>
+                          <div className="text-xs text-slate-400">Export forecast data</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={exportToJSON}
+                        disabled={!weatherData?.forecast?.length}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-slate-200 hover:bg-slate-700 disabled:opacity-50 transition-colors text-left border-t border-slate-700"
+                      >
+                        <Download className="w-4 h-4" />
+                        <div>
+                          <div className="font-medium">JSON</div>
+                          <div className="text-xs text-slate-400">Full data with summary</div>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => searchInputRef.current?.focus()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"

@@ -267,6 +267,10 @@ export default function EquipmentPage() {
     }
   }, [showExportMenu])
 
+  // Check if date range is valid for form validation feedback
+  const isDateRangeValid = form.dateStart && form.dateEnd && new Date(form.dateEnd) >= new Date(form.dateStart)
+  const isDateRangeInvalid = form.dateStart && form.dateEnd && new Date(form.dateEnd) < new Date(form.dateStart)
+
   const filtered = equipment.filter(eq => {
     const matchSearch = eq.name.toLowerCase().includes(search.toLowerCase()) ||
       (eq.vendor?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
@@ -276,10 +280,32 @@ export default function EquipmentPage() {
     return matchSearch && matchCat && matchStatus
   })
 
+  // Validate form dates
+  const validateForm = (): string | null => {
+    if (!form.name.trim()) return 'Equipment name is required'
+    if (!form.dateStart) return 'Start date is required'
+    if (!form.dateEnd) return 'End date is required'
+    if (form.dateStart && form.dateEnd && new Date(form.dateEnd) < new Date(form.dateStart)) {
+      return 'End date cannot be before start date'
+    }
+    if (form.dailyRate && parseFloat(form.dailyRate) <= 0) {
+      return 'Daily rate must be greater than 0'
+    }
+    return null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
+    
+    // Validate before submitting
+    const validationError = validateForm()
+    if (validationError) {
+      setError(validationError)
+      setSaving(false)
+      return
+    }
     
     try {
       const res = await fetch('/api/equipment', {
@@ -759,7 +785,11 @@ export default function EquipmentPage() {
                       type="date"
                       value={form.dateStart}
                       onChange={(e) => setForm({ ...form, dateStart: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                      className={`w-full bg-slate-800 border rounded-lg px-4 py-2.5 text-sm focus:outline-none ${
+                        isDateRangeInvalid 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : 'border-slate-700 focus:border-indigo-500'
+                      }`}
                       required
                     />
                   </div>
@@ -769,11 +799,22 @@ export default function EquipmentPage() {
                       type="date"
                       value={form.dateEnd}
                       onChange={(e) => setForm({ ...form, dateEnd: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                      className={`w-full bg-slate-800 border rounded-lg px-4 py-2.5 text-sm focus:outline-none ${
+                        isDateRangeInvalid 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : 'border-slate-700 focus:border-indigo-500'
+                      }`}
                       required
                     />
                   </div>
                 </div>
+                
+                {isDateRangeInvalid && (
+                  <div className="text-red-400 text-sm flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    End date cannot be before start date
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1.5">Daily Rate (₹) *</label>

@@ -1,38 +1,91 @@
 # CinePilot Night Build Notes - March 10, 2026
 
-## Build Status: ✅ PASSING (7:09 PM)
+## Build Status: ✅ PASSING (10:32 PM)
 
-### 23. Scripts Page - Export Feature (March 10, 2026 7:09 PM)
-Added export functionality to the Scripts Management page:
-- **Export CSV**: Export scenes to CSV (Scene #, Heading, Int/Ext, Time, Location, Characters, Confidence)
-- **Export JSON**: Full script export including summary stats (total scripts, scenes, characters), all scripts with scenes, and character data
-- **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header (only shows when script is loaded)
+### 28. Notes Page - Export Dropdown Enhancement (March 10, 2026 10:32 PM)
+Enhanced export functionality to the Production Notes page:
+- **Export Dropdown**: Click-based dropdown UI with CSV/JSON options (replaces hover-only menu)
+- **CSV Export**: Export notes to CSV (Title, Content, Category, Tags, Pinned, Created, Updated)
+- **JSON Export**: Full notes export including export date, summary stats (total, filtered, pinned, categories, tags), category breakdown, and top tags
 - **Keyboard Shortcut**: "E" toggles export dropdown menu
-- **Click Outside**: Export menu closes when clicking outside
-- **Timestamped Filenames**: Exports include date (scripts-2026-03-10.csv/json)
+- **Click Outside**: Export menu closes when clicking outside the dropdown
 - **Keyboard Help Modal**: Updated with "E" shortcut for export
-- **Esc to Close**: Escape key closes export dropdown menu
-- **Filtered Export**: Exports respect current search and int/ext filter settings
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+- **Loading State**: Visual feedback during export with spinning icon
+- **Timestamped Filenames**: Exports include date (production-notes-2026-03-10.csv/json)
 
-- **Next.js Build:** Successful
-- **TypeScript:** No errors
+### Previous Features
 
-## Build Status: ✅ PASSING (6:49 PM)
+## Build Status: ✅ PASSING (9:51 PM)
 
-### 22. Notifications Page - Export Feature (March 10, 2026 6:49 PM)
-Added export functionality to the Notifications page:
-- **Export CSV**: Export notifications to CSV (ID, Channel, Recipient, Title, Body, Status, Priority, Created At)
-- **Export JSON**: Full notification export including summary stats (total, unread, sent, failed), filters, and all notifications
-- **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header
+### 27. Weather Page - Export Dropdown Feature (March 10, 2026 9:51 PM)
+Enhanced export functionality to the Weather Forecast page:
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+- **CSV Export**: Export forecast data to CSV (Date, Condition, Temp High/Low, Humidity, Wind Speed, Precipitation, Production Score, Recommendation)
+- **JSON Export**: Full forecast export including export date, location, coordinates, forecast data, and summary stats (total days, avg score, best/worst days)
 - **Keyboard Shortcut**: "E" toggles export dropdown menu
-- **Click Outside**: Export menu closes when clicking outside
-- **Timestamped Filenames**: Exports include date (notifications-2026-03-10.csv/json)
-- **Keyboard Help Modal**: Updated with "E" shortcut for export
-- **Esc to Close**: Escape key closes export dropdown menu
-- **Filtered Export**: Exports respect current search and filter settings
+- **Click Outside**: Export menu closes when clicking outside the dropdown
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+- **Timestamped Filenames**: Exports include date and location (weather-forecast-Chennai-2026-03-10.csv/json)
 
-- **Next.js Build:** Successful
-- **TypeScript:** No errors
+### Previous Features
+
+## Build Status: ✅ PASSING (8:57 PM)
+
+### 26. Censor Page - Export Dropdown Feature (March 10, 2026 8:57 PM)
+Enhanced export functionality to the Censor Certification Analysis page:
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON/PDF options (replaces separate buttons)
+- **CSV Export**: Export scene flags to CSV (Scene, Category, Severity, Context)
+- **JSON Export**: Full analysis export including certificate, sensitivity score, confidence, top drivers, high risk scenes, flags, suggestions
+- **PDF Export**: Formatted PDF report with certificate, stats table, and suggestions
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside the dropdown
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+- **Loading State**: Visual feedback during export with spinning icon
+- **Timestamped Filenames**: Exports include date (censor-flags-2026-03-10.csv/json/pdf)
+
+### 25. Analytics Page - Export Dropdown Feature (March 10, 2026 7:49 PM)
+Added export functionality to the Analytics page:
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+- **CSV Export**: Export overview, timeline, performance, forecast, and department stats to CSV
+- **JSON Export**: Full analytics export including dashboard, metrics, predictions, with export date and demo mode flag
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside the dropdown
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+
+### 24. Scripts Page - Export Dropdown Feature (March 10, 2026 7:49 PM)
+Added export functionality to the Scripts page:
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+- **CSV Export**: Export scenes, headings, locations, characters, props, VFX notes, warnings to CSV
+- **JSON Export**: Full script export including scenes, characters, with export date and demo mode flag
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside the dropdown
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+- **Timestamped Filenames**: Exports include date and sanitized script title
+
+### 22. Reports Page - Export Dropdown Feature (March 10, 2026 7:49 PM)
+Enhanced export functionality to the Reports page:
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+- **CSV Export**: Export production data to CSV (production, schedule, crew, censor metrics)
+- **JSON Export**: Full report export including all data with export date and demo mode flag
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside the dropdown
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+
+### 23. Continuity Page - Export Keyboard Shortcut Enhancement (March 10, 2026 7:49 PM)
+Enhanced export functionality to the Continuity Tracker page:
+- **Keyboard Shortcut**: "E" now toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside the dropdown
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu when open
+- **Export Data**: CSV and JSON export with scene, heading, type, severity, description
+
+### Previous Features
 
 ## Build Status: ✅ PASSING (12:05 PM)
 

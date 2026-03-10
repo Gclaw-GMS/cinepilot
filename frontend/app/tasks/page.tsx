@@ -1258,7 +1258,6 @@ function CalendarView({
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December']
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const dayOfWeek = dayNames[currentDate.getDay()]
 
   const daysInMonth = getDaysInMonth(currentDate)
   const firstDay = getFirstDayOfMonth(currentDate)
@@ -1270,10 +1269,6 @@ function CalendarView({
     return tasks.filter(t => t.dueDate === dateStr)
   }
 
-  const goToToday = () => setCurrentDate(new Date())
-  const isCurrentMonth = currentDate.getMonth() === new Date().getMonth() && 
-                         currentDate.getFullYear() === new Date().getFullYear()
-
   const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
 
@@ -1284,20 +1279,9 @@ function CalendarView({
         <button onClick={prevMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
           <ChevronDown className="w-5 h-5 rotate-90" />
         </button>
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-white">
-            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            <span className="ml-2 text-sm font-normal text-slate-400">({dayOfWeek})</span>
-          </h3>
-          {!isCurrentMonth && (
-            <button 
-              onClick={goToToday}
-              className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors"
-            >
-              Today
-            </button>
-          )}
-        </div>
+        <h3 className="text-lg font-semibold text-white">
+          {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </h3>
         <button onClick={nextMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
           <ChevronDown className="w-5 h-5 -rotate-90" />
         </button>

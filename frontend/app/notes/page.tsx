@@ -133,9 +133,12 @@ export default function NotesPage() {
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
   
-  // Refs for keyboard shortcuts
+  // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -211,6 +214,10 @@ export default function NotesPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(!showExportMenu)
+          break
         case 'escape':
           e.preventDefault()
           if (showKeyboardHelp) {
@@ -218,6 +225,8 @@ export default function NotesPage() {
           } else if (showForm) {
             setShowForm(false)
             setEditingId(null)
+          } else if (showExportMenu) {
+            setShowExportMenu(false)
           } else {
             setSearch('')
             setFilterCategory('all')
@@ -228,7 +237,20 @@ export default function NotesPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showKeyboardHelp, search, filterCategory])
+  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -331,7 +353,13 @@ export default function NotesPage() {
     setShowForm(true)
   }
 
-  const handleExport = (format: 'csv' | 'json') => {
+  const handleExport = async (format: 'csv' | 'json') => {
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    // Simulate small delay for UX
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
     const data = filteredNotes.map(note => ({
       title: note.title,
       content: note.content,
@@ -342,8 +370,34 @@ export default function NotesPage() {
       updatedAt: note.updatedAt,
     }))
     
+    // Calculate summary stats
+    const categoryCounts: Record<string, number> = {}
+    const tagCounts: Record<string, number> = {}
+    notes.forEach(note => {
+      categoryCounts[note.category] = (categoryCounts[note.category] || 0) + 1
+      note.tags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+      })
+    })
+    
     if (format === 'json') {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        summary: {
+          totalNotes: notes.length,
+          filteredNotes: filteredNotes.length,
+          pinnedNotes: pinnedNotes.length,
+          categories: Object.keys(categoryCounts).length,
+          uniqueTags: Object.keys(tagCounts).length,
+          categoryBreakdown: categoryCounts,
+          topTags: Object.entries(tagCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 10)
+            .reduce((acc, [tag, count]) => ({ ...acc, [tag]: count }), {})
+        },
+        notes: data
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -362,6 +416,7 @@ export default function NotesPage() {
       a.click()
       URL.revokeObjectURL(url)
     }
+    setExporting(false)
   }
 
   const handleDelete = async (id: string) => {
@@ -433,27 +488,39 @@ export default function NotesPage() {
               <HelpCircle className="w-4 h-4" />
               Shortcuts
             </button>
-            <div className="relative group">
+            <div className="relative" ref={exportMenuRef}>
               <button
-                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors"
               >
-                <Download className="w-4 h-4" />
-                Export
+                {exporting ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {exporting ? 'Exporting...' : 'Export'}
               </button>
-              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                <button
-                  onClick={() => handleExport('csv')}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap"
-                >
-                  Export as CSV
-                </button>
-                <button
-                  onClick={() => handleExport('json')}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap"
-                >
-                  Export as JSON
-                </button>
-              </div>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-10 min-w-[140px]">
+                  <button
+                    onClick={() => handleExport('csv')}
+                    disabled={exporting}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export as CSV
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    disabled={exporting}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export as JSON
+                  </button>
+                </div>
+              )}
             </div>
             <button
               onClick={() => {
@@ -845,6 +912,7 @@ export default function NotesPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', action: 'Refresh notes' },
+                { key: 'E', action: 'Export notes' },
                 { key: '/', action: 'Focus search' },
                 { key: 'N', action: 'Create new note' },
                 { key: '?', action: 'Show shortcuts' },

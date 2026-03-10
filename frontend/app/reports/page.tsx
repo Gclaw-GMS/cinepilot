@@ -53,6 +53,8 @@ export default function ReportsPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchReport = useCallback(async () => {
     try {
@@ -71,6 +73,19 @@ export default function ReportsPage() {
   }, [])
 
   useEffect(() => { fetchReport() }, [fetchReport])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -115,7 +130,7 @@ export default function ReportsPage() {
           break
         case 'e':
           e.preventDefault()
-          if (reportData) handleExport()
+          setShowExportMenu(!showExportMenu)
           break
         case 'g':
           e.preventDefault()
@@ -124,6 +139,7 @@ export default function ReportsPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           break
       }
@@ -156,13 +172,49 @@ export default function ReportsPage() {
     }
   }
 
-  const handleExport = () => {
+  const handleExport = (format: 'csv' | 'json' = 'json') => {
     if (!reportData) return
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `production-report-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
+    
+    if (format === 'json') {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        report: reportData,
+        isDemoMode
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `production-report-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+    } else if (format === 'csv') {
+      // CSV export with production overview data
+      const csvRows = [
+        ['Category', 'Metric', 'Value'],
+        ['Production', 'Total Scenes', reportData.production.totalScenes.toString()],
+        ['Production', 'Total Characters', reportData.production.totalCharacters.toString()],
+        ['Production', 'Total Locations', reportData.production.totalLocations.toString()],
+        ['Production', 'Shooting Days', reportData.production.shootingDays.toString()],
+        ['Production', 'Budget', reportData.production.budget.toString()],
+        ['Production', 'Spent', reportData.production.spent.toString()],
+        ['Schedule', 'Completed Days', reportData.schedule.completedDays.toString()],
+        ['Schedule', 'Total Days', reportData.schedule.totalDays.toString()],
+        ['Schedule', 'Scenes Shot', reportData.schedule.scenesShot.toString()],
+        ['Schedule', 'Total Scenes', reportData.schedule.totalScenes.toString()],
+        ['Crew', 'Total Members', reportData.crew.totalMembers.toString()],
+        ['Crew', 'Departments', reportData.crew.departments.toString()],
+        ['Crew', 'Total Daily Rate', reportData.crew.totalDailyRate.toString()],
+        ['Censor', 'Certificate', reportData.censor.certificate],
+        ['Censor', 'Score', reportData.censor.score.toString()],
+        ['Censor', 'Issues', reportData.censor.issues.toString()],
+      ]
+      const csv = csvRows.map(row => row.join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `production-report-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+    }
+    setShowExportMenu(false)
   }
 
   const budgetData = reportData ? [
@@ -229,9 +281,27 @@ export default function ReportsPage() {
               className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-600 text-gray-300 rounded-lg text-sm w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             />
           </div>
-          <button onClick={handleExport} disabled={!reportData} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 rounded-lg flex items-center gap-2">
-            <Download className="w-4 h-4" />Export
-          </button>
+          <div className="relative" ref={exportMenuRef}>
+            <button onClick={() => setShowExportMenu(!showExportMenu)} disabled={!reportData} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 rounded-lg flex items-center gap-2">
+              <Download className="w-4 h-4" />Export
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                <button
+                  onClick={() => handleExport('json')}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  Export as CSV
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white rounded-lg flex items-center gap-2">
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />}
             {generating ? 'Generating...' : 'Refresh'}
@@ -567,7 +637,7 @@ export default function ReportsPage() {
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">/</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Export report</span>
+                <span className="text-gray-300">Toggle export menu</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">E</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">

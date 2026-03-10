@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Check } from 'lucide-react'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
 
 interface ScriptData {
@@ -186,7 +186,6 @@ export default function ScriptsPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => Promise<void>>()
@@ -204,10 +203,6 @@ export default function ScriptsPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
-        case 'e':
-          e.preventDefault()
-          setShowExportMenu(prev => !prev)
-          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -219,6 +214,7 @@ export default function ScriptsPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSceneFilter('')
           setIntExtFilter('all')
           break
@@ -246,6 +242,10 @@ export default function ScriptsPage() {
           e.preventDefault()
           setActiveTab('compare')
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(!showExportMenu)
+          break
       }
     }
     
@@ -256,23 +256,14 @@ export default function ScriptsPage() {
   // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
-
-  // Close export menu on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showExportMenu) {
-        setShowExportMenu(false)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showExportMenu])
 
   const fetchData = useCallback(async () => {
@@ -308,6 +299,64 @@ export default function ScriptsPage() {
   
   // Store fetchData in ref for keyboard shortcuts
   fetchDataRef.current = fetchData
+
+  // Export functions
+  const handleExport = (format: 'csv' | 'json' = 'json') => {
+    if (!activeScript) return
+    
+    if (format === 'json') {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        script: {
+          id: activeScript.id,
+          title: activeScript.title,
+          version: activeScript.version,
+          createdAt: activeScript.createdAt,
+          scenes: activeScript.scenes.map(s => ({
+            sceneNumber: s.sceneNumber,
+            heading: s.headingRaw,
+            intExt: s.intExt,
+            timeOfDay: s.timeOfDay,
+            location: s.location,
+            characters: s.sceneCharacters.map(c => c.character.name),
+            locations: s.sceneLocations.map(l => l.name),
+            props: s.sceneProps.map(p => p.prop.name),
+            vfxNotes: s.vfxNotes.map(v => v.description),
+            warnings: s.warnings.map(w => ({ type: w.warningType, description: w.description, severity: w.severity })),
+          })),
+        },
+        characters: characters.map(c => ({ name: c.name, roleHint: c.roleHint, aliases: c.aliases })),
+        isDemoMode
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `script-${activeScript.title.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+    } else if (format === 'csv') {
+      const rows = [['Scene', 'Heading', 'Int/Ext', 'Time', 'Location', 'Characters', 'Props', 'VFX Notes', 'Warnings']]
+      activeScript.scenes.forEach(s => {
+        rows.push([
+          s.sceneNumber,
+          s.headingRaw || '',
+          s.intExt || '',
+          s.timeOfDay || '',
+          s.location || '',
+          s.sceneCharacters.map(c => c.character.name).join('; '),
+          s.sceneProps.map(p => p.prop.name).join('; '),
+          s.vfxNotes.map(v => v.description).join('; '),
+          s.warnings.map(w => `${w.warningType}: ${w.description}`).join('; '),
+        ])
+      })
+      const csv = rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `script-${activeScript.title.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+    }
+    setShowExportMenu(false)
+  }
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -403,74 +452,6 @@ export default function ScriptsPage() {
     return matchesSearch && matchesIntExt
   })
 
-  // Export functions
-  const handleExportCSV = () => {
-    setExporting(true)
-    const headers = ['Scene #', 'Heading', 'Int/Ext', 'Time', 'Location', 'Characters', 'Confidence']
-    const rows = filteredScenes.map(s => [
-      s.sceneNumber,
-      s.headingRaw || '',
-      s.intExt || '',
-      s.timeOfDay || '',
-      s.location || '',
-      s.sceneCharacters?.map(sc => sc.character?.name).join('; ') || '',
-      String(s.confidence ? (s.confidence * 100).toFixed(0) : ''),
-    ])
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `scripts-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    setShowExportMenu(false)
-    setExporting(false)
-  }
-
-  const handleExportJSON = () => {
-    setExporting(true)
-    const exportData = {
-      exportDate: new Date().toISOString(),
-      projectId: 'demo',
-      summary: {
-        totalScripts: scripts.length,
-        totalScenes: scenes.length,
-        totalCharacters: characters.length,
-      },
-      scripts: scripts.map(script => ({
-        id: script.id,
-        title: script.title,
-        version: script.version,
-        createdAt: script.createdAt,
-        scenes: script.scenes?.map(s => ({
-          sceneNumber: s.sceneNumber,
-          headingRaw: s.headingRaw,
-          intExt: s.intExt,
-          timeOfDay: s.timeOfDay,
-          location: s.location,
-          characters: s.sceneCharacters?.map(sc => sc.character?.name) || [],
-          confidence: s.confidence,
-        })) || [],
-      })),
-      characters: characters.map(c => ({
-        id: c.id,
-        name: c.name,
-        aliases: c.aliases,
-        roleHint: c.roleHint,
-      })),
-    }
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `scripts-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    setShowExportMenu(false)
-    setExporting(false)
-  }
-
   const tabs: { key: ActiveTab; label: string; count?: number }[] = [
     { key: 'upload', label: 'Upload' },
     { key: 'scenes', label: 'Scenes', count: scenes.length },
@@ -529,39 +510,32 @@ export default function ScriptsPage() {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          {/* Export Dropdown */}
-          {activeScript && (
-            <div className="relative" ref={exportMenuRef}>
-              <button
-                onClick={() => setShowExportMenu(prev => !prev)}
-                disabled={exporting}
-                className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm disabled:opacity-50"
-                title="Export (E)"
-              >
-                <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
-                Export
-                <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
-              </button>
-              {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-20">
-                  <button
-                    onClick={handleExportCSV}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-700 transition-colors text-left"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Export CSV
-                  </button>
-                  <button
-                    onClick={handleExportJSON}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-700 transition-colors text-left"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Export JSON
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={!activeScript}
+              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
+              title="Export (E)"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                <button
+                  onClick={() => handleExport('json')}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  Export as CSV
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
@@ -1015,8 +989,8 @@ export default function ScriptsPage() {
             <div className="space-y-2 text-sm">
               {[
                 { key: 'R', action: 'Refresh scripts' },
-                { key: 'E', action: 'Export dropdown' },
                 { key: '/', action: 'Focus search' },
+                { key: 'E', action: 'Toggle export menu' },
                 { key: '1', action: 'Upload tab' },
                 { key: '2', action: 'Scenes tab' },
                 { key: '3', action: 'Characters tab' },

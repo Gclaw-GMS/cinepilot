@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -169,10 +169,10 @@ export default function VfxPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   
-  // Refs for keyboard shortcuts
+  // Refs for keyboard shortcuts and menus
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -212,9 +212,9 @@ export default function VfxPage() {
           setComplexityFilter('all')
           break
         case 'e':
-          e.preventDefault()
-          if (vfxNotes.length > 0) {
-            setShowExportMenu(!showExportMenu)
+          if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
+            e.preventDefault()
+            setShowExportMenu(prev => !prev)
           }
           break
         case '1':
@@ -234,7 +234,19 @@ export default function VfxPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedScript, showNoteForm, showExportMenu])
+  }, [selectedScript, showNoteForm, vfxNotes.length, vfxWarnings.length])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -265,19 +277,6 @@ export default function VfxPage() {
         }
       });
   }, []);
-
-  // Click outside to close export menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    if (showExportMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showExportMenu])
 
   // Filtered notes based on search and filters
   const filteredNotes = useMemo(() => {
@@ -526,8 +525,15 @@ export default function VfxPage() {
     }
   }
 
+  // Toggle export menu
+  function handleExport() {
+    if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
+      setShowExportMenu(prev => !prev)
+    }
+  }
+
   // Export VFX data to CSV
-  function handleExportCSV() {
+  function exportToCSV() {
     const headers = ['Scene', 'Heading', 'Type', 'Description', 'Confidence', 'Severity', 'Warning'];
     const rows = displayScenes.map(([sceneNum, group]) => {
       const notes = group.notes.map(n => ({
@@ -563,10 +569,11 @@ export default function VfxPage() {
   }
 
   // Export VFX data to JSON
-  function handleExportJSON() {
+  function exportToJSON() {
     const exportData = {
-      exportDate: new Date().toISOString(),
-      project: selectedScript,
+      exportedAt: new Date().toISOString(),
+      scriptId: selectedScript,
+      scriptTitle: scripts.find(s => s.id === selectedScript)?.title || 'Unknown',
       summary: summary ? {
         totalScenes: summary.totalScenes,
         totalNotes: summary.totalNotes,
@@ -575,31 +582,31 @@ export default function VfxPage() {
         estimatedTotalCost: summary.estimatedTotalCost,
         estimatedTotalDuration: summary.estimatedTotalDuration,
       } : null,
-      vfxNotes: vfxNotes.map(n => ({
-        id: n.id,
-        sceneNumber: n.scene.sceneNumber,
+      notes: vfxNotes.map(n => ({
+        scene: n.scene.sceneNumber,
         heading: n.scene.headingRaw,
         type: n.vfxType,
         description: n.description,
-        confidence: n.confidence,
+        confidence: Math.round(n.confidence * 100) + '%',
         estimatedDuration: n.estimatedDuration,
       })),
-      vfxWarnings: vfxWarnings.map(w => ({
-        id: w.id,
-        sceneNumber: w.scene.sceneNumber,
+      warnings: vfxWarnings.map(w => ({
+        scene: w.scene.sceneNumber,
         heading: w.scene.headingRaw,
         type: w.warningType,
         description: w.description,
         severity: w.severity,
       })),
-      vfxProps: vfxProps.map(p => ({
-        sceneNumber: p.scene.sceneNumber,
+      props: vfxProps.map(p => ({
+        scene: p.scene.sceneNumber,
         heading: p.scene.headingRaw,
-        propName: p.prop.name,
-        propDescription: p.prop.description,
+        prop: p.prop.name,
+        description: p.prop.description,
       })),
     };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -716,30 +723,28 @@ export default function VfxPage() {
               <>
                 <div className="relative" ref={exportMenuRef}>
                   <button
-                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    onClick={handleExport}
                     className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Export
-                    <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
                   </button>
                   {showExportMenu && (
-                    <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden min-w-[160px]">
                       <button
-                        onClick={handleExportCSV}
+                        onClick={exportToCSV}
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
                       >
-                        <Download className="w-4 h-4" />
-                        CSV
+                        <FileText className="w-4 h-4 text-emerald-400" />
+                        Export CSV
                       </button>
                       <button
-                        onClick={handleExportJSON}
+                        onClick={exportToJSON}
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
                       >
-                        <Download className="w-4 h-4" />
-                        JSON
+                        <FileJson className="w-4 h-4 text-purple-400" />
+                        Export JSON
                       </button>
                     </div>
                   )}

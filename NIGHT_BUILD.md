@@ -1,5 +1,25 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (2:05 PM)
+
+## Night Build (2:05 PM) - VFX Export Enhancement (IMPLEMENTED)
+
+### Features Perfected This Build
+- **VFX Page**: Enhanced export functionality to VFX Breakdown
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+  - **CSV Export**: Export VFX notes, warnings, and props to CSV (Scene, Heading, Type, Description, Confidence, Severity, Warning)
+  - **JSON Export**: Full VFX export including summary stats, all notes, warnings, and props with timestamps
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Timestamped Filenames**: Exports include date (vfx-breakdown-2026-03-10.csv/json)
+  - **Summary Stats**: JSON export includes total scenes, notes, warnings, complexity breakdown, and cost estimates
+  - **Props Export**: JSON export includes VFX props data
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
 ## Build Status: ✅ PASSING (12:25 PM)
 
 ## Night Build (12:25 PM) - Audience Sentiment Export Feature (IMPLEMENTED)

@@ -1,8 +1,80 @@
-# CinePilot Night Build Notes - March 9, 2026
+# CinePilot Night Build Notes - March 10, 2026
 
-## Build Status: ✅ PASSING
+## Build Status: ✅ PASSING (2:03 AM)
 
 ## Features Perfected This Session
+
+### 14. DOOD Page - Search, Export Dropdown & Keyboard Shortcuts (March 10, 2026 2:03 AM)
+Added missing search functionality and enhanced export to the DOOD (Day Out of Days) page:
+- **Search Input**: Added search box in header with hint "(/)"
+- **"/" Shortcut**: Focus search input for quick access
+- **"E" Shortcut**: Toggle export dropdown menu
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces separate buttons)
+- **Click Outside**: Export menu closes when clicking outside
+- **Role Filter**: Added role filter dropdown (All Roles/Main Cast/Supporting)
+- **Search Filtering**: Real-time filtering by character name, Tamil name, or actor name
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Consistency**: Now matches other pages in the app with search and keyboard shortcuts
+
+## Features Perfected Previous Session
+
+### 13. Search Placeholder Keyboard Shortcut Hints (March 9, 2026 10:51 PM)
+Added missing "(/)" keyboard shortcut hints to search placeholders across multiple pages for consistency and better UX:
+
+- **Crew**: "Search crew by name, role, or department... (/)"
+- **Exports**: "Search exports... (/)"
+- **AI Tools**: "Search tools... (/)"
+- **Audience Sentiment**: "Search analyses... (/)"
+- **Budget**: "Search budget... (/)"
+- **Catering**: "Search... (/)"
+- **Collaboration**: "Search team members... (/)"
+- **Tasks**: "Search tasks... (F)" (uses F shortcut, not /)
+
+These hints show users which keyboard shortcut to use for quick search access, improving discoverability and consistency across the app.
+
+### 12. Equipment Page - Missing Keyboard Shortcuts Modal (March 9, 2026 10:04 PM)
+Added missing keyboard shortcuts help modal to the Equipment page:
+- The page had the keyboard shortcuts button and state variable (`showKeyboardHelp`)
+- But the modal was never implemented - clicking "?" did nothing visible
+- **Added**: Professional keyboard shortcuts help modal
+- **Shortcuts listed**: R (refresh), / (search), N (add new), ? (help), Esc (close/clear)
+- **Styling**: Matches other pages with dark theme, kbd styling, hover effects
+
+### 11. Settings Page - Search & Keyboard Shortcuts (March 9, 2026 9:44 PM)
+
+## Features Perfected This Session
+
+### 11. Settings Page - Search & Keyboard Shortcuts (March 9, 2026 9:44 PM)
+Added search functionality and enhanced keyboard shortcuts to the Settings page:
+- **Search Input**: Added search box in header with hint "(/)"
+- **"/" Shortcut**: Focus search input for quick access
+- **"Esc" Shortcut**: Clear search query
+- **Clear Button**: X button to quickly clear search query
+- **Search Icon**: Search icon inside input for visual feedback
+- **R**: Refresh settings
+- **S**: Save settings
+- **?**: Show keyboard shortcuts help modal
+- **Esc**: Close modal
+- **Keyboard Help Modal**: Updated with "/" shortcut for search focus
+- **Consistent UI**: Now matches all other pages in the app with search and keyboard shortcuts
+
+### 10. Audience Sentiment Page - Keyboard Shortcuts & Search (March 9, 2026 9:04 PM)
+Added comprehensive keyboard navigation and search to the Audience Sentiment page:
+- **R**: Refresh analyses data
+- **/**: Focus search input
+- **N**: Create new analysis
+- **1**: Filter by All platforms
+- **2**: Filter by YouTube
+- **3**: Filter by Instagram
+- **4**: Filter by Twitter
+- **?**: Show keyboard shortcuts help modal
+- **Esc**: Close modal / Clear search
+- **Search Input**: Added search box in header with hint "(/)"
+- **Search Filtering**: Real-time filtering by title, comments, or takeaways
+- **Refresh Button**: Added dedicated refresh button in header with spinning animation
+- **Keyboard Help Button**: Added help button in header for easy access
+- **Professional Modal**: Styled modal with all shortcuts listed with hover effects
+- **Filtered Stats**: Stats display shows filtered count when search or filter is active
 
 ### 9. Mission Control Page - Search Functionality (March 9, 2026 8:44 PM)
 Added comprehensive search functionality to the Mission Control page:

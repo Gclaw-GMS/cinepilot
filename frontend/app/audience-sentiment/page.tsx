@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   MessageCircle,
   ThumbsUp,
@@ -22,6 +22,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  HelpCircle,
+  X,
+  Search,
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -64,23 +67,35 @@ interface SentimentAnalysis {
 export default function AudienceSentimentPage() {
   const [analyses, setAnalyses] = useState<SentimentAnalysis[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [platformFilter, setPlatformFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [formData, setFormData] = useState({
     title: '',
     platform: 'youtube',
     videoUrl: '',
   })
 
-  // Filter analyses by platform
-  const filteredAnalyses = platformFilter === 'all' 
-    ? analyses 
-    : analyses.filter(a => a.platform === platformFilter)
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchDataRef = useRef<() => void | Promise<void>>()
+
+  // Filter analyses by platform and search query
+  const filteredAnalyses = analyses.filter(a => {
+    const matchesPlatform = platformFilter === 'all' || a.platform === platformFilter
+    const matchesSearch = !searchQuery || 
+      a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.topPositive?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+      (a.topNegative?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+      (a.takeaways?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())))
+    return matchesPlatform && matchesSearch
+  })
 
   const fetchAnalyses = useCallback(async () => {
-    setLoading(true)
     setError(null)
     try {
       const res = await fetch(`/api/audience-sentiment?projectId=${DEMO_PROJECT_ID}`)
@@ -91,7 +106,70 @@ export default function AudienceSentimentPage() {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
+  }, [])
+
+  // Set up fetch data ref for keyboard shortcut
+  useEffect(() => {
+    fetchDataRef.current = async () => {
+      setRefreshing(true)
+      await fetchAnalyses()
+    }
+  }, [fetchAnalyses])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          setShowForm(true)
+          break
+        case '1':
+          e.preventDefault()
+          setPlatformFilter('all')
+          break
+        case '2':
+          e.preventDefault()
+          setPlatformFilter('youtube')
+          break
+        case '3':
+          e.preventDefault()
+          setPlatformFilter('instagram')
+          break
+        case '4':
+          e.preventDefault()
+          setPlatformFilter('twitter')
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setShowForm(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   useEffect(() => {
@@ -176,16 +254,30 @@ export default function AudienceSentimentPage() {
               <div>
                 <h1 className="text-xl font-semibold text-white">Audience Sentiment</h1>
                 <p className="text-sm text-slate-400">
-                  {filteredAnalyses.length === analyses.length 
-                    ? `${analyses.length} analyses total`
-                    : `${filteredAnalyses.length} of ${analyses.length} analyses`}
+                  {searchQuery || platformFilter !== 'all'
+                    ? `${filteredAnalyses.length} of ${analyses.length} analyses`
+                    : `${analyses.length} analyses total`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search analyses... (/)"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-8 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 w-48"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">(/)</span>
+              </div>
+              
               {/* Platform Filter */}
               <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
-                {PLATFORMS.map((platform) => {
+                {PLATFORMS.map((platform, idx) => {
                   const Icon = platform.icon
                   return (
                     <button
@@ -199,6 +291,7 @@ export default function AudienceSentimentPage() {
                     >
                       <Icon className="w-3.5 h-3.5" style={{ color: platform.color }} />
                       <span className="hidden sm:inline">{platform.label}</span>
+                      <span className="text-xs text-slate-500 ml-0.5">({idx + 2})</span>
                     </button>
                   )
                 })}
@@ -213,6 +306,21 @@ export default function AudienceSentimentPage() {
                   All
                 </button>
               </div>
+              <button
+                onClick={() => fetchDataRef.current?.()}
+                disabled={refreshing}
+                className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
+                title="Refresh data (R)"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
+                title="Keyboard shortcuts (?)"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => setShowForm(true)}
                 className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all"
@@ -608,6 +716,61 @@ export default function AudienceSentimentPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-rose-400" />
+                Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowKeyboardHelp(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Refresh data</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Search analyses</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">New analysis</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter: All</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter: YouTube</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter: Instagram</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter: Twitter</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-slate-300">Close / Clear</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+              </div>
+            </div>
           </div>
         </div>
       )}

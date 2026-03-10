@@ -17,7 +17,8 @@ import {
   Filter,
   Eye,
   List,
-  Film
+  Film,
+  Search
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -97,9 +98,11 @@ export default function DOODPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'analytics'>('analytics')
   const [filterRole, setFilterRole] = useState<'all' | 'main' | 'supporting'>('all')
+  const [filterSearch, setFilterSearch] = useState('')
   
   // Keyboard shortcuts
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const loadDOOD = useCallback(async () => {
@@ -137,6 +140,23 @@ export default function DOODPage() {
     loadDOOD()
   }, [loadDOOD])
 
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.relative')) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showExportMenu])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea
@@ -172,6 +192,11 @@ export default function DOODPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
           break
       }
     }
@@ -180,12 +205,29 @@ export default function DOODPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Filter report based on role
+  // Filter report based on role and search
   const filteredReport = useMemo(() => {
-    if (filterRole === 'all') return report
-    if (filterRole === 'main') return report.filter(r => r.isMain)
-    return report.filter(r => !r.isMain)
-  }, [report, filterRole])
+    let filtered = report
+    
+    // Filter by role
+    if (filterRole === 'main') {
+      filtered = filtered.filter(r => r.isMain)
+    } else if (filterRole === 'supporting') {
+      filtered = filtered.filter(r => !r.isMain)
+    }
+    
+    // Filter by search
+    if (filterSearch.trim()) {
+      const searchLower = filterSearch.toLowerCase()
+      filtered = filtered.filter(r => 
+        r.character.toLowerCase().includes(searchLower) ||
+        r.characterTamil.toLowerCase().includes(searchLower) ||
+        (r.actorName && r.actorName.toLowerCase().includes(searchLower))
+      )
+    }
+    
+    return filtered
+  }, [report, filterRole, filterSearch])
 
   // Chart data
   const pieChartData = useMemo(() => {
@@ -543,6 +585,38 @@ export default function DOODPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              ref={searchInputRef}
+              placeholder="Search cast... (/)"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              className="pl-9 pr-4 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm w-48 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            />
+            {filterSearch && (
+              <button
+                onClick={() => setFilterSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Role Filter */}
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value as 'all' | 'main' | 'supporting')}
+            className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+          >
+            <option value="all">All Roles</option>
+            <option value="main">Main Cast</option>
+            <option value="supporting">Supporting</option>
+          </select>
           
           <button
             onClick={() => setShowKeyboardHelp(true)}
@@ -614,20 +688,33 @@ export default function DOODPage() {
             </div>
             
             <div className="flex gap-2">
-              <button
-                onClick={() => handleExport('csv')}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                CSV
-              </button>
-              <button
-                onClick={() => handleExport('json')}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
-              >
-                <Share2 className="w-4 h-4" />
-                JSON
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <button
+                      onClick={() => { handleExport('csv'); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4 text-green-400" />
+                      CSV
+                    </button>
+                    <button
+                      onClick={() => { handleExport('json'); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <Share2 className="w-4 h-4 text-purple-400" />
+                      JSON
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -756,6 +843,10 @@ export default function DOODPage() {
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Refresh data</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">R</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Export menu</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">E</kbd>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Focus search</span>

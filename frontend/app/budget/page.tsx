@@ -7,7 +7,8 @@ import {
 } from 'recharts'
 import { 
   DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
-  RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard, Search
+  RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard, Search,
+  FileText, FileJson
 } from 'lucide-react'
 
 interface BudgetItemData {
@@ -128,7 +129,64 @@ export default function BudgetPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  // Export functions
+  const handleExportCSV = () => {
+    const headers = ['Category', 'Description', 'Subcategory', 'Quantity', 'Unit', 'Rate Low', 'Rate High', 'Total', 'Source']
+    const rows = items.map(item => [
+      item.category,
+      item.description,
+      item.subcategory || '',
+      item.quantity,
+      item.unit || '',
+      item.rateLow || '',
+      item.rateHigh || '',
+      item.total,
+      item.source || 'manual'
+    ])
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budget-export-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    const exportData = {
+      items,
+      expenses,
+      forecast,
+      exportedAt: new Date().toISOString(),
+      totalPlanned: items.reduce((s, i) => s + Number(i.total || 0), 0),
+      totalSpent: expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budget-export-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -186,6 +244,7 @@ export default function BudgetPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowAddExpense(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           searchInputRef.current?.blur()
           break
@@ -204,6 +263,10 @@ export default function BudgetPage() {
         case '4':
           e.preventDefault()
           setActiveTab('forecast')
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
           break
       }
     }
@@ -317,7 +380,7 @@ export default function BudgetPage() {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search budget..."
+              placeholder="Search budget... (/)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-8 py-2 bg-gray-800 border border-gray-700 rounded text-sm w-48 focus:outline-none focus:border-cinepilot-accent"
@@ -341,6 +404,35 @@ export default function BudgetPage() {
           <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded font-medium text-sm">
             {generating ? 'Generating...' : 'Generate Budget'}
           </button>
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button 
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-sm flex items-center gap-2"
+              title="Export (E)"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                <button 
+                  onClick={handleExportCSV}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-t-lg"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <button 
+                  onClick={handleExportJSON}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg"
+                >
+                  <FileJson className="w-4 h-4" />
+                  Export JSON
+                </button>
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => setShowKeyboardHelp(true)}
             className="p-2 bg-gray-800 hover:bg-gray-700 rounded text-sm"
@@ -366,7 +458,37 @@ export default function BudgetPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
+        {/* Budget Utilization Gauge */}
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 flex flex-col items-center justify-center">
+          <div className="text-xs text-gray-500 mb-2">Budget Used</div>
+          <div className="relative w-24 h-24">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              {/* Background circle */}
+              <circle cx="50" cy="50" r="42" fill="none" stroke="#1e293b" strokeWidth="12" />
+              {/* Progress circle */}
+              <circle 
+                cx="50" 
+                cy="50" 
+                r="42" 
+                fill="none" 
+                stroke={totalPlanned > 0 ? (totalActual / totalPlanned > 0.9 ? '#ef4444' : totalActual / totalPlanned > 0.7 ? '#f59e0b' : '#10b981') : '#64748b'} 
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeDasharray={`${totalPlanned > 0 ? Math.min((totalActual / totalPlanned) * 264, 264) : 0} 264`}
+                className="transition-all duration-500"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-2xl font-bold ${totalPlanned > 0 ? (totalActual / totalPlanned > 0.9 ? 'text-red-400' : totalActual / totalPlanned > 0.7 ? 'text-amber-400' : 'text-emerald-400') : 'text-gray-400'}`}>
+                {totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0}%
+              </span>
+            </div>
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
+            {totalPlanned > 0 ? (totalActual / totalPlanned > 1 ? 'Over Budget!' : 'On Track') : 'No Data'}
+          </div>
+        </div>
         <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
           <div className="text-xs text-gray-500 mb-1">Planned Budget</div>
           <div className="text-2xl font-bold text-cinepilot-accent">{formatINR(totalPlanned)}</div>
@@ -384,6 +506,11 @@ export default function BudgetPage() {
         <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
           <div className="text-xs text-gray-500 mb-1">Forecast (EAC)</div>
           <div className="text-2xl font-bold text-yellow-400">{forecast ? formatINR(forecast.eacTotal) : '—'}</div>
+          {forecast && totalPlanned > 0 && (
+            <div className={`text-xs mt-1 ${forecast.eacTotal > totalPlanned ? 'text-red-400' : 'text-green-400'}`}>
+              {forecast.eacTotal > totalPlanned ? `+${formatINR(forecast.eacTotal - totalPlanned)} over` : `${formatINR(totalPlanned - forecast.eacTotal)} under`}
+            </div>
+          )}
         </div>
       </div>
 
@@ -607,7 +734,7 @@ export default function BudgetPage() {
           ) : (
             <>
               {/* Forecast Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-slate-400 text-sm">Budget Utilization</span>
@@ -623,6 +750,23 @@ export default function BudgetPage() {
                       style={{ width: `${Math.min(100, forecast.percentSpent)}%` }} />
                   </div>
                   <div className="text-xs text-slate-500 mt-2">{formatINR(forecast.actual)} of {formatINR(forecast.planned)}</div>
+                </div>
+
+                {/* Burn Rate Card */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-slate-400 text-sm">Daily Burn Rate</span>
+                    <DollarSign className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div className="text-3xl font-bold text-purple-400 mb-2">
+                    {formatINR(Math.round(forecast.actual / 30))}
+                  </div>
+                  <div className="text-xs text-slate-500">per day (30-day avg)</div>
+                  <div className="mt-3 pt-3 border-t border-slate-800">
+                    <div className="text-xs text-slate-400">
+                      Days remaining: <span className="text-white font-medium">{Math.max(0, 30 - Math.floor(forecast.actual / (forecast.actual / 30 || 1)))}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -775,6 +919,7 @@ export default function BudgetPage() {
                 { key: 'R', action: 'Refresh budget data' },
                 { key: '/', action: 'Search budget items' },
                 { key: 'N', action: 'Add new expense' },
+                { key: 'E', action: 'Toggle export menu' },
                 { key: '1', action: 'Switch to Overview tab' },
                 { key: '2', action: 'Switch to Breakdown tab' },
                 { key: '3', action: 'Switch to Expenses tab' },

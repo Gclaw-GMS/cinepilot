@@ -339,7 +339,7 @@ export default function CateringPage() {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search..."
+                  placeholder="Search... (/)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm w-40 focus:ring-2 focus:ring-amber-500 focus:border-transparent"

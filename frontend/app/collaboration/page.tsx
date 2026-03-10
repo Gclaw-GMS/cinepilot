@@ -386,7 +386,7 @@ export default function CollaborationPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              placeholder="Search team members..."
+              placeholder="Search team members... (/)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -9,6 +9,7 @@ import {
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
   ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, ListChecks,
+  Search, HelpCircle, X
 } from 'lucide-react'
 
 const PALETTE = {
@@ -146,6 +147,13 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false) // Start with loading=false since we have demo data
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking')
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  
+  // Refs for keyboard shortcuts
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const fetchStatsRef = useRef<() => void>(() => {})
 
   // Check database connection status
   const checkDbStatus = useCallback(async () => {
@@ -349,6 +357,47 @@ export default function Dashboard() {
     })
   }, [fetchStats])
 
+  // Set up fetch stats ref for keyboard shortcut
+  useEffect(() => {
+    fetchStatsRef.current = () => {
+      setRefreshing(true)
+      fetchStats()
+    }
+  }, [fetchStats])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchStatsRef.current()
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setSearchQuery('')
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const budgetData = stats.budget.planned > 0
     ? [
         { name: 'Planned', value: stats.budget.planned, color: PALETTE.primary },
@@ -393,12 +442,42 @@ export default function Dashboard() {
               <p className="text-slate-500 text-sm mt-1">CinePilot &mdash; AI Pre-Production Command Center</p>
             </div>
             <button
-              onClick={fetchStats}
-              disabled={loading}
+              onClick={() => {
+                setRefreshing(true)
+                fetchStats()
+              }}
+              disabled={loading || refreshing}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {loading || refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />}
               Refresh
+            </button>
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search... (/)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-48 pl-9 pr-8 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+            </div>
+            <button 
+              onClick={() => setShowKeyboardHelp(true)}
+              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Keyboard shortcuts (?)"
+            >
+              <HelpCircle className="w-5 h-5 text-slate-400" />
             </button>
           </div>
         </div>
@@ -515,6 +594,52 @@ export default function Dashboard() {
           />
         </div>
       </main>
+
+      {/* Keyboard Help Modal */}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+              <button 
+                onClick={() => setShowKeyboardHelp(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <ShortcutRow keys={['R']} description="Refresh dashboard data" />
+              <ShortcutRow keys={['/']} description="Focus search input" />
+              <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
+              <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
+            </div>
+            <div className="mt-6 pt-4 border-t border-white/10">
+              <p className="text-xs text-slate-500 text-center">
+                Press <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-slate-300">?</kbd> anytime to show this help
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ShortcutRow({ keys, description }: { keys: string[]; description: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
+      <span className="text-sm text-slate-300">{description}</span>
+      <div className="flex gap-1">
+        {keys.map((key) => (
+          <kbd 
+            key={key} 
+            className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300 min-w-[24px] text-center"
+          >
+            {key}
+          </kbd>
+        ))}
+      </div>
     </div>
   )
 }

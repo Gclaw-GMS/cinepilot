@@ -499,7 +499,7 @@ export default function AIToolsPage() {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search tools..."
+                  placeholder="Search tools... (/)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"

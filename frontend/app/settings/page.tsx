@@ -16,6 +16,8 @@ import {
   Shield,
   RefreshCw,
   Keyboard,
+  Search,
+  X,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -113,6 +115,8 @@ export default function SettingsPage() {
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSettings = useCallback(async () => {
     // First load from localStorage for instant display
@@ -152,6 +156,12 @@ export default function SettingsPage() {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
         return;
+      }
+
+      // /: Focus search
+      if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
       }
 
       // R: Refresh settings
@@ -239,7 +249,27 @@ export default function SettingsPage() {
             <Settings className="h-6 w-6" />
             Settings
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search... (/)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-40 bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-600 focus:border-transparent transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded"
+                >
+                  <X className="w-3 h-3 text-slate-500" />
+                </button>
+              )}
+            </div>
             <button
               onClick={() => {
                 setRefreshing(true);
@@ -539,6 +569,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               {[
+                { key: '/', action: 'Focus search' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
                 { key: '?', action: 'Show shortcuts' },

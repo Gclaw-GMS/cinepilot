@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
-  TrendingUp, RefreshCw, Search, HelpCircle, Loader2
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -73,10 +73,12 @@ export default function CateringPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void>(() => {})
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -115,6 +117,63 @@ export default function CateringPage() {
     setTimeout(() => setRefreshing(false), 500)
   }, [fetchData])
 
+  // Export functions
+  const exportToCSV = () => {
+    if (!plan) return
+    const headers = ['Date', 'Meal Type', 'Menu', 'Dietary', 'Budget', 'Actual Cost']
+    const rows: string[][] = []
+    
+    plan.shootDays.forEach(sd => {
+      sd.meals.forEach(meal => {
+        rows.push([
+          sd.date,
+          meal.type,
+          meal.menu.join('; '),
+          meal.dietary.join('; '),
+          meal.budget.toString(),
+          (meal.actualCost || '').toString()
+        ])
+      })
+    })
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `catering-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const exportToJSON = () => {
+    if (!plan) return
+    const data = {
+      exportDate: new Date().toISOString(),
+      projectId: plan.projectId,
+      summary: {
+        totalShootDays: plan.shootDays.length,
+        totalMeals: plan.shootDays.reduce((sum, sd) => sum + sd.meals.length, 0),
+        totalBudget: plan.totalBudget,
+        totalSpent: plan.shootDays.reduce((sum, sd) => 
+          sum + sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0), 0),
+        catererId: plan.catererId,
+        dietaryRestrictions: plan.dietaryRestrictions
+      },
+      shootDays: plan.shootDays,
+      caterers: caterers
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `catering-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -144,6 +203,13 @@ export default function CateringPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setSearchQuery('')
+          setShowExportMenu(false)
+          setShowDayForm(false)
+          setShowMealForm(false)
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
           break
       }
     }
@@ -173,6 +239,19 @@ export default function CateringPage() {
   }
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   const handleAddShootDay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -310,6 +389,7 @@ export default function CateringPage() {
               <ShortcutRow keys={['R']} description="Refresh catering data" />
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
               <ShortcutRow keys={['N']} description="Add new shoot day" />
+              <ShortcutRow keys={['E']} description="Export menu" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
             </div>
@@ -356,6 +436,36 @@ export default function CateringPage() {
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+              
+              {/* Export Dropdown */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors text-sm"
+                  title="Export (E)"
+                >
+                  <Download className="w-4 h-4 text-slate-400" />
+                  Export
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <button
+                      onClick={() => { exportToCSV(); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={() => { exportToJSON(); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
               
               {/* Keyboard Help Button */}
               <button

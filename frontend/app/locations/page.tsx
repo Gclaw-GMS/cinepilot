@@ -5,7 +5,7 @@ import {
   MapPin, Search, Filter, RefreshCw, Loader2, 
   Star, ExternalLink, TrendingUp, AlertTriangle,
   Building2, Trees, Warehouse, Waves, Users,
-  ChevronRight, Info, Target, Award, X, Keyboard
+  ChevronRight, Info, Target, Award, X, Keyboard, Download
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -123,6 +123,7 @@ export default function LocationsPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'chart'>('cards')
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -177,11 +178,15 @@ export default function LocationsPage() {
         case '2':
           setViewMode('chart')
           break
+        case 'e':
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           setShowShortcuts(true)
           break
         case 'escape':
           setShowShortcuts(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           break
       }
@@ -244,6 +249,84 @@ export default function LocationsPage() {
       return next
     })
   }
+
+  // Export functions
+  const handleExportCSV = () => {
+    if (filteredCandidates.length === 0) return
+    const headers = ['Scene', 'Location', 'Candidate', 'Type', 'Score', 'Access', 'Locality', 'Risk Flags', 'Favorite']
+    const rows = filteredCandidates.map(c => [
+      selectedScene?.sceneNumber || 'N/A',
+      selectedScene?.location || 'N/A',
+      c.name || 'Unknown',
+      c.placeType || 'N/A',
+      c.scoreTotal.toString(),
+      c.scoreAccess?.toString() || 'N/A',
+      c.scoreLocality?.toString() || 'N/A',
+      c.riskFlags?.join('; ') || '',
+      favorites.has(c.id || '') ? 'Yes' : 'No',
+    ])
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `locations-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    if (filteredCandidates.length === 0) return
+    const data = {
+      exportDate: new Date().toISOString(),
+      sceneCount: scenes.length,
+      selectedScene: selectedScene ? {
+        sceneNumber: selectedScene.sceneNumber,
+        heading: selectedScene.headingRaw,
+        location: selectedScene.location,
+        intExt: selectedScene.intExt,
+        timeOfDay: selectedScene.timeOfDay,
+      } : null,
+      candidateCount: filteredCandidates.length,
+      summary: {
+        averageScore: filteredCandidates.reduce((sum, c) => sum + c.scoreTotal, 0) / filteredCandidates.length,
+        totalCandidates: filteredCandidates.length,
+        favoritesCount: filteredCandidates.filter(c => favorites.has(c.id || '')).length,
+        byPlaceType: Object.entries(filteredCandidates.reduce((acc, c) => {
+          const type = c.placeType || 'unknown'
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)),
+      },
+      candidates: filteredCandidates.map(c => ({
+        ...c,
+        isFavorite: favorites.has(c.id || ''),
+      })),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `locations-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.export-menu')) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId)
   const filteredScenes = useMemo(() => {
@@ -363,6 +446,35 @@ export default function LocationsPage() {
             <Keyboard className="w-5 h-5 text-slate-400" />
           </button>
 
+          {/* Export Dropdown */}
+          <div className="relative export-menu">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-all flex items-center gap-1"
+              title="Export (E)"
+            >
+              <Download className="w-5 h-5 text-slate-400" />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4 text-violet-400" />
+                  Export JSON
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="flex bg-slate-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('cards')}
@@ -416,6 +528,7 @@ export default function LocationsPage() {
                 { key: '/', action: 'Focus search input' },
                 { key: '1', action: 'Switch to Cards view' },
                 { key: '2', action: 'Switch to Analysis view' },
+                { key: 'E', action: 'Toggle export menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },
               ].map(({ key, action }) => (

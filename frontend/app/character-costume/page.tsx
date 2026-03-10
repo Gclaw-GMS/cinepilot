@@ -117,9 +117,12 @@ export default function CharacterCostumePage() {
 
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   const fetchCharacters = useCallback(async () => {
@@ -189,8 +192,15 @@ export default function CharacterCostumePage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchTerm('')
           setFilterRole('all')
+          break
+        case 'e':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setShowExportMenu(prev => !prev)
+          }
           break
       }
     }
@@ -198,6 +208,19 @@ export default function CharacterCostumePage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showForm])
+
+  // Click outside handler for export menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -223,6 +246,81 @@ export default function CharacterCostumePage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save')
     }
+  }
+
+  // Export handlers
+  const handleExportCSV = () => {
+    setExporting(true)
+    const headers = ['Name', 'Age', 'Gender', 'Role', 'Appearance', 'Personality', 'Costume Style', 'Fabrics', 'Color Palette', 'Description', 'Designer', 'Budget', 'Status']
+    const rows = filteredCharacters.map(char => [
+      char.name,
+      char.age,
+      char.gender,
+      char.role,
+      char.appearance.join('; '),
+      char.personality.join('; '),
+      char.costumeStyle.join('; '),
+      char.fabrics.join('; '),
+      char.colorPalette.join('; '),
+      char.description,
+      char.designer || '',
+      char.estimatedBudget?.toString() || '',
+      char.status
+    ])
+    
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `character-costumes-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+  }
+
+  const handleExportJSON = () => {
+    setExporting(true)
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalCharacters: filteredCharacters.length,
+      summary: summary ? {
+        totalCharacters: summary.totalCharacters,
+        byRole: summary.byRole,
+        totalBudget: summary.totalBudget,
+      } : null,
+      characters: filteredCharacters.map(char => ({
+        name: char.name,
+        age: char.age,
+        gender: char.gender,
+        role: char.role,
+        appearance: char.appearance,
+        personality: char.personality,
+        costumeStyle: char.costumeStyle,
+        fabrics: char.fabrics,
+        colorPalette: char.colorPalette,
+        description: char.description,
+        costumeNotes: char.costumeNotes,
+        designer: char.designer,
+        estimatedBudget: char.estimatedBudget,
+        status: char.status,
+      }))
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `character-costumes-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
   }
 
   const handleEdit = (char: Character) => {
@@ -379,6 +477,33 @@ export default function CharacterCostumePage() {
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(prev => !prev)}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg transition-colors"
+                title="Export (E)"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1">
+                  <button
+                    onClick={handleExportCSV}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-purple-400" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowKeyboardHelp(true)}
               className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg transition-colors"
@@ -1095,6 +1220,10 @@ export default function CharacterCostumePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Focus search</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">/</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Export data</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Add new character</span>

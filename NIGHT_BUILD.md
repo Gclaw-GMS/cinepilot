@@ -1,5 +1,69 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (7:09 PM)
+
+## Night Build (7:09 PM) - Scripts Export Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Scripts Page**: Added export functionality to Script Management
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header (only visible when script is loaded)
+  - **CSV Export**: Export scenes to CSV (Scene #, Heading, Int/Ext, Time, Location, Characters, Confidence)
+  - **JSON Export**: Full script export including summary stats (total scripts, scenes, characters), all scripts with scenes, and character data
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Loading State**: Visual feedback during export with spinning icon
+  - **Timestamped Filenames**: Exports include date (scripts-2026-03-10.csv/json)
+  - **Summary Stats**: JSON export includes total scripts, scenes, and character counts
+  - **Filtered Export**: CSV export respects current scene search and int/ext filter settings
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Build Status: ✅ PASSING (4:49 PM)
+
+## Night Build (4:49 PM) - Crew Export Enhancement (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Crew Page**: Enhanced export functionality to Crew Management
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+  - **CSV Export**: Export crew data to CSV (Name, Role, Department, Phone, Email, Daily Rate, Notes)
+  - **JSON Export**: Full crew export including summary stats (total crew, total daily rate, departments), all crew members with details and timestamps
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Loading State**: Visual feedback during export with spinning icon
+  - **Timestamped Filenames**: Exports include date (crew-2026-03-10.csv/json)
+  - **Summary Stats**: JSON export includes total crew count, total daily rate, and department count
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Build Status: ✅ PASSING (2:45 PM)
+
+## Night Build (2:45 PM) - Catering Export Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Catering Page**: Added export functionality to Catering Management
+  - **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+  - **CSV Export**: Export catering meals to CSV (Date, Meal Type, Menu, Dietary, Budget, Actual Cost)
+  - **JSON Export**: Full catering export including summary stats (total shoot days, meals, budget, spent), all shoot days, and caterer info
+  - **"E" Shortcut**: Keyboard shortcut to toggle export dropdown menu
+  - **Click Outside**: Export menu closes when clicking outside
+  - **Keyboard Help Modal**: Updated with "E" shortcut for export
+  - **Timestamped Filenames**: Exports include date (catering-2026-03-10.csv/json)
+  - **Esc to Close**: Escape key now closes export dropdown menu
+
+- **Export Data Includes**:
+  - CSV: Date, Meal Type, Menu, Dietary, Budget, Actual Cost
+  - JSON: Export date, project ID, summary stats (total shoot days, meals, budget, total spent), all shoot days with meals, caterer info
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
 ## Build Status: ✅ PASSING (2:05 PM)
 
 ## Night Build (2:05 PM) - VFX Export Enhancement (IMPLEMENTED)

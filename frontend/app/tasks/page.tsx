@@ -33,6 +33,7 @@ import {
   Keyboard,
   ChevronDown,
   Download,
+  FileText,
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -124,6 +125,8 @@ export default function TasksPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
@@ -193,6 +196,7 @@ export default function TasksPage() {
         break
       case 'Escape':
         setSelectedRowIndex(-1)
+        setShowExportMenu(false)
         break
       case '?':
         if (e.shiftKey) {
@@ -224,6 +228,13 @@ export default function TasksPage() {
           setViewMode(prev => prev === 'list' ? 'board' : prev === 'board' ? 'calendar' : 'list')
         }
         break
+      case 'e':
+      case 'E':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+        }
+        break
     }
   }, [tasks.length])
 
@@ -242,6 +253,19 @@ export default function TasksPage() {
       }
     }
   }, [selectedRowIndex])
+
+  // Click outside handler for export menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   // Calculate stats
   const stats = useMemo((): TaskStats => {
@@ -398,6 +422,45 @@ export default function TasksPage() {
     link.download = `tasks-export-${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Export tasks to JSON
+  const handleExportJSON = () => {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      summary: {
+        totalTasks: filteredTasks.length,
+        total: stats.total,
+        pending: stats.pending,
+        inProgress: stats.inProgress,
+        completed: stats.completed,
+        blocked: stats.blocked,
+        overdue: stats.overdue,
+        highPriority: stats.highPriority,
+        completionPercent: stats.completionPercent,
+      },
+      tasks: filteredTasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        assignee: task.assignee,
+        dueDate: task.dueDate,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+      })),
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `tasks-export-${new Date().toISOString().split('T')[0]}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
   }
 
   // Open edit form
@@ -484,15 +547,39 @@ export default function TasksPage() {
                 <span className="hidden sm:inline">Clear Done</span>
               </button>
             )}
-            <button
-              onClick={handleExportCSV}
-              disabled={filteredTasks.length === 0}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-emerald-900/30 border border-slate-700 hover:border-emerald-700/50 rounded-lg text-sm text-slate-400 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Export filtered tasks to CSV"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
+            {/* Export Dropdown */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={filteredTasks.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-emerald-900/30 border border-slate-700 hover:border-emerald-700/50 rounded-lg text-sm text-slate-400 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Export tasks (E)"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={filteredTasks.length === 0}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-emerald-900/30 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={handleExportJSON}
+                    disabled={filteredTasks.length === 0}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-purple-900/30 hover:text-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
@@ -968,6 +1055,7 @@ export default function TasksPage() {
                   { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
                   { keys: ['N'], desc: 'New task', category: 'Actions' },
                   { keys: ['F'], desc: 'Focus search', category: 'Actions' },
+                  { keys: ['E'], desc: 'Export dropdown', category: 'Actions' },
                   { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
                   { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
                 ].map((shortcut, idx) => (
@@ -1170,6 +1258,7 @@ function CalendarView({
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December']
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayOfWeek = dayNames[currentDate.getDay()]
 
   const daysInMonth = getDaysInMonth(currentDate)
   const firstDay = getFirstDayOfMonth(currentDate)
@@ -1181,6 +1270,10 @@ function CalendarView({
     return tasks.filter(t => t.dueDate === dateStr)
   }
 
+  const goToToday = () => setCurrentDate(new Date())
+  const isCurrentMonth = currentDate.getMonth() === new Date().getMonth() && 
+                         currentDate.getFullYear() === new Date().getFullYear()
+
   const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
 
@@ -1191,9 +1284,20 @@ function CalendarView({
         <button onClick={prevMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
           <ChevronDown className="w-5 h-5 rotate-90" />
         </button>
-        <h3 className="text-lg font-semibold text-white">
-          {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold text-white">
+            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+            <span className="ml-2 text-sm font-normal text-slate-400">({dayOfWeek})</span>
+          </h3>
+          {!isCurrentMonth && (
+            <button 
+              onClick={goToToday}
+              className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors"
+            >
+              Today
+            </button>
+          )}
+        </div>
         <button onClick={nextMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
           <ChevronDown className="w-5 h-5 -rotate-90" />
         </button>

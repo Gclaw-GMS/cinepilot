@@ -1,25 +1,129 @@
 # CinePilot Night Build Notes - March 10, 2026
 
-## Build Status: ✅ PASSING (12:25 PM)
+## Build Status: ✅ PASSING (7:09 PM)
 
-### 17. Audience Sentiment Page - Export Feature (March 10, 2026 12:25 PM)
-Added export functionality to the Audience Sentiment page:
-- **Export CSV**: One-click export of sentiment analyses to CSV file
-- **Export JSON**: Full sentiment export including all details to JSON
+### 23. Scripts Page - Export Feature (March 10, 2026 7:09 PM)
+Added export functionality to the Scripts Management page:
+- **Export CSV**: Export scenes to CSV (Scene #, Heading, Int/Ext, Time, Location, Characters, Confidence)
+- **Export JSON**: Full script export including summary stats (total scripts, scenes, characters), all scripts with scenes, and character data
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header (only shows when script is loaded)
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (scripts-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export
+- **Esc to Close**: Escape key closes export dropdown menu
+- **Filtered Export**: Exports respect current search and int/ext filter settings
+
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Build Status: ✅ PASSING (6:49 PM)
+
+### 22. Notifications Page - Export Feature (March 10, 2026 6:49 PM)
+Added export functionality to the Notifications page:
+- **Export CSV**: Export notifications to CSV (ID, Channel, Recipient, Title, Body, Status, Priority, Created At)
+- **Export JSON**: Full notification export including summary stats (total, unread, sent, failed), filters, and all notifications
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options in header
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (notifications-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export
+- **Esc to Close**: Escape key closes export dropdown menu
+- **Filtered Export**: Exports respect current search and filter settings
+
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+## Build Status: ✅ PASSING (12:05 PM)
+
+### 21. Tasks Page - Export Dropdown Feature (March 10, 2026 12:05 PM)
+Enhanced export functionality to the Tasks page:
+- **Export CSV**: One-click export of tasks to CSV file
+- **Export JSON**: Full tasks export including all details with summary stats
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (tasks-export-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu
+
+- **Export Data Includes**:
+  - CSV: Title, Description, Status, Priority, Assignee, Due Date, Created
+  - JSON: Export date, summary stats (total, pending, in progress, completed, blocked, overdue, high priority, completion %), all task details
+
+### Previous Features
+
+## Build Status: ✅ PASSING (11:25 AM)
+
+### 20. Travel Expenses Page - Export Dropdown Feature (March 10, 2026 11:25 AM)
+Enhanced export functionality to the Travel Expenses page:
+- **Export CSV**: One-click export of travel expenses to CSV file
+- **Export JSON**: Full travel expenses export including all details with summary stats
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (travel-expenses-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu
+
+- **Export Data Includes**:
+  - CSV: Date, Person, Category, Description, Vendor, Amount, Status
+  - JSON: Export date, total expenses, total amount, by category, by status, all expense details
+
+### Previous Features
+
+
+## Build Status: ✅ PASSING (10:45 AM)
+
+### 19. Call Sheets Page - Export Dropdown Feature (March 10, 2026 10:45 AM)
+Enhanced export functionality to the Call Sheets page:
+- **Export CSV**: One-click export of crew calls to CSV file
+- **Export JSON**: Full call sheet export including all details with summary stats
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options (replaces single button)
+- **Keyboard Shortcut**: "X" toggles export dropdown menu (E is edit)
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (callsheet-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "X" shortcut for export menu
+- **Esc to Close**: Escape key now closes export dropdown menu
+
+- **Export Data Includes**:
+  - CSV: Role, Name, Department, Call Time
+  - JSON: Export date, full call sheet data (title, date, times, location, scenes, crew calls, notes), summary stats
+
+### Previous Features
+
+### 18. Dubbing Page - Export Feature (March 10, 2026 9:25 AM)
+Added export functionality to the Dubbing Script Generator page:
+- **Export CSV**: One-click export of dubbed versions to CSV file
+- **Export JSON**: Full dubbing export including versions and preview scenes to JSON
 - **Export Dropdown**: Clean dropdown UI with CSV/JSON options
 - **Keyboard Shortcut**: "E" toggles export dropdown menu
 - **Click Outside**: Export menu closes when clicking outside
-- **Timestamped Filenames**: Exports include date (audience-sentiment-2026-03-10.csv/json)
+- **Timestamped Filenames**: Exports include date (dubbed-scripts-2026-03-10.csv/json)
 - **Keyboard Help Modal**: Updated with "E" shortcut for export
-- **Filtered Export**: Exports respect current search and filter settings
 
 - **Export Data Includes**:
-  - CSV: Title, Platform, Status, Total Comments, Positive, Negative, Neutral, Avg Sentiment, Created At
-  - JSON: Full data with export date, filters applied, and all analysis details including top comments, takeaways, and poster tips
+  - CSV: Title, Language, Created Date
+  - JSON: Export date, total dubbed versions, total preview scenes, all version details, and preview scene details
 
-## Build Status: ✅ PASSING (8:43 AM)
+### Previous Features
 
-### 16. Mission Control Page - Export Feature (March 10, 2026 8:43 AM)
+### 17. Projects Page - Export Feature (March 10, 2026 9:15 AM)
+Added export functionality to the Projects page:
+- **Export CSV**: One-click export of projects to CSV file
+- **Export JSON**: Full projects export including all details with summary stats
+- **Export Dropdown**: Clean dropdown UI with CSV/JSON options
+- **Keyboard Shortcut**: "E" toggles export dropdown menu
+- **Click Outside**: Export menu closes when clicking outside
+- **Timestamped Filenames**: Exports include date (projects-2026-03-10.csv/json)
+- **Keyboard Help Modal**: Updated with "E" shortcut for export
+- **Filtered Export**: Exports respect current search settings
+
+- **Export Data Includes**:
+  - CSV: Name, Description, Status, Language, Genre, Budget, Start/End Date, Scripts, Crew
+  - JSON: Full data with export date, total projects, status/language distribution, total budget, and all project details
+
+### Previous Features
 Added export functionality to the Mission Control page:
 - **Export CSV**: One-click export of mission control data to CSV file
 - **Export JSON**: Full mission control export including all production data to JSON

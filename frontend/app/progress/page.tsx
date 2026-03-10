@@ -6,7 +6,7 @@ import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
-  TrendingUp, Activity, Search, X, Keyboard, Filter
+  TrendingUp, Activity, Search, X, Keyboard, Download
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -94,7 +94,7 @@ export default function ProgressPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [showHelp, setShowHelp] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -153,6 +153,67 @@ export default function ProgressPage() {
     }
   }, [])
 
+  // Export functions
+  const handleExportCSV = () => {
+    if (!progress) return
+    const headers = ['Type', 'Name', 'Status', 'Progress', 'Date/Tasks']
+    const rows = [
+      ...progress.phases.map(p => ['Phase', p.displayName, p.status, `${p.progress}%`, '-']),
+      ...progress.milestones.map(m => ['Milestone', m.name, m.status, `${m.tasks} tasks`, m.date]),
+      ...progress.tasks.map(t => ['Task', t.name, t.status, `${t.progress}%`, t.dueDate || '-']),
+    ]
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `progress-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    if (!progress) return
+    const data = {
+      exportDate: new Date().toISOString(),
+      overallProgress: progress.overall,
+      summary: {
+        totalPhases: progress.phases.length,
+        totalMilestones: progress.milestones.length,
+        totalTasks: progress.tasks.length,
+        phasesCompleted: progress.phases.filter(p => p.status === 'completed').length,
+        milestonesCompleted: progress.milestones.filter(m => m.status === 'completed').length,
+        tasksCompleted: progress.tasks.filter(t => t.status === 'completed').length,
+      },
+      phases: progress.phases,
+      milestones: progress.milestones,
+      tasks: progress.tasks,
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `progress-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.export-menu')) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
   useEffect(() => {
     fetchProgress()
   }, [fetchProgress, refreshKey])
@@ -188,6 +249,10 @@ export default function ProgressPage() {
           e.preventDefault()
           setViewMode('kanban')
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowHelp(true)
@@ -195,13 +260,9 @@ export default function ProgressPage() {
         case 'escape':
           e.preventDefault()
           setShowHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
-          setShowFilters(false)
           searchInputRef.current?.blur()
-          break
-        case 'f':
-          e.preventDefault()
-          setShowFilters(prev => !prev)
           break
       }
     }
@@ -361,18 +422,6 @@ export default function ProgressPage() {
               </button>
             )}
           </div>
-          {/* Filter Toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-2 rounded-lg border transition-colors ${
-              showFilters 
-                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' 
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-            }`}
-            title="Toggle filters (F)"
-          >
-            <Filter className="w-4 h-4" />
-          </button>
           {/* View Toggle */}
           <div className="flex bg-slate-800 rounded-lg p-1">
             {(['timeline', 'tasks', 'kanban'] as const).map((mode, idx) => (
@@ -403,6 +452,34 @@ export default function ProgressPage() {
           >
             <Keyboard className="w-5 h-5" />
           </button>
+          {/* Export Dropdown */}
+          <div className="relative export-menu">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1"
+              title="Export (E)"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4 text-violet-400" />
+                  Export JSON
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -426,10 +503,10 @@ export default function ProgressPage() {
               {[
                 { key: 'R', action: 'Refresh data' },
                 { key: '/', action: 'Focus search' },
-                { key: 'F', action: 'Toggle filters' },
                 { key: '1', action: 'Timeline view' },
                 { key: '2', action: 'Tasks view' },
                 { key: '3', action: 'Kanban view' },
+                { key: 'E', action: 'Export menu' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },
               ].map((shortcut) => (

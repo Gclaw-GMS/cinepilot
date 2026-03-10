@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
 import { promises as fs } from 'fs';
-import path from 'path';
 
 interface HealthCheck {
   component: string;
@@ -17,29 +15,46 @@ interface HealthResponse {
   uptime: number;
   checks: HealthCheck[];
   version: string;
+  isDemo?: boolean;
 }
+
+// Check if we're in demo mode (no database configured)
+const isDemoMode = !process.env.DATABASE_URL;
 
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   const checks: HealthCheck[] = [];
   const startTime = Date.now();
   
-  // Check database connection
+  // Check database connection (only if configured)
   const dbStart = Date.now();
-  try {
-    await prisma.$queryRaw`SELECT 1`;
+  if (isDemoMode) {
+    // Demo mode - simulate database as healthy for UI purposes
     checks.push({
       component: 'database',
       status: 'healthy',
-      message: 'Connected',
+      message: 'Demo mode (no database configured)',
+      details: { demoMode: true },
       latencyMs: Date.now() - dbStart,
     });
-  } catch (error) {
-    checks.push({
-      component: 'database',
-      status: 'unhealthy',
-      message: error instanceof Error ? error.message : 'Connection failed',
-      latencyMs: Date.now() - dbStart,
-    });
+  } else {
+    // Try to connect to actual database
+    try {
+      const { prisma } = await import('@/lib/db');
+      await prisma.$queryRaw`SELECT 1`;
+      checks.push({
+        component: 'database',
+        status: 'healthy',
+        message: 'Connected',
+        latencyMs: Date.now() - dbStart,
+      });
+    } catch (error) {
+      checks.push({
+        component: 'database',
+        status: 'unhealthy',
+        message: error instanceof Error ? error.message : 'Connection failed',
+        latencyMs: Date.now() - dbStart,
+      });
+    }
   }
 
   // Check disk space (workspace)
@@ -132,6 +147,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     uptime: process.uptime(),
     checks,
     version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+    isDemo: isDemoMode,
   };
 
   return NextResponse.json(response, {

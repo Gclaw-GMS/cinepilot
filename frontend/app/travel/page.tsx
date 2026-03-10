@@ -22,6 +22,9 @@ import {
   Search,
   HelpCircle,
   RefreshCw,
+  ChevronDown,
+  FileText,
+  Keyboard,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -97,6 +100,8 @@ export default function TravelExpensesPage() {
   // Search and keyboard shortcuts
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
@@ -151,6 +156,10 @@ export default function TravelExpensesPage() {
           e.preventDefault()
           setShowForm(true)
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -160,6 +169,7 @@ export default function TravelExpensesPage() {
           setShowKeyboardHelp(false)
           setSearchQuery('')
           setShowForm(false)
+          setShowExportMenu(false)
           break
       }
     }
@@ -167,6 +177,19 @@ export default function TravelExpensesPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside)
+    }
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showExportMenu])
 
   // CSV Export function
   const exportToCSV = () => {
@@ -196,6 +219,34 @@ export default function TravelExpensesPage() {
     URL.revokeObjectURL(url)
   }
 
+  // JSON Export function
+  const exportToJSON = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      totalExpenses: expenses.length,
+      totalAmount: summary.totalAmount,
+      byCategory: summary.byCategory,
+      byStatus: summary.byStatus,
+      expenses: expenses.map(exp => ({
+        date: exp.date,
+        person: exp.description.match(/^([^:]+):/)?.[1] || '',
+        category: exp.category,
+        description: exp.description.replace(/^[^:]+:s*/, ''),
+        vendor: exp.vendor || null,
+        amount: exp.amount,
+        status: exp.status,
+        notes: exp.notes || null,
+      }))
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const clearDateFilter = () => {
     setDateRange({ start: '', end: '' })
     setShowDateFilter(false)
@@ -214,6 +265,7 @@ export default function TravelExpensesPage() {
     })
     setEditingId(null)
     setShowForm(false)
+          setShowExportMenu(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -564,14 +616,37 @@ export default function TravelExpensesPage() {
                 />
               </div>
             )}
-            <button
-              onClick={exportToCSV}
-              disabled={filteredExpenses.length === 0}
-              className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-sm transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(prev => !prev)}
+                disabled={filteredExpenses.length === 0}
+                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-sm transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+                <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                  <button
+                    onClick={() => { exportToCSV(); setShowExportMenu(false); }}
+                    disabled={filteredExpenses.length === 0}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => { exportToJSON(); setShowExportMenu(false); }}
+                    disabled={filteredExpenses.length === 0}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={fetchExpenses}
               className="ml-auto text-sm text-slate-400 hover:text-white transition-colors"
@@ -808,6 +883,10 @@ export default function TravelExpensesPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Add new expense</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export menu</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

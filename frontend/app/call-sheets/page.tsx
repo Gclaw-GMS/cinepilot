@@ -70,7 +70,6 @@ export default function CallSheetsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   
   // Refs
@@ -153,13 +152,13 @@ export default function CallSheetsPage() {
         case 'e':
           e.preventDefault()
           if (selected && !isEditing) {
-            setShowExportMenu(prev => !prev)
+            startEditing()
           }
           break
-        case 'i':
+        case 'x':
           e.preventDefault()
-          if (selected && !isEditing && !showExportMenu) {
-            startEditing()
+          if (selected && !isEditing) {
+            setShowExportMenu(prev => !prev)
           }
           break
         case 'd':
@@ -193,7 +192,20 @@ export default function CallSheetsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selected, isEditing, creating, deleting, showKeyboardHelp, fetchCallSheets])
+  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, fetchCallSheets])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   // Filter call sheets by search
   const filteredCallSheets = useMemo(() => {
@@ -475,8 +487,6 @@ export default function CallSheetsPage() {
   // Export to CSV
   const handleExportCSV = () => {
     if (!selected) return
-    setExporting(true)
-    setShowExportMenu(false)
     const crew = selected.content?.crewCalls || []
     const rows = [['Role', 'Name', 'Department', 'Call Time']]
     crew.forEach(c => {
@@ -487,53 +497,48 @@ export default function CallSheetsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `callsheet-${selected.date?.split('T')[0] || 'export'}.csv`
+    const date = new Date().toISOString().split('T')[0]
+    a.download = `callsheet-${date}.csv`
     a.click()
-    setExporting(false)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
   }
 
   // Export to JSON
   const handleExportJSON = () => {
     if (!selected) return
-    setExporting(true)
-    setShowExportMenu(false)
-    const exportData = {
+    const data = {
+      exportDate: new Date().toISOString(),
       callSheet: {
         id: selected.id,
         title: selected.title,
         date: selected.date,
-        notes: selected.notes,
+        callTime: selected.content?.callTime,
+        wrapTime: selected.content?.wrapTime,
+        location: selected.content?.location,
+        locationAddress: selected.content?.locationAddress,
+        weather: selected.content?.weather,
+        scenes: selected.content?.scenes || [],
+        crewCalls: selected.content?.crewCalls || [],
+        notes: selected.notes
       },
-      content: selected.content,
-      stats: {
+      summary: {
         totalCrew: selected.content?.crewCalls?.length || 0,
         departments: [...new Set(selected.content?.crewCalls?.map(c => c.department).filter(Boolean))].length,
-        scenes: selected.content?.scenes?.length || 0,
-      },
-      exportedAt: new Date().toISOString(),
+        scenesCount: selected.content?.scenes?.length || 0
+      }
     }
-    const jsonStr = JSON.stringify(exportData, null, 2)
-    const blob = new Blob([jsonStr], { type: 'application/json' })
+    const json = JSON.stringify(data, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `callsheet-${selected.date?.split('T')[0] || 'export'}.json`
+    const date = new Date().toISOString().split('T')[0]
+    a.download = `callsheet-${date}.json`
     a.click()
-    setExporting(false)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
   }
-
-  // Close export menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    if (showExportMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showExportMenu])
 
   // Group crew by department for display
   const crewByDepartment = useMemo(() => {
@@ -833,13 +838,6 @@ export default function CallSheetsPage() {
                       <button
                         onClick={handlePrint}
                         className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
-                        title="Print"
-                      >
-                        <Printer className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handlePrint}
-                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
                         title="Print (P)"
                       >
                         <Printer className="w-4 h-4" />
@@ -847,31 +845,26 @@ export default function CallSheetsPage() {
                       <div className="relative" ref={exportMenuRef}>
                         <button
                           onClick={() => setShowExportMenu(!showExportMenu)}
-                          disabled={exporting || !selected}
-                          className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-slate-400 hover:text-white"
-                          title="Export (E)"
+                          className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"
+                          title="Export (X)"
                         >
-                          {exporting ? (
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
+                          <Download className="w-4 h-4" />
                         </button>
-                        {showExportMenu && selected && (
-                          <div className="absolute right-0 mt-1 w-36 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                            <button
-                              onClick={handleExportJSON}
-                              className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 flex items-center gap-2"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              JSON
-                            </button>
+                        {showExportMenu && (
+                          <div className="absolute right-0 top-full mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                             <button
                               onClick={handleExportCSV}
-                              className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
                             >
-                              <FileText className="w-3.5 h-3.5" />
-                              CSV
+                              <FileText className="w-4 h-4" />
+                              Export CSV
+                            </button>
+                            <button
+                              onClick={handleExportJSON}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Export JSON
                             </button>
                           </div>
                         )}
@@ -879,7 +872,6 @@ export default function CallSheetsPage() {
                       <button
                         onClick={startEditing}
                         className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm"
-                        title="Edit (I)"
                       >
                         <Edit2 className="w-4 h-4" />
                         Edit
@@ -1277,8 +1269,8 @@ export default function CallSheetsPage() {
                 { key: 'R', description: 'Refresh call sheets' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'N', description: 'New call sheet' },
-                { key: 'E', description: 'Export selected sheet' },
-                { key: 'I', description: 'Edit selected sheet' },
+                { key: 'E', description: 'Edit selected sheet' },
+                { key: 'X', description: 'Export dropdown menu' },
                 { key: 'D', description: 'Delete selected sheet' },
                 { key: 'P', description: 'Print selected sheet' },
                 { key: '?', description: 'Show keyboard shortcuts' },

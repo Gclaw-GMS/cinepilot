@@ -22,6 +22,7 @@ import {
   Users,
   Zap,
   Keyboard,
+  Download,
 } from 'lucide-react';
 
 type Notification = {
@@ -185,9 +186,11 @@ export default function NotificationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     channel: 'app' as 'app' | 'email' | 'whatsapp' | 'sms',
@@ -228,6 +231,80 @@ export default function NotificationsPage() {
     setTimeout(() => setIsRefreshing(false), 500)
   }
 
+  // Export functions
+  const handleExport = (format: 'csv' | 'json') => {
+    const dataToExport = filteredNotifications
+    
+    if (format === 'json') {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        summary: {
+          total: stats.total,
+          unread: stats.unread,
+          sent: stats.sent,
+          failed: stats.failed,
+        },
+        filters: {
+          tab: filterTab,
+          channel: channelFilter,
+          search: searchQuery || undefined,
+        },
+        notifications: dataToExport.map(n => ({
+          id: n.id,
+          channel: n.channel,
+          recipient: n.recipient,
+          title: n.title,
+          body: n.body,
+          status: n.status,
+          priority: n.priority,
+          createdAt: n.createdAt,
+          sentAt: n.sentAt,
+        })),
+      }
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `notifications-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      const headers = ['ID', 'Channel', 'Recipient', 'Title', 'Body', 'Status', 'Priority', 'Created At']
+      const rows = dataToExport.map(n => [
+        n.id,
+        n.channel,
+        n.recipient || '',
+        `"${n.title.replace(/"/g, '""')}"`,
+        `"${n.body.replace(/"/g, '""')}"`,
+        n.status,
+        n.priority,
+        n.createdAt,
+      ])
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `notifications-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    setShowExportMenu(false)
+  }
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -244,6 +321,10 @@ export default function NotificationsPage() {
         case 'r':
           e.preventDefault()
           handleRefresh()
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -282,6 +363,7 @@ export default function NotificationsPage() {
           setShowKeyboardHelp(false)
           setSearchQuery('')
           setShowFilters(false)
+          setShowExportMenu(false)
           break
       }
     }
@@ -463,6 +545,33 @@ export default function NotificationsPage() {
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                title="Export (E)"
+              >
+                <Download className="h-4 w-4 text-slate-400" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                  <button
+                    onClick={() => handleExport('csv')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="h-3 w-3" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="h-3 w-3" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowKeyboardHelp(true)}
               className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
@@ -871,6 +980,10 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Refresh notifications</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">R</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Export data</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">E</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Focus search</span>

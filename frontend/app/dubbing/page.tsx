@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, ChevronDown } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -62,8 +62,8 @@ export default function DubbingPage() {
   const [loadingVersions, setLoadingVersions] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   
   // Refs for keyboard shortcuts
@@ -89,7 +89,7 @@ export default function DubbingPage() {
           break
         case 'e':
           e.preventDefault()
-          setShowExportMenu(prev => !prev)
+          setShowExportMenu(!showExportMenu)
           break
         case '?':
           e.preventDefault()
@@ -98,15 +98,28 @@ export default function DubbingPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
-          setSearchQuery('')
           setShowExportMenu(false)
+          setSearchQuery('')
           break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [showExportMenu])
+
+  // Click outside handler for export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   useEffect(() => {
     async function loadScripts() {
@@ -171,6 +184,53 @@ export default function DubbingPage() {
   // Assign to ref for keyboard shortcuts
   fetchDataRef.current = () => {
     if (selectedScriptId) loadDubbedVersions(selectedScriptId)
+  }
+
+  // Export functions
+  const handleExportCSV = () => {
+    const headers = ['Title', 'Language', 'Created At']
+    const rows = dubbedVersions.map(d => [
+      d.title,
+      d.language,
+      new Date(d.createdAt).toLocaleDateString()
+    ])
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dubbed-scripts-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    const data = {
+      exportDate: new Date().toISOString(),
+      totalDubbedVersions: dubbedVersions.length,
+      totalPreviewScenes: preview.length,
+      dubbedVersions: dubbedVersions.map(d => ({
+        title: d.title,
+        language: d.language,
+        createdAt: d.createdAt
+      })),
+      previewScenes: preview.map(p => ({
+        sceneNumber: p.sceneNumber,
+        translatedDialogue: p.translatedDialogue,
+        notes: p.notes
+      }))
+    }
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dubbed-scripts-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
   }
 
   useEffect(() => {
@@ -263,64 +323,6 @@ export default function DubbingPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [dubbedVersions])
 
-  // Click outside to close export menu
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
-        setShowExportMenu(false)
-      }
-    }
-    if (showExportMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showExportMenu])
-
-  // Export functions
-  const handleExport = (format: 'csv' | 'json') => {
-    const timestamp = new Date().toISOString().split('T')[0]
-    
-    if (format === 'csv') {
-      // CSV export of dubbed versions
-      const headers = ['Title', 'Language', 'Created At']
-      const rows = dubbedVersions.map(dub => [
-        `"${dub.title}"`,
-        dub.language,
-        new Date(dub.createdAt).toLocaleDateString()
-      ])
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `dubbed-scripts-${timestamp}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-    } else {
-      // JSON export
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        totalDubbedVersions: dubbedVersions.length,
-        languages: [...new Set(dubbedVersions.map(d => d.language))],
-        dubbedVersions: dubbedVersions.map(dub => ({
-          title: dub.title,
-          language: dub.language,
-          createdAt: dub.createdAt,
-          preview: preview.filter(p => p.sceneNumber)
-        })),
-        previewScenes: preview
-      }
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `dubbed-scripts-${timestamp}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    }
-    setShowExportMenu(false)
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -352,19 +354,19 @@ export default function DubbingPage() {
                 title="Export (E)"
               >
                 <Download className="w-4 h-4" />
-                <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+                <span className="text-xs">Export</span>
               </button>
               {showExportMenu && (
                 <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                   <button
-                    onClick={() => handleExport('csv')}
+                    onClick={handleExportCSV}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
                   >
-                    <Download className="w-4 h-4" />
+                    <FileText className="w-4 h-4" />
                     Export CSV
                   </button>
                   <button
-                    onClick={() => handleExport('json')}
+                    onClick={handleExportJSON}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
                   >
                     <Download className="w-4 h-4" />

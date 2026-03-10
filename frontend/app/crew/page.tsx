@@ -21,6 +21,8 @@ import {
   TrendingUp,
   Keyboard,
   RefreshCw,
+  ChevronDown,
+  FileText,
 } from 'lucide-react';
 import {
   BarChart,
@@ -106,10 +108,13 @@ export default function CrewPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
 
   const [form, setForm] = useState({
@@ -195,8 +200,13 @@ export default function CrewPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearch('')
           setDeptFilter('all')
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
           break
       }
     }
@@ -397,7 +407,21 @@ export default function CrewPage() {
     }
   };
 
-  const handleExport = () => {
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showExportMenu])
+
+  const handleExportCSV = () => {
+    setExporting(true)
     const headers = ['Name', 'Role', 'Department', 'Phone', 'Email', 'Daily Rate', 'Notes'];
     const rows = filtered.map(c => [
       c.name,
@@ -414,13 +438,55 @@ export default function CrewPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `crew-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `crew-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     
-    setSuccess('Crew data exported!');
-    setTimeout(() => setSuccess(null), 3000);
-  };
+    setShowExportMenu(false)
+    setExporting(false)
+    setSuccess('Crew exported to CSV!')
+    setTimeout(() => setSuccess(null), 3000)
+  }
+
+  const handleExportJSON = () => {
+    setExporting(true)
+    const totalDailyRate = crew.reduce((sum, c) => {
+      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
+      return sum + (isNaN(rate) ? 0 : rate)
+    }, 0)
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      projectId: 'demo',
+      summary: {
+        totalCrew: crew.length,
+        totalDailyRate: totalDailyRate,
+        departments: [...new Set(crew.map(c => c.department).filter(Boolean))].length,
+      },
+      crew: crew.map(c => ({
+        name: c.name,
+        role: c.role,
+        department: c.department || '',
+        phone: c.phone || '',
+        email: c.email || '',
+        dailyRate: c.dailyRate,
+        notes: c.notes || '',
+        createdAt: c.createdAt,
+      })),
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `crew-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    
+    setShowExportMenu(false)
+    setExporting(false)
+    setSuccess('Crew exported to JSON!')
+    setTimeout(() => setSuccess(null), 3000)
+  }
 
   if (loading) {
     return (
@@ -459,10 +525,36 @@ export default function CrewPage() {
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
-              <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors">
-                <Download className="w-4 h-4" />
-                Export
-              </button>
+              <div className="relative" ref={exportMenuRef}>
+                <button 
+                  onClick={() => setShowExportMenu(prev => !prev)}
+                  disabled={exporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm transition-colors"
+                  title="Export (E)"
+                >
+                  <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
+                  Export
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
               <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium transition-colors">
                 <Plus className="w-4 h-4" />
                 Add Crew
@@ -834,6 +926,10 @@ export default function CrewPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Add new crew</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export menu</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Filter by department</span>

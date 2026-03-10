@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, HelpCircle, X } from 'lucide-react'
+import { Search, RefreshCw, HelpCircle, X, Download } from 'lucide-react'
 
 interface FrameData {
   id: string
@@ -61,6 +61,7 @@ export default function StoryboardPage() {
   const [maxFrames, setMaxFrames] = useState(3)
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   
   // Refs for keyboard shortcuts
@@ -94,6 +95,84 @@ export default function StoryboardPage() {
       setLoading(false)
     }
   }, [selectedScript])
+
+  // Export functions
+  const handleExportCSV = () => {
+    if (scenes.length === 0) return
+    const headers = ['Scene', 'Shot', 'Frame ID', 'Status', 'Approved', 'Style', 'Prompt']
+    const rows: string[][] = []
+    scenes.forEach(scene => {
+      scene.frames.forEach(frame => {
+        rows.push([
+          scene.sceneNumber.toString(),
+          frame.shot.shotIndex.toString(),
+          frame.id,
+          frame.status,
+          frame.isApproved ? 'Yes' : 'No',
+          frame.style,
+          frame.prompt || '',
+        ])
+      })
+    })
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `storyboard-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    if (scenes.length === 0) return
+    const data = {
+      exportDate: new Date().toISOString(),
+      totalScenes: scenes.length,
+      totalFrames: scenes.reduce((sum, s) => sum + s.frames.length, 0),
+      summary: {
+        approved: scenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0),
+        pending: scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending').length, 0),
+        failed: scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0),
+      },
+      scenes: scenes.map(scene => ({
+        sceneNumber: scene.sceneNumber,
+        heading: scene.heading,
+        frames: scene.frames.map(frame => ({
+          id: frame.id,
+          shotIndex: frame.shot.shotIndex,
+          status: frame.status,
+          isApproved: frame.isApproved,
+          style: frame.style,
+          prompt: frame.prompt,
+          directorNotes: frame.directorNotes,
+        })),
+      })),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `storyboard-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.export-menu')) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   useEffect(() => {
     fetchFrames()
@@ -140,6 +219,10 @@ export default function StoryboardPage() {
           e.preventDefault()
           setSelectedStyle('blueprint')
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -147,6 +230,7 @@ export default function StoryboardPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           break
       }
@@ -312,6 +396,34 @@ export default function StoryboardPage() {
             >
               <HelpCircle className="w-5 h-5 text-gray-400" />
             </button>
+            {/* Export Dropdown */}
+            <div className="relative export-menu">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg hover:bg-[#222] transition-colors flex items-center gap-1"
+                title="Export (E)"
+              >
+                <Download className="w-5 h-5 text-gray-400" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportCSV}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-[#222] transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-[#222] transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-violet-400" />
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -590,6 +702,7 @@ export default function StoryboardPage() {
                   { key: '2', action: 'Switch to Pencil Sketch style' },
                   { key: '3', action: 'Switch to Marker & Ink style' },
                   { key: '4', action: 'Switch to Blueprint style' },
+                  { key: 'E', action: 'Export menu' },
                   { key: '?', action: 'Show this help modal' },
                   { key: 'Esc', action: 'Close modal / Clear search' },
                 ].map(shortcut => (

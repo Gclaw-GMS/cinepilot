@@ -120,7 +120,7 @@ const FEATURES = [
   {
     key: 'censor',
     label: 'Censor Board',
-    href: '/reports',
+    href: '/censor',
     icon: Shield,
     color: 'from-red-600 to-rose-600',
     metric: (s: DashboardStats) => s.censor.certificate !== '--' ? `CBFC: ${s.censor.certificate}` : 'Not analyzed',

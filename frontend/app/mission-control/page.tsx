@@ -144,6 +144,7 @@ export default function MissionControl() {
   const [time, setTime] = useState(new Date())
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Ref for keyboard shortcut access
@@ -187,6 +188,78 @@ export default function MissionControl() {
     fetchData()
   }
 
+  // Export functions
+  const handleExportCSV = () => {
+    if (!data) return
+    
+    const rows = [
+      ['Category', 'Name', 'Value'],
+      // Production
+      ['Production', 'Overall Health', `${data.production.overall}%`],
+      ['Production', 'Scenes Total', data.production.scenes.total.toString()],
+      ['Production', 'Scenes Completed', data.production.scenes.completed.toString()],
+      ['Production', 'Scenes Remaining', data.production.scenes.remaining.toString()],
+      ['Production', 'Days Total', data.production.schedule.daysTotal.toString()],
+      ['Production', 'Days Elapsed', data.production.schedule.daysElapsed.toString()],
+      ['Production', 'Days Remaining', data.production.schedule.daysRemaining.toString()],
+      ['Production', 'Budget Total', data.production.budget.total.toString()],
+      ['Production', 'Budget Spent', data.production.budget.spent.toString()],
+      ['Production', 'Budget Remaining', data.production.budget.remaining.toString()],
+      // Today
+      ['Today', 'Scenes Shot', data.today.scenesShot.toString()],
+      ['Today', 'Scenes Planned', data.today.scenesPlanned.toString()],
+      ['Today', 'Crew Present', data.today.crewPresent.toString()],
+      ['Today', 'Crew Total', data.today.crewTotal.toString()],
+      ['Today', 'Hours Remaining', data.today.hoursRemaining.toString()],
+      // Departments
+      ...data.departments.map(d => ['Department', d.name, `Health: ${d.health}%, Members: ${d.members}, Rate: ₹${d.dailyRate}/day`]),
+      // Risks
+      ...data.risks.map(r => ['Risk', r.title, `Level: ${r.level}, Days Left: ${r.daysLeft}`]),
+      // Locations
+      ...data.locations.map(l => ['Location', l.name, `Scenes: ${l.scenes}, Progress: ${l.progress}%`]),
+    ]
+    
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mission-control-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    if (!data) return
+    
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      production: data.production,
+      today: data.today,
+      weekly: data.weekly,
+      departments: data.departments,
+      risks: data.risks,
+      locations: data.locations,
+      summary: data.summary,
+      stats: {
+        totalDepartments: data.departments.length,
+        totalRisks: data.risks.length,
+        totalLocations: data.locations.length,
+      }
+    }
+    
+    const json = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mission-control-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
   // Set up fetch data ref for keyboard shortcut
   useEffect(() => {
     fetchDataRef.current = () => {
@@ -194,6 +267,21 @@ export default function MissionControl() {
       fetchData()
     }
   }, [fetchData])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu) {
+        const target = e.target as HTMLElement
+        const isDropdown = target.closest('.relative')
+        if (!isDropdown) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showExportMenu])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -212,6 +300,10 @@ export default function MissionControl() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -219,6 +311,7 @@ export default function MissionControl() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           break
       }
@@ -359,9 +452,33 @@ export default function MissionControl() {
               >
                 <HelpCircle className="w-5 h-5 text-cyan-400" />
               </button>
-              <button className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all">
-                <Download className="w-5 h-5 text-cyan-400" />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowExportMenu(prev => !prev)}
+                  className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all"
+                  title="Export (E)"
+                >
+                  <Download className="w-5 h-5 text-cyan-400" />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-3"
+                    >
+                      <FileText className="w-4 h-4 text-green-400" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-3"
+                    >
+                      <FileText className="w-4 h-4 text-purple-400" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -405,6 +522,7 @@ export default function MissionControl() {
             <div className="space-y-3">
               <ShortcutRow keys={['R']} description="Refresh mission data" />
               <ShortcutRow keys={['/']} description="Focus search input" />
+              <ShortcutRow keys={['E']} description="Export dropdown menu" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
             </div>

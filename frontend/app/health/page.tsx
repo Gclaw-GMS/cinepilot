@@ -27,6 +27,7 @@ interface HealthResponse {
   uptime: number
   checks: HealthCheck[]
   version: string
+  isDemo?: boolean
 }
 
 interface HealthHistory {
@@ -280,6 +281,11 @@ export default function HealthPage() {
               <h1 className="text-2xl font-bold">System Health</h1>
               <p className="text-slate-400">Monitor database, disk, memory, and environment</p>
             </div>
+            {healthData?.isDemo && (
+              <span className="ml-4 px-3 py-1 bg-indigo-500/20 text-indigo-400 text-sm font-medium rounded-full border border-indigo-500/30">
+                Demo Mode
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {/* Search Input */}

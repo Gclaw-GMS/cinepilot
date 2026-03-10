@@ -133,10 +133,6 @@ export default function AudienceSentimentPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
-        case 'e':
-          e.preventDefault()
-          setShowExportMenu(prev => !prev)
-          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -161,6 +157,10 @@ export default function AudienceSentimentPage() {
           e.preventDefault()
           setPlatformFilter('twitter')
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -178,17 +178,6 @@ export default function AudienceSentimentPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-
-  // Click outside handler for export menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showExportMenu && !(e.target as HTMLElement).closest('.export-menu')) {
-        setShowExportMenu(false)
-      }
-    }
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [showExportMenu])
 
   useEffect(() => {
     fetchAnalyses()
@@ -257,22 +246,20 @@ export default function AudienceSentimentPage() {
     }
   }
 
-  const selectedAnalysis = filteredAnalyses[0]
-
   // Export functions
-  const exportToCSV = () => {
+  const handleExportCSV = () => {
     if (filteredAnalyses.length === 0) return
-    const headers = ['Title', 'Platform', 'Status', 'Total Comments', 'Positive', 'Negative', 'Neutral', 'Avg Sentiment', 'Created At']
+    const headers = ['Title', 'Platform', 'Total Comments', 'Positive', 'Negative', 'Neutral', 'Avg Sentiment', 'Status', 'Created']
     const rows = filteredAnalyses.map(a => [
       a.title,
       a.platform,
-      a.status,
       a.totalComments.toString(),
       a.positiveCount.toString(),
       a.negativeCount.toString(),
       a.neutralCount.toString(),
-      a.avgSentiment.toString(),
-      a.createdAt
+      a.avgSentiment.toFixed(2),
+      a.status,
+      a.createdAt,
     ])
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -285,34 +272,27 @@ export default function AudienceSentimentPage() {
     setShowExportMenu(false)
   }
 
-  const exportToJSON = () => {
+  const handleExportJSON = () => {
     if (filteredAnalyses.length === 0) return
     const data = {
       exportDate: new Date().toISOString(),
-      projectId: DEMO_PROJECT_ID,
       totalAnalyses: filteredAnalyses.length,
-      platformFilter,
-      searchQuery,
-      analyses: filteredAnalyses.map(a => ({
-        id: a.id,
-        title: a.title,
-        platform: a.platform,
-        status: a.status,
-        totalComments: a.totalComments,
-        analyzedCount: a.analyzedCount,
-        positiveCount: a.positiveCount,
-        negativeCount: a.neutralCount,
-        neutralCount: a.neutralCount,
-        avgSentiment: a.avgSentiment,
-        topPositive: a.topPositive,
-        topNegative: a.topNegative,
-        takeaways: a.takeaways,
-        posterTips: a.posterTips,
-        createdAt: a.createdAt
-      }))
+      summary: {
+        totalComments: filteredAnalyses.reduce((sum, a) => sum + a.totalComments, 0),
+        totalPositive: filteredAnalyses.reduce((sum, a) => sum + a.positiveCount, 0),
+        totalNegative: filteredAnalyses.reduce((sum, a) => sum + a.negativeCount, 0),
+        totalNeutral: filteredAnalyses.reduce((sum, a) => sum + a.neutralCount, 0),
+        averageSentiment: filteredAnalyses.length > 0 
+          ? (filteredAnalyses.reduce((sum, a) => sum + a.avgSentiment, 0) / filteredAnalyses.length).toFixed(2)
+          : 0,
+        byPlatform: PLATFORMS.map(p => ({
+          platform: p.key,
+          count: filteredAnalyses.filter(a => a.platform === p.key).length,
+        })),
+      },
+      analyses: filteredAnalyses,
     }
-    const json = JSON.stringify(data, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -321,6 +301,33 @@ export default function AudienceSentimentPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.export-menu')) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
+  // Close export menu on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showExportMenu) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showExportMenu])
+
+  const selectedAnalysis = filteredAnalyses[0]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -395,36 +402,6 @@ export default function AudienceSentimentPage() {
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
-              
-              {/* Export Dropdown */}
-              <div className="relative export-menu">
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="flex items-center gap-2 p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
-                  title="Export (E)"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                    <button
-                      onClick={exportToCSV}
-                      className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 transition-colors flex items-center gap-2"
-                    >
-                      <Download className="w-3 h-3" />
-                      Export CSV
-                    </button>
-                    <button
-                      onClick={exportToJSON}
-                      className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 transition-colors flex items-center gap-2"
-                    >
-                      <Download className="w-3 h-3" />
-                      Export JSON
-                    </button>
-                  </div>
-                )}
-              </div>
-              
               <button
                 onClick={() => setShowKeyboardHelp(true)}
                 className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
@@ -432,6 +409,33 @@ export default function AudienceSentimentPage() {
               >
                 <HelpCircle className="w-4 h-4" />
               </button>
+              <div className="relative export-menu">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-1"
+                  title="Export (E)"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4 text-emerald-400" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4 text-violet-400" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setShowForm(true)}
                 className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all"
@@ -854,12 +858,12 @@ export default function AudienceSentimentPage() {
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Export data</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">New analysis</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export menu</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Filter: All</span>

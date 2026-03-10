@@ -18,7 +18,9 @@ import {
   DollarSign,
   MapPin,
   RefreshCw,
-  Keyboard
+  Keyboard,
+  Download,
+  ChevronDown
 } from 'lucide-react'
 
 interface Project {
@@ -117,7 +119,9 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [saving, setSaving] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -190,20 +194,96 @@ export default function ProjectsPage() {
       e.preventDefault()
       setShowKeyboardHelp(prev => !prev)
     }
-    // Escape: Close modal / Clear search
+    // E: Toggle export dropdown
+    else if (e.key.toLowerCase() === 'e') {
+      e.preventDefault()
+      setShowExportDropdown(prev => !prev)
+    }
+    // Escape: Close modal / Clear search / Close export
     else if (e.key === 'Escape') {
       if (showKeyboardHelp) {
         setShowKeyboardHelp(false)
+      } else if (showExportDropdown) {
+        setShowExportDropdown(false)
       } else if (search) {
         setSearch('')
       }
     }
-  }, [loadProjects, search, showKeyboardHelp])
+  }, [loadProjects, search, showKeyboardHelp, showExportDropdown])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+
+  // Click outside to close export dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setShowExportDropdown(false)
+      }
+    }
+    if (showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportDropdown])
+
+  const handleExport = (format: 'csv' | 'json') => {
+    const exportData = filtered
+    const timestamp = new Date().toISOString().split('T')[0]
+    
+    if (format === 'csv') {
+      const headers = ['Name', 'Description', 'Status', 'Language', 'Genre', 'Budget', 'Start Date', 'End Date', 'Scripts', 'Crew']
+      const rows = exportData.map(p => [
+        p.name,
+        p.description || '',
+        p.status,
+        p.language || '',
+        p.genre || '',
+        p.budget || '',
+        p.startDate || '',
+        p.endDate || '',
+        p.scriptCount,
+        p.crewCount
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      const csv = [headers.join(','), ...rows].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `projects-${timestamp}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      const jsonData = {
+        exportDate: new Date().toISOString(),
+        totalProjects: exportData.length,
+        summary: {
+          byStatus: exportData.reduce((acc, p) => {
+            acc[p.status] = (acc[p.status] || 0) + 1
+            return acc
+          }, {} as Record<string, number>),
+          byLanguage: exportData.reduce((acc, p) => {
+            if (p.language) {
+              acc[p.language] = (acc[p.language] || 0) + 1
+            }
+            return acc
+          }, {} as Record<string, number>),
+          totalBudget: exportData.reduce((sum, p) => sum + (parseFloat(p.budget || '0') || 0), 0),
+        },
+        projects: exportData
+      }
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `projects-${timestamp}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    setShowExportDropdown(false)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -355,6 +435,35 @@ export default function ProjectsPage() {
           >
             <Keyboard className="w-4 h-4" />
           </button>
+          <div className="relative" ref={exportDropdownRef}>
+            <button 
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+              title="Export (E)"
+            >
+              <Download className="w-4 h-4" />
+              <ChevronDown className={`w-3 h-3 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            {showExportDropdown && (
+              <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={() => handleExport('json')}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export JSON
+                </button>
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
@@ -715,6 +824,7 @@ export default function ProjectsPage() {
                 { key: 'R', description: 'Refresh projects' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'N', description: 'Create new project' },
+                { key: 'E', description: 'Export projects' },
                 { key: '?', description: 'Show this help' },
                 { key: 'Esc', description: 'Close modal / Clear search' },
               ].map(({ key, description }) => (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson, Printer } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -168,11 +168,13 @@ export default function VfxPage() {
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
   
   // Refs for keyboard shortcuts and menus
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const printMenuRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -207,6 +209,7 @@ export default function VfxPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           setTypeFilter('all')
           setComplexityFilter('all')
@@ -215,6 +218,12 @@ export default function VfxPage() {
           if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
             e.preventDefault()
             setShowExportMenu(prev => !prev)
+          }
+          break
+        case 'p':
+          if (vfxNotes.length > 0) {
+            e.preventDefault()
+            setShowPrintMenu(prev => !prev)
           }
           break
         case '1':
@@ -242,11 +251,14 @@ export default function VfxPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -616,6 +628,143 @@ export default function VfxPage() {
     setShowExportMenu(false);
   }
 
+  // Print VFX Report
+  function printVfxReport() {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) return;
+    
+    const scriptTitle = scripts.find(s => s.id === selectedScript)?.title || 'Unknown Script';
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>VFX Breakdown - ${scriptTitle}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; line-height: 1.5; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #8b5cf6; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1a1a1a; margin-bottom: 5px; }
+    .header p { color: #666; font-size: 14px; }
+    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+    .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; }
+    .summary-card .label { font-size: 12px; color: #666; text-transform: uppercase; }
+    .summary-card .value { font-size: 24px; font-weight: bold; color: #8b5cf6; }
+    .summary-card.budget .value { color: #10b981; }
+    .summary-card.warning .value { color: #f59e0b; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e5e5; }
+    th { background: #f5f5f5; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #666; }
+    .scene-header { background: #8b5cf6; color: white; font-weight: bold; }
+    .scene-header td { padding: 10px 12px; }
+    .complexity-simple { background: #f0f0f0; color: #666; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .complexity-moderate { background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .complexity-complex { background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .warning-row { background: #fffbeb; }
+    .warning-icon { color: #f59e0b; }
+    .type-explicit { color: #8b5cf6; font-weight: 500; }
+    .type-implied { color: #10b981; font-weight: 500; }
+    @media print {
+      body { padding: 20px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>VFX Breakdown Report</h1>
+    <p>${scriptTitle} - Generated on ${new Date().toLocaleDateString()}</p>
+  </div>
+  
+  <div class="summary">
+    <div class="summary-card">
+      <div class="label">VFX Scenes</div>
+      <div class="value">${summary?.totalScenes || 0}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Shots</div>
+      <div class="value">${summary?.totalNotes || 0}</div>
+    </div>
+    <div class="summary-card budget">
+      <div class="label">Est. Budget</div>
+      <div class="value">${summary ? formatCurrency(summary.estimatedTotalCost) : '₹0'}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Simple</div>
+      <div class="value">${summary?.complexityBreakdown.simple || 0}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Moderate</div>
+      <div class="value">${summary?.complexityBreakdown.moderate || 0}</div>
+    </div>
+    <div class="summary-card warning">
+      <div class="label">Warnings</div>
+      <div class="value">${summary?.totalWarnings || 0}</div>
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 60px;">Scene</th>
+        <th style="width: 80px;">Type</th>
+        <th>Description</th>
+        <th style="width: 80px;">Complexity</th>
+        <th style="width: 70px;">Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${displayScenes.map(([sceneNum, group]) => {
+        const maxConf = Math.max(...group.notes.map(n => n.confidence), 0);
+        const complexity = getComplexity(maxConf);
+        const compClass = `complexity-${complexity}`;
+        
+        return `
+          <tr class="scene-header">
+            <td colspan="5">Scene ${sceneNum}${group.heading ? ' - ' + group.heading : ''}</td>
+          </tr>
+          ${group.notes.map(note => {
+            const noteComplexity = getComplexity(note.confidence);
+            return `
+              <tr>
+                <td>${note.scene.sceneNumber}</td>
+                <td class="type-${note.vfxType}">${note.vfxType === 'explicit' ? 'Explicit' : 'Implied'}</td>
+                <td>${note.description}</td>
+                <td><span class="${`complexity-${noteComplexity}`}">${noteComplexity}</span></td>
+                <td>${Math.round(note.confidence * 100)}%</td>
+              </tr>
+            `;
+          }).join('')}
+          ${group.warnings.map(warn => `
+            <tr class="warning-row">
+              <td>${warn.scene.sceneNumber}</td>
+              <td class="warning-icon">⚠ Warning</td>
+              <td>${warn.description}</td>
+              <td><span class="complexity-${warn.severity === 'high' ? 'complex' : 'moderate'}">${warn.severity}</span></td>
+              <td>-</td>
+            </tr>
+          `).join('')}
+        `;
+      }).join('')}
+    </tbody>
+  </table>
+  
+  <div style="text-align: center; color: #999; font-size: 12px; margin-top: 20px;">
+    Generated by CinePilot - VFX Breakdown Tool
+  </div>
+</body>
+</html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+    setShowPrintMenu(false);
+  }
+
   const sceneGroups = new Map<
     string,
     { heading: string | null; notes: VfxNote[]; warnings: VfxWarning[]; props: VfxProp[] }
@@ -745,6 +894,27 @@ export default function VfxPage() {
                       >
                         <FileJson className="w-4 h-4 text-purple-400" />
                         Export JSON
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="relative" ref={printMenuRef}>
+                  <button
+                    onClick={() => setShowPrintMenu(prev => !prev)}
+                    className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print
+                    <ChevronDown className={`w-3 h-3 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showPrintMenu && (
+                    <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden min-w-[180px]">
+                      <button
+                        onClick={printVfxReport}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                      >
+                        <Printer className="w-4 h-4 text-purple-400" />
+                        Print VFX Report
                       </button>
                     </div>
                   )}
@@ -1341,6 +1511,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export data</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Print VFX report</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Overview tab</span>

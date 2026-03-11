@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown } from 'lucide-react'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
 
 interface ScriptData {
@@ -208,6 +208,10 @@ export default function ScriptsPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          handlePrint()
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -389,6 +393,110 @@ export default function ScriptsPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
     setExporting(false)
+  }
+
+  // Print functionality
+  const handlePrint = () => {
+    if (!activeScript || scenes.length === 0) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    // Generate summary stats
+    const intScenes = scenes.filter(s => s.intExt === 'INT').length
+    const extScenes = scenes.filter(s => s.intExt === 'EXT').length
+    const dayScenes = scenes.filter(s => s.timeOfDay === 'DAY').length
+    const nightScenes = scenes.filter(s => s.timeOfDay === 'NIGHT').length
+    const totalCharacters = new Set(scenes.flatMap(s => s.sceneCharacters.map(c => c.character.name))).size
+
+    const statsHtml = `
+      <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin: 0 0 10px 0; color: #1a1a2e;">Script Summary</h3>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+          <div><strong>Total Scenes:</strong> ${scenes.length}</div>
+          <div><strong>INT:</strong> ${intScenes}</div>
+          <div><strong>EXT:</strong> ${extScenes}</div>
+          <div><strong>Characters:</strong> ${totalCharacters}</div>
+          <div><strong>Day:</strong> ${dayScenes}</div>
+          <div><strong>Night:</strong> ${nightScenes}</div>
+          <div><strong>Locations:</strong> ${new Set(scenes.map(s => s.location)).size}</div>
+          <div><strong>VFX Shots:</strong> ${allVfx.length}</div>
+        </div>
+      </div>
+    `
+
+    // Generate scenes table
+    const scenesHtml = scenes.map(scene => {
+      const characters = scene.sceneCharacters.map(c => c.character.name).join(', ')
+      const props = scene.sceneProps.map(p => p.prop.name).join(', ')
+      const vfx = scene.vfxNotes.map(v => v.description).join(', ')
+      const warnings = scene.warnings.map(w => w.description).join(', ')
+      
+      const rowStyle = scene.sceneIndex % 2 === 0 ? 'background: #fff;' : 'background: #f9f9f9;'
+      const warningColor = warnings ? 'color: #dc2626;' : ''
+      
+      return `
+        <tr style="${rowStyle}">
+          <td style="padding: 8px; border: 1px solid #ddd;">${scene.sceneNumber}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${scene.intExt || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${scene.timeOfDay || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${scene.location || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${characters || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${props || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${vfx || '-'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; ${warningColor}">${warnings || '-'}</td>
+        </tr>
+      `
+    }).join('')
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Script Report - ${activeScript.title}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; }
+            h1 { color: #1a1a2e; margin-bottom: 5px; }
+            .subtitle { color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+            th { background: #374151; color: white; padding: 10px; text-align: left; border: 1px solid #ddd; }
+            @media print {
+              body { padding: 0; }
+              table { font-size: 10px; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${activeScript.title}</h1>
+          <p class="subtitle">Version ${activeScript.version} | Exported: ${new Date().toLocaleDateString()}</p>
+          ${statsHtml}
+          <table>
+            <thead>
+              <tr>
+                <th>Scene</th>
+                <th>INT/EXT</th>
+                <th>Time</th>
+                <th>Location</th>
+                <th>Characters</th>
+                <th>Props</th>
+                <th>VFX Notes</th>
+                <th>Warnings</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${scenesHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    printWindow.document.write(fullHtml)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
   }
 
   const activeScript = scripts[0]
@@ -575,6 +683,16 @@ export default function ScriptsPage() {
                 </div>
               )}
             </div>
+          )}
+          {activeScript && scenes.length > 0 && (
+            <button
+              onClick={handlePrint}
+              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
+              title="Print script (P)"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print</span>
+            </button>
           )}
           <button
             onClick={() => setShowKeyboardHelp(true)}
@@ -1030,6 +1148,7 @@ export default function ScriptsPage() {
               {[
                 { key: 'R', action: 'Refresh scripts' },
                 { key: 'E', action: 'Export menu' },
+                { key: 'P', action: 'Print script' },
                 { key: '/', action: 'Focus search' },
                 { key: '1', action: 'Upload tab' },
                 { key: '2', action: 'Scenes tab' },

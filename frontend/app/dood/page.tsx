@@ -18,7 +18,8 @@ import {
   Eye,
   List,
   Film,
-  Search
+  Search,
+  Printer
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -198,6 +199,10 @@ export default function DOODPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          handlePrint()
+          break
       }
     }
 
@@ -300,6 +305,87 @@ export default function DOODPage() {
       a.click()
       URL.revokeObjectURL(url)
     }
+  }
+
+  const handlePrint = () => {
+    const printContent = document.getElementById('dood-print-area')
+    if (!printContent) return
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    const statsHtml = `
+      <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin: 0 0 10px 0; color: #1a1a2e;">Summary Statistics</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+          <div><strong>Total Characters:</strong> ${stats.totalCharacters}</div>
+          <div><strong>Total Shooting Days:</strong> ${stats.totalShootingDays}</div>
+          <div><strong>Total Calls:</strong> ${stats.totalCalls}</div>
+          <div><strong>Avg Days/Actor:</strong> ${stats.avgDaysPerActor}</div>
+          <div><strong>Main Cast Days:</strong> ${stats.mainCastDays}</div>
+          <div><strong>Supporting Days:</strong> ${stats.supportingCastDays}</div>
+        </div>
+      </div>
+    `
+    
+    const tableHtml = printContent.innerHTML
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Day Out of Days Report - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; }
+            h1 { color: #1a1a2e; margin-bottom: 5px; }
+            .subtitle { color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background: #f8f9fa; font-weight: 600; }
+            .main-cast { background: #e8f5e9; }
+            .supporting { background: #fff3e0; }
+            .days-cell { font-family: monospace; white-space: nowrap; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Day Out of Days Report</h1>
+          <p class="subtitle">Generated: ${new Date().toLocaleString()}</p>
+          ${statsHtml}
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Character</th>
+                <th>Tamil Name</th>
+                <th>Actor</th>
+                <th>Role</th>
+                <th>Total Days</th>
+                <th>Days</th>
+                <th>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${report.map((r, i) => `
+                <tr class="${r.isMain ? 'main-cast' : 'supporting'}">
+                  <td>${i + 1}</td>
+                  <td>${r.character}</td>
+                  <td>${r.characterTamil}</td>
+                  <td>${r.actorName || '-'}</td>
+                  <td>${r.isMain ? 'Main' : 'Supporting'}</td>
+                  <td>${r.total_days}</td>
+                  <td class="days-cell">${r.days.join(', ')}</td>
+                  <td>${r.percentage}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+    
+    printWindow.document.write(fullHtml)
+    printWindow.document.close()
+    printWindow.print()
   }
 
   const totalShootingDays = stats.totalShootingDays
@@ -715,11 +801,19 @@ export default function DOODPage() {
                   </div>
                 )}
               </div>
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                title="Print DOOD report (P)"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
             </div>
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
+          <div id="dood-print-area" className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-800/50">
                 <tr>
@@ -847,6 +941,10 @@ export default function DOODPage() {
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">E</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Print report</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">P</kbd>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Focus search</span>

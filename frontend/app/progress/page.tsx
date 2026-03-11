@@ -6,7 +6,7 @@ import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
-  TrendingUp, Activity, Search, X, Keyboard, Download
+  TrendingUp, Activity, Search, X, Keyboard, Download, Printer
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -95,6 +95,7 @@ export default function ProgressPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -200,6 +201,197 @@ export default function ProgressPage() {
     setShowExportMenu(false)
   }
 
+  const handlePrint = () => {
+    if (!progress) return
+    
+    const getStatusLabel = (status: string) => {
+      switch (status) {
+        case 'completed': return 'Completed'
+        case 'in_progress': return 'In Progress'
+        case 'pending': return 'Pending'
+        case 'delayed': return 'Delayed'
+        case 'blocked': return 'Blocked'
+        default: return status
+      }
+    }
+
+    const getPriorityLabel = (priority: string) => {
+      switch (priority) {
+        case 'critical': return 'Critical'
+        case 'high': return 'High'
+        case 'medium': return 'Medium'
+        case 'low': return 'Low'
+        default: return priority
+      }
+    }
+
+    const getPriorityColor = (priority: string) => {
+      switch (priority) {
+        case 'critical': return '#ef4444'
+        case 'high': return '#f59e0b'
+        case 'medium': return '#eab308'
+        case 'low': return '#64748b'
+        default: return '#64748b'
+      }
+    }
+
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'completed': return '#10b981'
+        case 'in_progress': return '#3b82f6'
+        case 'pending': return '#64748b'
+        case 'delayed': return '#ef4444'
+        case 'blocked': return '#ef4444'
+        default: return '#64748b'
+      }
+    }
+
+    const tasksCompleted = progress.tasks.filter(t => t.status === 'completed').length
+    const tasksInProgress = progress.tasks.filter(t => t.status === 'in_progress').length
+    const tasksPending = progress.tasks.filter(t => t.status === 'pending').length
+    const tasksBlocked = progress.tasks.filter(t => t.status === 'blocked').length
+    const milestonesCompleted = progress.milestones.filter(m => m.status === 'completed').length
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>CinePilot - Progress Report</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+          h1 { font-size: 24px; margin-bottom: 8px; color: #0f172a; }
+          .subtitle { color: #64748b; margin-bottom: 24px; }
+          .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+          .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+          .stat-value { font-size: 28px; font-weight: bold; color: #0f172a; }
+          .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+          .section { margin-bottom: 32px; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1e293b; border-bottom: 2px solid #06b6d4; padding-bottom: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+          th { text-align: left; padding: 12px; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #475569; }
+          td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+          .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+          .progress-bar { width: 100px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+          .progress-fill { height: 100%; border-radius: 4px; }
+          .overall-progress { font-size: 48px; font-weight: bold; color: #06b6d4; }
+        </style>
+      </head>
+      <body>
+        <h1>CinePilot Progress Report</h1>
+        <p class="subtitle">Generated on ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+
+        <div class="section">
+          <h2 class="section-title">Overall Progress</h2>
+          <div style="display: flex; align-items: center; gap: 24px; margin-bottom: 24px;">
+            <div class="overall-progress">${progress.overall}%</div>
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                ${progress.phases.map(p => `
+                  <div style="text-align: center;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">${p.displayName}</div>
+                    <div style="font-weight: 600;">${p.progress}%</div>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progress.overall}%; background: linear-gradient(to right, #06b6d4, #8b5cf6);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary">
+          <div class="stat">
+            <div class="stat-value">${progress.tasks.length}</div>
+            <div class="stat-label">Total Tasks</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${tasksCompleted}</div>
+            <div class="stat-label">Completed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${progress.milestones.length}</div>
+            <div class="stat-label">Milestones</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">${milestonesCompleted}</div>
+            <div class="stat-label">Completed</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Tasks by Status</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Task Name</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Progress</th>
+                <th>Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${progress.tasks.map(t => `
+                <tr>
+                  <td>
+                    <strong>${t.name}</strong>
+                    ${t.description ? `<br><span style="font-size: 12px; color: #64748b;">${t.description.substring(0, 60)}${t.description.length > 60 ? '...' : ''}</span>` : ''}
+                  </td>
+                  <td><span class="badge" style="background: ${getStatusColor(t.status)}20; color: ${getStatusColor(t.status)};">${getStatusLabel(t.status)}</span></td>
+                  <td><span class="badge" style="background: ${getPriorityColor(t.priority)}20; color: ${getPriorityColor(t.priority)};">${getPriorityLabel(t.priority)}</span></td>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <div class="progress-bar"><div class="progress-fill" style="width: ${t.progress}%; background: ${getStatusColor(t.status)};"></div></div>
+                      <span style="font-size: 12px; color: #64748b;">${t.progress}%</span>
+                    </div>
+                  </td>
+                  <td>${t.dueDate || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Milestones</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Milestone</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Tasks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${progress.milestones.map(m => `
+                <tr>
+                  <td><strong>${m.name}</strong></td>
+                  <td>${m.date}</td>
+                  <td><span class="badge" style="background: ${getStatusColor(m.status)}20; color: ${getStatusColor(m.status)};">${getStatusLabel(m.status)}</span></td>
+                  <td>${m.tasks} tasks</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px;">
+          Generated by CinePilot - Film Production Management System
+        </div>
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
+    setShowPrintMenu(false)
+  }
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -209,10 +401,16 @@ export default function ProgressPage() {
           setShowExportMenu(false)
         }
       }
+      if (showPrintMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.print-menu')) {
+          setShowPrintMenu(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   useEffect(() => {
     fetchProgress()
@@ -253,6 +451,10 @@ export default function ProgressPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          if (progress) setShowPrintMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowHelp(true)
@@ -261,6 +463,7 @@ export default function ProgressPage() {
           e.preventDefault()
           setShowHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           searchInputRef.current?.blur()
           break
@@ -480,6 +683,28 @@ export default function ProgressPage() {
               </div>
             )}
           </div>
+          {/* Print Dropdown */}
+          <div className="relative print-menu">
+            <button
+              onClick={() => progress && setShowPrintMenu(!showPrintMenu)}
+              disabled={!progress}
+              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Print (P)"
+            >
+              <Printer className="w-5 h-5" />
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4 text-cyan-400" />
+                  Print Progress Report
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -507,6 +732,7 @@ export default function ProgressPage() {
                 { key: '2', action: 'Tasks view' },
                 { key: '3', action: 'Kanban view' },
                 { key: 'E', action: 'Export menu' },
+                { key: 'P', action: 'Print report' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },
               ].map((shortcut) => (

@@ -5,7 +5,7 @@ import {
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw, HelpCircle, X, Search
+  Loader2, RefreshCw, HelpCircle, X, Search, Printer
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -145,11 +145,14 @@ export default function MissionControl() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -260,6 +263,234 @@ export default function MissionControl() {
     setShowExportMenu(false)
   }
 
+  // Print function
+  const printMissionControl = () => {
+    if (!data) return
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    const getHealthColor = (health: number) => {
+      if (health >= 80) return '#10b981'
+      if (health >= 60) return '#f59e0b'
+      return '#ef4444'
+    }
+    
+    const getRiskColor = (level: string) => {
+      switch (level) {
+        case 'high': return '#ef4444'
+        case 'medium': return '#f59e0b'
+        default: return '#64748b'
+      }
+    }
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mission Control Report - CinePilot</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; color: #1e293b; }
+    h1 { color: #1e293b; border-bottom: 3px solid #8b5cf6; padding-bottom: 10px; margin-bottom: 20px; }
+    h2 { color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 30px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .generated { color: #64748b; font-size: 14px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+    .summary-card { padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; }
+    .summary-card h3 { margin: 0; font-size: 28px; }
+    .summary-card p { margin: 5px 0 0; color: #64748b; font-size: 12px; }
+    .production-health { text-align: center; padding: 30px; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%); border-radius: 12px; color: white; margin: 20px 0; }
+    .production-health h2 { color: white; border: none; margin: 0; }
+    .production-health .percentage { font-size: 64px; font-weight: bold; }
+    .section { margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    .health-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .badge.high { background: #fee2e2; color: #991b1b; }
+    .badge.medium { background: #fef3c7; color: #92400e; }
+    .badge.low { background: #f1f5f9; color: #475569; }
+    .today-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0; }
+    .today-card { padding: 15px; border-radius: 8px; background: #f8fafc; text-align: center; }
+    .today-card .value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    .today-card .label { font-size: 12px; color: #64748b; }
+    .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎯 Mission Control Report</h1>
+    <span class="generated">Generated: ${new Date().toLocaleString()}</span>
+  </div>
+  
+  <div class="production-health">
+    <h2>Production Health</h2>
+    <div class="percentage">${data.production.overall}%</div>
+  </div>
+  
+  <div class="summary-grid">
+    <div class="summary-card">
+      <h3>${data.production.scenes.total}</h3>
+      <p>Total Scenes</p>
+    </div>
+    <div class="summary-card">
+      <h3>${data.production.scenes.completed}</h3>
+      <p>Completed</p>
+    </div>
+    <div class="summary-card">
+      <h3>${data.production.schedule.daysTotal}</h3>
+      <p>Shooting Days</p>
+    </div>
+    <div class="summary-card">
+      <h3>${data.summary.totalCrew}</h3>
+      <p>Crew Members</p>
+    </div>
+  </div>
+  
+  <div class="today-grid">
+    <div class="today-card">
+      <div class="value">${data.today.scenesShot}</div>
+      <div class="label">Scenes Shot</div>
+    </div>
+    <div class="today-card">
+      <div class="value">${data.today.scenesPlanned}</div>
+      <div class="label">Planned</div>
+    </div>
+    <div class="today-card">
+      <div class="value">${data.today.crewPresent}</div>
+      <div class="label">Crew Present</div>
+    </div>
+    <div class="today-card">
+      <div class="value">${data.today.hoursRemaining}</div>
+      <div class="label">Hours Left</div>
+    </div>
+    <div class="today-card">
+      <div class="value">₹${(data.production.budget.spent / 100000).toFixed(1)}L</div>
+      <div class="label">Budget Spent</div>
+    </div>
+  </div>
+  
+  <h2>📊 Budget Overview</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Total Budget</td>
+        <td>₹${(data.production.budget.total / 10000000).toFixed(2)} Cr</td>
+      </tr>
+      <tr>
+        <td>Spent</td>
+        <td>₹${(data.production.budget.spent / 10000000).toFixed(2)} Cr</td>
+      </tr>
+      <tr>
+        <td>Remaining</td>
+        <td>₹${(data.production.budget.remaining / 10000000).toFixed(2)} Cr</td>
+      </tr>
+      <tr>
+        <td>Projected Total</td>
+        <td>₹${(data.production.budget.projectedTotal / 10000000).toFixed(2)} Cr</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  ${data.departments.length > 0 ? `
+  <h2>🏢 Departments</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Department</th>
+        <th>Health</th>
+        <th>Members</th>
+        <th>Daily Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.departments.map(d => `
+        <tr>
+          <td><strong>${d.name}</strong></td>
+          <td>
+            <div class="health-bar">
+              <div class="health-fill" style="width: ${d.health}%; background: ${getHealthColor(d.health)}"></div>
+            </div>
+            ${d.health}%
+          </td>
+          <td>${d.members}</td>
+          <td>₹${(d.dailyRate / 1000).toFixed(0)}K</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+  
+  ${data.risks.length > 0 ? `
+  <h2>⚠️ Risks</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Level</th>
+        <th>Title</th>
+        <th>Days Left</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.risks.map(r => `
+        <tr>
+          <td><span class="badge ${r.level}">${r.level}</span></td>
+          <td>${r.title}</td>
+          <td>${r.daysLeft} days</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+  
+  ${data.locations.length > 0 ? `
+  <h2>📍 Locations</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Location</th>
+        <th>Scenes</th>
+        <th>Progress</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.locations.map(l => `
+        <tr>
+          <td><strong>${l.name}</strong></td>
+          <td>${l.scenes}</td>
+          <td>
+            <div class="health-bar">
+              <div class="health-fill" style="width: ${l.progress}%; background: #10b981"></div>
+            </div>
+            ${l.progress}%
+          </td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+  
+  <div class="footer">
+    Generated by CinePilot • ${new Date().toISOString()}
+  </div>
+</body>
+</html>
+    `
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.print()
+    setShowPrintMenu(false)
+  }
+
   // Set up fetch data ref for keyboard shortcut
   useEffect(() => {
     fetchDataRef.current = () => {
@@ -268,20 +499,19 @@ export default function MissionControl() {
     }
   }, [fetchData])
 
-  // Click outside to close export menu
+  // Click outside to close export/print menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (showExportMenu) {
-        const target = e.target as HTMLElement
-        const isDropdown = target.closest('.relative')
-        if (!isDropdown) {
-          setShowExportMenu(false)
-        }
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
       }
     }
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [showExportMenu])
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu, showPrintMenu])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -304,6 +534,10 @@ export default function MissionControl() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          setShowPrintMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -312,6 +546,7 @@ export default function MissionControl() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           break
       }
@@ -479,6 +714,27 @@ export default function MissionControl() {
                   </div>
                 )}
               </div>
+              <div className="relative" ref={printMenuRef}>
+                <button 
+                  onClick={() => setShowPrintMenu(!showPrintMenu)}
+                  disabled={!data}
+                  className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Print (P)"
+                >
+                  <Printer className="w-5 h-5 text-cyan-400" />
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={printMissionControl}
+                      className="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-3"
+                    >
+                      <Printer className="w-4 h-4 text-purple-400" />
+                      Print Report
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -523,6 +779,7 @@ export default function MissionControl() {
               <ShortcutRow keys={['R']} description="Refresh mission data" />
               <ShortcutRow keys={['/']} description="Focus search input" />
               <ShortcutRow keys={['E']} description="Export dropdown menu" />
+              <ShortcutRow keys={['P']} description="Print mission report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
             </div>

@@ -26,6 +26,7 @@ import {
   X,
   Search,
   Download,
+  Printer,
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -76,6 +77,8 @@ export default function AudienceSentimentPage() {
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const [formData, setFormData] = useState({
     title: '',
     platform: 'youtube',
@@ -160,6 +163,10 @@ export default function AudienceSentimentPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'p':
+          e.preventDefault()
+          printSentimentReport()
           break
         case '?':
           e.preventDefault()
@@ -302,6 +309,130 @@ export default function AudienceSentimentPage() {
     setShowExportMenu(false)
   }
 
+  // Print function
+  const printSentimentReport = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    const totalComments = filteredAnalyses.reduce((sum, a) => sum + a.totalComments, 0)
+    const totalPositive = filteredAnalyses.reduce((sum, a) => sum + a.positiveCount, 0)
+    const totalNegative = filteredAnalyses.reduce((sum, a) => sum + a.negativeCount, 0)
+    const totalNeutral = filteredAnalyses.reduce((sum, a) => sum + a.neutralCount, 0)
+    const avgSentiment = filteredAnalyses.length > 0 
+      ? (filteredAnalyses.reduce((sum, a) => sum + a.avgSentiment, 0) / filteredAnalyses.length).toFixed(2)
+      : '0'
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Audience Sentiment Report - CinePilot</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; color: #1e293b; }
+    h1 { color: #1e293b; border-bottom: 2px solid #10b981; padding-bottom: 10px; margin-bottom: 5px; }
+    .subtitle { color: #64748b; margin-bottom: 20px; }
+    .meta { margin-bottom: 30px; }
+    .meta-item { font-size: 14px; color: #64748b; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .summary-card { padding: 20px; border-radius: 8px; text-align: center; }
+    .summary-card.positive { background: #d1fae5; border: 1px solid #6ee7b7; }
+    .summary-card.negative { background: #fee2e2; border: 1px solid #fca5a5; }
+    .summary-card.neutral { background: #f1f5f9; border: 1px solid #cbd5e1; }
+    .summary-card.avg { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .summary-card h3 { margin: 0; font-size: 24px; }
+    .summary-card p { margin: 5px 0 0; color: #64748b; font-size: 12px; }
+    .section { margin-bottom: 30px; }
+    .section h2 { font-size: 18px; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    th { background: #f8fafc; font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; }
+    .platform-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+    .platform-badge.youtube { background: #fee2e2; color: #dc2626; }
+    .platform-badge.instagram { background: #fce7f3; color: #db2777; }
+    .platform-badge.twitter { background: #e0f2fe; color: #0284c7; }
+    .sentiment-bar { width: 80px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+    .sentiment-fill { height: 100%; border-radius: 3px; }
+    .sentiment-fill.positive { background: #10b981; }
+    .sentiment-fill.negative { background: #ef4444; }
+    .sentiment-fill.neutral { background: #6b7280; }
+    .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>📊 Audience Sentiment Report</h1>
+  <p class="subtitle">CinePilot - Audience Analysis</p>
+  
+  <div class="meta">
+    <div class="meta-item"><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+    <div class="meta-item"><strong>Total Analyses:</strong> ${filteredAnalyses.length}</div>
+    <div class="meta-item"><strong>Total Comments:</strong> ${totalComments.toLocaleString()}</div>
+  </div>
+  
+  <div class="summary">
+    <div class="summary-card positive">
+      <h3>${totalPositive.toLocaleString()}</h3>
+      <p>Positive</p>
+    </div>
+    <div class="summary-card negative">
+      <h3>${totalNegative.toLocaleString()}</h3>
+      <p>Negative</p>
+    </div>
+    <div class="summary-card neutral">
+      <h3>${totalNeutral.toLocaleString()}</h3>
+      <p>Neutral</p>
+    </div>
+    <div class="summary-card avg">
+      <h3>${avgSentiment}</h3>
+      <p>Avg Score</p>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>Analysis Details</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Platform</th>
+          <th>Comments</th>
+          <th>Positive</th>
+          <th>Negative</th>
+          <th>Neutral</th>
+          <th>Sentiment</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredAnalyses.slice(0, 10).map(a => `
+          <tr>
+            <td><strong>${a.title}</strong></td>
+            <td><span class="platform-badge ${a.platform}">${a.platform}</span></td>
+            <td>${a.totalComments.toLocaleString()}</td>
+            <td>${a.positiveCount}</td>
+            <td>${a.negativeCount}</td>
+            <td>${a.neutralCount}</td>
+            <td>
+              <div class="sentiment-bar">
+                <div class="sentiment-fill ${a.avgSentiment > 0.3 ? 'positive' : a.avgSentiment < -0.3 ? 'negative' : 'neutral'}" style="width: ${Math.abs(a.avgSentiment * 100)}%"></div>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ${filteredAnalyses.length > 10 ? `<p style="color: #64748b; font-size: 12px; margin-top: 10px;">...and ${filteredAnalyses.length - 10} more analyses</p>` : ''}
+  </div>
+  
+  <div class="footer">
+    <p>Generated by CinePilot • Production Management System</p>
+  </div>
+</body>
+</html>`
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.print()
+  }
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -311,10 +442,13 @@ export default function AudienceSentimentPage() {
           setShowExportMenu(false)
         }
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   // Close export menu on Escape
   useEffect(() => {
@@ -322,10 +456,13 @@ export default function AudienceSentimentPage() {
       if (e.key === 'Escape' && showExportMenu) {
         setShowExportMenu(false)
       }
+      if (e.key === 'Escape' && showPrintMenu) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const selectedAnalysis = filteredAnalyses[0]
 
@@ -432,6 +569,27 @@ export default function AudienceSentimentPage() {
                     >
                       <Download className="w-4 h-4 text-violet-400" />
                       Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+              {/* Print Button */}
+              <div className="relative" ref={printMenuRef}>
+                <button
+                  onClick={() => setShowPrintMenu(!showPrintMenu)}
+                  className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-1"
+                  title="Print (P)"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={printSentimentReport}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <Printer className="w-4 h-4 text-amber-400" />
+                      Print Report
                     </button>
                   </div>
                 )}
@@ -864,6 +1022,10 @@ export default function AudienceSentimentPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Print report</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Filter: All</span>

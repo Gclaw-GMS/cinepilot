@@ -183,93 +183,16 @@ export default function TimelinePage() {
   };
 
   // Print function
-<<<<<<< HEAD
-  const printTimelineReport = () => {
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-    
-    const projectName = DEMO_PROJECTS.find(p => p.id === selectedProject)?.name || 'All Projects'
-    
-    const html = `
-=======
   const handlePrint = () => {
     setPrinting(true);
     setShowPrintMenu(false);
     
     const printContent = `
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
 <!DOCTYPE html>
 <html>
 <head>
   <title>Production Timeline - CinePilot</title>
   <style>
-<<<<<<< HEAD
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; color: #1e293b; }
-    h1 { color: #1e293b; border-bottom: 2px solid #9333ea; padding-bottom: 10px; margin-bottom: 5px; }
-    .subtitle { color: #64748b; margin-bottom: 20px; }
-    .meta { display: flex; gap: 30px; margin-bottom: 30px; }
-    .meta-item { font-size: 14px; }
-    .meta-item strong { color: #334155; }
-    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
-    .summary-card { padding: 20px; border-radius: 8px; text-align: center; }
-    .summary-card.total { background: #eff6ff; border: 1px solid #bfdbfe; }
-    .summary-card.completed { background: #dcfce7; border: 1px solid #bbf7d0; }
-    .summary-card.progress { background: #f5f3ff; border: 1px solid #ddd6fe; }
-    .summary-card h3 { margin: 0; font-size: 28px; }
-    .summary-card p { margin: 5px 0 0; color: #64748b; font-size: 14px; }
-    .phase-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    .phase-table th, .phase-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-    .phase-table th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748b; }
-    .phase-type { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
-    .phase-type.pre-production { background: #dbeafe; color: #1d4ed8; }
-    .phase-type.production { background: #f3e8ff; color: #7c3aed; }
-    .phase-type.post-production { background: #ffedd5; color: #ea580c; }
-    .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
-    .status-badge.completed { background: #dcfce7; color: #166534; }
-    .status-badge.in_progress { background: #fef9c3; color: #854d0e; }
-    .status-badge.pending { background: #f1f5f9; color: #475569; }
-    .progress-bar { width: 100px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: #9333ea; border-radius: 4px; }
-    .legend { display: flex; gap: 20px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .legend-dot.completed { border: 2px solid #22c55e; }
-    .legend-dot.in-progress { border: 2px solid #eab308; }
-    .legend-dot.pending { border: 2px solid #94a3b8; }
-    .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <h1>📅 Production Timeline</h1>
-  <p class="subtitle">${projectName}</p>
-  
-  <div class="meta">
-    <div class="meta-item"><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
-    <div class="meta-item"><strong>View Mode:</strong> ${viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}</div>
-    <div class="meta-item"><strong>Zoom:</strong> ${Math.round(zoomLevel * 100)}%</div>
-  </div>
-  
-  <div class="summary">
-    <div class="summary-card total">
-      <h3>${stats.total}</h3>
-      <p>Total Phases</p>
-    </div>
-    <div class="summary-card completed">
-      <h3>${stats.completed}</h3>
-      <p>Completed</p>
-    </div>
-    <div class="summary-card progress">
-      <h3>${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%</h3>
-      <p>Progress</p>
-    </div>
-  </div>
-  
-  <h2>Phase Details</h2>
-  <table class="phase-table">
-    <thead>
-      <tr>
-        <th>Phase</th>
-=======
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
     .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
@@ -350,7 +273,6 @@ export default function TimelinePage() {
       <tr>
         <th>#</th>
         <th>Phase Name</th>
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
         <th>Type</th>
         <th>Status</th>
         <th>Start Date</th>
@@ -359,52 +281,6 @@ export default function TimelinePage() {
       </tr>
     </thead>
     <tbody>
-<<<<<<< HEAD
-      ${isDemoMode ? `
-        <tr>
-          <td><strong>Pre-Production</strong></td>
-          <td><span class="phase-type pre-production">Pre-Production</span></td>
-          <td><span class="status-badge completed">Completed</span></td>
-          <td>Feb 1, 2026</td>
-          <td>Feb 15, 2026</td>
-          <td><div class="progress-bar"><div class="progress-bar-fill" style="width: 100%"></div></div></td>
-        </tr>
-        <tr>
-          <td><strong>Principal Photography</strong></td>
-          <td><span class="phase-type production">Production</span></td>
-          <td><span class="status-badge in_progress">In Progress</span></td>
-          <td>Feb 16, 2026</td>
-          <td>Mar 15, 2026</td>
-          <td><div class="progress-bar"><div class="progress-bar-fill" style="width: 65%"></div></div></td>
-        </tr>
-        <tr>
-          <td><strong>Post-Production</strong></td>
-          <td><span class="phase-type post-production">Post-Production</span></td>
-          <td><span class="status-badge pending">Pending</span></td>
-          <td>Mar 16, 2026</td>
-          <td>Apr 30, 2026</td>
-          <td><div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div></td>
-        </tr>
-      ` : `<tr><td colspan="6" style="text-align: center; color: #64748b;">No timeline data available</td></tr>`}
-    </tbody>
-  </table>
-  
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot completed"></div> Completed</div>
-    <div class="legend-item"><div class="legend-dot in-progress"></div> In Progress</div>
-    <div class="legend-item"><div class="legend-dot pending"></div> Pending</div>
-  </div>
-  
-  <div class="footer">
-    <p>Generated by CinePilot • Production Management System</p>
-  </div>
-</body>
-</html>`
-    
-    printWindow.document.write(html)
-    printWindow.document.close()
-    printWindow.print()
-=======
       <tr>
         <td>1</td>
         <td>Pre-Production</td>
@@ -452,7 +328,6 @@ export default function TimelinePage() {
     }
     
     setTimeout(() => setPrinting(false), 500);
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
   };
 
   // Keyboard shortcuts handler
@@ -496,13 +371,9 @@ export default function TimelinePage() {
           }
           break;
         case 'p':
-<<<<<<< HEAD
-          printTimelineReport();
-=======
           if (!printing) {
             handlePrint();
           }
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
           break;
       }
     };
@@ -511,7 +382,7 @@ export default function TimelinePage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Click outside to close export/print menus
+  // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -805,36 +676,21 @@ export default function TimelinePage() {
             <div className="relative" ref={printMenuRef}>
               <button 
                 onClick={() => setShowPrintMenu(!showPrintMenu)}
-<<<<<<< HEAD
-                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-=======
                 disabled={printing}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm disabled:opacity-50"
               >
                 <Printer className="w-4 h-4" />
                 {printing ? 'Printing...' : 'Print'}
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
               </button>
               
               {/* Print Dropdown Menu */}
               {showPrintMenu && (
                 <div className="absolute right-0 mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
                   <button
-<<<<<<< HEAD
-                    onClick={printTimelineReport}
-                    className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-lg"
-                  >
-                    <Printer className="w-3 h-3" />
-                    Print Report
-=======
                     onClick={handlePrint}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-lg"
                   >
                     Print Timeline
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
                   </button>
                 </div>
               )}
@@ -1021,11 +877,7 @@ export default function TimelinePage() {
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">E</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
-<<<<<<< HEAD
-                    <span className="text-slate-300">Print timeline report</span>
-=======
                     <span className="text-slate-300">Print timeline</span>
->>>>>>> ea5fb2fd882e265252b62592eeff112e8b194d1e
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">P</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">

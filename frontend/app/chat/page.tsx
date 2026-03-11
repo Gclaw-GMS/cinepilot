@@ -22,7 +22,10 @@ import {
   RefreshCw,
   AlertCircle,
   Loader2,
-  Keyboard
+  Keyboard,
+  Download,
+  ChevronDown,
+  X
 } from 'lucide-react'
 
 type Message = {
@@ -60,6 +63,9 @@ export default function ChatPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const initialLoadDone = useRef(false)
@@ -194,6 +200,56 @@ What would you like to know about your production?`,
     }
   }
 
+  const handleExportCSV = () => {
+    setExporting(true)
+    const headers = ['Timestamp', 'Role', 'Message']
+    const rows = messages.map(m => [
+      m.timestamp || new Date().toISOString(),
+      m.role,
+      `"${m.content.replace(/"/g, '""')}"`
+    ])
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+  }
+
+  const handleExportJSON = () => {
+    setExporting(true)
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalMessages: messages.length,
+      context: context ? {
+        scriptsCount: context.scriptsCount,
+        scenesCount: context.scenesCount,
+        budgetTotal: context.budgetTotal,
+        scheduleDays: context.scheduleDays,
+        crewCount: context.crewCount,
+        warningsCount: context.warningsCount,
+      } : null,
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp || new Date().toISOString(),
+      })),
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+  }
+
   const handlePrompt = (prompt: string) => {
     setInput(prompt)
     inputRef.current?.focus()
@@ -249,9 +305,14 @@ What would you like to know about your production?`,
           e.preventDefault()
           handleClear()
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           break
       }
     }
@@ -259,6 +320,19 @@ What would you like to know about your production?`,
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return ''
@@ -293,6 +367,36 @@ What would you like to know about your production?`,
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
+              <div className="relative" ref={exportMenuRef}>
+                <button 
+                  onClick={() => setShowExportMenu(prev => !prev)}
+                  disabled={exporting || messages.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
+                  title="Export chat (E)"
+                >
+                  <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
+                  Export
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
               <button 
                 onClick={() => setShowKeyboardHelp(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
@@ -544,6 +648,10 @@ What would you like to know about your production?`,
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Clear chat</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">C</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                <span className="text-slate-300">Export chat</span>
+                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">E</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Show shortcuts</span>

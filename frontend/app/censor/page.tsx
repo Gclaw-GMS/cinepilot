@@ -14,13 +14,17 @@ import {
   AlertCircle,
   Scale,
   ChevronRight,
+  ChevronDown,
   Lightbulb,
   X,
   Download,
   Printer,
   Filter,
   HelpCircle,
-  Search
+  Search,
+  Keyboard,
+  FileJson,
+  FileSpreadsheet
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell
@@ -162,9 +166,15 @@ export default function CensorPage() {
   const [filterSeverity, setFilterSeverity] = useState<string>('all')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   
-  // Refs for keyboard shortcuts
+  // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   // Keyboard shortcuts
@@ -184,6 +194,14 @@ export default function CensorPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(!showFilters)
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportDropdown(!showExportDropdown)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -191,6 +209,8 @@ export default function CensorPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportDropdown(false)
+          setShowFilters(false)
           setSearchQuery('')
           setFilterCategory('all')
           setFilterSeverity('all')
@@ -200,6 +220,20 @@ export default function CensorPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Click outside handlers
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setShowExportDropdown(false)
+      }
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   const fetchAnalysis = useCallback(async () => {
@@ -231,6 +265,7 @@ export default function CensorPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setIsRefreshing(false)
     }
   }, [selectedProject])
 
@@ -344,7 +379,19 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
     : []
 
   const filteredFlags = analysis?.sceneFlags?.filter(flag => {
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesSearch = 
+        flag.category.toLowerCase().includes(query) ||
+        flag.context.toLowerCase().includes(query) ||
+        flag.scene.sceneNumber.toLowerCase().includes(query) ||
+        flag.scene.headingRaw.toLowerCase().includes(query)
+      if (!matchesSearch) return false
+    }
+    // Category filter
     if (filterCategory !== 'all' && flag.category !== filterCategory) return false
+    // Severity filter
     if (filterSeverity === 'high' && flag.severity < 6) return false
     if (filterSeverity === 'medium' && (flag.severity < 4 || flag.severity >= 6)) return false
     if (filterSeverity === 'low' && flag.severity >= 4) return false
@@ -393,6 +440,90 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search flags... (/)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm w-48 placeholder:text-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          
+          {/* Filter Toggle Button */}
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                showFilters || filterCategory !== 'all' || filterSeverity !== 'all'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {(filterCategory !== 'all' || filterSeverity !== 'all') && (
+                <span className="ml-1 px-1.5 py-0.5 bg-cyan-500 text-black text-xs font-medium rounded">
+                  {([filterCategory !== 'all', filterSeverity !== 'all'].filter(Boolean)).length}
+                </span>
+              )}
+            </button>
+            
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-2 block">Category</label>
+                    <select
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="Violence">Violence</option>
+                      <option value="Profanity">Profanity</option>
+                      <option value="Sexual Content">Sexual Content</option>
+                      <option value="Drugs/Alcohol">Drugs/Alcohol</option>
+                      <option value="Sensitive Theme">Sensitive Theme</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-2 block">Severity</label>
+                    <select
+                      value={filterSeverity}
+                      onChange={(e) => setFilterSeverity(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
+                    >
+                      <option value="all">All Severities</option>
+                      <option value="high">High (7-10)</option>
+                      <option value="medium">Medium (4-6)</option>
+                      <option value="low">Low (1-3)</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => { setFilterCategory('all'); setFilterSeverity('all') }}
+                    className="w-full py-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
@@ -402,23 +533,44 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
             <option value="project-2">Veera's Journey</option>
           </select>
           
-          <div className="flex items-center gap-2">
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
             <button
-              onClick={() => handleExport('json')}
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
               disabled={!analysis}
-              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-              title="Export JSON"
+              className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-400 border border-gray-700 transition-colors disabled:opacity-50"
             >
-              <Download className="w-4 h-4 text-gray-400" />
+              <Download className="w-4 h-4" />
+              Export
+              <ChevronDown className={`w-3 h-3 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
             </button>
-            <button
-              onClick={() => handleExport('pdf')}
-              disabled={!analysis}
-              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-              title="Export PDF"
-            >
-              <Printer className="w-4 h-4 text-gray-400" />
-            </button>
+            
+            {showExportDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={() => { handleExport('json'); setShowExportDropdown(false) }}
+                  disabled={!analysis}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 transition-colors text-left disabled:opacity-50"
+                >
+                  <FileJson className="w-4 h-4 text-purple-400" />
+                  <div>
+                    <div className="text-sm text-white">JSON</div>
+                    <div className="text-xs text-gray-500">Full analysis data</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { handleExport('pdf'); setShowExportDropdown(false) }}
+                  disabled={!analysis}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 transition-colors text-left disabled:opacity-50"
+                >
+                  <Printer className="w-4 h-4 text-cyan-400" />
+                  <div>
+                    <div className="text-sm text-white">PDF</div>
+                    <div className="text-xs text-gray-500">Print-ready report</div>
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
           
           <button
@@ -437,6 +589,16 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                 Run Analysis
               </>
             )}
+          </button>
+          
+          {/* Refresh Button */}
+          <button
+            onClick={() => { setIsRefreshing(true); fetchDataRef.current?.() }}
+            disabled={isRefreshing || loading}
+            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh (R)"
+          >
+            <RefreshCw className={`w-4 h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
           
           <button
@@ -756,11 +918,19 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">/</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Toggle filters</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">F</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Export menu</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Show shortcuts</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">?</kbd>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-gray-300">Close / Clear filters</span>
+                <span className="text-gray-300">Close / Clear</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">Esc</kbd>
               </div>
             </div>

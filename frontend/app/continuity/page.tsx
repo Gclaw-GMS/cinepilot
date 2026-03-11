@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard } from 'lucide-react';
+import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard, FileJson, FileText } from 'lucide-react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -83,12 +83,15 @@ export default function ContinuityPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [filter, setFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isDemo, setIsDemo] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'breakdown' | 'trends'>('overview');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState('all');
   const [selectedWarning, setSelectedWarning] = useState<Warning | null>(null);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,6 +99,7 @@ export default function ContinuityPage() {
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
   
   // Historical and breakdown data
@@ -264,6 +268,14 @@ export default function ContinuityPage() {
         case '3':
           setActiveTab('trends');
           break;
+        case 'e':
+          e.preventDefault();
+          setShowExportMenu(!showExportMenu);
+          break;
+        case 'f':
+          e.preventDefault();
+          setShowFilters(!showFilters);
+          break;
         case '?':
           e.preventDefault();
           setShowKeyboardHelp(true);
@@ -271,6 +283,8 @@ export default function ContinuityPage() {
         case 'escape':
           e.preventDefault();
           setShowKeyboardHelp(false);
+          setShowExportMenu(false);
+          setShowFilters(false);
           setFilter('');
           break;
       }
@@ -280,16 +294,19 @@ export default function ContinuityPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Click outside to close export menu
+  // Click outside to close export menu and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showFilters])
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -351,22 +368,26 @@ export default function ContinuityPage() {
     low: ((severityCounts.low || 0) / total) * 100,
   };
 
-  // Filter warnings by type
+  // Filter warnings by type, severity, and search
   const filteredWarnings = useMemo(() => {
     let filtered = warnings;
     if (typeFilter !== 'all') {
       filtered = filtered.filter(w => w.warningType === typeFilter);
     }
-    if (filter) {
+    if (severityFilter !== 'all') {
+      filtered = filtered.filter(w => w.severity === severityFilter);
+    }
+    const searchTerm = searchQuery || filter;
+    if (searchTerm) {
       filtered = filtered.filter(
         (w) =>
-          w.description.toLowerCase().includes(filter.toLowerCase()) ||
-          w.scene.sceneNumber.includes(filter) ||
-          (w.scene.headingRaw || '').toLowerCase().includes(filter.toLowerCase()),
+          w.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          w.scene.sceneNumber.includes(searchTerm) ||
+          (w.scene.headingRaw || '').toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
     return filtered;
-  }, [warnings, typeFilter, filter]);
+  }, [warnings, typeFilter, severityFilter, searchQuery, filter]);
 
   // Export handlers
   const handleExport = (format: 'csv' | 'json' | 'pdf') => {
@@ -440,6 +461,114 @@ export default function ContinuityPage() {
                 <span className="text-xs text-cyan-400">Demo Data</span>
               </div>
             )}
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search... (/)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-48 pl-9 pr-8 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">/</span>
+            </div>
+            {/* Filter Toggle Button */}
+            <div className="relative" ref={filterPanelRef}>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  showFilters || severityFilter !== 'all' || typeFilter !== 'all'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {(severityFilter !== 'all' || typeFilter !== 'all') && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs font-medium rounded">
+                    {([severityFilter !== 'all', typeFilter !== 'all'].filter(Boolean)).length}
+                  </span>
+                )}
+              </button>
+              {/* Filter Panel */}
+              {showFilters && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-2 block">Type</label>
+                      <select
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
+                      >
+                        {WARNING_TYPES.map((type) => (
+                          <option key={type.key} value={type.key}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-2 block">Severity</label>
+                      <select
+                        value={severityFilter}
+                        onChange={(e) => setSeverityFilter(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
+                      >
+                        <option value="all">All Severities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => { setTypeFilter('all'); setSeverityFilter('all') }}
+                      className="w-full py-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Export Dropdown */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={!warnings.length}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => { handleExport('json'); setShowExportMenu(false) }}
+                    disabled={!warnings.length}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left disabled:opacity-50"
+                  >
+                    <FileJson className="w-4 h-4 text-purple-400" />
+                    <div>
+                      <div className="text-sm text-white">JSON</div>
+                      <div className="text-xs text-slate-500">Full analysis data</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { handleExport('csv'); setShowExportMenu(false) }}
+                    disabled={!warnings.length}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <div>
+                      <div className="text-sm text-white">CSV</div>
+                      <div className="text-xs text-slate-500">Spreadsheet format</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -1002,11 +1131,13 @@ export default function ContinuityPage() {
               {[
                 { key: 'R', description: 'Refresh continuity data' },
                 { key: '/', description: 'Focus search input' },
+                { key: 'F', description: 'Toggle filters panel' },
+                { key: 'E', description: 'Toggle export dropdown' },
                 { key: '1', description: 'Switch to Overview tab' },
                 { key: '2', description: 'Switch to Breakdown tab' },
                 { key: '3', description: 'Switch to Trends tab' },
                 { key: '?', description: 'Show keyboard shortcuts' },
-                { key: 'Esc', description: 'Close modal / Clear search' },
+                { key: 'Esc', description: 'Close modal / Clear filters' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

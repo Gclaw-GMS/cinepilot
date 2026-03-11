@@ -25,6 +25,7 @@ import {
   ChevronDown,
   FileText,
   Keyboard,
+  Printer,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -102,6 +103,8 @@ export default function TravelExpensesPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
@@ -170,6 +173,13 @@ export default function TravelExpensesPage() {
           setSearchQuery('')
           setShowForm(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
+          break
+        case 'p':
+          e.preventDefault()
+          if (expenses.length > 0) {
+            setShowPrintMenu(prev => !prev)
+          }
           break
       }
     }
@@ -184,12 +194,15 @@ export default function TravelExpensesPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('click', handleClickOutside)
     }
     return () => document.removeEventListener('click', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   // CSV Export function
   const exportToCSV = () => {
@@ -245,6 +258,115 @@ export default function TravelExpensesPage() {
     link.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.json`
     link.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Print function
+  const handlePrint = () => {
+    const statusColors: Record<string, string> = {
+      pending: '#f59e0b',
+      approved: '#10b981',
+      rejected: '#ef4444',
+      reimbursed: '#6366f1',
+    }
+
+    const categoryColors: Record<string, string> = {
+      Flight: '#3b82f6',
+      Train: '#8b5cf6',
+      Bus: '#06b6d4',
+      Taxi: '#f59e0b',
+      Auto: '#f97316',
+      Hotel: '#ec4899',
+      Stay: '#a855f7',
+      'Per Diem': '#10b981',
+      'Daily Allowance': '#14b8a6',
+    }
+
+    const expensesRows = expenses.map(exp => {
+      const match = exp.description.match(/^([^:]+):\s*(.*)$/)
+      const personName = match ? match[1] : ''
+      const description = match ? match[2] : exp.description
+      return `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${new Date(exp.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${personName || '-'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;"><span style="background: ${categoryColors[exp.category] || '#64748b'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${exp.category}</span></td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${description}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${exp.vendor || '-'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">₹${exp.amount.toLocaleString('en-IN')}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center;"><span style="background: ${statusColors[exp.status] || '#64748b'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${exp.status}</span></td>
+        </tr>
+      `
+    }).join('')
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Travel Expenses Report - CinePilot</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
+          h1 { color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+          .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+          .summary-card { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+          .summary-card h3 { margin: 0 0 5px 0; color: #64748b; font-size: 12px; text-transform: uppercase; }
+          .summary-card p { margin: 0; font-size: 24px; font-weight: bold; color: #1e293b; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #3b82f6; color: white; padding: 12px 8px; text-align: left; font-size: 12px; }
+          td { font-size: 13px; }
+          .footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>✈️ Travel Expenses Report</h1>
+        <div class="summary">
+          <div class="summary-card">
+            <h3>Total Expenses</h3>
+            <p>${expenses.length}</p>
+          </div>
+          <div class="summary-card">
+            <h3>Total Amount</h3>
+            <p>₹${summary.totalAmount.toLocaleString('en-IN')}</p>
+          </div>
+          <div class="summary-card">
+            <h3>Categories</h3>
+            <p>${Object.keys(summary.byCategory).length}</p>
+          </div>
+          <div class="summary-card">
+            <h3>Pending</h3>
+            <p>${summary.byStatus.pending || 0}</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Person</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Vendor</th>
+              <th style="text-align: right;">Amount</th>
+              <th style="text-align: center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${expensesRows}
+          </tbody>
+        </table>
+        <div class="footer">
+          Generated by CinePilot on ${new Date().toLocaleString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.print()
+    }
+    setShowPrintMenu(false)
   }
 
   const clearDateFilter = () => {
@@ -647,6 +769,30 @@ export default function TravelExpensesPage() {
                 </div>
               )}
             </div>
+            {/* Print Dropdown */}
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={filteredExpenses.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-sm transition-colors"
+                title="Print (P)"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                  <button
+                    onClick={handlePrint}
+                    disabled={filteredExpenses.length === 0}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print Travel Report
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={fetchExpenses}
               className="ml-auto text-sm text-slate-400 hover:text-white transition-colors"
@@ -887,6 +1033,10 @@ export default function TravelExpensesPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Print report</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

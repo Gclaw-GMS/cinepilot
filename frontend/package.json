@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "jest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.999.0",
@@ -36,6 +37,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.10.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18.2.0",
@@ -43,8 +45,10 @@
     "autoprefixer": "^10.4.0",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
+    "jest": "^30.3.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.3.0"
   }
 }

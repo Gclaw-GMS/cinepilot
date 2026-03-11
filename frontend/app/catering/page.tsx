@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
-  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, Printer
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -74,11 +74,13 @@ export default function CateringPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void>(() => {})
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -174,6 +176,105 @@ export default function CateringPage() {
     setShowExportMenu(false)
   }
 
+  // Print function
+  const handlePrint = () => {
+    if (!plan) return
+    
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
+    if (!printWindow) return
+    
+    const totalSpent = plan.shootDays.reduce((sum, sd) => 
+      sum + sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0), 0)
+    
+    let mealsTable = ''
+    plan.shootDays.forEach((sd, idx) => {
+      mealsTable += `
+        <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#fff'}">
+          <td style="padding: 12px; border: 1px solid #e2e8f0;">${new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td>
+          <td style="padding: 12px; border: 1px solid #e2e8f0;">${sd.totalCrew + sd.totalCast}</td>
+          <td style="padding: 12px; border: 1px solid #e2e8f0;">${sd.meals.map(m => `<strong>${m.type}:</strong> ${m.menu.join(', ')}`).join('<br/>')}</td>
+          <td style="padding: 12px; border: 1px solid #e2e8f0;">${sd.meals.map(m => m.dietary.join(', ')).join('<br/>') || '-'}</td>
+          <td style="padding: 12px; border: 1px solid #e2e8f0; text-align: right;">₹${sd.meals.reduce((s, m) => s + m.budget, 0).toLocaleString('en-IN')}</td>
+          <td style="padding: 12px; border: 1px solid #e2e8f0; text-align: right;">₹${sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0).toLocaleString('en-IN')}</td>
+        </tr>
+      `
+    })
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>CinePilot - Catering Report</title>
+        <style>
+          body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; }
+          .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #6366f1; }
+          .header h1 { margin: 0; color: #6366f1; font-size: 28px; }
+          .header p { margin: 5px 0 0; color: #64748b; font-size: 14px; }
+          .stats { display: flex; gap: 20px; margin-bottom: 30px; }
+          .stat { flex: 1; background: #f8fafc; padding: 20px; border-radius: 8px; text-align: center; }
+          .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+          .stat-value { font-size: 24px; font-weight: bold; color: #1e293b; margin-top: 5px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          th { background: #6366f1; color: white; padding: 12px; text-align: left; font-weight: 600; }
+          .footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🍽️ CinePilot Catering Report</h1>
+          <p>Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}</p>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Total Budget</div>
+            <div class="stat-value">₹${plan.totalBudget.toLocaleString('en-IN')}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Total Spent</div>
+            <div class="stat-value">₹${totalSpent.toLocaleString('en-IN')}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Shoot Days</div>
+            <div class="stat-value">${plan.shootDays.length}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Total Meals</div>
+            <div class="stat-value">${plan.shootDays.reduce((sum, sd) => sum + sd.meals.length, 0)}</div>
+          </div>
+        </div>
+        <h3 style="color: #1e293b; margin-bottom: 15px;">Meal Schedule</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>People</th>
+              <th>Menu</th>
+              <th>Dietary</th>
+              <th style="text-align: right;">Budget</th>
+              <th style="text-align: right;">Actual</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${mealsTable}
+          </tbody>
+        </table>
+        <div class="footer">
+          <p>CinePilot - Film Production Management System</p>
+        </div>
+      </body>
+      </html>
+    `
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
+    setShowPrintMenu(false)
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -204,12 +305,17 @@ export default function CateringPage() {
           setShowKeyboardHelp(false)
           setSearchQuery('')
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setShowDayForm(false)
           setShowMealForm(false)
           break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'p':
+          e.preventDefault()
+          if (plan) setShowPrintMenu(prev => !prev)
           break
       }
     }
@@ -240,18 +346,21 @@ export default function CateringPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Click outside to close export menu
+  // Click outside to close export and print menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const handleAddShootDay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -390,6 +499,7 @@ export default function CateringPage() {
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
               <ShortcutRow keys={['N']} description="Add new shoot day" />
               <ShortcutRow keys={['E']} description="Export menu" />
+              <ShortcutRow keys={['P']} description="Print catering report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
             </div>
@@ -462,6 +572,30 @@ export default function CateringPage() {
                     >
                       <FileText className="w-4 h-4 text-slate-400" />
                       Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Print Button */}
+              <div className="relative" ref={printMenuRef}>
+                <button
+                  onClick={() => setShowPrintMenu(!showPrintMenu)}
+                  disabled={!plan}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Print (P)"
+                >
+                  <Printer className="w-4 h-4 text-slate-400" />
+                  Print
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <button
+                      onClick={handlePrint}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <Printer className="w-4 h-4 text-slate-400" />
+                      Print Report
                     </button>
                   </div>
                 )}

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   StickyNote, Plus, Search, Edit2, Trash2, X, Save, 
   Calendar, Tag, User, Clock, CheckCircle, AlertCircle,
-  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle
+  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle, Copy
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
@@ -178,6 +178,7 @@ export default function NotesPage() {
   // Refs for keyboard shortcuts
   const selectedNoteRef = useRef<Note | null>(null)
   const handleTogglePinRef = useRef<((note: Note) => Promise<void>) | null>(null)
+  const handleDuplicateRef = useRef<((note: Note) => Promise<void>) | null>(null)
 
   // Update refs when values change
   useEffect(() => {
@@ -231,6 +232,12 @@ export default function NotesPage() {
           e.preventDefault()
           if (selectedNoteRef.current && handleTogglePinRef.current) {
             handleTogglePinRef.current(selectedNoteRef.current)
+          }
+          break
+        case 'd':
+          e.preventDefault()
+          if (selectedNoteRef.current && handleDuplicateRef.current) {
+            handleDuplicateRef.current(selectedNoteRef.current)
           }
           break
         case 'escape':
@@ -457,10 +464,34 @@ export default function NotesPage() {
     }
   }, [fetchNotes])
 
+  const handleDuplicate = useCallback(async (note: Note) => {
+    try {
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${note.title} (Copy)`,
+          content: note.content,
+          category: note.category,
+          tags: note.tags.join(', '),
+          isPinned: false
+        })
+      })
+      fetchNotes()
+    } catch (err) {
+      console.error('Failed to duplicate note:', err)
+    }
+  }, [fetchNotes])
+
   // Update ref when handleTogglePin changes
   useEffect(() => {
     handleTogglePinRef.current = handleTogglePin
   }, [handleTogglePin])
+
+  // Update ref when handleDuplicate changes
+  useEffect(() => {
+    handleDuplicateRef.current = handleDuplicate
+  }, [handleDuplicate])
 
   // Refs for keyboard shortcuts
 
@@ -517,9 +548,16 @@ export default function NotesPage() {
                 <button
                   onClick={() => handleTogglePin(selectedNote)}
                   className="ml-1 p-1 hover:bg-cyan-500/20 rounded"
-                  title={selectedNote.isPinned ? 'Unpin note' : 'Pin note'}
+                  title={selectedNote.isPinned ? 'Unpin note (P)' : 'Pin note (P)'}
                 >
                   <StickyNote className={`w-3.5 h-3.5 ${selectedNote.isPinned ? 'text-amber-400' : 'text-slate-400'}`} />
+                </button>
+                <button
+                  onClick={() => handleDuplicate(selectedNote)}
+                  className="p-1 hover:bg-cyan-500/20 rounded"
+                  title="Duplicate note"
+                >
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
                 </button>
               </div>
             )}
@@ -954,6 +992,7 @@ export default function NotesPage() {
                 { key: '/', action: 'Focus search' },
                 { key: 'N', action: 'Create new note' },
                 { key: 'P', action: 'Pin/unpin selected note' },
+                { key: 'D', action: 'Duplicate selected note' },
                 { key: 'E', action: 'Export notes' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear filters' },

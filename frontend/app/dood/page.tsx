@@ -520,6 +520,140 @@ export default function DOODPage() {
           <div className="text-xs text-slate-500 mt-1">Day Range Spread</div>
         </div>
       </div>
+
+      {/* Call Frequency Groups */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+          <Users className="w-4 h-4 text-cyan-400" />
+          Cast by Call Frequency
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+            <div className="text-2xl font-bold text-red-400">{callFrequencyGroups.heavy.length}</div>
+            <div className="text-xs text-slate-400 mt-1">Heavy Call (70%+)</div>
+            <div className="mt-2 space-y-1">
+              {callFrequencyGroups.heavy.slice(0, 3).map(r => (
+                <div key={r.characterId} className="text-xs text-slate-500 truncate">{r.character}</div>
+              ))}
+              {callFrequencyGroups.heavy.length > 3 && (
+                <div className="text-xs text-slate-600">+{callFrequencyGroups.heavy.length - 3} more</div>
+              )}
+            </div>
+          </div>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+            <div className="text-2xl font-bold text-amber-400">{callFrequencyGroups.moderate.length}</div>
+            <div className="text-xs text-slate-400 mt-1">Moderate (40-70%)</div>
+            <div className="mt-2 space-y-1">
+              {callFrequencyGroups.moderate.slice(0, 3).map(r => (
+                <div key={r.characterId} className="text-xs text-slate-500 truncate">{r.character}</div>
+              ))}
+              {callFrequencyGroups.moderate.length > 3 && (
+                <div className="text-xs text-slate-600">+{callFrequencyGroups.moderate.length - 3} more</div>
+              )}
+            </div>
+          </div>
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+            <div className="text-2xl font-bold text-emerald-400">{callFrequencyGroups.light.length}</div>
+            <div className="text-xs text-slate-400 mt-1">Light Call (&lt;40%)</div>
+            <div className="mt-2 space-y-1">
+              {callFrequencyGroups.light.slice(0, 3).map(r => (
+                <div key={r.characterId} className="text-xs text-slate-500 truncate">{r.character}</div>
+              ))}
+              {callFrequencyGroups.light.length > 3 && (
+                <div className="text-xs text-slate-600">+{callFrequencyGroups.light.length - 3} more</div>
+              )}
+            </div>
+          </div>
+          <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4">
+            <div className="text-2xl font-bold text-slate-400">{callFrequencyGroups.unassigned.length}</div>
+            <div className="text-xs text-slate-400 mt-1">Unassigned (0%)</div>
+            <div className="mt-2 space-y-1">
+              {callFrequencyGroups.unassigned.slice(0, 3).map(r => (
+                <div key={r.characterId} className="text-xs text-slate-500 truncate">{r.character}</div>
+              ))}
+              {callFrequencyGroups.unassigned.length > 3 && (
+                <div className="text-xs text-slate-600">+{callFrequencyGroups.unassigned.length - 3} more</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Shooting Schedule Heatmap */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          Daily Cast Requirements Heatmap
+        </h3>
+        <div className="overflow-x-auto">
+          <div className="flex gap-1 min-w-max pb-2">
+            {(() => {
+              // Calculate cast count per day
+              const dayCastCount: number[] = []
+              for (let d = 1; d <= stats.totalShootingDays; d++) {
+                dayCastCount[d - 1] = report.filter(r => r.days.includes(d)).length
+              }
+              const maxCast = Math.max(...dayCastCount, 1)
+              
+              return (
+                <>
+                  {/* Day numbers */}
+                  <div className="flex flex-col gap-1 mr-2">
+                    <div className="h-6"></div>
+                    {dayCastCount.map((count, idx) => (
+                      <div key={idx} className="h-8 flex items-center justify-end pr-2 text-xs text-slate-500 w-8">
+                        Day {idx + 1}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Heatmap cells */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-1 h-6 items-center">
+                      <span className="text-xs text-slate-500 mr-2">Cast:</span>
+                      <div className="flex gap-1">
+                        <div className="w-8 text-center text-xs text-slate-500">0</div>
+                        <div className="w-8 text-center text-xs text-slate-500">{Math.ceil(maxCast / 2)}</div>
+                        <div className="w-8 text-center text-xs text-slate-500">{maxCast}</div>
+                      </div>
+                    </div>
+                    {dayCastCount.map((count, idx) => {
+                      const intensity = count / maxCast
+                      const getColor = (intensity: number) => {
+                        if (intensity === 0) return 'bg-slate-800'
+                        if (intensity < 0.25) return 'bg-emerald-900/80 border border-emerald-700'
+                        if (intensity < 0.5) return 'bg-emerald-700/80 border border-emerald-500'
+                        if (intensity < 0.75) return 'bg-emerald-500/80 border border-emerald-400'
+                        return 'bg-emerald-400 border border-emerald-300'
+                      }
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`w-8 h-8 rounded flex items-center justify-center text-xs font-medium transition-all hover:scale-110 ${getColor(intensity)} ${count > 0 ? 'text-white' : 'text-slate-600'}`}
+                          title={`Day ${idx + 1}: ${count} actors`}
+                        >
+                          {count > 0 ? count : '-'}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* Legend */}
+                  <div className="flex flex-col gap-1 ml-4">
+                    <div className="h-6"></div>
+                    <div className="flex items-center gap-1 h-8">
+                      <span className="text-xs text-slate-500 w-16">Low</span>
+                      <div className="w-4 h-4 rounded bg-emerald-900/80 border border-emerald-700"></div>
+                      <div className="w-4 h-4 rounded bg-emerald-700/80 border border-emerald-500"></div>
+                      <div className="w-4 h-4 rounded bg-emerald-500/80 border border-emerald-400"></div>
+                      <div className="w-4 h-4 rounded bg-emerald-400 border border-emerald-300"></div>
+                      <span className="text-xs text-slate-500 w-12">High</span>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -558,6 +692,16 @@ export default function DOODPage() {
       subtext: 'Per actor average'
     },
   ]
+
+  // Calculate call frequency groups
+  const callFrequencyGroups = useMemo(() => {
+    const heavy = report.filter(r => r.percentage >= 70) // 70%+ = heavy call
+    const moderate = report.filter(r => r.percentage >= 40 && r.percentage < 70)
+    const light = report.filter(r => r.percentage > 0 && r.percentage < 40)
+    const unassigned = report.filter(r => r.percentage === 0)
+    
+    return { heavy, moderate, light, unassigned }
+  }, [report])
 
   if (loading) {
     return (

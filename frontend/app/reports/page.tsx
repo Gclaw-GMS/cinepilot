@@ -5,7 +5,7 @@ import {
   FileText, BarChart3, Download, RefreshCw, Loader2, 
   ChevronRight, TrendingUp, Target, Film, Users, 
   MapPin, DollarSign, Calendar, PieChart, Shield,
-  AlertTriangle, CheckCircle, Keyboard, Search
+  AlertTriangle, CheckCircle, Keyboard, Search, Printer
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -89,6 +89,9 @@ export default function ReportsPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [printing, setPrinting] = useState(false)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchReport = useCallback(async () => {
     try {
@@ -154,6 +157,10 @@ export default function ReportsPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          if (reportData) handlePrint()
+          break
         case 'g':
           e.preventDefault()
           handleGenerate()
@@ -162,6 +169,7 @@ export default function ReportsPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           break
       }
@@ -177,10 +185,13 @@ export default function ReportsPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -267,6 +278,120 @@ export default function ReportsPage() {
     a.download = `production-report-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     setExporting(false)
+  }
+
+  const handlePrint = () => {
+    if (!reportData) return
+    setPrinting(true)
+    setShowPrintMenu(false)
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Production Report - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1e293b; margin-bottom: 5px; }
+    .header p { color: #64748b; font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-card .value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    .section { margin-bottom: 30px; }
+    .section h2 { font-size: 20px; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    th { background: #f1f5f9; font-weight: 600; color: #475569; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .badge.u { background: #dcfce7; color: #16a34a; }
+    .badge.a { background: #dbeafe; color: #1d4ed8; }
+    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Production Report</h1>
+    <p>Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Scenes</div>
+      <div class="value">${reportData.production.totalScenes}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Crew Members</div>
+      <div class="value">${reportData.crew.totalMembers}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Locations</div>
+      <div class="value">${reportData.production.totalLocations}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Budget</div>
+      <div class="value">₹${(reportData.production.budget / 10000000).toFixed(1)}Cr</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Production Summary</h2>
+    <table>
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Total Characters</td><td>${reportData.production.totalCharacters}</td></tr>
+      <tr><td>Shooting Days</td><td>${reportData.production.shootingDays}</td></tr>
+      <tr><td>Total Budget</td><td>₹${(reportData.production.budget / 10000000).toFixed(1)}Cr</td></tr>
+      <tr><td>Spent</td><td>₹${(reportData.production.spent / 10000000).toFixed(1)}Cr</td></tr>
+      <tr><td>Remaining</td><td>₹${((reportData.production.budget - reportData.production.spent) / 10000000).toFixed(1)}Cr</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Schedule Progress</h2>
+    <table>
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Completed Days</td><td>${reportData.schedule.completedDays}</td></tr>
+      <tr><td>Total Days</td><td>${reportData.schedule.totalDays}</td></tr>
+      <tr><td>Scenes Shot</td><td>${reportData.schedule.scenesShot}</td></tr>
+      <tr><td>Total Scenes</td><td>${reportData.schedule.totalScenes}</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Crew Overview</h2>
+    <table>
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Total Members</td><td>${reportData.crew.totalMembers}</td></tr>
+      <tr><td>Departments</td><td>${reportData.crew.departments}</td></tr>
+      <tr><td>Total Daily Rate</td><td>₹${reportData.crew.totalDailyRate.toLocaleString('en-IN')}</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Censor Information</h2>
+    <table>
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Certificate</td><td>${reportData.censor.certificate}</td></tr>
+      <tr><td>Score</td><td>${reportData.censor.score}</td></tr>
+      <tr><td>Issues</td><td>${reportData.censor.issues}</td></tr>
+    </table>
+  </div>
+
+  <div class="footer">
+    <p>CinePilot - Film Production Management</p>
+  </div>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.print()
+    }
+    setPrinting(false)
   }
 
   const budgetData = reportData ? [
@@ -377,6 +502,28 @@ export default function ReportsPage() {
                 >
                   <Download className="w-4 h-4 text-green-400" />
                   Export as CSV
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={printMenuRef}>
+            <button 
+              onClick={() => setShowPrintMenu(!showPrintMenu)} 
+              disabled={printing || !reportData}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg flex items-center gap-2"
+              title="Print (P)"
+            >
+              {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              Print
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors"
+                >
+                  <Printer className="w-4 h-4 text-amber-400" />
+                  Print Report
                 </button>
               </div>
             )}
@@ -718,6 +865,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle export menu</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Print report</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">P</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Generate report</span>

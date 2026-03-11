@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 
 interface ShotData {
@@ -76,10 +76,13 @@ export default function ShotHubPage() {
   const [error, setError] = useState<string | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   const fetchScriptId = useCallback(async () => {
@@ -171,8 +174,15 @@ export default function ShotHubPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSceneFilter('')
           setSelectedSceneId(null)
+          break
+        case 'p':
+          e.preventDefault()
+          if (shots.length > 0 && !printing) {
+            handlePrint()
+          }
           break
       }
     }
@@ -187,14 +197,17 @@ export default function ShotHubPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const handleGenerateAll = async () => {
     if (!scriptId) return
@@ -339,6 +352,120 @@ export default function ShotHubPage() {
     setTimeout(() => setSaveMessage(null), 3000)
   }
 
+  // Print shot list
+  const handlePrint = useCallback(() => {
+    if (!shots.length) return
+    setPrinting(true)
+    setShowPrintMenu(false)
+    
+    const activeShots = selectedSceneId
+      ? shots.filter(s => s.scene.id === selectedSceneId)
+      : shots
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shot List - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #8b5cf6; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1e293b; margin-bottom: 5px; }
+    .header .subtitle { color: #64748b; font-size: 14px; }
+    .header .date { color: #94a3b8; font-size: 12px; margin-top: 5px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+    .stat-card .value { font-size: 20px; font-weight: bold; color: #1e293b; }
+    .stat-card.purple .value { color: #8b5cf6; }
+    .stat-card.green .value { color: #22c55e; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
+    th { background: #f1f5f9; font-weight: 600; color: #475569; }
+    th:first-child, td:first-child { text-align: left; width: 50px; }
+    .shot-num { font-weight: bold; color: #8b5cf6; }
+    .scene { font-size: 10px; color: #64748b; }
+    .size { font-size: 10px; }
+    .locked { color: #22c55e; }
+    .unlocked { color: #94a3b8; }
+    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Shot List Report</h1>
+    <div class="subtitle">${selectedSceneId ? `Scene ${scenes.find(s => s.id === selectedSceneId)?.sceneNumber || ''}` : 'All Scenes'}</div>
+    <div class="date">Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card purple">
+      <div class="label">Total Shots</div>
+      <div class="value">${activeShots.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Scenes</div>
+      <div class="value">${new Set(activeShots.map(s => s.scene.id)).size}</div>
+    </div>
+    <div class="stat-card green">
+      <div class="label">Locked</div>
+      <div class="value">${activeShots.filter(s => s.isLocked).length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Est. Duration</div>
+      <div class="value">${Math.round(activeShots.reduce((sum, s) => sum + (s.durationEstSec || 3), 0) / 60)}m</div>
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Scene</th>
+        <th>Shot Text</th>
+        <th>Size</th>
+        <th>Angle</th>
+        <th>Movement</th>
+        <th>Duration</th>
+        <th>Lock</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${activeShots.map(shot => `
+      <tr>
+        <td><span class="shot-num">${shot.shotIndex + 1}</span></td>
+        <td><span class="scene">${shot.scene.sceneNumber}</span></td>
+        <td>${(shot.shotText || '').substring(0, 40)}${(shot.shotText || '').length > 40 ? '...' : ''}</td>
+        <td><span class="size">${shot.shotSize || '-'}</span></td>
+        <td>${shot.cameraAngle || '-'}</td>
+        <td>${shot.cameraMovement || '-'}</td>
+        <td>${shot.durationEstSec ? shot.durationEstSec + 's' : '-'}</td>
+        <td>${shot.isLocked ? '<span class="locked">🔒</span>' : '<span class="unlocked">○</span>'}</td>
+      </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="footer">
+    <p>CinePilot - Shot List Generator</p>
+  </div>
+</body>
+</html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+    
+    setTimeout(() => setPrinting(false), 500);
+  }, [shots, selectedSceneId, scenes]);
+
   const filteredScenes = scenes.filter(s => {
     if (!sceneFilter) return true
     return s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
@@ -456,6 +583,29 @@ export default function ShotHubPage() {
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
                 >
                   Export JSON
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Print Button */}
+          <div className="relative" ref={printMenuRef}>
+            <button
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              disabled={shots.length === 0 || printing}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded font-medium text-sm flex items-center gap-2"
+              title="Print shot list (P)"
+            >
+              {printing ? 'Printing...' : 'Print'}
+              <ChevronDown className={`w-3 h-3 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-1 w-36 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+                <button
+                  onClick={handlePrint}
+                  disabled={shots.length === 0}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Print Shot List
                 </button>
               </div>
             )}
@@ -625,6 +775,10 @@ export default function ShotHubPage() {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Print shot list</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Show shortcuts</span>

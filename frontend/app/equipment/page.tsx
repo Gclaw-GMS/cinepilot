@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -120,8 +120,9 @@ export default function EquipmentPage() {
     notes: '',
   })
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -242,7 +243,7 @@ export default function EquipmentPage() {
         case 'p':
           e.preventDefault()
           if (equipment.length > 0) {
-            setShowPrintMenu(prev => !prev)
+            handlePrint()
           }
           break
         case 'escape':
@@ -259,7 +260,7 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalOpen, editModalOpen, showExportMenu, showPrintMenu])
+  }, [modalOpen, editModalOpen, showExportMenu])
 
   // Click outside to close export menu
   useEffect(() => {
@@ -416,111 +417,121 @@ export default function EquipmentPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  // Print function
+  // Print functionality
   const handlePrint = () => {
-    const filteredData = filtered.length > 0 ? filtered : equipment
-    const totalValue = filteredData.reduce((sum, eq) => sum + (eq.dailyRate * eq.quantity), 0)
-    const statusCounts = {
-      available: filteredData.filter(e => e.status === 'available').length,
-      'in-use': filteredData.filter(e => e.status === 'in-use').length,
-      maintenance: filteredData.filter(e => e.status === 'maintenance').length,
-      returned: filteredData.filter(e => e.status === 'returned').length,
-    }
+    setPrinting(true)
+    setShowPrintMenu(false)
     
     const printContent = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Equipment List - CinePilot</title>
+  <title>Equipment Rental Report - CinePilot</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
-    .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #6366f1; }
-    .header h1 { font-size: 24px; color: #6366f1; margin-bottom: 5px; }
-    .header p { font-size: 12px; color: #64748b; }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-    .stat-card { background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; }
-    .stat-card h3 { font-size: 11px; color: #64748b; text-transform: uppercase; }
-    .stat-card p { font-size: 20px; font-weight: bold; color: #1e293b; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th { background: #6366f1; color: white; padding: 12px 8px; text-align: left; font-size: 12px; }
-    td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1e293b; }
+    .header .subtitle { color: #64748b; font-size: 14px; }
+    .logo { color: #6366f1; font-weight: bold; font-size: 18px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    .stat-card.available .value { color: #10b981; }
+    .stat-card.in-use .value { color: #f59e0b; }
+    .stat-card.maintenance .value { color: #ef4444; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    th { background: #6366f1; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
     tr:nth-child(even) { background: #f8fafc; }
-    .status { padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 500; }
-    .status.available { background: #d1fae5; color: #065f46; }
-    .status.in-use { background: #fef3c7; color: #92400e; }
-    .status.maintenance { background: #fee2e2; color: #991b1b; }
-    .status.returned { background: #f1f5f9; color: #475569; }
-    .footer { text-align: center; font-size: 11px; color: #94a3b8; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge.available { background: #d1fae5; color: #065f46; }
+    .badge.in-use { background: #fef3c7; color: #92400e; }
+    .badge.maintenance { background: #fee2e2; color: #991b1b; }
+    .badge.returned { background: #f1f5f9; color: #475569; }
+    .badge.camera { background: #e0e7ff; color: #4338ca; }
+    .badge.lighting { background: #fef3c7; color: #92400e; }
+    .badge.sound { background: #dbeafe; color: #1e40af; }
+    .badge.grip { background: #fce7f3; color: #9d174d; }
+    .badge.art { background: #f3e8ff; color: #6b21a8; }
+    .footer { text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
     @media print { body { padding: 20px; } }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>🎬 CinePilot - Equipment List</h1>
-    <p>Generated on ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+    <div>
+      <h1>Equipment Rental Report</h1>
+      <p class="subtitle">Generated on ${new Date().toLocaleString()}</p>
+    </div>
+    <div class="logo">🎬 CinePilot</div>
   </div>
+  
   <div class="stats">
     <div class="stat-card">
-      <h3>Total Items</h3>
-      <p>${filteredData.length}</p>
+      <div class="label">Total Items</div>
+      <div class="value">${stats.totalItems}</div>
     </div>
     <div class="stat-card">
-      <h3>Total Value</h3>
-      <p>₹${totalValue.toLocaleString('en-IN')}/day</p>
+      <div class="label">Daily Rate</div>
+      <div class="value">₹${stats.totalDailyRate.toLocaleString()}</div>
     </div>
-    <div class="stat-card">
-      <h3>In Use</h3>
-      <p>${statusCounts['in-use']}</p>
+    <div class="stat-card available">
+      <div class="label">Available</div>
+      <div class="value">${stats.available}</div>
     </div>
-    <div class="stat-card">
-      <h3>Available</h3>
-      <p>${statusCounts.available}</p>
+    <div class="stat-card in-use">
+      <div class="label">In Use</div>
+      <div class="value">${stats.inUse}</div>
     </div>
   </div>
+  
   <table>
     <thead>
       <tr>
         <th>#</th>
-        <th>Name</th>
+        <th>Equipment Name</th>
         <th>Category</th>
-        <th>Vendor</th>
-        <th>Daily Rate</th>
-        <th>Qty</th>
         <th>Start Date</th>
         <th>End Date</th>
+        <th>Daily Rate</th>
+        <th>Vendor</th>
         <th>Status</th>
       </tr>
     </thead>
     <tbody>
-      ${filteredData.map((eq, i) => `
+      ${filtered.map((eq, i) => `
         <tr>
           <td>${i + 1}</td>
           <td><strong>${eq.name}</strong></td>
-          <td>${eq.category.charAt(0).toUpperCase() + eq.category.slice(1)}</td>
+          <td><span class="badge ${eq.category}">${eq.category.charAt(0).toUpperCase() + eq.category.slice(1)}</span></td>
+          <td>${eq.dateStart.split('T')[0]}</td>
+          <td>${eq.dateEnd.split('T')[0]}</td>
+          <td>₹${eq.dailyRate.toLocaleString()}</td>
           <td>${eq.vendor || '-'}</td>
-          <td>₹${eq.dailyRate.toLocaleString('en-IN')}</td>
-          <td>${eq.quantity}</td>
-          <td>${new Date(eq.dateStart).toLocaleDateString('en-GB')}</td>
-          <td>${new Date(eq.dateEnd).toLocaleDateString('en-GB')}</td>
-          <td><span class="status ${eq.status}">${eq.status}</span></td>
+          <td><span class="badge ${eq.status}">${eq.status === 'in-use' ? 'In Use' : eq.status.charAt(0).toUpperCase() + eq.status.slice(1)}</span></td>
         </tr>
       `).join('')}
     </tbody>
   </table>
+  
   <div class="footer">
-    CinePilot - Film Production Management System
+    <p>🎬 CinePilot - Production Equipment Management</p>
   </div>
 </body>
-</html>`
+</html>
+`
     
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(printContent)
       printWindow.document.close()
-      printWindow.print()
+      printWindow.onload = () => {
+        printWindow.print()
+      }
     }
-    setShowPrintMenu(false)
+    setPrinting(false)
   }
 
   const handleEdit = (eq: EquipmentRental) => {
@@ -646,8 +657,8 @@ export default function EquipmentPage() {
             <div className="relative" ref={printMenuRef}>
               <button
                 onClick={() => setShowPrintMenu(!showPrintMenu)}
-                disabled={equipment.length === 0}
-                className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={printing || equipment.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
                 title="Print (P)"
               >
                 <Printer className="w-4 h-4" />
@@ -1132,7 +1143,7 @@ export default function EquipmentPage() {
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Print equipment list</span>
+                  <span className="text-slate-300">Print equipment report</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">P</kbd>
                 </div>
                 <div className="flex items-center justify-between">

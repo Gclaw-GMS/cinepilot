@@ -23,6 +23,7 @@ import {
   Zap,
   Keyboard,
   Download,
+  Printer,
 } from 'lucide-react';
 
 type Notification = {
@@ -190,8 +191,11 @@ export default function NotificationsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const printMenuRef = useRef<HTMLDivElement>(null);
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     channel: 'app' as 'app' | 'email' | 'whatsapp' | 'sms',
@@ -301,6 +305,131 @@ export default function NotificationsPage() {
     setExporting(false)
   }
 
+  const handlePrint = () => {
+    if (notifications.length === 0) return
+    setPrinting(true)
+    setShowPrintMenu(false)
+
+    const stats = {
+      total: notifications.length,
+      unread: notifications.filter(n => n.status === 'unread').length,
+      sent: notifications.filter(n => n.status === 'sent').length,
+      failed: notifications.filter(n => n.status === 'failed').length,
+      byChannel: {
+        app: notifications.filter(n => n.channel === 'app').length,
+        email: notifications.filter(n => n.channel === 'email').length,
+        whatsapp: notifications.filter(n => n.channel === 'whatsapp').length,
+        sms: notifications.filter(n => n.channel === 'sms').length,
+      },
+    }
+
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Notifications Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1a1a1a; }
+    .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #4f46e5; }
+    .header h1 { color: #4f46e5; font-size: 28px; margin-bottom: 5px; }
+    .header p { color: #666; font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #4f46e5; }
+    .stat-card h3 { font-size: 24px; color: #1a1a1a; }
+    .stat-card p { font-size: 12px; color: #666; text-transform: uppercase; }
+    .stat-card.high { border-color: #dc2626; }
+    .stat-card.sent { border-color: #16a34a; }
+    .stat-card.failed { border-color: #dc2626; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { background: #4f46e5; color: white; padding: 12px; text-align: left; font-size: 12px; }
+    td { padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+    tr:nth-child(even) { background: #f9fafb; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge.app { background: #dbeafe; color: #1d4ed8; }
+    .badge.email { background: #fef3c7; color: #b45309; }
+    .badge.whatsapp { background: #d1fae5; color: #047857; }
+    .badge.sms { background: #ede9fe; color: #6d28d9; }
+    .badge.high { background: #fee2e2; color: #dc2626; }
+    .badge.medium { background: #fef3c7; color: #b45309; }
+    .badge.low { background: #f3f4f6; color: #6b7280; }
+    .badge.read { background: #d1fae5; color: #047857; }
+    .badge.unread { background: #dbeafe; color: #1d4ed8; }
+    .badge.sent { background: #d1fae5; color: #047857; }
+    .badge.failed { background: #fee2e2; color: #dc2626; }
+    .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📢 CinePilot Notifications Report</h1>
+    <p>Generated on ${new Date().toLocaleString()}</p>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <h3>${stats.total}</h3>
+      <p>Total</p>
+    </div>
+    <div class="stat-card">
+      <h3>${stats.unread}</h3>
+      <p>Unread</p>
+    </div>
+    <div class="stat-card sent">
+      <h3>${stats.sent}</h3>
+      <p>Sent</p>
+    </div>
+    <div class="stat-card failed">
+      <h3>${stats.failed}</h3>
+      <p>Failed</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Channel</th>
+        <th>Title</th>
+        <th>Recipient</th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${notifications.map((n, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><span class="badge ${n.channel}">${n.channel.toUpperCase()}</span></td>
+          <td>${n.title}</td>
+          <td>${n.recipient || '-'}</td>
+          <td><span class="badge ${n.status}">${n.status.toUpperCase()}</span></td>
+          <td><span class="badge ${n.priority}">${n.priority.toUpperCase()}</span></td>
+          <td>${new Date(n.createdAt).toLocaleString()}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p>CinePilot - Production Management System</p>
+  </div>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.onload = () => {
+        printWindow.print()
+      }
+    }
+    setPrinting(false)
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -354,6 +483,7 @@ export default function NotificationsPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           setShowFilters(false)
           break
@@ -361,6 +491,12 @@ export default function NotificationsPage() {
           if (!showExportMenu) {
             e.preventDefault()
             setShowExportMenu(prev => !prev)
+          }
+          break
+        case 'p':
+          if (!showPrintMenu && notifications.length > 0) {
+            e.preventDefault()
+            setShowPrintMenu(prev => !prev)
           }
           break
       }
@@ -376,10 +512,13 @@ export default function NotificationsPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   // Calculate stats
   const stats: NotificationStats = {
@@ -586,6 +725,35 @@ export default function NotificationsPage() {
                   >
                     <Download className="h-4 w-4 text-green-400" />
                     Export as CSV
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Print Button */}
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={printing || notifications.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50"
+                title="Print (P)"
+              >
+                {printing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4" />
+                )}
+                <span className="text-sm">Print</span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handlePrint}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                  >
+                    <Printer className="h-4 w-4 text-amber-400" />
+                    Print Notifications
                   </button>
                 </div>
               )}
@@ -1003,6 +1171,10 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Toggle export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Print notifications</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">P</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Focus search</span>

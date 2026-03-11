@@ -25,6 +25,7 @@ import {
   ChevronDown,
   FileText,
   FileJson,
+  Printer,
 } from 'lucide-react';
 import {
   LineChart,
@@ -202,6 +203,9 @@ export default function WeatherPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const printMenuRef = useRef<HTMLDivElement>(null);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -324,6 +328,13 @@ export default function WeatherPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
+          break
+        case 'p':
+          e.preventDefault()
+          if (weatherData?.forecast?.length && !printing) {
+            handlePrint()
+          }
           break
       }
     }
@@ -445,16 +456,159 @@ export default function WeatherPage() {
     exportToJSONRef.current = exportToJSON;
   }, [exportToCSV, exportToJSON]);
 
+  // Print forecast report
+  const handlePrint = useCallback(() => {
+    if (!weatherData?.forecast?.length) return;
+    setPrinting(true);
+    setShowPrintMenu(false);
+    
+    const forecast = weatherData.forecast;
+    const avgScore = Math.round(forecast.reduce((sum, d) => sum + d.productionScore, 0) / forecast.length);
+    const bestDay = forecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, forecast[0]);
+    const totalPrecip = forecast.reduce((sum, d) => sum + d.precipitation, 0);
+    
+    const getConditionColor = (condition: string) => {
+      const c = condition.toLowerCase();
+      if (c.includes('sun') || c.includes('clear')) return '#22c55e';
+      if (c.includes('cloud')) return '#94a3b8';
+      if (c.includes('rain')) return '#3b82f6';
+      if (c.includes('storm')) return '#8b5cf6';
+      return '#64748b';
+    };
+    
+    const getScoreColor = (score: number) => {
+      if (score >= 80) return '#22c55e';
+      if (score >= 60) return '#eab308';
+      return '#ef4444';
+    };
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Weather Forecast - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #10b981; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1e293b; margin-bottom: 5px; }
+    .header .location { color: #64748b; font-size: 16px; }
+    .header .date { color: #94a3b8; font-size: 12px; margin-top: 5px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+    .stat-card .value { font-size: 20px; font-weight: bold; color: #1e293b; }
+    .stat-card .value.green { color: #22c55e; }
+    .stat-card .value.yellow { color: #eab308; }
+    .stat-card .value.blue { color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+    th { background: #f1f5f9; font-weight: 600; color: #475569; }
+    th:first-child, td:first-child { text-align: left; }
+    .condition { display: flex; align-items: center; gap: 8px; }
+    .condition-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .score { font-weight: bold; }
+    .score.high { color: #22c55e; }
+    .score.medium { color: #eab308; }
+    .score.low { color: #ef4444; }
+    .recommendation { font-size: 10px; color: #64748b; max-width: 150px; }
+    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Weather Forecast Report</h1>
+    <div class="location">📍 ${weatherData.location}</div>
+    <div class="date">Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Forecast Days</div>
+      <div class="value">${forecast.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Score</div>
+      <div class="value ${avgScore >= 80 ? 'green' : avgScore >= 60 ? 'yellow' : ''}">${avgScore}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Best Day</div>
+      <div class="value green">${bestDay.date}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Rain</div>
+      <div class="value blue">${totalPrecip.toFixed(1)}mm</div>
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Condition</th>
+        <th>High</th>
+        <th>Low</th>
+        <th>Humidity</th>
+        <th>Wind</th>
+        <th>Rain</th>
+        <th>Score</th>
+        <th>Recommendation</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${forecast.map(day => `
+      <tr>
+        <td>${day.date}</td>
+        <td>
+          <div class="condition">
+            <div class="condition-dot" style="background: ${getConditionColor(day.condition)}"></div>
+            ${day.condition}
+          </div>
+        </td>
+        <td>${day.tempHigh}°C</td>
+        <td>${day.tempLow}°C</td>
+        <td>${day.humidity}%</td>
+        <td>${day.windSpeed} km/h</td>
+        <td>${day.precipitation}mm</td>
+        <td><span class="score ${day.productionScore >= 80 ? 'high' : day.productionScore >= 60 ? 'medium' : 'low'}">${day.productionScore}%</span></td>
+        <td><div class="recommendation">${day.recommendation}</div></td>
+      </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="footer">
+    <p>CinePilot - Production Weather Forecasting</p>
+  </div>
+</body>
+</html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+    
+    setTimeout(() => setPrinting(false), 500);
+  }, [weatherData]);
+
   // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false);
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showExportMenu]);
+  }, [showExportMenu, showPrintMenu]);
 
   // Analytics calculations
   const analytics = useMemo(() => {
@@ -562,6 +716,7 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['2']} description="Switch to Analytics view" />
                 <ShortcutRow keys={['3']} description="Switch to Schedule view" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
+                <ShortcutRow keys={['P']} description="Print forecast report" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
                 <ShortcutRow keys={['Esc']} description="Close modal" />
               </div>
@@ -680,6 +835,33 @@ export default function WeatherPage() {
                         <div>
                           <div className="font-medium">Export as JSON</div>
                           <div className="text-xs text-slate-500">Full data with summary</div>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* Print Button */}
+                <div className="relative" ref={printMenuRef}>
+                  <button
+                    onClick={() => setShowPrintMenu(!showPrintMenu)}
+                    disabled={!weatherData?.forecast?.length || printing}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 transition-colors"
+                    title="Print forecast (P)"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print
+                  </button>
+                  {showPrintMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                      <button
+                        onClick={handlePrint}
+                        disabled={!weatherData?.forecast?.length}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50"
+                      >
+                        <Printer className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <div className="font-medium">Print Forecast</div>
+                          <div className="text-xs text-slate-500">Formatted report</div>
                         </div>
                       </button>
                     </div>

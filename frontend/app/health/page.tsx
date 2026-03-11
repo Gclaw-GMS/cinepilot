@@ -119,94 +119,134 @@ export default function HealthPage() {
   }
 
   // Print function
-  const printHealthReport = () => {
+  const handlePrint = () => {
     if (!healthData) return
     
-    const healthyChecks = healthData.checks.filter(c => c.status === 'healthy').length
-    const degradedChecks = healthData.checks.filter(c => c.status === 'degraded').length
-    const unhealthyChecks = healthData.checks.filter(c => c.status === 'unhealthy').length
+    const healthyCount = healthData.checks.filter(c => c.status === 'healthy').length
+    const degradedCount = healthData.checks.filter(c => c.status === 'degraded').length
+    const unhealthyCount = healthData.checks.filter(c => c.status === 'unhealthy').length
     
-    const printWindow = window.open('', '_blank')
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
     if (!printWindow) return
     
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>System Health Report - CinePilot</title>
+  <title>CinePilot Health Report</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-    h1 { color: #1e293b; border-bottom: 2px solid #6366f1; padding-bottom: 10px; }
-    .summary { display: flex; gap: 20px; margin: 20px 0; }
-    .summary-card { flex: 1; padding: 15px; border-radius: 8px; text-align: center; }
-    .summary-card.healthy { background: #d1fae5; }
-    .summary-card.degraded { background: #fef3c7; }
-    .summary-card.unhealthy { background: #fee2e2; }
-    .summary-card h3 { margin: 0; font-size: 32px; }
-    .summary-card p { margin: 5px 0 0; color: #64748b; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+    .header { text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 28px; color: #0f172a; margin-bottom: 8px; }
+    .header .subtitle { color: #64748b; font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .stat-card .value.healthy { color: #10b981; }
+    .stat-card .value.degraded { color: #f59e0b; }
+    .stat-card .value.unhealthy { color: #ef4444; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 18px; color: #0f172a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; }
     th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-    th { background: #f8fafc; font-weight: 600; }
-    .status { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-    .status.healthy { background: #d1fae5; color: #065f46; }
-    .status.degraded { background: #fef3c7; color: #92400e; }
-    .status.unhealthy { background: #fee2e2; color: #991b1b; }
-    .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
+    th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748b; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .status-badge.healthy { background: #d1fae5; color: #065f46; }
+    .status-badge.degraded { background: #fef3c7; color: #92400e; }
+    .status-badge.unhealthy { background: #fee2e2; color: #991b1b; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
   </style>
 </head>
 <body>
-  <h1>🔧 System Health Report</h1>
-  <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-  <p><strong>Version:</strong> ${healthData.version}</p>
-  <p><strong>Uptime:</strong> ${Math.floor(healthData.uptime / 3600)}h ${Math.floor((healthData.uptime % 3600) / 60)}m</p>
+  <div class="header">
+    <h1>🏥 CinePilot Health Report</h1>
+    <div class="subtitle">Generated on ${new Date().toLocaleString()}</div>
+  </div>
   
-  <div class="summary">
-    <div class="summary-card healthy">
-      <h3>${healthyChecks}</h3>
-      <p>Healthy</p>
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Overall Status</div>
+      <div class="value ${healthData.status}">${healthData.status.charAt(0).toUpperCase() + healthData.status.slice(1)}</div>
     </div>
-    <div class="summary-card degraded">
-      <h3>${degradedChecks}</h3>
-      <p>Degraded</p>
+    <div class="stat-card">
+      <div class="label">Healthy</div>
+      <div class="value healthy">${healthyCount}</div>
     </div>
-    <div class="summary-card unhealthy">
-      <h3>${unhealthyChecks}</h3>
-      <p>Unhealthy</p>
+    <div class="stat-card">
+      <div class="label">Degraded</div>
+      <div class="value degraded">${degradedCount}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Unhealthy</div>
+      <div class="value unhealthy">${unhealthyCount}</div>
     </div>
   </div>
   
-  <h2>Component Status</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Component</th>
-        <th>Status</th>
-        <th>Message</th>
-        <th>Latency</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${healthData.checks.map(c => `
+  <div class="section">
+    <h2>Component Status</h2>
+    <table>
+      <thead>
         <tr>
-          <td><strong>${c.component}</strong></td>
-          <td><span class="status ${c.status}">${c.status}</span></td>
-          <td>${c.message || '-'}</td>
-          <td>${c.latencyMs ? c.latencyMs + 'ms' : '-'}</td>
+          <th>Component</th>
+          <th>Status</th>
+          <th>Message</th>
+          <th>Latency</th>
         </tr>
-      `).join('')}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        ${healthData.checks.map(check => `
+          <tr>
+            <td style="text-transform: capitalize; font-weight: 500;">${check.component}</td>
+            <td><span class="status-badge ${check.status}">${check.status}</span></td>
+            <td>${check.message || '-'}</td>
+            <td>${check.latencyMs !== undefined ? check.latencyMs + 'ms' : '-'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="section">
+    <h2>System Information</h2>
+    <table>
+      <tr>
+        <th>Property</th>
+        <th>Value</th>
+      </tr>
+      <tr>
+        <td>Version</td>
+        <td>${healthData.version}</td>
+      </tr>
+      <tr>
+        <td>Uptime</td>
+        <td>${Math.floor(healthData.uptime / 3600)}h ${Math.floor((healthData.uptime % 3600) / 60)}m</td>
+      </tr>
+      <tr>
+        <td>Timestamp</td>
+        <td>${new Date(healthData.timestamp).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td>Demo Mode</td>
+        <td>${healthData.isDemo ? 'Yes' : 'No'}</td>
+      </tr>
+    </table>
+  </div>
   
   <div class="footer">
-    Generated by CinePilot • ${new Date().toISOString()}
+    CinePilot • Film Production Management System
   </div>
+  
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
 </body>
 </html>
-    `
+`
     
     printWindow.document.write(html)
     printWindow.document.close()
-    printWindow.print()
     setShowPrintMenu(false)
   }
 
@@ -279,9 +319,7 @@ export default function HealthPage() {
           break
         case 'p':
           e.preventDefault()
-          if (healthData) {
-            printHealthReport()
-          }
+          setShowPrintMenu(prev => !prev)
           break
         case '?':
           e.preventDefault()
@@ -301,7 +339,7 @@ export default function HealthPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close export/print menus
+  // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -451,21 +489,20 @@ export default function HealthPage() {
             <div className="relative" ref={printMenuRef}>
               <button
                 onClick={() => setShowPrintMenu(!showPrintMenu)}
-                disabled={!healthData}
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg transition-colors"
                 title="Print (P)"
               >
                 <Printer className="w-4 h-4" />
                 Print
               </button>
               {showPrintMenu && (
-                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-10 overflow-hidden">
                   <button
-                    onClick={printHealthReport}
+                    onClick={handlePrint}
                     className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 transition-colors flex items-center gap-2"
                   >
                     <Printer className="w-3 h-3" />
-                    Print Report
+                    Print Health Report
                   </button>
                 </div>
               )}

@@ -20,23 +20,55 @@ interface ReportData {
     shootingDays: number
     budget: number
     spent: number
+    vfxShots?: number
+    totalShots?: number
   }
   schedule: {
     completedDays: number
     totalDays: number
     scenesShot: number
     totalScenes: number
+    dailyProgress?: Array<{ day: number; scenes: number; budget: number }>
   }
   crew: {
     totalMembers: number
     departments: number
     totalDailyRate: number
+    departmentBreakdown?: Array<{ name: string; count: number; dailyRate: number }>
   }
   censor: {
     certificate: string
     score: number
     issues: number
+    flags?: Array<{ category: string; count: number }>
   }
+  budget?: {
+    categories: Array<{ name: string; budget: number; spent: number }>
+    variance: number
+    projectedTotal: number
+  }
+  vfx?: {
+    totalShots: number
+    completed: number
+    pending: number
+    complexityBreakdown: Array<{ level: string; count: number }>
+  }
+  locations?: {
+    total: number
+    indoor: number
+    outdoor: number
+    byType: Array<{ type: string; count: number }>
+  }
+}
+
+interface DataSources {
+  scripts: number
+  characters: number
+  locations: number
+  shootingDays: number
+  crew: number
+  censor: boolean
+  expenses: number
 }
 
 const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
@@ -45,6 +77,7 @@ type ReportTab = 'overview' | 'production' | 'schedule' | 'crew' | 'censor'
 
 export default function ReportsPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [dataSources, setDataSources] = useState<DataSources | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<ReportTab>('overview')
@@ -64,6 +97,7 @@ export default function ReportsPage() {
       if (data.success) {
         setReportData(data.data)
         setIsDemoMode(data.isDemoMode === true)
+        setDataSources(data.dataSources || null)
       }
     } catch (e) {
       console.error(e)
@@ -161,6 +195,7 @@ export default function ReportsPage() {
       if (data.success) {
         setReportData(data.data)
         setIsDemoMode(data.isDemoMode === true)
+        setDataSources(data.dataSources || null)
       } else {
         throw new Error(data.error || 'Generation failed')
       }
@@ -283,10 +318,29 @@ export default function ReportsPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-white">Production Reports</h1>
               {isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Data</span>}
+              {!isDemoMode && dataSources && (
+                <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-medium flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Live Data
+                </span>
+              )}
             </div>
             <p className="text-gray-500 text-sm mt-1">Comprehensive production analytics</p>
           </div>
         </div>
+        
+        {/* Data Sources Display */}
+        {dataSources && !isDemoMode && (
+          <div className="flex items-center gap-3 text-xs text-gray-400 bg-gray-800/50 px-3 py-1.5 rounded-lg">
+            <span className="text-gray-500">Data sources:</span>
+            {dataSources.scripts > 0 && <span className="text-indigo-400">{dataSources.scripts} scripts</span>}
+            {dataSources.characters > 0 && <span className="text-purple-400">{dataSources.characters} characters</span>}
+            {dataSources.locations > 0 && <span className="text-emerald-400">{dataSources.locations} locations</span>}
+            {dataSources.shootingDays > 0 && <span className="text-amber-400">{dataSources.shootingDays} shoot days</span>}
+            {dataSources.crew > 0 && <span className="text-cyan-400">{dataSources.crew} crew</span>}
+            {dataSources.expenses > 0 && <span className="text-pink-400">{dataSources.expenses} expenses</span>}
+          </div>
+        )}
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />

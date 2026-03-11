@@ -60,6 +60,7 @@ export default function HealthPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   
   // Filtered checks based on search
   const filteredChecks = healthData?.checks.filter(check => {
@@ -199,6 +200,17 @@ export default function HealthPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true)
     fetchHealth()
@@ -302,7 +314,7 @@ export default function HealthPage() {
             </div>
             
             {/* Export Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"

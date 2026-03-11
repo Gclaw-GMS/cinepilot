@@ -346,10 +346,15 @@ export default function BudgetPage() {
   }, [])
 
   const fetchData = useCallback(async () => {
+    setLoading(true)
     try {
       const res = await fetch('/api/budget')
+      if (!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`)
+      }
       const data = await res.json()
-      if (data.items && data.items.length > 0) {
+      // Check if real data exists, otherwise use demo
+      if (data.items && data.items.length > 0 && !data._demo) {
         setItems(data.items || [])
         setExpenses(data.expenses || [])
         setForecast(data.forecast || null)
@@ -360,8 +365,8 @@ export default function BudgetPage() {
         setForecast(DEMO_FORECAST)
       }
     } catch (e) {
-      console.error(e)
-      // Fallback to demo data
+      console.error('Budget fetch error:', e)
+      // Fallback to demo data with error logged
       setItems(DEMO_BUDGET_ITEMS)
       setExpenses(DEMO_EXPENSES)
       setForecast(DEMO_FORECAST)
@@ -468,18 +473,24 @@ export default function BudgetPage() {
   }
 
   const handleAddExpense = async () => {
-    if (!newExpense.description || !newExpense.amount) return
+    if (!newExpense.description || !newExpense.amount) {
+      setError('Please fill in description and amount')
+      return
+    }
     try {
-      await fetch('/api/budget', {
+      const res = await fetch('/api/budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'addExpense', ...newExpense, amount: parseFloat(newExpense.amount) }),
       })
+      if (!res.ok) {
+        throw new Error('Failed to add expense')
+      }
       setShowAddExpense(false)
       setNewExpense({ category: 'Production', description: '', amount: '', date: '', vendor: '' })
       await fetchData()
     } catch (e: any) {
-      setError(e.message)
+      setError(e.message || 'Failed to add expense')
     }
   }
 
@@ -524,7 +535,15 @@ export default function BudgetPage() {
   ]
 
   if (loading) {
-    return <div className="p-6 flex items-center justify-center min-h-[60vh]"><div className="text-gray-400 animate-pulse">Loading budget...</div></div>
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="relative">
+          <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+          <div className="absolute inset-0 w-12 h-12 border-4 border-indigo-200 rounded-full animate-ping opacity-30"></div>
+        </div>
+        <p className="text-slate-400 mt-4 animate-pulse">Loading budget data...</p>
+      </div>
+    )
   }
 
   return (

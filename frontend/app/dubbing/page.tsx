@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -63,8 +63,10 @@ export default function DubbingPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -91,6 +93,12 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
           break
+        case 'p':
+          e.preventDefault()
+          if (dubbedVersions.length > 0) {
+            printDubbingReport()
+          }
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -99,6 +107,7 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           break
       }
@@ -106,7 +115,7 @@ export default function DubbingPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu, dubbedVersions.length])
 
   // Click outside handler for export menu
   useEffect(() => {
@@ -114,12 +123,15 @@ export default function DubbingPage() {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   useEffect(() => {
     async function loadScripts() {
@@ -231,6 +243,130 @@ export default function DubbingPage() {
     a.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
+  }
+
+  // Print function
+  const printDubbingReport = () => {
+    if (dubbedVersions.length === 0) return
+    
+    const languageLabels: Record<string, string> = {
+      telugu: 'Telugu',
+      hindi: 'Hindi',
+      malayalam: 'Malayalam',
+      kannada: 'Kannada',
+      english: 'English',
+    }
+    
+    const getLanguageColor = (lang: string) => {
+      const colors: Record<string, string> = {
+        telugu: '#eab308',
+        hindi: '#f97316',
+        malayalam: '#14b8a6',
+        kannada: '#f43f5e',
+        english: '#3b82f6',
+      }
+      return colors[lang] || '#6b7280'
+    }
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Dubbing Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
+    .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 8px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .subtitle { font-size: 14px; color: #64748b; }
+    .timestamp { font-size: 12px; color: #94a3b8; margin-left: auto; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .lang-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+    .preview-section { margin-top: 24px; }
+    .preview-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
+    .scene { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .scene-number { font-weight: bold; color: #6366f1; margin-bottom: 8px; }
+    .scene-dialogue { font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+    .scene-notes { font-size: 12px; color: #64748b; margin-top: 8px; font-style: italic; }
+    .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo"></div>
+    <div>
+      <div class="title">CinePilot Dubbing Report</div>
+      <div class="subtitle">Script Translation & Cultural Adaptation</div>
+    </div>
+    <div class="timestamp">Generated: ${new Date().toLocaleString()}</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Total Versions</div>
+      <div class="stat-value">${dubbedVersions.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Preview Scenes</div>
+      <div class="stat-value">${preview.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Languages</div>
+      <div class="stat-value">${new Set(dubbedVersions.map(d => d.language)).size}</div>
+    </div>
+  </div>
+  
+  <h3 style="margin-bottom: 12px;">Dubbed Versions</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Title</th>
+        <th>Language</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dubbedVersions.map((dub, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${dub.title}</td>
+          <td><span class="lang-badge" style="background: ${getLanguageColor(dub.language)}20; color: ${getLanguageColor(dub.language)};">${languageLabels[dub.language] || dub.language}</span></td>
+          <td>${new Date(dub.createdAt).toLocaleDateString()}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  ${preview.length > 0 ? `
+  <div class="preview-section">
+    <div class="preview-title">Translation Preview</div>
+    ${preview.map(p => `
+      <div class="scene">
+        <div class="scene-number">Scene ${p.sceneNumber}</div>
+        <div class="scene-dialogue">${p.translatedDialogue}</div>
+        ${p.notes ? `<div class="scene-notes">Note: ${p.notes}</div>` : ''}
+      </div>
+    `).join('')}
+  </div>
+  ` : ''}
+  
+  <div class="footer">CinePilot - Film Production Management</div>
+</body>
+</html>`
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.print()
+    setShowPrintMenu(false)
   }
 
   useEffect(() => {
@@ -371,6 +507,29 @@ export default function DubbingPage() {
                   >
                     <Download className="w-4 h-4" />
                     Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Print Button */}
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={dubbedVersions.length === 0}
+                className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm text-amber-400 transition-colors"
+                title="Print (P)"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="text-xs">Print</span>
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={printDubbingReport}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print Report
                   </button>
                 </div>
               )}
@@ -646,6 +805,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Print report</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Show shortcuts</span>

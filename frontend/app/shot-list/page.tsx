@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 
 interface ShotData {
@@ -75,9 +75,11 @@ export default function ShotHubPage() {
   const [scriptId, setScriptId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   const fetchScriptId = useCallback(async () => {
@@ -157,8 +159,8 @@ export default function ShotHubPage() {
           break
         case 'e':
           e.preventDefault()
-          if (!exporting && shots.length > 0) {
-            handleExportShots('csv')
+          if (shots.length > 0) {
+            setShowExportMenu(prev => !prev)
           }
           break
         case '?':
@@ -168,6 +170,7 @@ export default function ShotHubPage() {
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSceneFilter('')
           setSelectedSceneId(null)
           break
@@ -177,6 +180,21 @@ export default function ShotHubPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [scriptId, generating, saving, exporting, shots.length])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
 
   const handleGenerateAll = async () => {
     if (!scriptId) return
@@ -416,27 +434,31 @@ export default function ShotHubPage() {
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
-          <div className="relative group">
+          <div className="relative" ref={exportMenuRef}>
             <button
-              disabled={exporting || shots.length === 0}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded font-medium text-sm"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={shots.length === 0}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded font-medium text-sm flex items-center gap-2"
             >
               {exporting ? 'Exporting...' : 'Export'}
+              <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
             </button>
-            <div className="absolute right-0 mt-1 w-32 bg-gray-800 border border-gray-700 rounded shadow-lg hidden group-hover:block z-10">
-              <button
-                onClick={() => handleExportShots('json')}
-                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
-              >
-                JSON
-              </button>
-              <button
-                onClick={() => handleExportShots('csv')}
-                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
-              >
-                CSV
-              </button>
-            </div>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1 w-36 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+                <button
+                  onClick={() => { handleExportShots('csv'); setShowExportMenu(false) }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+                >
+                  Export CSV
+                </button>
+                <button
+                  onClick={() => { handleExportShots('json'); setShowExportMenu(false) }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+                >
+                  Export JSON
+                </button>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setShowKeyboardHelp(true)}
@@ -601,7 +623,7 @@ export default function ShotHubPage() {
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">S</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                <span className="text-gray-300">Export CSV</span>
+                <span className="text-gray-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">

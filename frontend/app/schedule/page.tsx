@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { 
   Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -233,6 +233,7 @@ export default function SchedulePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -242,6 +243,7 @@ export default function SchedulePage() {
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const [mode, setMode] = useState('balanced')
@@ -324,12 +326,17 @@ export default function SchedulePage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           setShowFilters(false)
           break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'p':
+          e.preventDefault()
+          handlePrint()
           break
         case 'f':
           e.preventDefault()
@@ -342,23 +349,26 @@ export default function SchedulePage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [fetchData])
 
-  // Click outside to close export menu and filter panel
+  // Click outside to close export menu, print menu, and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (showExportMenu && !target.closest('.export-menu')) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
       if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
         setShowFilters(false)
       }
     }
     
-    if (showExportMenu || showFilters) {
+    if (showExportMenu || showPrintMenu || showFilters) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [showExportMenu, showFilters])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   // Export functions
   const handleExportCSV = () => {
@@ -422,6 +432,106 @@ export default function SchedulePage() {
     a.click()
     URL.revokeObjectURL(url)
     setExporting(false)
+  }
+
+  const handlePrint = () => {
+    const stats = {
+      totalDays: shootingDays.length,
+      completed: shootingDays.filter(d => d.status === 'completed').length,
+      inProgress: shootingDays.filter(d => d.status === 'in_progress').length,
+      scheduled: shootingDays.filter(d => d.status === 'scheduled').length,
+      delayed: shootingDays.filter(d => d.status === 'delayed').length,
+      totalScenes: shootingDays.reduce((sum, d) => sum + d.dayScenes.length, 0),
+    }
+
+    const statsHtml = `
+      <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin: 0 0 10px 0; color: #1a1a2e;">Schedule Summary</h3>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+          <div><strong>Total Days:</strong> ${stats.totalDays}</div>
+          <div><strong>Total Scenes:</strong> ${stats.totalScenes}</div>
+          <div><strong>Completed:</strong> ${stats.completed}</div>
+          <div><strong>Scheduled:</strong> ${stats.scheduled}</div>
+        </div>
+      </div>
+    `
+    
+    const tableRows = filteredShootingDays.map((day, i) => {
+      const statusColors: Record<string, string> = {
+        completed: '#22c55e',
+        in_progress: '#3b82f6',
+        scheduled: '#f59e0b',
+        delayed: '#ef4444',
+      }
+      const statusColor = statusColors[day.status] || '#64748b'
+      
+      return `
+        <tr style="${i % 2 === 0 ? 'background: #f9fafb;' : ''}">
+          <td style="padding: 10px; border: 1px solid #e5e7eb;">${day.dayNumber}</td>
+          <td style="padding: 10px; border: 1px solid #e5e7eb;">${day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN') : '-'}</td>
+          <td style="padding: 10px; border: 1px solid #e5e7eb;">${day.location?.name || 'TBD'}</td>
+          <td style="padding: 10px; border: 1px solid #e5e7eb;">${day.callTime || '-'}</td>
+          <td style="padding: 10px; border: 1px solid #e5e7eb;">${day.estimatedHours || '-'}</td>
+          <td style="padding: 10px; border: 1px solid #e5e7eb;">${day.dayScenes.length}</td>
+          <td style="padding: 10px; border: 1px solid #e5e7eb;"><span style="background: ${statusColor}20; color: ${statusColor}; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${day.status.replace('_', ' ').toUpperCase()}</span></td>
+        </tr>
+        ${day.dayScenes.length > 0 ? `
+          <tr>
+            <td colspan="7" style="padding: 8px 10px; border: 1px solid #e5e7eb; background: #f8fafc;">
+              <strong>Scenes:</strong> ${day.dayScenes.map(ds => `${ds.scene.sceneNumber}: ${ds.scene.headingRaw || 'Unknown'}`).join(', ')}
+            </td>
+          </tr>
+        ` : ''}
+      `
+    }).join('')
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Shooting Schedule - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; }
+            h1 { color: #1a1a2e; margin-bottom: 5px; }
+            .subtitle { color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background: #f8f9fa; font-weight: 600; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Shooting Schedule</h1>
+          <p class="subtitle">Generated: ${new Date().toLocaleString()}</p>
+          ${statsHtml}
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Call Time</th>
+                <th>Est. Hours</th>
+                <th>Scenes</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    printWindow.document.write(fullHtml)
+    printWindow.document.close()
+    printWindow.print()
+    
+    setShowPrintMenu(false)
   }
 
   const handleOptimize = async () => {
@@ -737,6 +847,29 @@ export default function SchedulePage() {
                 >
                   <Download className="w-4 h-4" />
                   Export JSON
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Print Button */}
+          <div className="relative" ref={printMenuRef}>
+            <button
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 flex items-center gap-2 transition-colors"
+              title="Print Schedule (P)"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            {/* Print Dropdown */}
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Schedule
                 </button>
               </div>
             )}
@@ -1259,6 +1392,7 @@ export default function SchedulePage() {
                 { key: '2', desc: 'Switch to Analytics view' },
                 { key: 'O', desc: 'Open optimize schedule' },
                 { key: 'E', desc: 'Export schedule (CSV/JSON)' },
+                { key: 'P', desc: 'Print schedule report' },
                 { key: '?', desc: 'Show this help modal' },
                 { key: 'Esc', desc: 'Close modal / Clear search / Close filters' },
               ].map(({ key, desc }) => (

@@ -9,7 +9,7 @@ import {
   BarChart3, TrendingUp, DollarSign, Calendar, 
   Users, Video, MapPin, Clapperboard, RefreshCw, Loader2, 
   Activity, Target, AlertTriangle,
-  Clock, Film, Search, X, HelpCircle, Download
+  Clock, Film, Search, X, HelpCircle, Download, Printer
 } from 'lucide-react'
 
 interface DashboardData {
@@ -174,9 +174,11 @@ export default function AnalyticsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -245,10 +247,15 @@ export default function AnalyticsPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          setShowPrintMenu(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowShortcuts(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           break
       }
@@ -264,10 +271,13 @@ export default function AnalyticsPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   // Export functions
   const handleExportCSV = () => {
@@ -343,6 +353,196 @@ export default function AnalyticsPage() {
     if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)} L`
     if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}K`
     return `₹${amount}`
+  }
+
+  // Print analytics report
+  const handlePrint = () => {
+    if (!dashboard || !metrics) return
+    setShowPrintMenu(false)
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    const overview = dashboard.overview
+    const timeline = metrics.timeline
+    const performance = metrics.performance
+    
+    // Build budget breakdown rows
+    const budgetRows = dashboard.budget_breakdown.map(b => {
+      const variance = b.allocated - b.spent
+      const varianceClass = variance >= 0 ? 'positive' : 'negative'
+      return `<tr>
+        <td>${b.category}</td>
+        <td>${formatCurrency(b.allocated)}</td>
+        <td>${formatCurrency(b.spent)}</td>
+        <td class="${varianceClass}">${formatCurrency(Math.abs(variance))}</td>
+      </tr>`
+    }).join('')
+    
+    // Build schedule progress rows
+    const scheduleRows = dashboard.schedule_progress.slice(0, 15).map(s => {
+      const statusClass = s.status === 'completed' ? 'completed' : s.status === 'in_progress' ? 'in-progress' : 'scheduled'
+      return `<tr>
+        <td>Day ${s.day}</td>
+        <td>${s.scenes}</td>
+        <td><span class="status status-${statusClass}">${s.status.replace('_', ' ')}</span></td>
+      </tr>`
+    }).join('')
+    
+    // Build department stats rows
+    const deptRows = metrics.department_stats.map(d => {
+      return `<tr>
+        <td>${d.name}</td>
+        <td>${d.efficiency}%</td>
+        <td>${d.utilization}%</td>
+      </tr>`
+    }).join('')
+    
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Analytics Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 28px; color: #0f172a; }
+    .header .subtitle { color: #64748b; margin-top: 4px; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .summary-card { background: #f8fafc; border-radius: 12px; padding: 20px; text-align: center; }
+    .summary-card .value { font-size: 28px; font-weight: 700; color: #0f172a; }
+    .summary-card .label { font-size: 14px; color: #64748b; margin-top: 4px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 18px; margin-bottom: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f1f5f9; padding: 10px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+    tr:hover { background: #f8fafc; }
+    .status { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+    .status-in-progress { background: #dbeafe; color: #1e40af; }
+    .status-scheduled { background: #fef3c7; color: #92400e; }
+    .positive { color: #059669; }
+    .negative { color: #dc2626; }
+    .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .metric-item { display: flex; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 8px; }
+    .metric-label { color: #64748b; }
+    .metric-value { font-weight: 600; color: #0f172a; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>📊 Production Analytics Report</h1>
+      <p class="subtitle">Generated by CinePilot - ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    </div>
+  </div>
+  
+  <div class="summary">
+    <div class="summary-card">
+      <div class="value">${overview.total_scenes}</div>
+      <div class="label">Total Scenes</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${overview.completed_scenes}</div>
+      <div class="label">Completed</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${overview.shooting_days_completed}/${overview.shooting_days_total}</div>
+      <div class="label">Shooting Days</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${formatCurrency(overview.budget_total)}</div>
+      <div class="label">Total Budget</div>
+    </div>
+  </div>
+  
+  <div class="two-col">
+    <div class="section">
+      <h2>📈 Timeline & Performance</h2>
+      <div class="metric-grid">
+        <div class="metric-item"><span class="metric-label">Overall Progress</span><span class="metric-value">${timeline.overall_progress}%</span></div>
+        <div class="metric-item"><span class="metric-label">Days Remaining</span><span class="metric-value">${timeline.days_remaining}</span></div>
+        <div class="metric-item"><span class="metric-label">Budget Used</span><span class="metric-value">${timeline.budget_utilization.toFixed(1)}%</span></div>
+        <div class="metric-item"><span class="metric-label">Efficiency Score</span><span class="metric-value">${performance.efficiency_score}%</span></div>
+        <div class="metric-item"><span class="metric-label">Avg Scenes/Day</span><span class="metric-value">${performance.avg_scenes_per_day}</span></div>
+        <div class="metric-item"><span class="metric-label">Avg Shots/Scene</span><span class="metric-value">${performance.avg_shots_per_scene}</span></div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>💰 Budget Overview</h2>
+      <div class="metric-grid">
+        <div class="metric-item"><span class="metric-label">Total Budget</span><span class="metric-value">${formatCurrency(overview.budget_total)}</span></div>
+        <div class="metric-item"><span class="metric-label">Spent</span><span class="metric-value">${formatCurrency(overview.budget_spent)}</span></div>
+        <div class="metric-item"><span class="metric-label">Remaining</span><span class="metric-value">${formatCurrency(overview.budget_remaining)}</span></div>
+        <div class="metric-item"><span class="metric-label">Crew Members</span><span class="metric-value">${overview.crew_members}</span></div>
+        <div class="metric-item"><span class="metric-label">Total Shots</span><span class="metric-value">${overview.total_shots}</span></div>
+        <div class="metric-item"><span class="metric-label">VFX Shots</span><span class="metric-value">${overview.vfx_shots}</span></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>💵 Budget Breakdown</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Allocated</th>
+          <th>Spent</th>
+          <th>Variance</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${budgetRows}
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="section">
+    <h2>📅 Schedule Progress (First 15 Days)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Scenes</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${scheduleRows}
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="section">
+    <h2>👥 Department Performance</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Department</th>
+          <th>Efficiency</th>
+          <th>Utilization</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${deptRows}
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="footer">
+    CinePilot Production Management • Analytics Report
+  </div>
+</body>
+</html>`
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.print()
   }
 
   const formatDate = (dateStr: string): string => {
@@ -486,6 +686,29 @@ export default function AnalyticsPage() {
                 >
                   <Download className="w-4 h-4 text-green-400" />
                   Export as CSV
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="relative" ref={printMenuRef}>
+            <button
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              disabled={!dashboard}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+              title="Print (P)"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <Printer className="w-4 h-4 text-indigo-400" />
+                  Print Analytics
                 </button>
               </div>
             )}
@@ -959,12 +1182,13 @@ export default function AnalyticsPage() {
               {[
                 { key: 'R', description: 'Refresh analytics data' },
                 { key: 'E', description: 'Toggle export dropdown' },
+                { key: 'P', description: 'Print analytics report' },
                 { key: '/', description: 'Focus search input' },
                 { key: '1', description: 'Switch to Overview view' },
                 { key: '2', description: 'Switch to Performance view' },
                 { key: '3', description: 'Switch to Forecast view' },
                 { key: '?', description: 'Show this help modal' },
-                { key: 'Esc', description: 'Close modal, export menu, or clear search' },
+                { key: 'Esc', description: 'Close modal, menus, or clear search' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

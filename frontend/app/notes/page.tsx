@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   StickyNote, Plus, Search, Edit2, Trash2, X, Save, 
   Calendar, Tag, User, Clock, CheckCircle, AlertCircle,
-  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle, Copy
+  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle, Copy, Printer, ChevronDown
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
@@ -134,11 +134,13 @@ export default function NotesPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   
   // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -234,6 +236,12 @@ export default function NotesPage() {
             handleTogglePinRef.current(selectedNoteRef.current)
           }
           break
+        case 'o':
+          e.preventDefault()
+          if (notes.length > 0) {
+            printNotesReport()
+          }
+          break
         case 'd':
           e.preventDefault()
           if (selectedNoteRef.current && handleDuplicateRef.current) {
@@ -249,6 +257,8 @@ export default function NotesPage() {
             setEditingId(null)
           } else if (showExportMenu) {
             setShowExportMenu(false)
+          } else if (showPrintMenu) {
+            setShowPrintMenu(false)
           } else {
             setSearch('')
             setFilterCategory('all')
@@ -261,18 +271,21 @@ export default function NotesPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu])
 
-  // Click outside to close export menu
+  // Click outside to close export and print menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -441,6 +454,133 @@ export default function NotesPage() {
     setExporting(false)
   }
 
+  // Print Notes Report
+  function printNotesReport() {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) return;
+    
+    const categoryColors: Record<string, string> = {
+      general: '#64748b',
+      production: '#3b82f6',
+      creative: '#8b5cf6',
+      technical: '#10b981',
+      logistics: '#f59e0b',
+      budget: '#22c55e',
+    };
+    
+    const categoryLabels: Record<string, string> = {
+      general: 'General',
+      production: 'Production',
+      creative: 'Creative',
+      technical: 'Technical',
+      logistics: 'Logistics',
+      budget: 'Budget',
+    };
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Production Notes Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; line-height: 1.5; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #8b5cf6; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1a1a1a; margin-bottom: 5px; }
+    .header p { color: #666; font-size: 14px; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; }
+    .summary-card .label { font-size: 12px; color: #666; text-transform: uppercase; }
+    .summary-card .value { font-size: 24px; font-weight: bold; color: #8b5cf6; }
+    .summary-card.pinned .value { color: #f59e0b; }
+    .summary-card.category .value { color: #10b981; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e5e5; }
+    th { background: #f5f5f5; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #666; }
+    .pinned-row { background: #fffbeb; }
+    .pinned-icon { color: #f59e0b; margin-right: 5px; }
+    .category-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .category-general { background: #f1f5f9; color: #64748b; }
+    .category-production { background: #dbeafe; color: #3b82f6; }
+    .category-creative { background: #ede9fe; color: #8b5cf6; }
+    .category-technical { background: #d1fae5; color: #10b981; }
+    .category-logistics { background: #fef3c7; color: #f59e0b; }
+    .category-budget { background: #dcfce7; color: #22c55e; }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag { background: #e2e8f0; color: #475569; padding: 1px 6px; border-radius: 3px; font-size: 10px; }
+    .note-content { white-space: pre-wrap; color: #444; font-size: 13px; }
+    .note-date { color: #888; font-size: 11px; }
+    @media print {
+      body { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Production Notes Report</h1>
+    <p>Generated on ${new Date().toLocaleDateString()}</p>
+  </div>
+  
+  <div class="summary">
+    <div class="summary-card">
+      <div class="label">Total Notes</div>
+      <div class="value">${notes.length}</div>
+    </div>
+    <div class="summary-card pinned">
+      <div class="label">Pinned</div>
+      <div class="value">${notes.filter(n => n.isPinned).length}</div>
+    </div>
+    <div class="summary-card category">
+      <div class="label">Categories</div>
+      <div class="value">${new Set(notes.map(n => n.category)).size}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Tags</div>
+      <div class="value">${new Set(notes.flatMap(n => n.tags)).size}</div>
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30px;"></th>
+        <th style="width: 150px;">Title</th>
+        <th>Content</th>
+        <th style="width: 90px;">Category</th>
+        <th style="width: 120px;">Tags</th>
+        <th style="width: 100px;">Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filteredNotes.map(note => `
+        <tr class="${note.isPinned ? 'pinned-row' : ''}">
+          <td>${note.isPinned ? '📌' : ''}</td>
+          <td><strong>${note.title}</strong></td>
+          <td class="note-content">${note.content.substring(0, 200)}${note.content.length > 200 ? '...' : ''}</td>
+          <td><span class="category-badge category-${note.category}">${categoryLabels[note.category] || note.category}</span></td>
+          <td><div class="tags">${note.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div></td>
+          <td class="note-date">${new Date(note.createdAt).toLocaleDateString()}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div style="text-align: center; color: #999; font-size: 12px; margin-top: 20px;">
+    Generated by CinePilot - Production Notes
+  </div>
+</body>
+</html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+    setShowPrintMenu(false);
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return
     try {
@@ -591,6 +731,29 @@ export default function NotesPage() {
                   >
                     <Download className="w-3 h-3" />
                     Export as JSON
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={notes.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-slate-300 transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+                <ChevronDown className={`w-3 h-3 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-10 min-w-[160px]">
+                  <button
+                    onClick={printNotesReport}
+                    disabled={notes.length === 0}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap flex items-center gap-2"
+                  >
+                    <Printer className="w-3 h-3 text-purple-400" />
+                    Print Notes Report
                   </button>
                 </div>
               )}
@@ -994,6 +1157,7 @@ export default function NotesPage() {
                 { key: 'P', action: 'Pin/unpin selected note' },
                 { key: 'D', action: 'Duplicate selected note' },
                 { key: 'E', action: 'Export notes' },
+                { key: 'O', action: 'Print notes report' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear filters' },
               ].map((shortcut) => (

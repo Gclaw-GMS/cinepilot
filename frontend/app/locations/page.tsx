@@ -5,7 +5,7 @@ import {
   MapPin, Search, Filter, RefreshCw, Loader2, 
   Star, ExternalLink, TrendingUp, AlertTriangle,
   Building2, Trees, Warehouse, Waves, Users,
-  ChevronRight, Info, Target, Award, X, Keyboard, Download
+  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -124,9 +124,11 @@ export default function LocationsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchScenes = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -182,12 +184,16 @@ export default function LocationsPage() {
         case 'e':
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          setShowPrintMenu(prev => !prev)
+          break
         case '?':
           setShowShortcuts(true)
           break
         case 'escape':
           setShowShortcuts(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           break
       }
@@ -315,6 +321,162 @@ export default function LocationsPage() {
     setShowExportMenu(false)
   }
 
+  // Print handler
+  const handlePrint = () => {
+    if (scenes.length === 0) return
+    
+    const selectedScene = scenes.find(s => s.id === selectedSceneId)
+    const candidatesToPrint = selectedSceneId ? filteredCandidates : candidates
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    const totalCandidates = scenes.reduce((acc, s) => acc + s.locationIntents.reduce((a, li) => a + (li._count?.candidates || 0), 0), 0)
+    const favoritesCount = candidatesToPrint.filter((c: CandidateData) => favorites.has(c.id || '')).length
+    const avgScore = candidatesToPrint.length > 0 
+      ? candidatesToPrint.reduce((sum: number, c: CandidateData) => sum + (c.scoreTotal || 0), 0) / candidatesToPrint.length 
+      : 0
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Location Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 28px; color: #0f172a; }
+    .header .subtitle { color: #64748b; margin-top: 4px; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 32px; }
+    .summary-card { background: #f8fafc; border-radius: 12px; padding: 20px; text-align: center; }
+    .summary-card .value { font-size: 32px; font-weight: 700; color: #0f172a; }
+    .summary-card .label { font-size: 14px; color: #64748b; margin-top: 4px; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 20px; margin-bottom: 16px; color: #1e293b; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    tr:hover { background: #f8fafc; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge-restaurant { background: #fef3c7; color: #92400e; }
+    .badge-park { background: #d1fae5; color: #065f46; }
+    .badge-warehouse { background: #e0e7ff; color: #3730a3; }
+    .badge-beach { background: #cffafe; color: #0e7490; }
+    .badge-hotel { background: #ede9fe; color: #6d28d9; }
+    .badge-temple { background: #ffedd5; color: #9a3412; }
+    .badge-office { background: #dbeafe; color: #1e40af; }
+    .badge-resort { background: #fce7f3; color: #9d174d; }
+    .badge-mountain { background: #ccfbf1; color: #0f766e; }
+    .badge-forest { background: #dcfce7; color: #166534; }
+    .badge-studio { background: #f3e8ff; color: #7e22ce; }
+    .badge-default { background: #f1f5f9; color: #475569; }
+    .score { font-weight: 600; color: #0f172a; }
+    .score-high { color: #059669; }
+    .score-medium { color: #d97706; }
+    .score-low { color: #dc2626; }
+    .favorite { color: #f59e0b; }
+    .risk { display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 2px; }
+    .no-data { text-align: center; padding: 40px; color: #94a3b8; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>📍 Location Scouter Report</h1>
+      <p class="subtitle">Generated by CinePilot - ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    </div>
+  </div>
+  
+  <div class="summary">
+    <div class="summary-card">
+      <div class="value">${scenes.length}</div>
+      <div class="label">Scenes</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${totalCandidates}</div>
+      <div class="label">Total Candidates</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${avgScore.toFixed(1)}</div>
+      <div class="label">Avg Score</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${favoritesCount}</div>
+      <div class="label">Favorites</div>
+    </div>
+  </div>
+  
+  ${selectedScene ? `
+  <div class="section">
+    <h2>📌 Selected Scene: ${selectedScene.sceneNumber}</h2>
+    <p style="color: #64748b; margin-bottom: 16px;">${selectedScene.headingRaw || 'N/A'} • ${selectedScene.intExt || ''} • ${selectedScene.timeOfDay || ''}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Location Name</th>
+          <th>Type</th>
+          <th>Score</th>
+          <th>Address</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredCandidates.length > 0 ? filteredCandidates.map((c: CandidateData, idx: number) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${c.name || 'N/A'} ${favorites.has(c.id || '') ? '⭐' : ''}</td>
+          <td><span class="badge badge-${(c.placeType || 'default').toLowerCase()}">${c.placeType || 'N/A'}</span></td>
+          <td class="score ${c.scoreTotal >= 80 ? 'score-high' : c.scoreTotal >= 60 ? 'score-medium' : 'score-low'}">${c.scoreTotal?.toFixed(1) || 'N/A'}</td>
+          <td>${c.latitude && c.longitude ? `${c.latitude}, ${c.longitude}` : 'N/A'}</td>
+          <td>${c.explanation || '-'} ${c.riskFlags?.length ? `<br/>${c.riskFlags.map((r: string) => `<span class="risk">${r}</span>`).join('')}` : ''}</td>
+        </tr>
+        `).join('') : `<tr><td colspan="6" class="no-data">No location candidates found for this scene</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  ` : `
+  <div class="section">
+    <h2>📋 All Location Scenes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Scene</th>
+          <th>Heading</th>
+          <th>Int/Ext</th>
+          <th>Time</th>
+          <th>Candidates</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${scenes.map(s => `
+        <tr>
+          <td><strong>${s.sceneNumber}</strong></td>
+          <td>${s.headingRaw || 'N/A'}</td>
+          <td>${s.intExt || '-'}</td>
+          <td>${s.timeOfDay || '-'}</td>
+          <td>${s.locationIntents.reduce((a, li) => a + (li._count?.candidates || 0), 0)}</td>
+        </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  `}
+  
+  <div class="footer">
+    CinePilot Production Management • Location Scouting Report
+  </div>
+</body>
+</html>`
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.print()
+    setShowPrintMenu(false)
+  }
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -324,10 +486,16 @@ export default function LocationsPage() {
           setShowExportMenu(false)
         }
       }
+      if (showPrintMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.print-menu')) {
+          setShowPrintMenu(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId)
   const filteredScenes = useMemo(() => {
@@ -476,6 +644,28 @@ export default function LocationsPage() {
             )}
           </div>
 
+          {/* Print Dropdown */}
+          <div className="relative print-menu">
+            <button
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-all flex items-center gap-1"
+              title="Print (P)"
+            >
+              <Printer className="w-5 h-5 text-slate-400" />
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4 text-amber-400" />
+                  Print Location Report
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="flex bg-slate-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('cards')}
@@ -530,6 +720,7 @@ export default function LocationsPage() {
                 { key: '1', action: 'Switch to Cards view' },
                 { key: '2', action: 'Switch to Analysis view' },
                 { key: 'E', action: 'Toggle export menu' },
+                { key: 'P', action: 'Toggle print menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },
               ].map(({ key, action }) => (

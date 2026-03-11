@@ -34,6 +34,7 @@ import {
   ChevronDown,
   Download,
   FileText,
+  Printer,
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -127,7 +128,9 @@ export default function TasksPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
@@ -243,6 +246,13 @@ export default function TasksPage() {
           setShowExportMenu(prev => !prev)
         }
         break
+      case 'p':
+      case 'P':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setShowPrintMenu(prev => !prev)
+        }
+        break
     }
   }, [tasks.length])
 
@@ -262,18 +272,21 @@ export default function TasksPage() {
     }
   }, [selectedRowIndex])
 
-  // Click outside handler for export menu
+  // Click outside handler for export/print menus
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
         setShowExportMenu(false)
       }
+      if (printMenuRef.current && !printMenuRef.current.contains(event.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   // Calculate stats
   const stats = useMemo((): TaskStats => {
@@ -471,6 +484,127 @@ export default function TasksPage() {
     setShowExportMenu(false)
   }
 
+  // Print tasks report
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    // Build table rows
+    let tableRows = ''
+    if (filteredTasks.length > 0) {
+      tableRows = filteredTasks.map(t => {
+        const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
+        const priorityIcon = t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '⚪'
+        const statusDisplay = t.status.replace('_', ' ')
+        return `<tr>
+          <td>${t.title}</td>
+          <td><span class="badge badge-${t.status}">${statusDisplay}</span></td>
+          <td><span class="priority priority-${t.priority}">${priorityIcon} ${t.priority}</span></td>
+          <td>${t.assignee || '-'}</td>
+          <td class="${isOverdue ? 'overdue' : ''}">${t.dueDate || '-'}</td>
+        </tr>`
+      }).join('')
+    } else {
+      tableRows = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#94a3b8">No tasks found</td></tr>'
+    }
+    
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Tasks Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 28px; color: #0f172a; }
+    .header .subtitle { color: #64748b; margin-top: 4px; }
+    .summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 32px; }
+    .summary-card { background: #f8fafc; border-radius: 12px; padding: 20px; text-align: center; }
+    .summary-card .value { font-size: 32px; font-weight: 700; color: #0f172a; }
+    .summary-card .label { font-size: 14px; color: #64748b; margin-top: 4px; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 20px; margin-bottom: 16px; color: #1e293b; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    tr:hover { background: #f8fafc; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge-pending { background: #f1f5f9; color: #475569; }
+    .badge-in_progress { background: #dbeafe; color: #1e40af; }
+    .badge-completed { background: #d1fae5; color: #065f46; }
+    .badge-blocked { background: #fee2e2; color: #991b1b; }
+    .badge-high { background: #fee2e2; color: #991b1b; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-low { background: #f1f5f9; color: #475569; }
+    .priority { display: inline-flex; align-items: center; gap: 4px; }
+    .priority-high { color: #dc2626; }
+    .priority-medium { color: #d97706; }
+    .priority-low { color: #64748b; }
+    .overdue { color: #dc2626; font-weight: 600; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>✅ Tasks Report</h1>
+      <p class="subtitle">Generated by CinePilot - ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    </div>
+  </div>
+  
+  <div class="summary">
+    <div class="summary-card">
+      <div class="value">${stats.total}</div>
+      <div class="label">Total</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${stats.pending}</div>
+      <div class="label">Pending</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${stats.inProgress}</div>
+      <div class="label">In Progress</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${stats.completed}</div>
+      <div class="label">Completed</div>
+    </div>
+    <div class="summary-card">
+      <div class="value">${stats.completionPercent}%</div>
+      <div class="label">Done</div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>📋 All Tasks</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Assignee</th>
+          <th>Due Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="footer">
+    CinePilot Production Management • Tasks Report
+  </div>
+</body>
+</html>`
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.print()
+    setShowPrintMenu(false)
+  }
+
   // Open edit form
   const openEditForm = (task: Task) => {
     setEditingTask(task)
@@ -584,6 +718,31 @@ export default function TasksPage() {
                   >
                     <FileText className="w-4 h-4" />
                     Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Print Dropdown */}
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={filteredTasks.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-amber-900/30 border border-slate-700 hover:border-amber-700/50 rounded-lg text-sm text-slate-400 hover:text-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Print tasks (P)"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handlePrint}
+                    disabled={filteredTasks.length === 0}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-amber-900/30 hover:text-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print Tasks
                   </button>
                 </div>
               )}
@@ -1088,6 +1247,7 @@ export default function TasksPage() {
                   { keys: ['F'], desc: 'Toggle filters', category: 'Actions' },
                   { keys: ['/'], desc: 'Focus search', category: 'Actions' },
                   { keys: ['E'], desc: 'Export dropdown', category: 'Actions' },
+                  { keys: ['P'], desc: 'Print tasks', category: 'Actions' },
                   { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
                   { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
                 ].map((shortcut, idx) => (

@@ -8,7 +8,7 @@ import {
 import { 
   DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
   RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard, Search,
-  FileText, FileJson
+  FileText, FileJson, Printer
 } from 'lucide-react'
 
 interface BudgetItemData {
@@ -130,8 +130,10 @@ export default function BudgetPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   // Export functions
   const handleExportCSV = () => {
@@ -177,11 +179,166 @@ export default function BudgetPage() {
     setShowExportMenu(false)
   }
 
+  const handlePrint = () => {
+    // Get category totals
+    const categoryTotals: Record<string, number> = {}
+    items.forEach(item => {
+      const cat = item.category
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.total || 0)
+    })
+
+    // Get category breakdown for expenses
+    const expenseByCategory: Record<string, number> = {}
+    expenses.forEach(exp => {
+      expenseByCategory[exp.category] = (expenseByCategory[exp.category] || 0) + Number(exp.amount)
+    })
+
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Budget Report - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1a1a1a; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; margin-bottom: 5px; }
+    .header p { color: #666; font-size: 14px; }
+    .summary { display: flex; justify-content: space-around; margin-bottom: 30px; }
+    .summary-card { text-align: center; padding: 15px 25px; background: #f5f5f5; border-radius: 8px; }
+    .summary-card .label { font-size: 12px; color: #666; text-transform: uppercase; }
+    .summary-card .value { font-size: 24px; font-weight: bold; margin-top: 5px; }
+    .summary-card.planned .value { color: #6366f1; }
+    .summary-card.spent .value { color: #10b981; }
+    .summary-card.variance .value { color: ${variance >= 0 ? '#10b981' : '#ef4444'}; }
+    .section { margin-bottom: 30px; }
+    .section h2 { font-size: 18px; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f0f0f0; padding: 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #ccc; }
+    td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+    tr:nth-child(even) { background: #fafafa; }
+    .category-header { background: #e8e8e8; font-weight: bold; }
+    .category-total { background: #f5f5f5; font-weight: bold; }
+    .status-approved { color: #10b981; }
+    .status-pending { color: #f59e0b; }
+    .footer { margin-top: 30px; text-align: center; color: #999; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Production Budget Report</h1>
+    <p>CinePilot • Generated on ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+  </div>
+
+  <div class="summary">
+    <div class="summary-card planned">
+      <div class="label">Total Planned</div>
+      <div class="value">${formatINR(totalPlanned)}</div>
+    </div>
+    <div class="summary-card spent">
+      <div class="label">Total Spent</div>
+      <div class="value">${formatINR(totalActual)}</div>
+    </div>
+    <div class="summary-card variance">
+      <div class="label">Variance</div>
+      <div class="value">${formatINR(Math.abs(variance))} ${variance >= 0 ? 'Under' : 'Over'}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📋 Budget Breakdown by Category</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Subcategory</th>
+          <th>Description</th>
+          <th style="text-align:right">Quantity</th>
+          <th style="text-align:right">Unit</th>
+          <th style="text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Object.entries(categoryTotals).map(([cat, total]) => {
+          const catItems = items.filter(i => i.category === cat)
+          return catItems.map((item, idx) => `
+            <tr ${idx === 0 ? 'class="category-header"' : ''}>
+              ${idx === 0 ? `<td rowspan="${catItems.length}" style="vertical-align:top;font-weight:bold">${cat}</td>` : ''}
+              <td>${item.subcategory || '-'}</td>
+              <td>${item.description || '-'}</td>
+              <td style="text-align:right">${item.quantity || '-'}</td>
+              <td style="text-align:right">${item.unit || '-'}</td>
+              <td style="text-align:right">${formatINR(Number(item.total || 0))}</td>
+            </tr>
+          `).join('')
+        }).join('')}
+        <tr class="category-total">
+          <td colspan="5" style="text-align:right">TOTAL</td>
+          <td style="text-align:right">${formatINR(totalPlanned)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  ${expenses.length > 0 ? `
+  <div class="section">
+    <h2>💰 Expenses Details</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Category</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th style="text-align:right">Amount</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${expenses.map(exp => `
+          <tr>
+            <td>${exp.date}</td>
+            <td>${exp.category}</td>
+            <td>${exp.description}</td>
+            <td>${exp.vendor || '-'}</td>
+            <td style="text-align:right">${formatINR(Number(exp.amount))}</td>
+            <td class="status-${exp.status}">${exp.status}</td>
+          </tr>
+        `).join('')}
+        <tr class="category-total">
+          <td colspan="4" style="text-align:right">TOTAL SPENT</td>
+          <td style="text-align:right">${formatINR(totalActual)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  ` : ''}
+
+  <div class="footer">
+    <p>Generated by CinePilot • AI-Powered Film Production Management</p>
+  </div>
+</body>
+</html>
+    `
+    
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.print()
+    }
+    setShowPrintMenu(false)
+  }
+
   // Close export menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
+      }
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -267,6 +424,10 @@ export default function BudgetPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'p':
+          e.preventDefault()
+          setShowPrintMenu(prev => !prev)
           break
       }
     }
@@ -429,6 +590,28 @@ export default function BudgetPage() {
                 >
                   <FileJson className="w-4 h-4" />
                   Export JSON
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Print Dropdown */}
+          <div className="relative" ref={printMenuRef}>
+            <button 
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-sm flex items-center gap-2"
+              title="Print (P)"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                <button 
+                  onClick={handlePrint}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-lg"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Budget Report
                 </button>
               </div>
             )}
@@ -920,6 +1103,7 @@ export default function BudgetPage() {
                 { key: '/', action: 'Search budget items' },
                 { key: 'N', action: 'Add new expense' },
                 { key: 'E', action: 'Toggle export menu' },
+                { key: 'P', action: 'Print budget report' },
                 { key: '1', action: 'Switch to Overview tab' },
                 { key: '2', action: 'Switch to Breakdown tab' },
                 { key: '3', action: 'Switch to Expenses tab' },

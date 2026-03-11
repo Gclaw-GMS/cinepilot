@@ -23,6 +23,7 @@ import {
   RefreshCw,
   ChevronDown,
   FileText,
+  Printer,
 } from 'lucide-react';
 import {
   BarChart,
@@ -109,12 +110,14 @@ export default function CrewPage() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const printMenuRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
 
   const [form, setForm] = useState({
@@ -201,12 +204,17 @@ export default function CrewPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearch('')
           setDeptFilter('all')
           break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'p':
+          e.preventDefault()
+          handlePrint()
           break
       }
     }
@@ -413,12 +421,15 @@ export default function CrewPage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const handleExportCSV = () => {
     setExporting(true)
@@ -488,6 +499,99 @@ export default function CrewPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
+  const handlePrint = () => {
+    const totalDailyRate = crew.reduce((sum, c) => {
+      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
+      return sum + (isNaN(rate) ? 0 : rate)
+    }, 0)
+
+    const deptCounts = crew.reduce<Record<string, number>>((acc, c) => {
+      const d = c.department || 'Unassigned'
+      acc[d] = (acc[d] ?? 0) + 1
+      return acc
+    }, {})
+
+    const statsHtml = `
+      <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h3 style="margin: 0 0 10px 0; color: #1a1a2e;">Summary Statistics</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+          <div><strong>Total Crew:</strong> ${crew.length}</div>
+          <div><strong>Total Daily Rate:</strong> ₹${totalDailyRate.toLocaleString('en-IN')}</div>
+          <div><strong>Departments:</strong> ${Object.keys(deptCounts).length}</div>
+          <div><strong>Avg Rate:</strong> ₹${(totalDailyRate / crew.length || 0).toLocaleString('en-IN')}</div>
+        </div>
+      </div>
+      <div style="margin-bottom: 20px; padding: 10px; background: #f0fdf4; border-radius: 8px;">
+        <h4 style="margin: 0 0 8px 0; color: #166534;">Department Breakdown</h4>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          ${Object.entries(deptCounts).map(([dept, count]) => 
+            `<span style="background: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #e5e7eb;">${dept}: ${count}</span>`
+          ).join('')}
+        </div>
+      </div>
+    `
+    
+    const tableRows = filtered.map((c, i) => `
+      <tr style="${i % 2 === 0 ? 'background: #f9fafb;' : ''}">
+        <td style="padding: 10px; border: 1px solid #e5e7eb;">${i + 1}</td>
+        <td style="padding: 10px; border: 1px solid #e5e7eb;"><strong>${c.name}</strong></td>
+        <td style="padding: 10px; border: 1px solid #e5e7eb;">${c.role}</td>
+        <td style="padding: 10px; border: 1px solid #e5e7eb;"><span style="background: ${DEPT_COLORS[c.department || 'Unassigned'] || '#64748b'}20; color: ${DEPT_COLORS[c.department || 'Unassigned'] || '#64748b'}; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${c.department || 'Unassigned'}</span></td>
+        <td style="padding: 10px; border: 1px solid #e5e7eb;">${c.phone || '-'}</td>
+        <td style="padding: 10px; border: 1px solid #e5e7eb;">${c.email || '-'}</td>
+        <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">${c.dailyRate ? '₹' + Number(c.dailyRate).toLocaleString('en-IN') : '-'}</td>
+      </tr>
+    `).join('')
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Crew Report - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; }
+            h1 { color: #1a1a2e; margin-bottom: 5px; }
+            .subtitle { color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background: #f8f9fa; font-weight: 600; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Crew Management Report</h1>
+          <p class="subtitle">Generated: ${new Date().toLocaleString()}</p>
+          ${statsHtml}
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th style="text-align: right;">Daily Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    printWindow.document.write(fullHtml)
+    printWindow.document.close()
+    printWindow.print()
+    
+    setShowPrintMenu(false)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -551,6 +655,28 @@ export default function CrewPage() {
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="relative" ref={printMenuRef}>
+                <button 
+                  onClick={() => setShowPrintMenu(prev => !prev)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                  title="Print (P)"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                    <button
+                      onClick={handlePrint}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Print Crew Report
                     </button>
                   </div>
                 )}
@@ -930,6 +1056,10 @@ export default function CrewPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Print crew report</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Filter by department</span>

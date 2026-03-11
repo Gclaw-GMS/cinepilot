@@ -20,7 +20,8 @@ import {
   RefreshCw,
   Keyboard,
   Download,
-  ChevronDown
+  ChevronDown,
+  Filter
 } from 'lucide-react'
 
 interface Project {
@@ -120,8 +121,15 @@ export default function ProjectsPage() {
   const [saving, setSaving] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    status: [] as string[],
+    language: [] as string[],
+    genre: [] as string[],
+  })
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -199,17 +207,24 @@ export default function ProjectsPage() {
       e.preventDefault()
       setShowExportDropdown(prev => !prev)
     }
-    // Escape: Close modal / Clear search / Close export
+    // F: Toggle filters
+    else if (e.key.toLowerCase() === 'f') {
+      e.preventDefault()
+      setShowFilters(prev => !prev)
+    }
+    // Escape: Close modal / Clear search / Close export / Close filters
     else if (e.key === 'Escape') {
       if (showKeyboardHelp) {
         setShowKeyboardHelp(false)
       } else if (showExportDropdown) {
         setShowExportDropdown(false)
+      } else if (showFilters) {
+        setShowFilters(false)
       } else if (search) {
         setSearch('')
       }
     }
-  }, [loadProjects, search, showKeyboardHelp, showExportDropdown])
+  }, [loadProjects, search, showKeyboardHelp, showExportDropdown, showFilters])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -228,6 +243,24 @@ export default function ProjectsPage() {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showExportDropdown])
+
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Only close if clicking outside the filter panel and not on the filter toggle button
+        const filterButton = document.querySelector('[title="Toggle filters (F)"]')
+        if (filterButton && filterButton.contains(e.target as Node)) {
+          return
+        }
+        setShowFilters(false)
+      }
+    }
+    if (showFilters) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showFilters])
 
   const handleExport = (format: 'csv' | 'json') => {
     const exportData = filtered
@@ -380,11 +413,41 @@ export default function ProjectsPage() {
     setEditingProject(project)
   }
 
-  const filtered = projects.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.description?.toLowerCase().includes(search.toLowerCase()) ||
-    p.genre?.toLowerCase().includes(search.toLowerCase())
-  )
+  // Count active filters
+  const activeFilterCount = filters.status.length + filters.language.length + filters.genre.length
+
+  const filtered = projects.filter(p => {
+    // Search filter
+    const matchesSearch = !search || 
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.description?.toLowerCase().includes(search.toLowerCase()) ||
+      p.genre?.toLowerCase().includes(search.toLowerCase())
+    
+    // Status filter
+    const matchesStatus = filters.status.length === 0 || filters.status.includes(p.status)
+    
+    // Language filter
+    const matchesLanguage = filters.language.length === 0 || (p.language && filters.language.includes(p.language))
+    
+    // Genre filter (partial match)
+    const matchesGenre = filters.genre.length === 0 || filters.genre.some(g => p.genre?.toLowerCase().includes(g.toLowerCase()))
+    
+    return matchesSearch && matchesStatus && matchesLanguage && matchesGenre
+  })
+
+  const toggleFilter = (type: 'status' | 'language' | 'genre', value: string) => {
+    setFilters(prev => {
+      const current = prev[type]
+      const updated = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value]
+      return { ...prev, [type]: updated }
+    })
+  }
+
+  const clearFilters = () => {
+    setFilters({ status: [], language: [], genre: [] })
+  }
 
   const getStatusStyle = (status: string) => {
     const option = STATUS_OPTIONS.find(o => o.value === status)
@@ -427,6 +490,23 @@ export default function ProjectsPage() {
             title="Refresh (R)"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              showFilters || activeFilterCount > 0 
+                ? 'bg-purple-600 text-white' 
+                : 'bg-slate-800 hover:bg-slate-700'
+            }`}
+            title="Toggle filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
           <button 
             onClick={() => setShowKeyboardHelp(true)}
@@ -473,6 +553,85 @@ export default function ProjectsPage() {
           </button>
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div ref={filterPanelRef} className="mb-6 bg-slate-900/50 border border-slate-800 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-slate-300">Filter Projects</h3>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="text-xs text-purple-400 hover:text-purple-300"
+              >
+                Clear all ({activeFilterCount})
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status Filter */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Status</label>
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => toggleFilter('status', opt.value)}
+                    className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                      filters.status.includes(opt.value)
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Language Filter */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Language</label>
+              <div className="flex flex-wrap gap-1.5">
+                {LANGUAGE_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => toggleFilter('language', opt.value)}
+                    className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                      filters.language.includes(opt.value)
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Genre Filter */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Genre</label>
+              <div className="flex flex-wrap gap-1.5">
+                {GENRE_OPTIONS.map(genre => (
+                  <button
+                    key={genre}
+                    onClick={() => toggleFilter('genre', genre)}
+                    className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                      filters.genre.includes(genre)
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -823,10 +982,11 @@ export default function ProjectsPage() {
               {[
                 { key: 'R', description: 'Refresh projects' },
                 { key: '/', description: 'Focus search input' },
+                { key: 'F', description: 'Toggle filters' },
                 { key: 'N', description: 'Create new project' },
                 { key: 'E', description: 'Export projects' },
                 { key: '?', description: 'Show this help' },
-                { key: 'Esc', description: 'Close modal / Clear search' },
+                { key: 'Esc', description: 'Close modal / Clear search / Close filters' },
               ].map(({ key, description }) => (
                 <div 
                   key={key}

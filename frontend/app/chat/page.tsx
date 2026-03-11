@@ -25,7 +25,8 @@ import {
   Keyboard,
   Download,
   ChevronDown,
-  X
+  X,
+  Printer
 } from 'lucide-react'
 
 type Message = {
@@ -64,8 +65,10 @@ export default function ChatPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const initialLoadDone = useRef(false)
@@ -250,6 +253,120 @@ What would you like to know about your production?`,
     setExporting(false)
   }
 
+  const handlePrintChat = () => {
+    const formatTime = (timestamp?: string) => {
+      if (!timestamp) return ''
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    const formatContent = (content: string) => {
+      return content
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/• /g, '<br>• ')
+        .replace(/\n/g, '<br>')
+    }
+
+    const printHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot AI Chat Transcript</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1e293b; line-height: 1.6; }
+    .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 24px; color: #4f46e5; margin-bottom: 8px; }
+    .header p { color: #64748b; font-size: 14px; }
+    .stats { display: flex; justify-content: center; gap: 30px; margin-bottom: 30px; flex-wrap: wrap; }
+    .stat-card { background: #f8fafc; padding: 15px 25px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #4f46e5; }
+    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .message-user { background: #f0f9ff; border-color: #bae6fd; }
+    .message-assistant { background: #faf5ff; border-color: #e9d5ff; }
+    .message-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: #64748b; }
+    .message-role { font-weight: 600; text-transform: uppercase; }
+    .message-content { white-space: pre-wrap; }
+    .message-content strong { color: #4f46e5; }
+    .message-content em { font-style: italic; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px; }
+    @media print {
+      body { padding: 20px; }
+      .message { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎬 CinePilot AI Chat Transcript</h1>
+    <p>Generated on ${new Date().toLocaleString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}</p>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value">${messages.length}</div>
+      <div class="stat-label">Messages</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${messages.filter(m => m.role === 'user').length}</div>
+      <div class="stat-label">Your Messages</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${messages.filter(m => m.role === 'assistant').length}</div>
+      <div class="stat-label">AI Responses</div>
+    </div>
+    ${context ? `
+    <div class="stat-card">
+      <div class="stat-value">${context.scriptsCount}</div>
+      <div class="stat-label">Scripts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${context.crewCount}</div>
+      <div class="stat-label">Crew Members</div>
+    </div>
+    ` : ''}
+  </div>
+  
+  ${messages.map(m => `
+    <div class="message ${m.role === 'user' ? 'message-user' : 'message-assistant'}">
+      <div class="message-header">
+        <span class="message-role">${m.role === 'user' ? 'You' : 'CinePilot AI'}</span>
+        <span>${formatTime(m.timestamp)}</span>
+      </div>
+      <div class="message-content">${formatContent(m.content)}</div>
+    </div>
+  `).join('')}
+  
+  <div class="footer">
+    <p> CinePilot - AI Assistant for South Indian Cinema Production</p>
+  </div>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printHTML)
+      printWindow.document.close()
+      printWindow.onload = () => {
+        printWindow.print()
+      }
+    }
+    setShowPrintMenu(false)
+  }
+
   const handlePrompt = (prompt: string) => {
     setInput(prompt)
     inputRef.current?.focus()
@@ -309,10 +426,17 @@ What would you like to know about your production?`,
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          if (messages.length > 0) {
+            handlePrintChat()
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           break
       }
     }
@@ -327,12 +451,15 @@ What would you like to know about your production?`,
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return ''
@@ -393,6 +520,28 @@ What would you like to know about your production?`,
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="relative" ref={printMenuRef}>
+                <button 
+                  onClick={() => setShowPrintMenu(prev => !prev)}
+                  disabled={messages.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm transition-colors disabled:opacity-50"
+                  title="Print chat (P)"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                    <button
+                      onClick={handlePrintChat}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Print Transcript
                     </button>
                   </div>
                 )}
@@ -652,6 +801,10 @@ What would you like to know about your production?`,
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Export chat</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                <span className="text-slate-300">Print chat</span>
+                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">P</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Show shortcuts</span>

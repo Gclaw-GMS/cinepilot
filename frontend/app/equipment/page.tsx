@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -121,10 +121,13 @@ export default function EquipmentPage() {
   })
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   // Calculate category breakdown for chart
@@ -237,10 +240,17 @@ export default function EquipmentPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          if (equipment.length > 0) {
+            handlePrint()
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearch('')
           setFilterCat('all')
           setFilterStatus('all')
@@ -266,6 +276,21 @@ export default function EquipmentPage() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showExportMenu])
+
+  // Click outside to close print menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
+    }
+    if (showPrintMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPrintMenu])
 
   const filtered = equipment.filter(eq => {
     const matchSearch = eq.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -392,6 +417,123 @@ export default function EquipmentPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
+  // Print functionality
+  const handlePrint = () => {
+    setPrinting(true)
+    setShowPrintMenu(false)
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Equipment Rental Report - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1e293b; }
+    .header .subtitle { color: #64748b; font-size: 14px; }
+    .logo { color: #6366f1; font-weight: bold; font-size: 18px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    .stat-card.available .value { color: #10b981; }
+    .stat-card.in-use .value { color: #f59e0b; }
+    .stat-card.maintenance .value { color: #ef4444; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    th { background: #6366f1; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    tr:nth-child(even) { background: #f8fafc; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge.available { background: #d1fae5; color: #065f46; }
+    .badge.in-use { background: #fef3c7; color: #92400e; }
+    .badge.maintenance { background: #fee2e2; color: #991b1b; }
+    .badge.returned { background: #f1f5f9; color: #475569; }
+    .badge.camera { background: #e0e7ff; color: #4338ca; }
+    .badge.lighting { background: #fef3c7; color: #92400e; }
+    .badge.sound { background: #dbeafe; color: #1e40af; }
+    .badge.grip { background: #fce7f3; color: #9d174d; }
+    .badge.art { background: #f3e8ff; color: #6b21a8; }
+    .footer { text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Equipment Rental Report</h1>
+      <p class="subtitle">Generated on ${new Date().toLocaleString()}</p>
+    </div>
+    <div class="logo">🎬 CinePilot</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Items</div>
+      <div class="value">${stats.totalItems}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Daily Rate</div>
+      <div class="value">₹${stats.totalDailyRate.toLocaleString()}</div>
+    </div>
+    <div class="stat-card available">
+      <div class="label">Available</div>
+      <div class="value">${stats.available}</div>
+    </div>
+    <div class="stat-card in-use">
+      <div class="label">In Use</div>
+      <div class="value">${stats.inUse}</div>
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Equipment Name</th>
+        <th>Category</th>
+        <th>Start Date</th>
+        <th>End Date</th>
+        <th>Daily Rate</th>
+        <th>Vendor</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filtered.map((eq, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${eq.name}</strong></td>
+          <td><span class="badge ${eq.category}">${eq.category.charAt(0).toUpperCase() + eq.category.slice(1)}</span></td>
+          <td>${eq.dateStart.split('T')[0]}</td>
+          <td>${eq.dateEnd.split('T')[0]}</td>
+          <td>₹${eq.dailyRate.toLocaleString()}</td>
+          <td>${eq.vendor || '-'}</td>
+          <td><span class="badge ${eq.status}">${eq.status === 'in-use' ? 'In Use' : eq.status.charAt(0).toUpperCase() + eq.status.slice(1)}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="footer">
+    <p>🎬 CinePilot - Production Equipment Management</p>
+  </div>
+</body>
+</html>
+`
+    
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.onload = () => {
+        printWindow.print()
+      }
+    }
+    setPrinting(false)
+  }
+
   const handleEdit = (eq: EquipmentRental) => {
     setEditingEquipment(eq)
     setEditForm({
@@ -508,6 +650,28 @@ export default function EquipmentPage() {
                   >
                     <Download className="w-4 h-4 text-violet-400" />
                     Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={printing || equipment.length === 0}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
+                title="Print (P)"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handlePrint}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4 text-amber-400" />
+                    Print Report
                   </button>
                 </div>
               )}
@@ -977,6 +1141,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Export dropdown</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Print equipment report</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">P</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Show shortcuts</span>

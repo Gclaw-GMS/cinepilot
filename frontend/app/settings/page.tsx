@@ -18,6 +18,8 @@ import {
   Keyboard,
   Search,
   X,
+  Printer,
+  Download,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -116,6 +118,9 @@ export default function SettingsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const printMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSettings = useCallback(async () => {
@@ -183,9 +188,16 @@ export default function SettingsPage() {
         setShowShortcuts(true);
       }
 
+      // P: Print settings
+      if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        handlePrint();
+      }
+
       // Escape: Close modal
       if (e.key === 'Escape') {
         setShowShortcuts(false);
+        setShowPrintMenu(false);
       }
     };
 
@@ -229,6 +241,99 @@ export default function SettingsPage() {
       setSaving(false);
     }
   };
+
+  // Print settings report
+  const handlePrint = () => {
+    setPrinting(true);
+    setShowPrintMenu(false);
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot Settings Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1a1a1a; }
+    h1 { font-size: 24px; margin-bottom: 8px; color: #1a1a1a; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+    .section { margin-bottom: 20px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+    .section-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; border-bottom: 1px solid #e5e5e5; padding-bottom: 8px; }
+    .setting { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+    .setting:last-child { border-bottom: none; }
+    .label { color: #666; font-size: 13px; }
+    .value { font-weight: 500; font-size: 13px; }
+    .enabled { color: #10b981; }
+    .disabled { color: #ef4444; }
+    .footer { margin-top: 32px; padding-top: 16px; border-top: 2px solid #1a1a1a; text-align: center; font-size: 12px; color: #666; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <h1>⚙️ CinePilot Settings Report</h1>
+  <p class="subtitle">Generated on ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+  
+  <div class="section">
+    <div class="section-title">🌐 Language & Region</div>
+    <div class="setting"><span class="label">Language</span><span class="value">${(get('language') as string) || 'tamil'}</span></div>
+    <div class="setting"><span class="label">Default Currency</span><span class="value">${(get('defaultCurrency') as string) || 'INR'}</span></div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">🤖 AI Settings</div>
+    <div class="setting"><span class="label">Tamil Cinema Features</span><span class="value ${(get('tamilCinemaEnabled') as boolean) ? 'enabled' : 'disabled'}">${(get('tamilCinemaEnabled') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+    <div class="setting"><span class="label">AI Model</span><span class="value">${(get('aiModel') as string) || 'gpt4o'}</span></div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">🎨 Appearance</div>
+    <div class="setting"><span class="label">Theme</span><span class="value">${(get('theme') as string) || 'dark'}</span></div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">🔔 Notifications</div>
+    <div class="setting"><span class="label">Push Notifications</span><span class="value ${(get('notificationsPush') as boolean) ? 'enabled' : 'disabled'}">${(get('notificationsPush') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+    <div class="setting"><span class="label">Email Alerts</span><span class="value ${(get('notificationsEmail') as boolean) ? 'enabled' : 'disabled'}">${(get('notificationsEmail') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+    <div class="setting"><span class="label">Budget Alerts</span><span class="value ${(get('budgetAlerts') as boolean) ? 'enabled' : 'disabled'}">${(get('budgetAlerts') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+    <div class="setting"><span class="label">Schedule Reminders</span><span class="value ${(get('scheduleReminders') as boolean) ? 'enabled' : 'disabled'}">${(get('scheduleReminders') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">📊 Data & Privacy</div>
+    <div class="setting"><span class="label">Analytics</span><span class="value ${(get('analyticsEnabled') as boolean) ? 'enabled' : 'disabled'}">${(get('analyticsEnabled') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">🎬 Production</div>
+    <div class="setting"><span class="label">Censor Mode</span><span class="value">${(get('censorMode') as string) || 'standard'}</span></div>
+    <div class="setting"><span class="label">Auto-Save</span><span class="value ${(get('autoSave') as boolean) ? 'enabled' : 'disabled'}">${(get('autoSave') as boolean) ? 'Enabled' : 'Disabled'}</span></div>
+    <div class="setting"><span class="label">Auto-Save Interval</span><span class="value">${(get('autoSaveInterval') as number) || 30} seconds</span></div>
+  </div>
+  
+  <div class="footer">
+    CinePilot — AI Pre-Production Assistant for South Indian Cinema
+  </div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.print();
+    }
+    setPrinting(false);
+  };
+
+  // Click outside to close print menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPrintMenu]);
 
   if (loading) {
     return (
@@ -288,6 +393,29 @@ export default function SettingsPage() {
             >
               <Keyboard className="w-5 h-5" />
             </button>
+            {/* Print Button */}
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-amber-900/30 border border-slate-700 hover:border-amber-700/50 rounded-lg text-sm text-slate-400 hover:text-amber-400 transition-colors"
+                title="Print settings report (P)"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handlePrint}
+                    disabled={printing}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    {printing ? 'Printing...' : 'Print Settings'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           {dbConnected === false && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg">
@@ -572,6 +700,7 @@ export default function SettingsPage() {
                 { key: '/', action: 'Focus search' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
+                { key: 'P', action: 'Print settings' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal' },
               ].map((shortcut) => (

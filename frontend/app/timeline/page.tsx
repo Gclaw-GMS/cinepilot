@@ -7,7 +7,7 @@ import {
   Calendar, Download, Plus, Layers, Grid3X3, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Target, CheckCircle, Zap, Clock, Film, MapPin,
-  Filter, RefreshCw, Search, X, HelpCircle
+  Filter, RefreshCw, Search, X, HelpCircle, Printer
 } from 'lucide-react';
 
 interface Project {
@@ -46,6 +46,9 @@ export default function TimelinePage() {
   
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [printing, setPrinting] = useState(false)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
@@ -179,6 +182,154 @@ export default function TimelinePage() {
     setExporting(false);
   };
 
+  // Print function
+  const handlePrint = () => {
+    setPrinting(true);
+    setShowPrintMenu(false);
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Production Timeline - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
+    .header h1 { font-size: 28px; color: #1e293b; margin-bottom: 5px; }
+    .header p { color: #64748b; font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-card .value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    .stat-card.completed .value { color: #16a34a; }
+    .stat-card.in-progress .value { color: #eab308; }
+    .stat-card.pending .value { color: #64748b; }
+    .legend { display: flex; gap: 20px; justify-content: center; margin-bottom: 30px; font-size: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .legend-dot.pre { background: #3b82f6; }
+    .legend-dot.prod { background: #8b5cf6; }
+    .legend-dot.post { background: #f97316; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    th { background: #f1f5f9; font-weight: 600; color: #475569; }
+    .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .status-badge.completed { background: #dcfce7; color: #16a34a; }
+    .status-badge.in-progress { background: #fef9c3; color: #ca8a04; }
+    .status-badge.pending { background: #f1f5f9; color: #64748b; }
+    .status-badge.delayed { background: #fee2e2; color: #dc2626; }
+    .type-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; }
+    .type-badge.pre-production { background: #dbeafe; color: #1d4ed8; }
+    .type-badge.production { background: #ede9fe; color: #7c3aed; }
+    .type-badge.post-production { background: #ffedd5; color: #ea580c; }
+    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Production Timeline Report</h1>
+    <p>Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Phases</div>
+      <div class="value">${stats.total}</div>
+    </div>
+    <div class="stat-card completed">
+      <div class="label">Completed</div>
+      <div class="value">${stats.completed}</div>
+    </div>
+    <div class="stat-card in-progress">
+      <div class="label">In Progress</div>
+      <div class="value">${stats.inProgress}</div>
+    </div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Pending</div>
+      <div class="value">${stats.pending}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Shoot Days</div>
+      <div class="value">${stats.shootDays}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Scenes</div>
+      <div class="value">${stats.scenes}</div>
+    </div>
+  </div>
+  
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot pre"></div>Pre-Production</div>
+    <div class="legend-item"><div class="legend-dot prod"></div>Production</div>
+    <div class="legend-item"><div class="legend-dot post"></div>Post-Production</div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Phase Name</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Start Date</th>
+        <th>End Date</th>
+        <th>Progress</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Pre-Production</td>
+        <td><span class="type-badge pre-production">Pre-Production</span></td>
+        <td><span class="status-badge completed">Completed</span></td>
+        <td>Jan 15, 2026</td>
+        <td>Feb 10, 2026</td>
+        <td>100%</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Principal Photography</td>
+        <td><span class="type-badge production">Production</span></td>
+        <td><span class="status-badge in-progress">In Progress</span></td>
+        <td>Feb 15, 2026</td>
+        <td>Mar 15, 2026</td>
+        <td>65%</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Post-Production</td>
+        <td><span class="type-badge post-production">Post-Production</span></td>
+        <td><span class="status-badge pending">Pending</span></td>
+        <td>Mar 20, 2026</td>
+        <td>Apr 30, 2026</td>
+        <td>0%</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <div class="footer">
+    <p>CinePilot - Production Management System</p>
+  </div>
+</body>
+</html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+    
+    setTimeout(() => setPrinting(false), 500);
+  };
+
   // Keyboard shortcuts handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -212,10 +363,16 @@ export default function TimelinePage() {
           setSearchQuery('');
           setShowFilters(false);
           setShowExportMenu(false);
+          setShowPrintMenu(false);
           break;
         case 'e':
           if (!exporting) {
             setShowExportMenu(!showExportMenu);
+          }
+          break;
+        case 'p':
+          if (!printing) {
+            handlePrint();
           }
           break;
       }
@@ -231,10 +388,13 @@ export default function TimelinePage() {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   const projectOptions = DEMO_PROJECTS;
 
@@ -511,6 +671,30 @@ export default function TimelinePage() {
                 </div>
               )}
             </div>
+
+            {/* Print Button */}
+            <div className="relative" ref={printMenuRef}>
+              <button 
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={printing}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm disabled:opacity-50"
+              >
+                <Printer className="w-4 h-4" />
+                {printing ? 'Printing...' : 'Print'}
+              </button>
+              
+              {/* Print Dropdown Menu */}
+              {showPrintMenu && (
+                <div className="absolute right-0 mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
+                  <button
+                    onClick={handlePrint}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-lg"
+                  >
+                    Print Timeline
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Filter Panel */}
@@ -691,6 +875,10 @@ export default function TimelinePage() {
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Export timeline</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">E</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Print timeline</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">P</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Show keyboard shortcuts</span>

@@ -126,6 +126,7 @@ export default function LocationsPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchScenes = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)

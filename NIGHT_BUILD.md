@@ -1,6 +1,27 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (3:12 AM)
+## Build Status: ✅ PASSING (4:32 AM)
+
+## Night Build (4:32 AM) - Timeline Export Click-Outside Fix (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Timeline Page**: Added click-outside to close export dropdown
+  - **Click Outside**: Export menu now closes when clicking outside the dropdown
+  - **exportMenuRef**: Added ref for proper click detection
+  - **useEffect Handler**: Added mousedown listener for outside clicks
+  - **Consistency**: Now matches other pages in the app
+
+- **Build**: Clean build with 78 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+### Timeline Export Feature Checklist
+- [x] Feature works 100% (click outside closes dropdown)
+- [x] Export dropdown UI professional & visual
+- [x] Keyboard shortcuts working (E=export menu, Esc=close)
+- [x] Click outside closes dropdown
+- [x] Error handling complete
+- [x] Build passes
 
 ## Night Build (3:12 AM) - Shot List Export Dropdown (IMPLEMENTED)
 

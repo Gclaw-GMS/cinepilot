@@ -1,6 +1,60 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (8:53 PM) - 6 Features Complete with Tests
+## Build Status: ✅ PASSING (9:40 PM) - 8 Features Complete with Tests
+
+## Dubbing - COMPLETE with Tests (March 11, 2026)
+
+### Feature Summary
+- **Location:** /dubbing
+- **Languages:** Telugu, Hindi, Malayalam, Kannada, English
+- **Features:** Script selection, language selection, AI dubbing translation, scene preview, dubbed version management
+- **Demo Data:** 2 sample scripts, 3 dubbed versions
+- **API:** /api/dubbing with GET (list scripts/versions) and POST (generate translation) + demo fallback
+- **Tests:** tests/dubbing.test.ts - 14 test cases covering all endpoints
+
+### Test Coverage
+- GET returns scripts and dubbed versions in demo mode
+- Scripts have required fields (id, title, language)
+- Dubbed versions have required fields (id, title, language, createdAt)
+- Demo mode flag is boolean
+- POST generates dubbing translation with valid params
+- POST supports all 5 supported languages
+- POST returns 400 when scriptId is missing
+- POST returns 400 when targetLanguage is missing
+- POST returns 400 for unsupported language
+- Translated scenes have required fields (sceneNumber, translatedDialogue)
+- Demo translation works for demo script IDs
+- Handles empty body gracefully
+- Demo scripts contain Tamil films
+- Demo dubbed versions cover multiple languages
+
+## Budget - COMPLETE with Tests (March 11, 2026)
+
+### Feature Summary
+- **Location:** /budget
+- **Categories:** Production, Crew, Equipment, Locations, Art, Costume, Post-Production, Music, Marketing, Contingency
+- **Features:** Budget overview, breakdown by category, expense tracking, forecast projections, AI budget generation, export CSV/JSON, print reports
+- **Demo Data:** 22 sample budget items totaling ₹10.5Cr, 5 sample expenses
+- **API:** /api/budget with generate, addExpense, forecast actions + demo fallback
+- **Tests:** tests/budget.test.ts - 21 test cases covering all endpoints
+
+### Test Coverage
+- GET budget data with items, expenses, and forecast
+- GET returns forecast with required fields (planned, actual, variance, percentSpent)
+- GET forecast includes category breakdown with status
+- GET returns demo data when database unavailable
+- Demo items have required fields (id, category, description, quantity, unit, rate, total, source)
+- Demo expenses have required fields (id, category, description, amount, date, status)
+- GET with action=forecast returns forecast-only data
+- POST generate budget with valid action
+- POST addExpense creates new expense with all fields
+- POST addExpense handles missing fields gracefully
+- POST invalid action returns 400
+- POST generate with different scales (micro, indie, mid, big)
+- Budget items have numeric totals
+- Expenses have numeric amounts
+- Forecast variance is calculated correctly
+- PercentSpent is between 0 and 100
 
 ## Crew - COMPLETE with Tests (March 11, 2026)
 
@@ -74,16 +128,19 @@
 
 ---
 
-## All 4 Features Now Complete (March 11, 2026)
+## All 8 Features Now Complete (March 11, 2026)
 
 ### Feature Status
 | Feature | UI | API | Tests |
 |---------|----|----|-------|
+| Budget | ✓ /budget | ✓ /api/budget | ✓ tests/budget.test.ts |
+| Crew | ✓ /crew | ✓ /api/crew | ✓ tests/crew.test.ts |
 | Equipment | ✓ /equipment | ✓ /api/equipment | ✓ tests/equipment.test.ts |
-| Audience Sentiment | ✓ /audience-sentiment | ✓ /api/audience-sentiment | ✓ tests/audience-sentiment.test.ts |
 | Travel Expenses | ✓ /travel | ✓ /api/travel | ✓ tests/travel.test.ts |
+| Audience Sentiment | ✓ /audience-sentiment | ✓ /api/audience-sentiment | ✓ tests/audience-sentiment.test.ts |
 | Character Costume | ✓ /character-costume | ✓ /api/character-costume | ✓ tests/character-costume.test.ts |
 | Catering | ✓ /catering | ✓ /api/catering | ✓ tests/catering.test.ts |
+| Dubbing | ✓ /dubbing | ✓ /api/dubbing | ✓ tests/dubbing.test.ts |
 
 All features have:
 - Full UI with professional dark theme

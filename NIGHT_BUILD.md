@@ -1,6 +1,57 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (8:04 PM) - All 4 Features Complete
+## Build Status: ✅ PASSING (8:53 PM) - 6 Features Complete with Tests
+
+## Crew - COMPLETE with Tests (March 11, 2026)
+
+### Feature Summary
+- **Location:** /crew
+- **Departments:** Camera, Direction, Sound, Lighting, Art, Makeup, Costume, Production, VFX, Stunts
+- **Features:** Add/edit/delete crew members, filters by department, charts by department, demo data fallback
+- **Demo Data:** 12 sample crew members with realistic Tamil cinema roles
+- **API:** /api/crew with full CRUD + demo fallback
+- **Tests:** tests/crew.test.ts - 20 test cases covering all endpoints
+
+### Test Coverage
+- GET all crew members
+- GET returns demo data when DB unavailable
+- POST create new crew member
+- POST validation (name and role required)
+- POST validates non-empty strings
+- PATCH update crew member
+- PATCH validation (ID required)
+- PATCH dailyRate conversion to number
+- DELETE remove crew member
+- DELETE validation (ID required)
+- DELETE validates non-empty ID
+- Demo data covers 10+ departments
+- Demo phone numbers follow Indian format (+91)
+- Demo daily rates are realistic (8k-50k)
+
+## Equipment - COMPLETE with Tests (March 11, 2026)
+
+### Feature Summary
+- **Location:** /equipment
+- **Categories:** Camera, Lighting, Sound, Grip, Art
+- **Features:** Add/edit/delete equipment, filters by category/status, charts by category & status, print report, export CSV
+- **Demo Data:** 9 sample equipment items with status tracking
+- **API:** /api/equipment with full CRUD + demo fallback
+- **Tests:** tests/equipment.test.ts - 15 test cases covering all endpoints
+
+### Test Coverage
+- GET all equipment with stats
+- GET returns demo data when DB unavailable
+- POST create new equipment
+- POST validation (required fields)
+- PATCH update equipment
+- PATCH validation (ID required)
+- DELETE remove equipment
+- DELETE validation (ID required)
+- Stats calculations verification
+- Status values validation
+- Daily rate totals verification
+
+---
 
 ## Travel Expenses - COMPLETE with Tests (March 11, 2026)
 
@@ -28,6 +79,7 @@
 ### Feature Status
 | Feature | UI | API | Tests |
 |---------|----|----|-------|
+| Equipment | ✓ /equipment | ✓ /api/equipment | ✓ tests/equipment.test.ts |
 | Audience Sentiment | ✓ /audience-sentiment | ✓ /api/audience-sentiment | ✓ tests/audience-sentiment.test.ts |
 | Travel Expenses | ✓ /travel | ✓ /api/travel | ✓ tests/travel.test.ts |
 | Character Costume | ✓ /character-costume | ✓ /api/character-costume | ✓ tests/character-costume.test.ts |

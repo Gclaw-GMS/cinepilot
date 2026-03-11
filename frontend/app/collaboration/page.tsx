@@ -5,7 +5,7 @@ import {
   Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
   Film, Star, Clock, CheckCircle, MoreHorizontal, Loader2,
   Trash2, Edit2, X, DollarSign, Briefcase, Send, RefreshCw,
-  TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText
+  TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText, Printer
 } from 'lucide-react'
 
 interface TeamMember {
@@ -83,11 +83,14 @@ export default function CollaborationPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
+  const filteredMembersRef = useRef<TeamMember[]>([])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -147,7 +150,7 @@ export default function CollaborationPage() {
           break
         case 'e':
           e.preventDefault()
-          if (filteredMembers.length > 0) {
+          if (filteredMembersRef.current.length > 0) {
             setShowExportMenu(!showExportMenu)
           }
           break
@@ -169,15 +172,22 @@ export default function CollaborationPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearch('')
           setDeptFilter('all')
+          break
+        case 'p':
+          e.preventDefault()
+          if (filteredMembersRef.current.length > 0) {
+            handlePrint()
+          }
           break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm])
+  }, [showForm, showExportMenu, showPrintMenu, search, deptFilter])
 
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -186,6 +196,9 @@ export default function CollaborationPage() {
     const matchesDept = deptFilter === 'all' || m.department === deptFilter
     return matchesSearch && matchesDept
   })
+  
+  // Update ref for keyboard shortcuts
+  filteredMembersRef.current = filteredMembers
 
   const activeCount = members.filter(m => m.status === 'active').length
 
@@ -332,11 +345,129 @@ export default function CollaborationPage() {
     setShowExportMenu(false)
   }
 
-  // Click outside handler for export menu
+  // Print function
+  const handlePrint = () => {
+    const membersToPrint = filteredMembers
+    const activeCount = membersToPrint.filter(m => m.status === 'active').length
+    const busyCount = membersToPrint.filter(m => m.status === 'busy').length
+    const offlineCount = membersToPrint.filter(m => m.status === 'offline').length
+    const totalDailyRate = membersToPrint.reduce((sum, m) => sum + (m.dailyRate || 0), 0)
+    
+    const departments: Record<string, number> = {}
+    membersToPrint.forEach(m => {
+      if (m.department) {
+        departments[m.department] = (departments[m.department] || 0) + 1
+      }
+    })
+    
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Team Collaboration Report - CinePilot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 28px; color: #1e293b; }
+    .header .date { color: #64748b; font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: #f8fafc; padding: 20px; border-radius: 10px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 32px; font-weight: bold; color: #1e293b; margin-top: 5px; }
+    .stat-card.active .value { color: #10b981; }
+    .stat-card.busy .value { color: #f59e0b; }
+    .stat-card.offline .value { color: #64748b; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 14px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f1f5f9; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }
+    .status { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .status.active { background: #d1fae5; color: #059669; }
+    .status.busy { background: #fef3c7; color: #d97706; }
+    .status.offline { background: #f1f5f9; color: #64748b; }
+    .skills { display: flex; gap: 5px; flex-wrap: wrap; }
+    .skill-tag { background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #64748b; font-size: 12px; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Team Collaboration Report</h1>
+    <div class="date">Generated: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Members</div>
+      <div class="value">${membersToPrint.length}</div>
+    </div>
+    <div class="stat-card active">
+      <div class="label">Active</div>
+      <div class="value">${activeCount}</div>
+    </div>
+    <div class="stat-card busy">
+      <div class="label">Busy</div>
+      <div class="value">${busyCount}</div>
+    </div>
+    <div class="stat-card offline">
+      <div class="label">Offline</div>
+      <div class="value">${offlineCount}</div>
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Department</th>
+        <th>Contact</th>
+        <th>Daily Rate</th>
+        <th>Status</th>
+        <th>Skills</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${membersToPrint.map(m => `
+        <tr>
+          <td><strong>${m.name}</strong></td>
+          <td>${m.role}</td>
+          <td>${m.department || '-'}</td>
+          <td>${m.email || '-'} ${m.phone ? '<br>' + m.phone : ''}</td>
+          <td>${m.dailyRate ? '₹' + m.dailyRate.toLocaleString() : '-'}</td>
+          <td><span class="status ${m.status}">${m.status.charAt(0).toUpperCase() + m.status.slice(1)}</span></td>
+          <td><div class="skills">${(m.skills || []).map(s => `<span class="skill-tag">${s}</span>`).join('')}</div></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="footer">
+    CinePilot - AI Pre-Production Assistant | Total Daily Rate: ₹${totalDailyRate.toLocaleString()}
+  </div>
+</body>
+</html>`
+    
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.onload = () => {
+        printWindow.print()
+      }
+    }
+    setShowPrintMenu(false)
+  }
+
+  // Click outside handler for export menu and print menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
+      }
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -402,6 +533,30 @@ export default function CollaborationPage() {
                 >
                   <FileText className="w-4 h-4" />
                   <span>Export JSON</span>
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Print Dropdown */}
+          <div className="relative" ref={printMenuRef}>
+            <button
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              disabled={exporting || filteredMembers.length === 0}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
+              title="Print (P)"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-colors text-left"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Report</span>
                 </button>
               </div>
             )}
@@ -798,6 +953,10 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export team data</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Print team report</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">P</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Add new member</span>

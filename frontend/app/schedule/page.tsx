@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { 
   Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -235,9 +235,14 @@ export default function SchedulePage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterLocation, setFilterLocation] = useState<string>('all')
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -320,10 +325,15 @@ export default function SchedulePage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setSearchQuery('')
+          setShowFilters(false)
           break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
       }
     }
@@ -332,20 +342,23 @@ export default function SchedulePage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [fetchData])
 
-  // Click outside to close export menu
+  // Click outside to close export menu and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (showExportMenu && !target.closest('.export-menu')) {
         setShowExportMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
     
-    if (showExportMenu) {
+    if (showExportMenu || showFilters) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showFilters])
 
   // Export functions
   const handleExportCSV = () => {
@@ -501,19 +514,46 @@ export default function SchedulePage() {
       .sort((a, b) => b.scenes - a.scenes)
   }, [shootingDays])
 
-  // Filter shooting days by search query
+  // Get unique locations for filter dropdown
+  const uniqueLocations = useMemo(() => {
+    const locations = new Set<string>()
+    shootingDays.forEach(day => {
+      if (day.location?.name) {
+        locations.add(day.location.name)
+      }
+    })
+    return Array.from(locations).sort()
+  }, [shootingDays])
+
+  // Filter shooting days by search query and filters
   const filteredShootingDays = useMemo(() => {
-    if (!searchQuery.trim()) return shootingDays
-    const query = searchQuery.toLowerCase()
-    return shootingDays.filter(day => 
-      day.location?.name?.toLowerCase().includes(query) ||
-      day.dayScenes.some(ds => 
-        ds.scene.sceneNumber.toLowerCase().includes(query) ||
-        ds.scene.headingRaw?.toLowerCase().includes(query) ||
-        ds.scene.location?.toLowerCase().includes(query)
+    let days = shootingDays
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      days = days.filter(day => 
+        day.location?.name?.toLowerCase().includes(query) ||
+        day.dayScenes.some(ds => 
+          ds.scene.sceneNumber.toLowerCase().includes(query) ||
+          ds.scene.headingRaw?.toLowerCase().includes(query) ||
+          ds.scene.location?.toLowerCase().includes(query)
+        )
       )
-    )
-  }, [shootingDays, searchQuery])
+    }
+    
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      days = days.filter(day => day.status === filterStatus)
+    }
+    
+    // Apply location filter
+    if (filterLocation !== 'all') {
+      days = days.filter(day => day.location?.name === filterLocation)
+    }
+    
+    return days
+  }, [shootingDays, searchQuery, filterStatus, filterLocation])
 
   // Night vs Day breakdown
   const dayNightData = useMemo(() => {
@@ -625,6 +665,24 @@ export default function SchedulePage() {
               Analytics
             </button>
           </div>
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+              showFilters 
+                ? 'bg-indigo-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title="Toggle Filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {(filterStatus !== 'all' || filterLocation !== 'all') && (
+              <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
+                {(filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)}
+              </span>
+            )}
+          </button>
           {/* Copy to Clipboard Button */}
           <button
             onClick={handleCopyToClipboard}
@@ -693,6 +751,54 @@ export default function SchedulePage() {
           </button>
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div 
+          ref={filterPanelRef}
+          className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm font-medium text-gray-300">Filters:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-400">Status:</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Status</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="delayed">Delayed</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-400">Location:</label>
+              <select
+                value={filterLocation}
+                onChange={(e) => setFilterLocation(e.target.value)}
+                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Locations</option>
+                {uniqueLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => { setFilterStatus('all'); setFilterLocation('all') }}
+              className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Error Alert */}
       {error && (
@@ -1148,12 +1254,13 @@ export default function SchedulePage() {
               {[
                 { key: 'R', desc: 'Refresh schedule data' },
                 { key: '/', desc: 'Focus search input' },
+                { key: 'F', desc: 'Toggle filters panel' },
                 { key: '1', desc: 'Switch to Timeline view' },
                 { key: '2', desc: 'Switch to Analytics view' },
                 { key: 'O', desc: 'Open optimize schedule' },
                 { key: 'E', desc: 'Export schedule (CSV/JSON)' },
                 { key: '?', desc: 'Show this help modal' },
-                { key: 'Esc', desc: 'Close modal / Clear search' },
+                { key: 'Esc', desc: 'Close modal / Clear search / Close filters' },
               ].map(({ key, desc }) => (
                 <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-700/50 transition-colors">
                   <span className="text-gray-300">{desc}</span>

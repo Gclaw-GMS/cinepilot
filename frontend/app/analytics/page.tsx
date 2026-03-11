@@ -9,7 +9,7 @@ import {
   BarChart3, TrendingUp, DollarSign, Calendar, 
   Users, Video, MapPin, Clapperboard, RefreshCw, Loader2, 
   Activity, Target, AlertTriangle,
-  Clock, Film, Search, X, HelpCircle
+  Clock, Film, Search, X, HelpCircle, Download
 } from 'lucide-react'
 
 interface DashboardData {
@@ -173,7 +173,10 @@ export default function AnalyticsPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -238,9 +241,14 @@ export default function AnalyticsPage() {
           e.preventDefault()
           setShowShortcuts(true)
           break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowShortcuts(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           break
       }
@@ -249,6 +257,80 @@ export default function AnalyticsPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
+  // Export functions
+  const handleExportCSV = () => {
+    if (!dashboard) return
+    setExporting(true)
+    setShowExportMenu(false)
+
+    const rows = [
+      ['Metric', 'Value'],
+      ['Total Scenes', dashboard.overview.total_scenes.toString()],
+      ['Completed Scenes', dashboard.overview.completed_scenes.toString()],
+      ['Total Locations', dashboard.overview.total_locations.toString()],
+      ['Total Characters', dashboard.overview.total_characters.toString()],
+      ['Shooting Days Completed', dashboard.overview.shooting_days_completed.toString()],
+      ['Shooting Days Total', dashboard.overview.shooting_days_total.toString()],
+      ['Budget Total', dashboard.overview.budget_total.toString()],
+      ['Budget Spent', dashboard.overview.budget_spent.toString()],
+      ['Budget Remaining', dashboard.overview.budget_remaining.toString()],
+      ['Crew Members', dashboard.overview.crew_members.toString()],
+      ['Total Shots', dashboard.overview.total_shots.toString()],
+      ['Completed Shots', dashboard.overview.completed_shots.toString()],
+      ['VFX Shots', dashboard.overview.vfx_shots.toString()],
+      ['Completed VFX', dashboard.overview.completed_vfx.toString()],
+      [],
+      ['Budget Breakdown'],
+      ['Category', 'Allocated', 'Spent'],
+      ...dashboard.budget_breakdown.map(b => [b.category, b.allocated.toString(), b.spent.toString()]),
+    ]
+
+    const csv = rows.map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    setExporting(false)
+  }
+
+  const handleExportJSON = () => {
+    if (!dashboard || !metrics) return
+    setExporting(true)
+    setShowExportMenu(false)
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      overview: dashboard.overview,
+      timeline: metrics.timeline,
+      performance: metrics.performance,
+      predictions: metrics.predictions,
+      budgetBreakdown: dashboard.budget_breakdown,
+      scheduleProgress: dashboard.schedule_progress,
+      departmentStats: metrics.department_stats,
+      recentActivities: dashboard.recent_activities,
+      upcomingShoots: dashboard.upcoming_shoots,
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `analytics-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    setExporting(false)
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -374,6 +456,40 @@ export default function AnalyticsPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={exporting || !dashboard}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+              title="Export (E)"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-indigo-400" />
+                  Export as JSON
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-green-400" />
+                  Export as CSV
+                </button>
+              </div>
+            )}
+          </div>
           
           <button
             onClick={() => setShowShortcuts(true)}
@@ -842,12 +958,13 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh analytics data' },
+                { key: 'E', description: 'Toggle export dropdown' },
                 { key: '/', description: 'Focus search input' },
                 { key: '1', description: 'Switch to Overview view' },
                 { key: '2', description: 'Switch to Performance view' },
                 { key: '3', description: 'Switch to Forecast view' },
                 { key: '?', description: 'Show this help modal' },
-                { key: 'Esc', description: 'Close modal or clear search' },
+                { key: 'Esc', description: 'Close modal, export menu, or clear search' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

@@ -111,6 +111,7 @@ export default function TasksPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterPriority, setFilterPriority] = useState<FilterPriority>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [formData, setFormData] = useState({
@@ -197,6 +198,7 @@ export default function TasksPage() {
       case 'Escape':
         setSelectedRowIndex(-1)
         setShowExportMenu(false)
+        setShowFilters(false)
         break
       case '?':
         if (e.shiftKey) {
@@ -217,7 +219,13 @@ export default function TasksPage() {
       case 'F':
         if (!e.ctrlKey && !e.metaKey) {
           e.preventDefault()
-          const searchInput = document.querySelector('input[placeholder="Search tasks..."]') as HTMLInputElement
+          setShowFilters(!showFilters)
+        }
+        break
+      case '/':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          const searchInput = document.querySelector('input[placeholder="Search tasks... (F)"]') as HTMLInputElement
           searchInput?.focus()
         }
         break
@@ -698,31 +706,54 @@ export default function TasksPage() {
               />
             </div>
 
-            {/* Status Filter */}
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                showFilters 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600'
+              }`}
+              title="Toggle filters (F)"
             >
-              <option value="all">All Status</option>
-              <option value="overdue">⚠️ Overdue</option>
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="blocked">Blocked</option>
-            </select>
+              <Filter className="w-4 h-4" />
+              <span>Filters</span>
+              {(filterStatus !== 'all' || filterPriority !== 'all') && (
+                <span className="ml-1 px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded">
+                  {(filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)}
+                </span>
+              )}
+            </button>
 
-            {/* Priority Filter */}
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-            >
-              <option value="all">All Priority</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+            {/* Status Filter - shown when filters enabled */}
+            {showFilters && (
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Status</option>
+                <option value="overdue">⚠️ Overdue</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="blocked">Blocked</option>
+              </select>
+            )}
+
+            {/* Priority Filter - shown when filters enabled */}
+            {showFilters && (
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
+                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Priority</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            )}
 
             {/* View Mode Toggle */}
             <div className="flex bg-slate-800 rounded-lg p-1">
@@ -1054,7 +1085,8 @@ export default function TasksPage() {
                   { keys: ['End'], desc: 'Go to last task', category: 'Navigation' },
                   { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
                   { keys: ['N'], desc: 'New task', category: 'Actions' },
-                  { keys: ['F'], desc: 'Focus search', category: 'Actions' },
+                  { keys: ['F'], desc: 'Toggle filters', category: 'Actions' },
+                  { keys: ['/'], desc: 'Focus search', category: 'Actions' },
                   { keys: ['E'], desc: 'Export dropdown', category: 'Actions' },
                   { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
                   { keys: ['?'], desc: 'Toggle this help', category: 'Help' },

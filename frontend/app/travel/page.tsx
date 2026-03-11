@@ -113,12 +113,13 @@ export default function TravelExpensesPage() {
     setError(null)
     try {
       const params = new URLSearchParams()
+      params.set('projectId', 'demo-project')
       if (filterCategory !== 'all') params.set('category', filterCategory)
       if (filterStatus !== 'all') params.set('status', filterStatus)
       if (dateRange.start) params.set('startDate', dateRange.start)
       if (dateRange.end) params.set('endDate', dateRange.end)
       
-      const res = await fetch(`/api/travel?${params}`)
+      const res = await fetch(`/api/travel?${params.toString()}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setExpenses(data.expenses || [])

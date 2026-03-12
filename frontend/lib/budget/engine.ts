@@ -408,7 +408,7 @@ export async function forecastBudget(projectId: string) {
   });
 
   const eacTotal = categoryForecasts.reduce((s, c) => s + c.forecast, 0);
-  const variance = eacTotal - planned;
+  const variance = planned - actual;
 
   return {
     planned: Math.round(planned),

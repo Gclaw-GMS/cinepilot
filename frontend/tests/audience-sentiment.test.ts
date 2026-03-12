@@ -3,7 +3,7 @@
  * Run with: npx jest tests/audience-sentiment.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/audience-sentiment';
+const API_BASE = 'http://localhost:3002/api/audience-sentiment';
 
 describe('Audience Sentiment API', () => {
   let createdSentimentId: string;

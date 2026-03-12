@@ -59,6 +59,26 @@ export async function GET(req: NextRequest) {
     const status = req.nextUrl.searchParams.get('status');
     const startDate = req.nextUrl.searchParams.get('startDate');
     const endDate = req.nextUrl.searchParams.get('endDate');
+    const id = req.nextUrl.searchParams.get('id');
+
+    // If ID is provided, return single expense
+    if (id) {
+      // Check demo data first
+      const demoExpense = DEMO_EXPENSES.find(e => e.id === id);
+      if (demoExpense) {
+        return NextResponse.json({ ...demoExpense, isDemoMode: true });
+      }
+      // Try database
+      try {
+        const expense = await prisma.travelExpense.findUnique({ where: { id } });
+        if (expense) {
+          return NextResponse.json({ ...expense, isDemoMode: false });
+        }
+      } catch (dbError) {
+        // Continue to demo data
+      }
+      return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+    }
 
     // Try to fetch from database
     try {
@@ -89,7 +109,24 @@ export async function GET(req: NextRequest) {
     }
 
     // Fall back to demo data
-    return NextResponse.json(getDemoResponse());
+    let demoExpenses = DEMO_EXPENSES.map(e => ({
+      ...e,
+      date: e.date,
+    }));
+    
+    // Apply filters to demo data (case-insensitive)
+    if (category && category !== 'all') {
+      demoExpenses = demoExpenses.filter(e => e.category.toLowerCase() === category.toLowerCase());
+    }
+    if (status && status !== 'all') {
+      demoExpenses = demoExpenses.filter(e => e.status.toLowerCase() === status.toLowerCase());
+    }
+    
+    return NextResponse.json({
+      expenses: demoExpenses,
+      summary: calculateSummary(demoExpenses),
+      isDemoMode: true,
+    });
   } catch (error) {
     console.error('[GET /api/travel]', error);
     return NextResponse.json({ error: 'Failed to fetch expenses' }, { status: 500 });

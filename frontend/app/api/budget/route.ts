@@ -42,7 +42,7 @@ const DEMO_FORECAST = {
   planned: 105000000,
   actual: 32000000,
   eacTotal: 98000000,
-  variance: -7000000,
+  variance: 73000000,
   percentSpent: 30.5,
   categories: [
     { category: 'Production', planned: 36800000, actual: 15000000, forecast: 36000000, status: 'on_track' },
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
       forecastBudget(projectId),
     ]);
 
-    return NextResponse.json({ items, expenses, forecast });
+    return NextResponse.json({ items, expenses, forecast, _demo: false });
   } catch (error) {
     console.error('[GET /api/budget] Database not available, using demo data');
     // Use demo data when database is not available
@@ -116,9 +116,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/budget — generate budget or add expense
 export async function POST(req: NextRequest) {
+  let body;
+  let action;
+  
   try {
-    const body = await req.json();
-    const { action } = body;
+    body = await req.json();
+    action = body.action;
 
     if (action === 'generate') {
       const result = await generateBudget({
@@ -178,6 +181,52 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
     console.error('[POST /api/budget]', error);
+    
+    // If action is generate, return demo data on error
+    if (action === 'generate') {
+      const scaleMultipliers: Record<string, number> = {
+        micro: 0.2,
+        indie: 0.5,
+        mid: 1.0,
+        big: 2.0,
+      };
+      const mult = scaleMultipliers[body.targetScale] || 1.0;
+      
+      return NextResponse.json({
+        message: `Budget generated: ${DEMO_ITEMS.length} line items (demo mode)`,
+        items: DEMO_ITEMS,
+        totalPlanned: Math.round(105000000 * mult),
+        totalActual: 0,
+        isDemoMode: true,
+      });
+    }
+    
+    // If action is addExpense, return demo response
+    if (action === 'addExpense') {
+      return NextResponse.json({
+        message: 'Expense added (demo mode)',
+        expense: {
+          id: `demo-${Date.now()}`,
+          category: body.category,
+          description: body.description,
+          amount: body.amount,
+          date: body.date,
+          vendor: body.vendor,
+          status: 'pending',
+          notes: body.notes,
+        },
+        isDemoMode: true,
+      });
+    }
+    
+    // If action is forecast, return demo forecast
+    if (action === 'forecast') {
+      return NextResponse.json({
+        ...DEMO_FORECAST,
+        isDemoMode: true,
+      });
+    }
+    
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

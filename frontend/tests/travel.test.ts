@@ -3,7 +3,7 @@
  * Run with: npx jest tests/travel.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/travel';
+const API_BASE = 'http://localhost:3002/api/travel';
 
 describe('Travel Expenses API', () => {
   let createdExpenseId: string;

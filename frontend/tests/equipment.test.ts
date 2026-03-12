@@ -3,7 +3,7 @@
  * Run with: npx jest tests/equipment.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/equipment';
+const API_BASE = 'http://localhost:3002/api/equipment';
 
 describe('Equipment API', () => {
   let createdEquipmentId: string;

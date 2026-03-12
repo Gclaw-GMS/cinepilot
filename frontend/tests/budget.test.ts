@@ -3,7 +3,7 @@
  * Run with: npx jest tests/budget.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/budget';
+const API_BASE = 'http://localhost:3002/api/budget';
 
 describe('Budget API', () => {
   let createdExpenseId: string;

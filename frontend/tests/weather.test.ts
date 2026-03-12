@@ -3,7 +3,7 @@
  * Tests all endpoints: GET weather, POST location management
  */
 
-const API_BASE = 'http://localhost:3000/api/weather';
+const API_BASE = 'http://localhost:3002/api/weather';
 
 describe('Weather API', () => {
   // Store original fetch

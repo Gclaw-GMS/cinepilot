@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
   initFallbackData()
   
   return NextResponse.json({
+    cateringPlan: fallbackPlan,
     plan: fallbackPlan,
     caterers: fallbackCaterers,
     isDemoMode: true

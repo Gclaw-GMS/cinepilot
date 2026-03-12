@@ -3,7 +3,7 @@
  * Run with: npx jest tests/catering.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/catering';
+const API_BASE = 'http://localhost:3002/api/catering';
 
 describe('Catering API', () => {
   let createdPlanId: string;

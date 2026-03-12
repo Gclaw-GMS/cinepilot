@@ -126,13 +126,21 @@ function calculateSummary(characters: CharacterCostume[]) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+  const role = searchParams.get('role');
+  const search = searchParams.get('search');
 
   try {
     // Try database first
     await prisma.$connect();
     
+    // Build where clause for filtering
+    const whereClause: any = { projectId };
+    if (role) {
+      whereClause.roleHint = role === 'protagonist' ? { not: null } : role;
+    }
+    
     const characters = await prisma.character.findMany({
-      where: { projectId },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -167,27 +175,67 @@ export async function GET(request: NextRequest) {
       char.description
     );
     
-    if (formattedCharacters.length > 0 && hasMeaningfulData) {
+    // Apply filters to DB results
+    let filteredDbCharacters = formattedCharacters;
+    if (role) {
+      filteredDbCharacters = filteredDbCharacters.filter(char => char.role === role);
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredDbCharacters = filteredDbCharacters.filter(char => 
+        char.name.toLowerCase().includes(searchLower) ||
+        char.description?.toLowerCase().includes(searchLower) ||
+        char.personality?.some(p => p.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    if (filteredDbCharacters.length > 0 && hasMeaningfulData) {
       return NextResponse.json({
-        characters: formattedCharacters,
-        summary: calculateSummary(formattedCharacters),
+        characters: filteredDbCharacters,
+        summary: calculateSummary(filteredDbCharacters),
         isDemoMode: false
       });
     }
     
     // No meaningful characters in DB, return demo data
+    let filteredDemoCharacters = DEMO_CHARACTERS;
+    if (role) {
+      filteredDemoCharacters = DEMO_CHARACTERS.filter(char => char.role === role);
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredDemoCharacters = filteredDemoCharacters.filter(char => 
+        char.name.toLowerCase().includes(searchLower) ||
+        char.description?.toLowerCase().includes(searchLower) ||
+        char.personality?.some(p => p.toLowerCase().includes(searchLower))
+      );
+    }
+    
     return NextResponse.json({
-      characters: DEMO_CHARACTERS,
-      summary: calculateSummary(DEMO_CHARACTERS),
+      characters: filteredDemoCharacters,
+      summary: calculateSummary(filteredDemoCharacters),
       isDemoMode: true
     });
   } catch (error) {
     console.log('[GET /api/character-costume] Using demo data - database not connected');
     
     // Return demo data when database is not connected
+    let filteredDemoCharacters = DEMO_CHARACTERS;
+    if (role) {
+      filteredDemoCharacters = DEMO_CHARACTERS.filter(char => char.role === role);
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredDemoCharacters = filteredDemoCharacters.filter(char => 
+        char.name.toLowerCase().includes(searchLower) ||
+        char.description?.toLowerCase().includes(searchLower) ||
+        char.personality?.some(p => p.toLowerCase().includes(searchLower))
+      );
+    }
+    
     return NextResponse.json({
-      characters: DEMO_CHARACTERS,
-      summary: calculateSummary(DEMO_CHARACTERS),
+      characters: filteredDemoCharacters,
+      summary: calculateSummary(filteredDemoCharacters),
       isDemoMode: true
     });
   } finally {

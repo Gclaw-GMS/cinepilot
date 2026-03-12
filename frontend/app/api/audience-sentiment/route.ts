@@ -118,6 +118,7 @@ function getDemoSentiments(projectId: string) {
       _count: { comments: s.analyzedCount },
     })),
     _demo: true,
+    isDemoMode: true,
   }
 }
 
@@ -126,10 +127,46 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const projectId = searchParams.get('projectId') || 'demo-project'
   const useDemo = searchParams.get('demo') === 'true'
+  const id = searchParams.get('id')
+  const platform = searchParams.get('platform')
 
   // Return demo data if explicitly requested or if no projectId
   if (useDemo || !projectId || projectId === 'demo-project') {
-    return NextResponse.json(getDemoSentiments(projectId))
+    const demo = getDemoSentiments(projectId);
+    // Filter by platform if provided
+    let sentiments = demo.sentiments;
+    if (platform) {
+      sentiments = sentiments.filter(s => s.platform === platform);
+    }
+    // If id is provided, return single sentiment
+    if (id) {
+      const sentiment = sentiments.find(s => s.id === id);
+      if (sentiment) {
+        return NextResponse.json(sentiment);
+      }
+      return NextResponse.json({ error: 'Sentiment not found' }, { status: 404 });
+    }
+    return NextResponse.json({ ...demo, sentiments });
+  }
+
+  // If id is provided, return single sentiment from DB
+  if (id) {
+    try {
+      const sentiment = await prisma.audienceSentiment.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: { comments: true }
+          }
+        }
+      });
+      if (sentiment) {
+        return NextResponse.json(sentiment);
+      }
+      return NextResponse.json({ error: 'Sentiment not found' }, { status: 404 });
+    } catch (error) {
+      return NextResponse.json(getDemoSentiments(projectId));
+    }
   }
 
   try {

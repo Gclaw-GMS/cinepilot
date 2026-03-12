@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 
-const API_BASE = 'http://localhost:3000/api/progress';
+const API_BASE = 'http://localhost:3002/api/progress';
 
 describe('Progress API', () => {
   describe('GET /api/progress', () => {

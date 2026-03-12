@@ -3,7 +3,7 @@
  * Run with: npx jest tests/character-costume.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/character-costume';
+const API_BASE = 'http://localhost:3002/api/character-costume';
 
 describe('Character Costume API', () => {
   let createdCharacterId: string;

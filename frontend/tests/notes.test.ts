@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 
-const API_BASE = 'http://localhost:3000/api/notes';
+const API_BASE = 'http://localhost:3002/api/notes';
 
 describe('Notes API', () => {
   let createdNoteId: string;

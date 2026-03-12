@@ -1,7 +1,7 @@
-import { fetch } from '@jest/globals'
+
 import { describe, test, expect, beforeAll } from '@jest/globals'
 
-const API_BASE = 'http://localhost:3000/api/travel-expenses'
+const API_BASE = 'http://localhost:3002/api/travel-expenses'
 
 describe('Travel Expenses API', () => {
   describe('GET /api/travel-expenses', () => {

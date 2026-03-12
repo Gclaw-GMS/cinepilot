@@ -3,7 +3,7 @@
  * Tests all endpoints for VFX notes, warnings, and props
  */
 
-const API_BASE = 'http://localhost:3003/api/vfx';
+const API_BASE = 'http://localhost:3002/api/vfx';
 
 describe('GET /api/vfx', () => {
   it('returns VFX data with all required sections', async () => {

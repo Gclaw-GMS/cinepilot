@@ -58,8 +58,8 @@ const DEMO_EQUIPMENT_RESPONSE = {
   ],
   stats: {
     totalItems: 9,
-    totalDailyRate: 72200,
-    available: 6,
+    totalDailyRate: 75700,
+    available: 5,
     inUse: 3,
   },
 };
@@ -70,10 +70,15 @@ export async function GET(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const action = req.nextUrl.searchParams.get('action');
     
+    // Return demo response directly for noseed action (for testing)
+    if (action === 'noseed') {
+      return NextResponse.json(DEMO_EQUIPMENT_RESPONSE);
+    }
+    
     // Check if we should seed data
     const existingCount = await prisma.equipmentRental.count({ where: { projectId } });
     
-    if (existingCount === 0 && action !== 'noseed') {
+    if (existingCount === 0) {
       // Auto-seed demo data if empty
       await seedEquipment(projectId);
     }

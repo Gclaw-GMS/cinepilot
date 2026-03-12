@@ -3,7 +3,7 @@
  * Run with: npx jest tests/analytics.test.ts
  */
 
-const API_BASE = 'http://localhost:3000/api/analytics';
+const API_BASE = 'http://localhost:3002/api/analytics';
 
 describe('Analytics API', () => {
   beforeAll(async () => {

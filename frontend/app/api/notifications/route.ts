@@ -151,8 +151,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let body;
   try {
-    const body = await req.json();
+    body = await req.json();
     const { channel, recipient, title, body: bodyText, metadata } = body;
 
     if (typeof channel !== 'string' || !channel.trim()) {
@@ -183,7 +184,8 @@ export async function POST(req: NextRequest) {
     // Demo mode: create notification in demo data
     console.log('[POST /api/notifications] Using demo data - database not connected');
     
-    const { channel, recipient, title, body: bodyText, metadata } = await req.json();
+    // Use body from try block (already parsed)
+    const { channel, recipient, title, body: bodyText, metadata } = body || {};
     
     const newNotification = {
       id: `demo-${demoNextId++}`,
@@ -205,8 +207,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  let body;
   try {
-    const body = await req.json();
+    body = await req.json();
     const { id, status } = body;
 
     if (typeof id !== 'string' || !id.trim()) {
@@ -229,7 +232,8 @@ export async function PATCH(req: NextRequest) {
     // Demo mode: update in-memory demo data
     console.log('[PATCH /api/notifications] Using demo data - database not connected');
     
-    const { id, status } = await req.json();
+    // Use body from try block (already parsed)
+    const { id, status } = body || {};
     
     if (typeof id !== 'string' || !id.trim()) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -250,8 +254,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  let body;
   try {
-    const body = await req.json();
+    body = await req.json();
     const { id } = body;
 
     if (typeof id !== 'string' || !id.trim()) {
@@ -267,7 +272,8 @@ export async function DELETE(req: NextRequest) {
     // Demo mode: remove from in-memory demo data
     console.log('[DELETE /api/notifications] Using demo data - database not connected');
     
-    const { id } = await req.json();
+    // Use body from try block (already parsed)
+    const { id } = body || {};
     
     if (typeof id !== 'string' || !id.trim()) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });

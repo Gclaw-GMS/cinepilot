@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  const aiConfigured = AIML_API_KEY && AIML_API_KEY !== 'your-aiml-api-key-here';
+  const aiConfigured = Boolean(AIML_API_KEY && AIML_API_KEY !== 'your-aiml-api-key-here');
 
   return NextResponse.json({
     capabilities: [

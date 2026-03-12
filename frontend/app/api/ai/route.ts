@@ -17,7 +17,7 @@ interface AnalysisRequest {
 
 // Check if AIML API is configured
 const AIML_API_KEY = process.env.AIML_API_KEY || '';
-const isAIConfigured = AIML_API_KEY && AIML_API_KEY !== 'your-aiml-api-key-here';
+const isAIConfigured = Boolean(AIML_API_KEY && AIML_API_KEY !== 'your-aiml-api-key-here');
 
 // AI-powered analysis functions using AIML API
 async function aiScriptAnalysis(data: AnalysisRequest): Promise<any> {

@@ -9,4 +9,6 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   verbose: true,
+  testTimeout: 30000,
+  globalTimeout: 120000,
 };

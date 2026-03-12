@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard } from 'lucide-react'
+import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown } from 'lucide-react'
 
 interface WhatsAppTemplate { id: string; name: string; category: string; content: string; variables: string[]; createdAt: string }
 interface SentMessage { id: string; recipient: string; recipientName?: string; message: string; status: string; timestamp: string }
@@ -46,9 +46,13 @@ export default function WhatsAppPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
   
-  // Refs for keyboard shortcuts
+  // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -118,10 +122,20 @@ export default function WhatsAppPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'p':
+          e.preventDefault()
+          setShowPrintMenu(prev => !prev)
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportDropdown(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowTemplateEditor(false)
+          setShowPrintMenu(false)
+          setShowExportDropdown(false)
           setSearchQuery('')
           break
       }
@@ -130,6 +144,22 @@ export default function WhatsAppPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
+      if (showExportDropdown && exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setShowExportDropdown(false)
+      }
+    }
+    if (showPrintMenu || showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPrintMenu, showExportDropdown])
 
   const handleTemplateSelect = (template: WhatsAppTemplate) => {
     setSelectedTemplate(template); setMessage(template.content)
@@ -207,16 +237,128 @@ export default function WhatsAppPage() {
     }
     setTemplates(prev => prev.filter(t => t.id !== id))
   }
-  const handleExportHistory = () => {
+  // Print function
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    
+    const stats = {
+      total: messages.length,
+      delivered: messages.filter(m => m.status === 'delivered').length,
+      read: messages.filter(m => m.status === 'read').length,
+      sent: messages.filter(m => m.status === 'sent').length,
+      pending: messages.filter(m => m.status === 'pending').length,
+      failed: messages.filter(m => m.status === 'failed').length,
+    }
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - WhatsApp Broadcast Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; background: #f5f5f5; }
+    .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 32px; }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { opacity: 0.9; font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 24px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+    .stat-card { background: white; padding: 16px; border-radius: 8px; text-align: center; }
+    .stat-value { font-size: 28px; font-weight: bold; color: #111827; }
+    .stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+    .section { padding: 24px; }
+    .section h2 { font-size: 18px; color: #111827; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 12px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-size: 12px; color: #6b7280; text-transform: uppercase; }
+    td { padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+    .status { display: inline-block; padding: 4px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+    .status-delivered { background: #dcfce7; color: #166534; }
+    .status-read { background: #d1fae5; color: #065f46; }
+    .status-sent { background: #dbeafe; color: #1e40af; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-failed { background: #fee2e2; color: #991b1b; }
+    .footer { padding: 16px 24px; background: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af; }
+    @media print { body { background: white; } .container { box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📱 WhatsApp Broadcast Report</h1>
+      <p>Generated on ${new Date().toLocaleString()}</p>
+    </div>
+    <div class="stats">
+      <div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total Messages</div></div>
+      <div class="stat-card"><div class="stat-value">${stats.delivered + stats.read}</div><div class="stat-label">Delivered/Read</div></div>
+      <div class="stat-card"><div class="stat-value">${stats.failed}</div><div class="stat-label">Failed</div></div>
+    </div>
+    <div class="section">
+      <h2>Recent Messages</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Recipient</th>
+            <th>Message</th>
+            <th>Status</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${messages.slice(0, 20).map(m => `
+            <tr>
+              <td>${m.recipientName || m.recipient}<br><small style="color:#6b7280">${m.recipient}</small></td>
+              <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.message}</td>
+              <td><span class="status status-${m.status}">${m.status}</span></td>
+              <td>${formatTime(m.timestamp)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footer">
+      CinePilot - Film Production Management System
+    </div>
+  </div>
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`
+    printWindow.document.write(html)
+    printWindow.document.close()
+    setShowPrintMenu(false)
+  }
+  
+  const formatTime = (timestamp: string) => { const date = new Date(timestamp), now = new Date(), diffMs = now.getTime() - date.getTime(), diffMins = Math.floor(diffMs / 60000), diffHours = Math.floor(diffMins / 60), diffDays = Math.floor(diffHours / 24); if (diffMins < 1) return 'Just now'; if (diffMins < 60) return `${diffMins}m ago`; if (diffHours < 24) return `${diffHours}h ago`; if (diffDays < 7) return `${diffDays}d ago`; return date.toLocaleDateString() }
+
+  const handleExportJSON = () => {
     const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), messages: messages.map(m => ({ recipient: m.recipient, message: m.message, status: m.status, timestamp: m.timestamp })) }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `whatsapp-history-${new Date().toISOString().split('T')[0]}.json`; a.click()
+    setShowExportDropdown(false)
+  }
+  
+  const handleExportCSV = () => {
+    const headers = ['Recipient', 'Recipient Name', 'Message', 'Status', 'Timestamp']
+    const csvContent = [
+      headers.join(','),
+      ...messages.map(m => [
+        `"${(m.recipient || '').replace(/"/g, '""')}"`,
+        `"${(m.recipientName || '').replace(/"/g, '""')}"`,
+        `"${(m.message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+        `"${m.status}"`,
+        `"${m.timestamp}"`
+      ].join(','))
+    ].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `whatsapp-history-${new Date().toISOString().split('T')[0]}.csv`; a.click()
+    setShowExportDropdown(false)
   }
 
   const filteredMessages = messages.filter(m => !searchQuery || m.recipient.includes(searchQuery) || m.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()))
   const filteredTemplates = templates.filter(t => (categoryFilter === 'all' || t.category === categoryFilter) && (!searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase())))
   const filteredContacts = contacts.filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.phone.includes(searchQuery))
 
-  const formatTime = (timestamp: string) => { const date = new Date(timestamp), now = new Date(), diffMs = now.getTime() - date.getTime(), diffMins = Math.floor(diffMs / 60000), diffHours = Math.floor(diffMins / 60), diffDays = Math.floor(diffHours / 24); if (diffMins < 1) return 'Just now'; if (diffMins < 60) return `${diffMins}m ago`; if (diffHours < 24) return `${diffHours}h ago`; if (diffDays < 7) return `${diffDays}d ago`; return date.toLocaleDateString() }
   const STATUS_COLORS: Record<string, string> = { pending: 'bg-yellow-500/20 text-yellow-400', sent: 'bg-blue-500/20 text-blue-400', delivered: 'bg-green-500/20 text-green-400', read: 'bg-emerald-500/20 text-emerald-400', failed: 'bg-red-500/20 text-red-400' }
 
   if (loading) { return (<div className="p-6 flex items-center justify-center min-h-[400px]"><div className="text-center"><div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-gray-400">Loading WhatsApp...</p></div></div>) }
@@ -261,6 +403,59 @@ export default function WhatsAppPage() {
           >
             <Keyboard className="w-5 h-5 text-gray-400" />
           </button>
+          
+          {/* Print Dropdown */}
+          <div className="relative" ref={printMenuRef}>
+            <button 
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center gap-2"
+              title="Print (P)"
+            >
+              <Printer className="w-5 h-5 text-gray-400" />
+              <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button 
+                  onClick={handlePrint}
+                  className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Broadcast Report</span>
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
+            <button 
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center gap-2"
+              title="Export (E)"
+            >
+              <Download className="w-5 h-5 text-gray-400" />
+              <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            {showExportDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button 
+                  onClick={handleExportJSON}
+                  className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export JSON</span>
+                </button>
+                <button 
+                  onClick={handleExportCSV}
+                  className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -327,7 +522,7 @@ export default function WhatsAppPage() {
 
       {activeTab === 'templates' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="flex gap-2"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"><option value="all">All</option><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option></select></div><button onClick={() => { setEditingTemplate(null); setTemplateFormData({ name: '', category: 'schedule', content: '' }); setShowTemplateEditor(true) }} className="flex items-center gap-2 px-4 py-2 bg-green-500 text-black rounded-lg text-sm font-medium"><Plus className="w-4 h-4" />New</button></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredTemplates.map(t => (<div key={t.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-start justify-between mb-2"><div><h4 className="font-medium text-white">{t.name}</h4><span className="text-xs text-gray-500">{t.category}</span></div><div className="flex gap-1"><button onClick={() => { setEditingTemplate(t); setTemplateFormData({ name: t.name, category: t.category, content: t.content }); setShowTemplateEditor(true) }} className="p-1 text-gray-400 hover:text-white"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDeleteTemplate(t.id)} className="p-1 text-gray-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></button></div></div><pre className="text-xs text-gray-400 whitespace-pre-wrap bg-gray-800/50 rounded p-2 max-h-24 overflow-hidden">{t.content}</pre></div>))}</div></div>)}
 
-      {activeTab === 'history' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><button onClick={handleExportHistory} className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300"><Download className="w-4 h-4 inline" />Export</button></div><div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-gray-800/50"><tr><th className="text-left p-4 text-xs text-gray-400">Recipient</th><th className="text-left p-4 text-xs text-gray-400">Message</th><th className="text-center p-4 text-xs text-gray-400">Status</th><th className="text-right p-4 text-xs text-gray-400">Time</th></tr></thead><tbody className="divide-y divide-gray-800">{filteredMessages.map(m => (<tr key={m.id} className="hover:bg-gray-800/30"><td className="p-4"><p className="text-white">{m.recipientName || m.recipient}</p><p className="text-gray-500 text-xs">{m.recipient}</p></td><td className="p-4"><p className="text-gray-300 text-sm line-clamp-1">{m.message}</p></td><td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-xs ${STATUS_COLORS[m.status] || 'bg-gray-800 text-gray-400'}`}>{m.status}</span></td><td className="p-4 text-right text-gray-500 text-sm">{formatTime(m.timestamp)}</td></tr>))}</tbody></table></div></div>)}
+      {activeTab === 'history' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><button onClick={handleExportJSON} className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300"><Download className="w-4 h-4 inline" />Export</button></div><div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-gray-800/50"><tr><th className="text-left p-4 text-xs text-gray-400">Recipient</th><th className="text-left p-4 text-xs text-gray-400">Message</th><th className="text-center p-4 text-xs text-gray-400">Status</th><th className="text-right p-4 text-xs text-gray-400">Time</th></tr></thead><tbody className="divide-y divide-gray-800">{filteredMessages.map(m => (<tr key={m.id} className="hover:bg-gray-800/30"><td className="p-4"><p className="text-white">{m.recipientName || m.recipient}</p><p className="text-gray-500 text-xs">{m.recipient}</p></td><td className="p-4"><p className="text-gray-300 text-sm line-clamp-1">{m.message}</p></td><td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-xs ${STATUS_COLORS[m.status] || 'bg-gray-800 text-gray-400'}`}>{m.status}</span></td><td className="p-4 text-right text-gray-500 text-sm">{formatTime(m.timestamp)}</td></tr>))}</tbody></table></div></div>)}
 
       {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>))}</div></div>)}
 

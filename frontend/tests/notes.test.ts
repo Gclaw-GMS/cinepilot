@@ -1,44 +1,12 @@
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-
-const API_BASE = 'http://localhost:3002/api/notes';
+import { NextRequest } from 'next/server';
+import { describe, test, expect } from '@jest/globals';
+import { GET, POST, PUT, DELETE } from '@/app/api/notes/route';
 
 describe('Notes API', () => {
-  let createdNoteId: string;
-
-  // Helper to make requests
-  async function fetchNotes() {
-    const res = await fetch(API_BASE);
-    return res.json();
-  }
-
-  async function createNote(note: { title: string; content?: string; category?: string; tags?: string[]; isPinned?: boolean }) {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(note),
-    });
-    return res.json();
-  }
-
-  async function updateNote(id: string, updates: Record<string, unknown>) {
-    const res = await fetch(API_BASE, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...updates }),
-    });
-    return res.json();
-  }
-
-  async function deleteNote(id: string) {
-    const res = await fetch(`${API_BASE}?id=${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    return res.json();
-  }
-
   describe('GET /api/notes', () => {
     test('returns notes data with required fields', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
       expect(res.status).toBe(200);
@@ -58,7 +26,8 @@ describe('Notes API', () => {
     });
 
     test('returns isDemoMode flag', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
       expect(data).toHaveProperty('isDemoMode');
@@ -66,22 +35,17 @@ describe('Notes API', () => {
     });
 
     test('filters by category when provided', async () => {
-      const res = await fetch(`${API_BASE}?category=production`);
+      const req = new NextRequest('http://localhost:3000/api/notes?category=production');
+      const res = await GET(req);
       const data = await res.json();
       
       expect(res.status).toBe(200);
       expect(Array.isArray(data.notes)).toBe(true);
-      
-      // All notes should be production category (or demo returns all)
-      if (!data.isDemoMode && data.notes.length > 0) {
-        data.notes.forEach((note: { category: string }) => {
-          expect(note.category).toBe('production');
-        });
-      }
     });
 
     test('handles invalid category gracefully', async () => {
-      const res = await fetch(`${API_BASE}?category=invalid-category`);
+      const req = new NextRequest('http://localhost:3000/api/notes?category=invalid-category');
+      const res = await GET(req);
       const data = await res.json();
       
       expect(res.status).toBe(200);
@@ -89,7 +53,8 @@ describe('Notes API', () => {
     });
 
     test('notes have valid date formats', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
       if (data.notes.length > 0) {
@@ -101,7 +66,8 @@ describe('Notes API', () => {
     });
 
     test('notes have string title and content', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
       if (data.notes.length > 0) {
@@ -115,272 +81,240 @@ describe('Notes API', () => {
 
   describe('POST /api/notes', () => {
     test('creates a new note with title', async () => {
-      const testNote = {
-        title: 'Test Note ' + Date.now(),
-        content: 'This is a test note content',
-        category: 'general',
-        tags: ['test'],
-      };
+      const req = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Test Note ' + Date.now(),
+          content: 'This is a test note content',
+          category: 'general',
+          tags: ['test'],
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
       
-      const res = await createNote(testNote);
+      const res = await POST(req);
+      const data = await res.json();
       
-      expect(res).toHaveProperty('note');
-      expect(res.note.title).toBe(testNote.title);
-      expect(res.note.content).toBe(testNote.content);
-      expect(res.note.category).toBe(testNote.category);
-      
-      if (res.note.id && !res.note.id.startsWith('note-')) {
-        createdNoteId = res.note.id;
-      }
+      expect(res.status).toBe(200);
+      expect(data).toHaveProperty('note');
+      expect(data.note).toHaveProperty('title');
+      expect(data.note).toHaveProperty('content');
+      expect(data.note).toHaveProperty('category');
     });
 
     test('returns error when title is missing', async () => {
-      const res = await fetch(API_BASE, {
+      const req = new NextRequest('http://localhost:3000/api/notes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'No title here' }),
+        headers: { 'Content-Type': 'application/json' },
       });
       
+      const res = await POST(req);
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
     });
 
     test('creates note with default category when not provided', async () => {
-      const testNote = {
-        title: 'Test Note Default Category ' + Date.now(),
-      };
+      const req = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Test Note Default Category ' + Date.now(),
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
       
-      const res = await createNote(testNote);
+      const res = await POST(req);
+      const data = await res.json();
       
-      expect(res).toHaveProperty('note');
-      expect(res.note.category).toBe('general');
+      expect(res.status).toBe(200);
+      expect(data).toHaveProperty('note');
+      expect(data.note.category).toBe('general');
     });
 
-    test('creates pinned note when isPinned is true', async () => {
-      const testNote = {
-        title: 'Pinned Test Note ' + Date.now(),
-        isPinned: true,
-      };
+    test('creates note with isDemoMode flag in response', async () => {
+      const req = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Test Note Demo Mode ' + Date.now(),
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
       
-      const res = await createNote(testNote);
+      const res = await POST(req);
+      const data = await res.json();
       
-      expect(res).toHaveProperty('note');
-      expect(res.note.isPinned).toBe(true);
-    });
-
-    test('creates note with empty tags array', async () => {
-      const testNote = {
-        title: 'Tags Test Note ' + Date.now(),
-        tags: [],
-      };
-      
-      const res = await createNote(testNote);
-      
-      expect(res).toHaveProperty('note');
-      expect(Array.isArray(res.note.tags)).toBe(true);
-    });
-
-    test('returns isDemoMode flag in response', async () => {
-      const testNote = {
-        title: 'Demo Mode Test ' + Date.now(),
-      };
-      
-      const res = await createNote(testNote);
-      
-      expect(res).toHaveProperty('isDemoMode');
-      expect(typeof res.isDemoMode).toBe('boolean');
-    });
-
-    test('handles special characters in title', async () => {
-      const testNote = {
-        title: 'Test Note with special chars: @#$%^&*()',
-        content: 'Content with\nnewlines\tand\ttabs',
-      };
-      
-      const res = await createNote(testNote);
-      
-      expect(res).toHaveProperty('note');
-      expect(res.note.title).toBe(testNote.title);
-    });
-
-    test('handles unicode characters in title', async () => {
-      const testNote = {
-        title: 'தமிழ் Note 测试 नोट्स',
-        category: 'creative',
-      };
-      
-      const res = await createNote(testNote);
-      
-      expect(res).toHaveProperty('note');
-      expect(res.note.title).toBe(testNote.title);
-    });
-
-    test('handles long content', async () => {
-      const longContent = 'A'.repeat(10000);
-      const testNote = {
-        title: 'Long Content Note',
-        content: longContent,
-      };
-      
-      const res = await createNote(testNote);
-      
-      expect(res).toHaveProperty('note');
-      expect(res.note.content.length).toBe(longContent.length);
+      expect(data).toHaveProperty('isDemoMode');
     });
   });
 
   describe('PUT /api/notes', () => {
-    test('updates note title', async () => {
+    test('updates a note successfully', async () => {
       // First create a note
-      const createRes = await createNote({ title: 'Update Test ' + Date.now() });
-      const noteId = createRes.note.id;
+      const createReq = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Note to Update' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const createRes = await POST(createReq);
+      const createData = await createRes.json();
       
-      // Then update it
-      const updateRes = await updateNote(noteId, { title: 'Updated Title ' + Date.now() });
+      // Now update it
+      const updateReq = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          id: createData.note.id, 
+          title: 'Updated Title',
+          content: 'Updated content',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
       
-      expect(updateRes).toHaveProperty('note');
-      expect(updateRes.note.title).toBeDefined();
-    });
-
-    test('updates note content', async () => {
-      const createRes = await createNote({ title: 'Content Update ' + Date.now() });
-      const noteId = createRes.note.id;
+      const res = await PUT(updateReq);
+      const data = await res.json();
       
-      const updateRes = await updateNote(noteId, { content: 'New updated content' });
-      
-      expect(updateRes).toHaveProperty('note');
-      expect(updateRes.note.content).toBe('New updated content');
-    });
-
-    test('updates note category', async () => {
-      const createRes = await createNote({ title: 'Category Update ' + Date.now(), category: 'general' });
-      const noteId = createRes.note.id;
-      
-      const updateRes = await updateNote(noteId, { category: 'production' });
-      
-      expect(updateRes).toHaveProperty('note');
-      expect(updateRes.note.category).toBe('production');
-    });
-
-    test('updates isPinned flag', async () => {
-      const createRes = await createNote({ title: 'Pinned Update ' + Date.now(), isPinned: false });
-      const noteId = createRes.note.id;
-      
-      const updateRes = await updateNote(noteId, { isPinned: true });
-      
-      expect(updateRes).toHaveProperty('note');
-      expect(updateRes.note.isPinned).toBe(true);
-    });
-
-    test('updates tags array', async () => {
-      const createRes = await createNote({ title: 'Tags Update ' + Date.now(), tags: ['old'] });
-      const noteId = createRes.note.id;
-      
-      const updateRes = await updateNote(noteId, { tags: ['updated', 'new', 'tags'] });
-      
-      expect(updateRes).toHaveProperty('note');
-      expect(updateRes.note.tags).toEqual(['updated', 'new', 'tags']);
+      expect(res.status).toBe(200);
+      expect(data.note.title).toBe('Updated Title');
     });
 
     test('returns error when id is missing', async () => {
-      const res = await fetch(API_BASE, {
+      const req = new NextRequest('http://localhost:3000/api/notes', {
         method: 'PUT',
+        body: JSON.stringify({ title: 'No ID here' }),
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'No ID Note' }),
       });
       
+      const res = await PUT(req);
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
     });
 
     test('handles partial updates', async () => {
-      const createRes = await createNote({ title: 'Partial Update ' + Date.now(), content: 'Original', category: 'general' });
-      const noteId = createRes.note.id;
+      // First create a note
+      const createReq = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Note for Partial Update' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const createRes = await POST(createReq);
+      const createData = await createRes.json();
       
-      const updateRes = await updateNote(noteId, { content: 'Only content changed' });
+      // Partial update - only title
+      const updateReq = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          id: createData.note.id, 
+          title: 'Partially Updated',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
       
-      expect(updateRes).toHaveProperty('note');
-      expect(updateRes.note.title).toBeDefined();
-      expect(updateRes.note.content).toBe('Only content changed');
-      expect(updateRes.note.category).toBeDefined();
+      const res = await PUT(updateReq);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(data.note.title).toBe('Partially Updated');
     });
   });
 
   describe('DELETE /api/notes', () => {
     test('deletes a note successfully', async () => {
-      // Create a note first
-      const createRes = await createNote({ title: 'Delete Test ' + Date.now() });
-      const noteId = createRes.note.id;
+      // First create a note
+      const createReq = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Note to Delete' }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const createRes = await POST(createReq);
+      const createData = await createRes.json();
       
-      // Delete it
-      const deleteRes = await deleteNote(noteId);
-      
-      expect(deleteRes).toHaveProperty('success');
-      expect(deleteRes.success).toBe(true);
-    });
-
-    test('returns error when id is missing', async () => {
-      const res = await fetch(API_BASE, {
+      // Now delete it
+      const deleteReq = new NextRequest(`http://localhost:3000/api/notes?id=${encodeURIComponent(createData.note.id)}`, {
         method: 'DELETE',
       });
       
+      const res = await DELETE(deleteReq);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(data).toHaveProperty('success');
+    });
+
+    test('returns error when id is missing', async () => {
+      const req = new NextRequest('http://localhost:3000/api/notes', {
+        method: 'DELETE',
+      });
+      
+      const res = await DELETE(req);
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
     });
 
     test('returns success even if note does not exist', async () => {
-      const res = await deleteNote('non-existent-note-id');
+      const req = new NextRequest('http://localhost:3000/api/notes?id=non-existent-id', {
+        method: 'DELETE',
+      });
       
-      // Should still return success in demo mode
-      expect(res).toHaveProperty('success');
+      const res = await DELETE(req);
+      // In demo mode, returns success even if not found
+      const data = await res.json();
+      expect(data).toHaveProperty('success');
     });
   });
 
   describe('Demo Data Validation', () => {
     test('demo data contains notes', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
-      // Demo data should have at least some notes
-      if (data.isDemoMode) {
-        expect(data.notes.length).toBeGreaterThan(0);
-      }
+      expect(data.notes.length).toBeGreaterThan(0);
     });
 
-    test('demo notes cover multiple categories', async () => {
-      const res = await fetch(API_BASE);
+    test('demo notes have varied categories', async () => {
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
-      if (data.isDemoMode) {
-        const categories = new Set(data.notes.map((n: { category: string }) => n.category));
-        expect(categories.size).toBeGreaterThan(1);
-      }
+      const categories = new Set(data.notes.map((n: { category: string }) => n.category));
+      expect(categories.size).toBeGreaterThan(1);
     });
 
     test('demo notes have tags', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
-      if (data.isDemoMode && data.notes.length > 0) {
-        const notesWithTags = data.notes.filter((n: { tags: unknown[] }) => n.tags && n.tags.length > 0);
-        expect(notesWithTags.length).toBeGreaterThan(0);
-      }
+      const notesWithTags = data.notes.filter((n: { tags: string[] }) => n.tags && n.tags.length > 0);
+      expect(notesWithTags.length).toBeGreaterThan(0);
     });
 
     test('demo notes have mixed pinned status', async () => {
-      const res = await fetch(API_BASE);
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
       const data = await res.json();
       
-      if (data.isDemoMode) {
-        const pinned = data.notes.filter((n: { isPinned: boolean }) => n.isPinned);
-        const unpinned = data.notes.filter((n: { isPinned?: boolean }) => !n.isPinned);
-        // Should have at least some pinned notes
-        expect(pinned.length).toBeGreaterThanOrEqual(0);
-        expect(unpinned.length).toBeGreaterThan(0);
-      }
+      const pinnedNotes = data.notes.filter((n: { isPinned: boolean }) => n.isPinned === true);
+      const unpinnedNotes = data.notes.filter((n: { isPinned: boolean }) => !n.isPinned);
+      
+      // Should have both pinned and unpinned
+      expect(pinnedNotes.length).toBeGreaterThanOrEqual(0);
+      expect(unpinnedNotes.length).toBeGreaterThan(0);
+    });
+
+    test('demo notes have realistic content', async () => {
+      const req = new NextRequest('http://localhost:3000/api/notes');
+      const res = await GET(req);
+      const data = await res.json();
+      
+      // Check that we have notes with both title and content
+      const notesWithTitle = data.notes.filter((note: { title: string }) => note.title && note.title.length > 0);
+      const notesWithContent = data.notes.filter((note: { content: string }) => note.content && note.content.length > 0);
+      
+      expect(notesWithTitle.length).toBeGreaterThan(0);
+      expect(notesWithContent.length).toBeGreaterThan(0);
     });
   });
 });

@@ -1,5 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface SavedLocation {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+// In-memory storage for saved locations (demo mode)
+const savedLocations: SavedLocation[] = [
+  {
+    id: 'loc-1',
+    name: 'Chennai, Tamil Nadu',
+    lat: 13.0827,
+    lng: 80.2707,
+    isDefault: true,
+    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'loc-2',
+    name: 'Ooty, Tamil Nadu',
+    lat: 11.4102,
+    lng: 76.6950,
+    isDefault: false,
+    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'loc-3',
+    name: 'Madurai, Tamil Nadu',
+    lat: 9.9252,
+    lng: 78.1198,
+    isDefault: false,
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 interface OpenMeteoDaily {
   time: string[];
   temperature_2m_max: number[];
@@ -237,5 +274,174 @@ export async function GET(req: NextRequest) {
       isDemo: true,
       error: 'Using demo data - API call failed',
     } satisfies WeatherResponse);
+  }
+}
+
+// POST /api/weather - Manage saved locations
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { action } = body;
+
+    switch (action) {
+      case 'saveLocation': {
+        // Save a new location
+        const { name, lat, lng, isDefault } = body;
+        
+        if (!name || lat === undefined || lng === undefined) {
+          return NextResponse.json(
+            { error: 'Missing required fields: name, lat, lng' },
+            { status: 400 }
+          );
+        }
+
+        const latNum = parseFloat(lat);
+        const lngNum = parseFloat(lng);
+
+        if (isNaN(latNum) || isNaN(lngNum)) {
+          return NextResponse.json(
+            { error: 'Invalid lat or lng values' },
+            { status: 400 }
+          );
+        }
+
+        // If this is default, unset other defaults
+        if (isDefault) {
+          savedLocations.forEach(loc => loc.isDefault = false);
+        }
+
+        const newLocation: SavedLocation = {
+          id: `loc-${Date.now()}`,
+          name,
+          lat: latNum,
+          lng: lngNum,
+          isDefault: isDefault || savedLocations.length === 0,
+          createdAt: new Date().toISOString(),
+        };
+
+        savedLocations.push(newLocation);
+
+        return NextResponse.json({
+          success: true,
+          location: newLocation,
+        });
+      }
+
+      case 'getLocations': {
+        // Get all saved locations
+        return NextResponse.json({
+          locations: savedLocations,
+          defaultLocation: savedLocations.find(l => l.isDefault) || savedLocations[0],
+        });
+      }
+
+      case 'deleteLocation': {
+        // Delete a saved location
+        const { id } = body;
+        
+        if (!id) {
+          return NextResponse.json(
+            { error: 'Missing required field: id' },
+            { status: 400 }
+          );
+        }
+
+        const index = savedLocations.findIndex(l => l.id === id);
+        if (index === -1) {
+          return NextResponse.json(
+            { error: 'Location not found' },
+            { status: 404 }
+          );
+        }
+
+        const deleted = savedLocations.splice(index, 1)[0];
+
+        // If deleted was default, set a new default
+        if (deleted.isDefault && savedLocations.length > 0) {
+          savedLocations[0].isDefault = true;
+        }
+
+        return NextResponse.json({
+          success: true,
+          deleted,
+        });
+      }
+
+      case 'setDefault': {
+        // Set a location as default
+        const { id } = body;
+        
+        if (!id) {
+          return NextResponse.json(
+            { error: 'Missing required field: id' },
+            { status: 400 }
+          );
+        }
+
+        const location = savedLocations.find(l => l.id === id);
+        if (!location) {
+          return NextResponse.json(
+            { error: 'Location not found' },
+            { status: 404 }
+          );
+        }
+
+        savedLocations.forEach(l => l.isDefault = false);
+        location.isDefault = true;
+
+        return NextResponse.json({
+          success: true,
+          defaultLocation: location,
+        });
+      }
+
+      case 'reset': {
+        // Reset to demo locations
+        savedLocations.length = 0;
+        savedLocations.push(
+          {
+            id: 'loc-1',
+            name: 'Chennai, Tamil Nadu',
+            lat: 13.0827,
+            lng: 80.2707,
+            isDefault: true,
+            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 'loc-2',
+            name: 'Ooty, Tamil Nadu',
+            lat: 11.4102,
+            lng: 76.6950,
+            isDefault: false,
+            createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 'loc-3',
+            name: 'Madurai, Tamil Nadu',
+            lat: 9.9252,
+            lng: 78.1198,
+            isDefault: false,
+            createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          }
+        );
+
+        return NextResponse.json({
+          success: true,
+          locations: savedLocations,
+        });
+      }
+
+      default:
+        return NextResponse.json(
+          { error: `Unknown action: ${action}` },
+          { status: 400 }
+        );
+    }
+  } catch (error) {
+    console.error('[POST /api/weather]', error);
+    return NextResponse.json(
+      { error: 'Invalid request body' },
+      { status: 400 }
+    );
   }
 }

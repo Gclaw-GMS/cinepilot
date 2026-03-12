@@ -3,6 +3,9 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1'
+  },
   collectCoverageFrom: [
     'app/api/**/*.ts',
     '!app/api/**/*.d.ts',

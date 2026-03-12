@@ -155,10 +155,19 @@ export async function GET(req: NextRequest) {
 
 // POST /api/dood — generate DOOD from schedule
 export async function POST(req: NextRequest) {
+  let action: string | undefined;
+  let projectId = DEFAULT_PROJECT_ID;
+  
+  // Parse body once outside try block to avoid consumption issues
   try {
     const body = await req.json();
-    const { action, projectId = DEFAULT_PROJECT_ID } = body;
+    action = body.action;
+    projectId = body.projectId || DEFAULT_PROJECT_ID;
+  } catch {
+    // Body parsing failed, will handle in main try
+  }
 
+  try {
     if (action === 'generate') {
       // Get shooting days and characters
       const shootingDays = await prisma.shootingDay.findMany({
@@ -227,9 +236,8 @@ export async function POST(req: NextRequest) {
     console.log('[POST /api/dood] Using demo data - database not connected');
     
     // Demo mode fallback - return demo report
-    const body = await req.json().catch(() => ({}));
-    const { action } = body;
-    
+    // Note: We don't re-parse req.json() since body was already consumed in try block
+    // Use the action variable from the outer scope
     if (action === 'generate') {
       return NextResponse.json({
         message: 'DOOD generated from demo data (8 characters across 28 shooting days)',

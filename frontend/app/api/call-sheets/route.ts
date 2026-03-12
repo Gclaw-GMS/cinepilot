@@ -282,8 +282,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // Parse body outside try block so it's available in catch block
+  const body = await req.json();
+  
   try {
-    const body = await req.json();
     const { action, shootingDayId, date, title, content, notes } = body;
 
     const projectId = await ensureDefaultProject();
@@ -389,7 +391,15 @@ export async function POST(req: NextRequest) {
     // Demo mode: create a new call sheet in demo data
     console.log('[POST /api/call-sheets] Using demo data - database not connected');
     
-    const { date, title, content, notes } = await req.json();
+    const { action, shootingDayId, date, title, content, notes } = body;
+    
+    // Validate generate action even in demo mode
+    if (action === 'generate' && !shootingDayId) {
+      return NextResponse.json(
+        { error: 'shootingDayId is required for generate action' },
+        { status: 400 }
+      );
+    }
     
     const newDemoSheet = {
       id: `demo-${demoNextId++}`,
@@ -417,8 +427,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  // Parse body outside try block so it's available in catch block
+  const body = await req.json();
+  
   try {
-    const body = await req.json();
     const { id, ...updates } = body;
 
     if (typeof id !== 'string' || !id.trim()) {
@@ -453,7 +465,7 @@ export async function PATCH(req: NextRequest) {
     // Demo mode: update in-memory demo data
     console.log('[PATCH /api/call-sheets] Using demo data - database not connected');
     
-    const { id, title, date, content, notes } = await req.json();
+    const { id, title, date, content, notes } = body;
     
     const index = demoCallSheets.findIndex(s => s.id === id);
     if (index === -1) {
@@ -473,8 +485,10 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  // Parse body outside try block so it's available in catch block
+  const body = await req.json();
+  
   try {
-    const body = await req.json();
     const { id } = body;
 
     if (typeof id !== 'string' || !id.trim()) {
@@ -490,7 +504,7 @@ export async function DELETE(req: NextRequest) {
     // Demo mode: remove from in-memory demo data
     console.log('[DELETE /api/call-sheets] Using demo data - database not connected');
     
-    const { id } = await req.json();
+    const { id } = body;
     
     if (typeof id !== 'string' || !id.trim()) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });

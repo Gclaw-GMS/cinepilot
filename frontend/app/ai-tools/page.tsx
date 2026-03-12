@@ -7,7 +7,7 @@ import {
   Play, ArrowRight, TrendingUp, Target, Zap, Loader2,
   BarChart3, PieChart, Activity, Gauge, AlertOctagon,
   CheckCircle, XCircle, Info, RefreshCw, Keyboard, Search, X,
-  Download
+  Download, Printer
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -372,6 +372,8 @@ export default function AIToolsPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -474,16 +476,135 @@ export default function AIToolsPage() {
     setExporting(false)
   }
 
+  // Print functionality
+  const handlePrint = () => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+
+    const toolCategories = allCategories.reduce((acc: Record<string, number>, cat) => {
+      acc[cat] = filteredTools.filter(t => t.category === cat).length
+      return acc
+    }, {})
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - AI Tools Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 24px; color: #0f172a; }
+    .header .timestamp { font-size: 12px; color: #64748b; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat { background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #6366f1; }
+    .section { margin-bottom: 30px; }
+    .section h3 { font-size: 16px; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .tool-name { font-weight: bold; color: #1e293b; }
+    .tool-desc { color: #64748b; font-size: 13px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .badge-Script { background: #e0e7ff; color: #4f46e5; }
+    .badge-Finance { background: #d1fae5; color: #059669; }
+    .badge-Production { background: #fce7f3; color: #db2777; }
+    .badge-Planning { background: #fef3c7; color: #d97706; }
+    .badge-Risk { background: #fee2e2; color: #dc2626; }
+    .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 30px; }
+    .category-item { background: #f1f5f9; padding: 10px; border-radius: 6px; text-align: center; }
+    .category-name { font-size: 11px; color: #64748b; text-transform: uppercase; }
+    .category-count { font-size: 18px; font-weight: bold; }
+    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #64748b; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🤖 CinePilot - AI Tools Report</h1>
+    <div class="timestamp">Generated: ${timestamp}</div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">${filteredTools.length}</div>
+      <div class="stat-label">Total Tools</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${allCategories.length}</div>
+      <div class="stat-label">Categories</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${filteredTools.filter(t => t.endpoint?.includes('script')).length}</div>
+      <div class="stat-label">Script Tools</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${filteredTools.filter(t => t.endpoint?.includes('budget')).length}</div>
+      <div class="stat-label">Budget Tools</div>
+    </div>
+  </div>
+  <div class="category-grid">
+    ${Object.entries(toolCategories).map(([cat, count]) => `
+      <div class="category-item">
+        <div class="category-count">${count}</div>
+        <div class="category-name">${cat}</div>
+      </div>
+    `).join('')}
+  </div>
+  <div class="section">
+    <h3>AI Tools Overview</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Tool</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Endpoint</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredTools.map(tool => `
+          <tr>
+            <td class="tool-name">${tool.name}</td>
+            <td class="tool-desc">${tool.desc}</td>
+            <td><span class="badge badge-${tool.category}">${tool.category}</span></td>
+            <td>${tool.endpoint || 'N/A'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="footer">
+    Generated by CinePilot - AI Pre-Production Platform
+  </div>
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
+    if (!printWindow) return
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    setShowPrintMenu(false)
+  }
+
   // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   // Keyboard shortcuts handler
   useEffect(() => {
@@ -502,12 +623,16 @@ export default function AIToolsPage() {
       } else if (e.key === 'e' || e.key === 'E') {
         e.preventDefault()
         setShowExportMenu(prev => !prev)
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault()
+        handlePrint()
       } else if (e.key === '?') {
         e.preventDefault()
         setShowKeyboardHelp(true)
       } else if (e.key === 'Escape') {
         setShowKeyboardHelp(false)
         setShowExportMenu(false)
+        setShowPrintMenu(false)
         setSearchQuery('')
       }
     }
@@ -629,6 +754,30 @@ export default function AIToolsPage() {
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Print Button with Dropdown */}
+              <div className="relative" ref={printMenuRef}>
+                <button
+                  onClick={() => setShowPrintMenu(!showPrintMenu)}
+                  disabled={filteredTools.length === 0}
+                  className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  title="Print (P)"
+                >
+                  <Printer className="w-4 h-4 text-amber-400" />
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20 min-w-[160px]">
+                    <button
+                      onClick={handlePrint}
+                      disabled={filteredTools.length === 0}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <Printer className="w-4 h-4 text-amber-400" />
+                      Print Report
                     </button>
                   </div>
                 )}
@@ -954,6 +1103,10 @@ export default function AIToolsPage() {
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Export menu</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">E</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Print report</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">P</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Show shortcuts</span>

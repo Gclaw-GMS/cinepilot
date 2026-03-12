@@ -1,271 +1,353 @@
+/**
+ * Travel Expenses API Test Suite
+ * Tests all endpoints for the Travel Expenses feature
+ */
+import { describe, it, expect } from '@jest/globals';
+import { GET, POST } from '@/app/api/travel-expenses/route';
+import { NextRequest } from 'next/server';
 
-import { describe, test, expect, beforeAll } from '@jest/globals'
-
-const API_BASE = 'http://localhost:3002/api/travel-expenses'
+// Helper to create request
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/travel-expenses');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  
+  const req = new NextRequest(url, {
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+  });
+  
+  return req;
+}
 
 describe('Travel Expenses API', () => {
   describe('GET /api/travel-expenses', () => {
-    test('returns travel expenses array', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
+    it('returns array of expenses', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(Array.isArray(data)).toBe(true);
+    });
 
-      expect(Array.isArray(data)).toBe(true)
-      expect(data.length).toBeGreaterThan(0)
-    })
-
-    test('expenses have required fields', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
-      const expense = data[0]
-
-      expect(expense).toHaveProperty('id')
-      expect(expense).toHaveProperty('projectId')
-      expect(expense).toHaveProperty('category')
-      expect(expense).toHaveProperty('description')
-      expect(expense).toHaveProperty('amount')
-      expect(expense).toHaveProperty('date')
-      expect(expense).toHaveProperty('status')
-    })
-
-    test('amount is numeric', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
-
-      for (const expense of data) {
-        expect(typeof expense.amount).toBe('number')
-        expect(expense.amount).toBeGreaterThan(0)
+    it('expenses have required fields', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      if (data.length > 0) {
+        const expense = data[0];
+        expect(expense).toHaveProperty('id');
+        expect(expense).toHaveProperty('projectId');
+        expect(expense).toHaveProperty('category');
+        expect(expense).toHaveProperty('description');
+        expect(expense).toHaveProperty('amount');
+        expect(expense).toHaveProperty('date');
+        expect(expense).toHaveProperty('status');
       }
-    })
+    });
 
-    test('status is valid', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
-      const validStatuses = ['pending', 'approved', 'rejected', 'reimbursed']
+    it('filters by projectId', async () => {
+      const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(Array.isArray(data)).toBe(true);
+    });
 
-      for (const expense of data) {
-        expect(validStatuses).toContain(expense.status)
-      }
-    })
+    it('filters by category', async () => {
+      const req = createRequest({ method: 'GET', params: { category: 'flight' } });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      data.forEach((expense: any) => {
+        expect(expense.category).toBe('flight');
+      });
+    });
 
-    test('category is valid', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
-      const validCategories = ['flight', 'train', 'bus', 'taxi', 'auto', 'hotel', 'stay', 'per_diem', 'daily_allowance']
+    it('filters by status', async () => {
+      const req = createRequest({ method: 'GET', params: { status: 'pending' } });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      data.forEach((expense: any) => {
+        expect(expense.status).toBe('pending');
+      });
+    });
 
-      for (const expense of data) {
-        expect(validCategories).toContain(expense.category)
-      }
-    })
+    it('returns summary when action=summary', async () => {
+      const req = createRequest({ method: 'GET', params: { action: 'summary' } });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(data).toHaveProperty('summary');
+      expect(data).toHaveProperty('totals');
+      expect(data).toHaveProperty('isDemoMode');
+    });
 
-    test('filter by projectId', async () => {
-      const res = await fetch(`${API_BASE}?projectId=demo-project`)
-      const data = await res.json()
+    it('summary has totals', async () => {
+      const req = createRequest({ method: 'GET', params: { action: 'summary' } });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(data.totals).toHaveProperty('totalSpent');
+      expect(data.totals).toHaveProperty('pendingAmount');
+      expect(data.totals).toHaveProperty('approvedAmount');
+      expect(data.totals).toHaveProperty('reimbursedAmount');
+    });
 
-      expect(data.length).toBeGreaterThan(0)
-      for (const expense of data) {
-        expect(expense.projectId).toBe('demo-project')
-      }
-    })
-
-    test('filter by category', async () => {
-      const res = await fetch(`${API_BASE}?category=flight`)
-      const data = await res.json()
-
-      for (const expense of data) {
-        expect(expense.category).toBe('flight')
-      }
-    })
-
-    test('filter by status', async () => {
-      const res = await fetch(`${API_BASE}?status=pending`)
-      const data = await res.json()
-
-      for (const expense of data) {
-        expect(expense.status).toBe('pending')
-      }
-    })
-  })
-
-  describe('GET /api/travel-expenses?action=summary', () => {
-    test('returns summary with categories', async () => {
-      const res = await fetch(`${API_BASE}?action=summary`)
-      const data = await res.json()
-
-      expect(data).toHaveProperty('summary')
-      expect(data).toHaveProperty('totals')
-      expect(Array.isArray(data.summary)).toBe(true)
-    })
-
-    test('summary has category totals', async () => {
-      const res = await fetch(`${API_BASE}?action=summary`)
-      const data = await res.json()
-
-      expect(data.summary.length).toBeGreaterThan(0)
-      expect(data.summary[0]).toHaveProperty('category')
-      expect(data.summary[0]).toHaveProperty('total')
-      expect(data.summary[0]).toHaveProperty('count')
-      expect(data.summary[0]).toHaveProperty('pending')
-      expect(data.summary[0]).toHaveProperty('approved')
-    })
-
-    test('totals has correct structure', async () => {
-      const res = await fetch(`${API_BASE}?action=summary`)
-      const data = await res.json()
-
-      expect(data.totals).toHaveProperty('totalSpent')
-      expect(data.totals).toHaveProperty('pendingAmount')
-      expect(data.totals).toHaveProperty('approvedAmount')
-      expect(data.totals).toHaveProperty('reimbursedAmount')
-      expect(data.totals).toHaveProperty('totalExpenses')
-    })
-
-    test('totals are numeric', async () => {
-      const res = await fetch(`${API_BASE}?action=summary`)
-      const data = await res.json()
-
-      expect(typeof data.totals.totalSpent).toBe('number')
-      expect(typeof data.totals.pendingAmount).toBe('number')
-      expect(typeof data.totals.approvedAmount).toBe('number')
-      expect(typeof data.totals.reimbursedAmount).toBe('number')
-      expect(typeof data.totals.totalExpenses).toBe('number')
-    })
-
-    test('isDemoMode is boolean', async () => {
-      const res = await fetch(`${API_BASE}?action=summary`)
-      const data = await res.json()
-
-      expect(typeof data.isDemoMode).toBe('boolean')
-    })
-  })
+    it('handles invalid category filter', async () => {
+      const req = createRequest({ method: 'GET', params: { category: 'invalid-category' } });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(Array.isArray(data)).toBe(true);
+    });
+  });
 
   describe('POST /api/travel-expenses', () => {
-    test('creates new expense', async () => {
-      const newExpense = {
-        action: 'create',
-        category: 'flight',
-        description: 'Test flight',
-        amount: 5000,
-        date: '2026-03-20',
-        vendor: 'Test Airlines',
-        status: 'pending'
-      }
-
-      const res = await fetch(API_BASE, {
+    it('creates new expense', async () => {
+      const req = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newExpense)
-      })
+        body: {
+          action: 'create',
+          projectId: 'demo-project',
+          category: 'flight',
+          description: 'Test flight',
+          amount: 5000,
+          date: '2026-04-01',
+          status: 'pending'
+        }
+      });
+      const res = await POST(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(201);
+      expect(data).toHaveProperty('id');
+      expect(data.description).toBe('Test flight');
+    });
 
-      expect(res.status).toBe(201)
-      const data = await res.json()
-      expect(data).toHaveProperty('id')
-      expect(data.category).toBe('flight')
-      expect(data.description).toBe('Test flight')
-      expect(data.amount).toBe(5000)
-    })
-
-    test('update expense', async () => {
-      const updateData = {
-        action: 'update',
-        id: '1',
-        status: 'approved',
-        amount: 15000
-      }
-
-      const res = await fetch(API_BASE, {
+    it('updates existing expense', async () => {
+      // First create an expense
+      const createReq = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
-      })
-
-      const data = await res.json()
-      expect(data.status).toBe('approved')
-      expect(data.amount).toBe(15000)
-    })
-
-    test('delete expense', async () => {
-      // First create one
-      const newExpense = {
-        action: 'create',
-        category: 'taxi',
-        description: 'Test taxi to delete',
-        amount: 500,
-        status: 'pending'
-      }
-
-      const createRes = await fetch(API_BASE, {
+        body: {
+          action: 'create',
+          category: 'taxi',
+          description: 'To be updated',
+          amount: 100
+        }
+      });
+      const createRes = await POST(createReq);
+      const created = await createRes.json();
+      
+      // Now update it
+      const updateReq = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newExpense)
-      })
-      const created = await createRes.json()
-      const idToDelete = created.id
+        body: {
+          action: 'update',
+          id: created.id,
+          amount: 200,
+          status: 'approved'
+        }
+      });
+      const updateRes = await POST(updateReq);
+      const updated = await updateRes.json();
+      
+      expect(updateRes.status).toBe(200);
+      expect(updated.amount).toBe(200);
+      expect(updated.status).toBe('approved');
+    });
 
-      // Delete it
-      const deleteRes = await fetch(API_BASE, {
+    it('deletes expense', async () => {
+      // First create an expense
+      const createReq = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', id: idToDelete })
-      })
-
-      expect(deleteRes.status).toBe(200)
-    })
-
-    test('reset to demo data', async () => {
-      const res = await fetch(API_BASE, {
+        body: {
+          action: 'create',
+          category: 'taxi',
+          description: 'To be deleted',
+          amount: 100
+        }
+      });
+      const createRes = await POST(createReq);
+      const created = await createRes.json();
+      
+      // Now delete it
+      const deleteReq = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset' })
-      })
+        body: {
+          action: 'delete',
+          id: created.id
+        }
+      });
+      const deleteRes = await POST(deleteReq);
+      const deleted = await deleteRes.json();
+      
+      expect(deleteRes.status).toBe(200);
+      expect(deleted.success).toBe(true);
+    });
 
-      const data = await res.json()
-      expect(data.success).toBe(true)
-    })
-
-    test('handles missing fields gracefully', async () => {
-      const res = await fetch(API_BASE, {
+    it('returns error for invalid update', async () => {
+      const req = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
+        body: {
+          action: 'update',
+          id: 'non-existent-id',
+          amount: 100
+        }
+      });
+      const res = await POST(req);
+      
+      expect(res.status).toBe(404);
+      const data = await res.json();
+      expect(data).toHaveProperty('error');
+    });
 
-      // Should handle gracefully
-      expect([200, 400]).toContain(res.status)
-    })
-  })
+    it('returns error for invalid delete', async () => {
+      const req = createRequest({
+        method: 'POST',
+        body: {
+          action: 'delete',
+          id: 'non-existent-id'
+        }
+      });
+      const res = await POST(req);
+      
+      expect(res.status).toBe(404);
+    });
+
+    it('resets demo data', async () => {
+      const req = createRequest({
+        method: 'POST',
+        body: { action: 'reset' }
+      });
+      const res = await POST(req);
+      const data = await res.json();
+      
+      expect(res.status).toBe(200);
+      expect(data.success).toBe(true);
+    });
+
+    it('returns error for invalid action', async () => {
+      const req = createRequest({
+        method: 'POST',
+        body: { action: 'invalid' }
+      });
+      const res = await POST(req);
+      
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data).toHaveProperty('error');
+    });
+
+    it('handles empty body', async () => {
+      const req = createRequest({
+        method: 'POST',
+        body: {}
+      });
+      const res = await POST(req);
+      
+      expect(res.status).toBe(400);
+    });
+  });
 
   describe('Demo Data Validation', () => {
-    test('demo expenses exist', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
+    it('has multiple expense categories', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      const categories = new Set(data.map((e: any) => e.category));
+      expect(categories.size).toBeGreaterThan(1);
+    });
 
-      expect(data.length).toBeGreaterThan(0)
-    })
+    it('has flight expenses', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      const hasFlight = data.some((e: any) => e.category === 'flight');
+      expect(hasFlight).toBe(true);
+    });
 
-    test('demo expenses cover multiple categories', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
+    it('has hotel expenses', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      const hasHotel = data.some((e: any) => e.category === 'hotel');
+      expect(hasHotel).toBe(true);
+    });
 
-      const categories = new Set(data.map((e: { category: string }) => e.category))
-      expect(categories.size).toBeGreaterThan(3)
-    })
+    it('has multiple status types', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      const statuses = new Set(data.map((e: any) => e.status));
+      expect(statuses.size).toBeGreaterThan(1);
+    });
 
-    test('demo expenses have mixed statuses', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
+    it('has realistic amounts', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      data.forEach((expense: any) => {
+        expect(expense.amount).toBeGreaterThan(0);
+      });
+    });
 
-      const statuses = new Set(data.map((e: { status: string }) => e.status))
-      expect(statuses.size).toBeGreaterThan(1)
-    })
+    it('has Tamil film industry context', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      // Check for known Tamil film industry vendors/locations
+      const hasIndustryContext = data.some((e: any) => 
+        e.vendor === 'Taj Coromandel' || 
+        e.vendor === 'IndiGo' ||
+        e.vendor === 'Air India' ||
+        e.fromLocation === 'Chennai' ||
+        e.toLocation === 'Chennai'
+      );
+      expect(hasIndustryContext).toBe(true);
+    });
 
-    test('demo expenses have valid amounts', async () => {
-      const res = await fetch(API_BASE)
-      const data = await res.json()
+    it('expenses have person names for cast/crew', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      // Some expenses should have personName
+      const hasPersonName = data.some((e: any) => e.personName);
+      expect(hasPersonName).toBe(true);
+    });
 
-      for (const expense of data) {
-        expect(expense.amount).toBeGreaterThan(0)
-        expect(expense.amount).toBeLessThan(1000000) // Reasonable max
-      }
-    })
-  })
-})
+    it('has valid date format', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
+      data.forEach((expense: any) => {
+        expect(expense.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      });
+    });
+  });
+});

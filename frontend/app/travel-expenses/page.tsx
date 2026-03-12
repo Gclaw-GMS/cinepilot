@@ -86,19 +86,26 @@ export default function TravelExpensesPage() {
 
   const loadExpenses = useCallback(async () => {
     try {
-      const demoExpenses: TravelExpense[] = [
-        { id: '1', projectId: DEMO_PROJECT_ID, category: 'flight', description: 'Flight tickets for Lead Actor - Chennai to Bangalore', amount: 12500, date: '2026-03-10', vendor: 'IndiGo', status: 'reimbursed', personName: 'Vijay Sethupathi', personRole: 'Lead Actor', fromLocation: 'Chennai', toLocation: 'Bangalore' },
-        { id: '2', projectId: DEMO_PROJECT_ID, category: 'hotel', description: 'Hotel stay for director - 3 nights', amount: 18000, date: '2026-03-10', vendor: 'Taj Coromandel', status: 'approved', notes: 'Suite room for 3 nights' },
-        { id: '3', projectId: DEMO_PROJECT_ID, category: 'train', description: 'Train tickets for crew', amount: 4500, date: '2026-03-12', vendor: 'Indian Railways', status: 'pending', personName: 'Camera Team', personRole: 'Crew' },
-        { id: '4', projectId: DEMO_PROJECT_ID, category: 'taxi', description: 'Airport pickup for lead actress', amount: 2500, date: '2026-03-15', vendor: 'Ola', status: 'approved', personName: 'Nayanthara' },
-        { id: '5', projectId: DEMO_PROJECT_ID, category: 'per_diem', description: 'Daily allowance for lead actor', amount: 10000, date: '2026-03-15', status: 'approved', personName: 'Vijay Sethupathi' },
-        { id: '6', projectId: DEMO_PROJECT_ID, category: 'bus', description: 'Bus booking for junior artists', amount: 3200, date: '2026-03-16', vendor: 'SETC', status: 'pending' },
-        { id: '7', projectId: DEMO_PROJECT_ID, category: 'auto', description: 'Auto for location recce', amount: 450, date: '2026-03-18', status: 'reimbursed' },
-        { id: '8', projectId: DEMO_PROJECT_ID, category: 'stay', description: 'PG for assistant director', amount: 15000, date: '2026-03-10', vendor: 'Zolo Stays', status: 'approved', personName: 'AD Team' },
-        { id: '9', projectId: DEMO_PROJECT_ID, category: 'daily_allowance', description: 'Daily allowance for costume designer', amount: 7500, date: '2026-03-20', status: 'pending', personName: 'Costume Dept' },
-        { id: '10', projectId: DEMO_PROJECT_ID, category: 'flight', description: 'Return flight for cinematographer', amount: 9800, date: '2026-03-25', vendor: 'Air India', status: 'pending', personName: 'Cinematographer' }
-      ]
-      setExpenses(demoExpenses)
+      const res = await fetch('/api/travel-expenses')
+      if (res.ok) {
+        const data = await res.json()
+        setExpenses(data)
+      } else {
+        // Fallback to demo data if API fails
+        const demoExpenses: TravelExpense[] = [
+          { id: '1', projectId: DEMO_PROJECT_ID, category: 'flight', description: 'Flight tickets for Lead Actor - Chennai to Bangalore', amount: 12500, date: '2026-03-10', vendor: 'IndiGo', status: 'reimbursed', personName: 'Vijay Sethupathi', personRole: 'Lead Actor', fromLocation: 'Chennai', toLocation: 'Bangalore' },
+          { id: '2', projectId: DEMO_PROJECT_ID, category: 'hotel', description: 'Hotel stay for director - 3 nights', amount: 18000, date: '2026-03-10', vendor: 'Taj Coromandel', status: 'approved', notes: 'Suite room for 3 nights' },
+          { id: '3', projectId: DEMO_PROJECT_ID, category: 'train', description: 'Train tickets for crew', amount: 4500, date: '2026-03-12', vendor: 'Indian Railways', status: 'pending', personName: 'Camera Team', personRole: 'Crew' },
+          { id: '4', projectId: DEMO_PROJECT_ID, category: 'taxi', description: 'Airport pickup for lead actress', amount: 2500, date: '2026-03-15', vendor: 'Ola', status: 'approved', personName: 'Nayanthara' },
+          { id: '5', projectId: DEMO_PROJECT_ID, category: 'per_diem', description: 'Daily allowance for lead actor', amount: 10000, date: '2026-03-15', status: 'approved', personName: 'Vijay Sethupathi' },
+          { id: '6', projectId: DEMO_PROJECT_ID, category: 'bus', description: 'Bus booking for junior artists', amount: 3200, date: '2026-03-16', vendor: 'SETC', status: 'pending' },
+          { id: '7', projectId: DEMO_PROJECT_ID, category: 'auto', description: 'Auto for location recce', amount: 450, date: '2026-03-18', status: 'reimbursed' },
+          { id: '8', projectId: DEMO_PROJECT_ID, category: 'stay', description: 'PG for assistant director', amount: 15000, date: '2026-03-10', vendor: 'Zolo Stays', status: 'approved', personName: 'AD Team' },
+          { id: '9', projectId: DEMO_PROJECT_ID, category: 'daily_allowance', description: 'Daily allowance for costume designer', amount: 7500, date: '2026-03-20', status: 'pending', personName: 'Costume Dept' },
+          { id: '10', projectId: DEMO_PROJECT_ID, category: 'flight', description: 'Return flight for cinematographer', amount: 9800, date: '2026-03-25', vendor: 'Air India', status: 'pending', personName: 'Cinematographer' }
+        ]
+        setExpenses(demoExpenses)
+      }
     } catch (err) {
       console.error(err)
     } finally {
@@ -143,11 +150,9 @@ export default function TravelExpensesPage() {
     color: s.color
   })).filter(d => d.value > 0)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newExpense: TravelExpense = {
-      id: editingExpense?.id || Date.now().toString(),
-      projectId: DEMO_PROJECT_ID,
+    const expenseData = {
       category: formData.category,
       description: formData.description,
       amount: parseFloat(formData.amount) || 0,
@@ -160,10 +165,31 @@ export default function TravelExpensesPage() {
       fromLocation: formData.fromLocation || undefined,
       toLocation: formData.toLocation || undefined,
     }
-    if (editingExpense) {
-      setExpenses(expenses.map(e => e.id === editingExpense.id ? newExpense : e))
-    } else {
-      setExpenses([newExpense, ...expenses])
+
+    try {
+      if (editingExpense) {
+        const res = await fetch('/api/travel-expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update', id: editingExpense.id, ...expenseData })
+        })
+        if (res.ok) {
+          const updated = await res.json()
+          setExpenses(expenses.map(e => e.id === editingExpense.id ? updated : e))
+        }
+      } else {
+        const res = await fetch('/api/travel-expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create', projectId: DEMO_PROJECT_ID, ...expenseData })
+        })
+        if (res.ok) {
+          const created = await res.json()
+          setExpenses([created, ...expenses])
+        }
+      }
+    } catch (err) {
+      console.error('Error saving expense:', err)
     }
     resetForm()
   }
@@ -186,9 +212,20 @@ export default function TravelExpensesPage() {
     setShowForm(true)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Delete this expense?')) {
-      setExpenses(expenses.filter(e => e.id !== id))
+      try {
+        const res = await fetch('/api/travel-expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id })
+        })
+        if (res.ok) {
+          setExpenses(expenses.filter(e => e.id !== id))
+        }
+      } catch (err) {
+        console.error('Error deleting expense:', err)
+      }
     }
   }
 

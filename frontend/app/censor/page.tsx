@@ -168,6 +168,7 @@ export default function CensorPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   
@@ -175,6 +176,7 @@ export default function CensorPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
   // Keyboard shortcuts
@@ -201,6 +203,12 @@ export default function CensorPage() {
         case 'e':
           e.preventDefault()
           setShowExportDropdown(!showExportDropdown)
+          break
+        case 'p':
+          e.preventDefault()
+          if (analysis) {
+            handlePrint()
+          }
           break
         case '?':
           e.preventDefault()
@@ -230,6 +238,9 @@ export default function CensorPage() {
       }
       if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
         setShowFilters(false)
+      }
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -350,6 +361,128 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
         a.click()
       }
     }
+  }
+
+  // Print functionality
+  const handlePrint = () => {
+    if (!analysis) return
+
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+
+    const certInfo = CERTIFICATE_INFO[analysis.predictedCertificate.replace(/\d+/g, '').trim()] || CERTIFICATE_INFO['UA']
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Censor Analysis Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 24px; color: #0f172a; }
+    .header .timestamp { font-size: 12px; color: #64748b; }
+    .certificate { text-align: center; padding: 30px; background: #f0f9ff; border-radius: 12px; margin-bottom: 30px; }
+    .certificate .cert { font-size: 48px; font-weight: bold; color: #0891b2; }
+    .certificate .label { font-size: 18px; color: #0e7490; margin-top: 5px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat { background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #06b6d4; }
+    .section { margin-bottom: 30px; }
+    .section h3 { font-size: 16px; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .severity-high { color: #dc2626; font-weight: bold; }
+    .severity-medium { color: #d97706; font-weight: bold; }
+    .severity-low { color: #16a34a; font-weight: bold; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .badge-high { background: #fef2f2; color: #dc2626; }
+    .badge-medium { background: #fffbeb; color: #d97706; }
+    .badge-low { background: #f0fdf4; color: #16a34a; }
+    .suggestion { background: #fefce8; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+    .suggestion h4 { color: #92400e; margin-bottom: 5px; }
+    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #64748b; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎬 CinePilot - Censor Analysis Report</h1>
+    <div class="timestamp">Generated: ${timestamp}</div>
+  </div>
+  <div class="certificate">
+    <div class="cert">${analysis.predictedCertificate}</div>
+    <div class="label">${certInfo.label}</div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">${Math.round(analysis.deterministicScore * 100)}%</div>
+      <div class="stat-label">Sensitivity Score</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${analysis._count?.sceneFlags || 0}</div>
+      <div class="stat-label">Risk Flags</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${analysis._count?.suggestions || 0}</div>
+      <div class="stat-label">Suggestions</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">${analysis.confidence}</div>
+      <div class="stat-label">Confidence</div>
+    </div>
+  </div>
+  <div class="section">
+    <h3>🚨 Risk Flags (${analysis.sceneFlags?.length || 0})</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Scene</th>
+          <th>Category</th>
+          <th>Severity</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(analysis.sceneFlags || []).map(f => `
+          <tr>
+            <td>${f.scene.sceneNumber}</td>
+            <td>${f.category}</td>
+            <td><span class="badge badge-${f.severity >= 6 ? 'high' : f.severity >= 4 ? 'medium' : 'low'}">${f.severity}/10</span></td>
+            <td>${f.context}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="section">
+    <h3>💡 Suggestions (${analysis.suggestions?.length || 0})</h3>
+    ${(analysis.suggestions || []).map(s => `
+      <div class="suggestion">
+        <h4>Scene ${s.sceneNumber}: ${s.issue}</h4>
+        <p><strong>Suggested Change:</strong> ${s.suggestedChange}</p>
+        <p><strong>Reason:</strong> ${s.why}</p>
+      </div>
+    `).join('')}
+  </div>
+  <div class="footer">
+    CinePilot - Film Production Management System | Generated by CinePilot AI
+  </div>
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
+    if (!printWindow) return
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    setShowPrintMenu(false)
   }
 
   const certInfo = analysis?.predictedCertificate 
@@ -568,6 +701,30 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                     <div className="text-sm text-white">PDF</div>
                     <div className="text-xs text-gray-500">Print-ready report</div>
                   </div>
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Print Button */}
+          <div className="relative" ref={printMenuRef}>
+            <button
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              disabled={!analysis}
+              className="flex items-center gap-2 px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg text-sm font-medium border border-amber-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Print (P)"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Report
                 </button>
               </div>
             )}
@@ -924,6 +1081,10 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Print report</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Show shortcuts</span>

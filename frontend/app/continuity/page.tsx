@@ -91,6 +91,7 @@ export default function ContinuityPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [severityFilter, setSeverityFilter] = useState('all');
   const [selectedWarning, setSelectedWarning] = useState<Warning | null>(null);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -100,6 +101,7 @@ export default function ContinuityPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
+  const printMenuRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
   
   // Historical and breakdown data
@@ -272,6 +274,12 @@ export default function ContinuityPage() {
           e.preventDefault();
           setShowExportMenu(!showExportMenu);
           break;
+        case 'p':
+          e.preventDefault();
+          if (warnings.length > 0) {
+            printContinuityReport();
+          }
+          break;
         case 'f':
           e.preventDefault();
           setShowFilters(!showFilters);
@@ -285,6 +293,7 @@ export default function ContinuityPage() {
           setShowKeyboardHelp(false);
           setShowExportMenu(false);
           setShowFilters(false);
+          setShowPrintMenu(false);
           setFilter('');
           break;
       }
@@ -292,7 +301,7 @@ export default function ContinuityPage() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [showExportMenu, showFilters, showPrintMenu, warnings.length]);
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -303,10 +312,13 @@ export default function ContinuityPage() {
       if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
         setShowFilters(false)
       }
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showFilters])
+  }, [showExportMenu, showFilters, showPrintMenu])
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -420,6 +432,155 @@ export default function ContinuityPage() {
     setShowExportMenu(false);
   };
 
+  // Print function for Continuity Report
+  const printContinuityReport = () => {
+    if (warnings.length === 0) return
+
+    const getSeverityColor = (severity: string) => {
+      const colors: Record<string, string> = {
+        critical: '#ef4444',
+        high: '#f97316',
+        medium: '#f59e0b',
+        low: '#64748b',
+      }
+      return colors[severity] || '#64748b'
+    }
+
+    const getTypeLabel = (type: string) => {
+      const labels: Record<string, string> = {
+        continuity: 'Continuity',
+        plot_hole: 'Plot Hole',
+        character: 'Character',
+        timeline: 'Timeline',
+        dialogue: 'Dialogue',
+      }
+      return labels[type] || type
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Continuity Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1e293b; }
+    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
+    .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 8px; }
+    .title { font-size: 24px; font-weight: bold; }
+    .subtitle { font-size: 14px; color: #64748b; }
+    .timestamp { font-size: 12px; color: #94a3b8; margin-left: auto; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #1e293b; }
+    .stat-value.critical { color: #ef4444; }
+    .stat-value.high { color: #f97316; }
+    .stat-value.medium { color: #f59e0b; }
+    .stat-value.low { color: #64748b; }
+    .health-score { font-size: 36px; font-weight: bold; color: #10b981; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .severity-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; }
+    .severity-critical { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+    .severity-high { background: #fff7ed; color: #f97316; border: 1px solid #fed7aa; }
+    .severity-medium { background: #fffbeb; color: #f59e0b; border: 1px solid #fde68a; }
+    .severity-low { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+    .type-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: #e0e7ff; color: #4338ca; }
+    .scene-num { font-weight: bold; color: #6366f1; }
+    .description { max-width: 300px; }
+    .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo"></div>
+    <div>
+      <div class="title">CinePilot Continuity Report</div>
+      <div class="subtitle">Script Continuity Analysis & Issue Tracking</div>
+    </div>
+    <div class="timestamp">Generated: ${new Date().toLocaleString()}</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Total Issues</div>
+      <div class="stat-value">${stats.total}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Health Score</div>
+      <div class="health-score">${stats.healthScore}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Critical</div>
+      <div class="stat-value critical">${stats.criticalCount}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">High</div>
+      <div class="stat-value high">${stats.highCount}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Continuity</div>
+      <div class="stat-value">${stats.byType.continuity}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Plot Holes</div>
+      <div class="stat-value">${stats.byType.plot_hole}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Character</div>
+      <div class="stat-value">${stats.byType.character}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Timeline</div>
+      <div class="stat-value">${stats.byType.timeline}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Scene</th>
+        <th>Type</th>
+        <th>Severity</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filteredWarnings.slice(0, 50).map(w => `
+        <tr>
+          <td class="scene-num">${w.scene.sceneNumber}</td>
+          <td><span class="type-badge">${getTypeLabel(w.warningType)}</span></td>
+          <td><span class="severity-badge severity-${w.severity}">${w.severity}</span></td>
+          <td class="description">${w.description}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  ${filteredWarnings.length > 50 ? `<p style="text-align: center; color: #64748b; font-size: 12px;">... and ${filteredWarnings.length - 50} more issues</p>` : ''}
+
+  <div class="footer">
+    CinePilot - Film Production Management System
+  </div>
+
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(html)
+      printWindow.document.close()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -529,6 +690,33 @@ export default function ContinuityPage() {
                       Clear Filters
                     </button>
                   </div>
+                </div>
+              )}
+            </div>
+            {/* Print Button */}
+            <div className="relative" ref={printMenuRef}>
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                disabled={!warnings.length}
+                className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:bg-slate-800 rounded-lg text-sm text-white transition-colors"
+                title="Print Report (P)"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+              {showPrintMenu && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => { printContinuityReport(); setShowPrintMenu(false) }}
+                    disabled={!warnings.length}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left disabled:opacity-50"
+                  >
+                    <Printer className="w-4 h-4 text-amber-400" />
+                    <div>
+                      <div className="text-sm text-white">Print Report</div>
+                      <div className="text-xs text-slate-500">Full analysis with stats</div>
+                    </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -1133,6 +1321,7 @@ export default function ContinuityPage() {
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters panel' },
                 { key: 'E', description: 'Toggle export dropdown' },
+                { key: 'P', description: 'Print continuity report' },
                 { key: '1', description: 'Switch to Overview tab' },
                 { key: '2', description: 'Switch to Breakdown tab' },
                 { key: '3', description: 'Switch to Trends tab' },

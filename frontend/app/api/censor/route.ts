@@ -197,6 +197,72 @@ function generateSuggestions(results: Record<string, ScanResult>, targetCert: st
   });
 }
 
+function generateSummary(analysis: any): {
+  overallScore: number;
+  certificate: string;
+  categories: { name: string; score: number; severity: string; count: number }[];
+  recommendations: string[];
+} {
+  // Calculate overall score from deterministic score
+  const overallScore = Math.round((analysis.deterministicScore || 0) * 100);
+  const certificate = analysis.predictedCertificate || 'N/A';
+  
+  // Aggregate categories from scene flags
+  const categoryMap = new Map<string, { count: number; maxSeverity: number }>();
+  
+  if (analysis.sceneFlags) {
+    for (const flag of analysis.sceneFlags) {
+      const existing = categoryMap.get(flag.category) || { count: 0, maxSeverity: 0 };
+      categoryMap.set(flag.category, {
+        count: existing.count + 1,
+        maxSeverity: Math.max(existing.maxSeverity, flag.severity || 0),
+      });
+    }
+  }
+  
+  // Build categories array
+  const categories = Array.from(categoryMap.entries()).map(([name, data]) => ({
+    name,
+    score: Math.round(data.count * 10),
+    severity: data.maxSeverity >= 3 ? 'high' : data.maxSeverity >= 2 ? 'medium' : 'low',
+    count: data.count,
+  }));
+  
+  // Generate recommendations from suggestions
+  const recommendations = analysis.suggestions?.slice(0, 3).map((s: any) => {
+    if (s.issue.includes('violence')) {
+      return `Consider reducing violent content to achieve a lower certificate rating`;
+    }
+    if (s.issue.includes('sexual')) {
+      return `Toning down sexual content may help achieve a lower certificate`;
+    }
+    if (s.issue.includes('profanity')) {
+      return `Reducing explicit language may help achieve a lower certificate`;
+    }
+    return s.suggestedChange || 'Review suggestions for certificate improvement';
+  }) || [];
+  
+  // If no suggestions, provide default recommendations
+  if (recommendations.length === 0) {
+    if (certificate.startsWith('U')) {
+      recommendations.push('Content is suitable for universal audience');
+    } else if (certificate.startsWith('UA')) {
+      recommendations.push('Content is suitable for UA audiences with parental guidance');
+    } else if (certificate === 'A') {
+      recommendations.push('Content is restricted to adults only');
+    } else {
+      recommendations.push('Content requires special certification');
+    }
+  }
+  
+  return {
+    overallScore,
+    certificate,
+    categories,
+    recommendations,
+  };
+}
+
 // GET /api/censor — get latest analysis for dashboard
 // GET /api/censor?stats=true — get stats only
 export async function GET(req: NextRequest) {
@@ -290,6 +356,7 @@ export async function GET(req: NextRequest) {
         creativeRisk: s.creativeRisk,
         expectedCertImpact: s.expectedCertImpact,
       })) || [],
+      summary: generateSummary(analysis),
     } : null;
 
     return NextResponse.json({ analysis: formattedAnalysis });

@@ -1,5 +1,39 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (7:52 AM) - 79 Routes | DOOD API Fix + Jest Config
+
+## Night Build (7:52 AM) - DOOD API Fix + Jest Config (IMPLEMENTED)
+
+### Features Perfected This Build
+- **DOOD API Fix**: Fixed POST handler to correctly return message property in demo mode
+  - **Issue**: Request body was consumed in try block, causing catch block to fail when re-parsing
+  - **Fix**: Parse request body outside try block so action variable is accessible in catch block
+  - **Result**: POST /api/dood with action=generate now correctly returns message in demo mode
+
+- **Jest Config Fix**: Added moduleNameMapper for @ path aliases
+  - **Issue**: Tests using @/app/api/... imports failed with module resolution errors
+  - **Fix**: Added moduleNameMapper to map @/* to <rootDir>/*
+  - **Result**: Direct route import tests now work (health, vfx, etc.)
+
+### Test Results
+```
+Test Suites: 1 passed, 1 total
+Tests:       23 passed, 23 total (DOOD)
+```
+
+### Build Verification
+- **Build**: Clean build with 79 routes ✅
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+
+### DOOD Fix Checklist
+- [x] Feature works 100% (POST /api/dood generate action returns message)
+- [x] API fully connected (works in both DB and demo mode)
+- [x] Error handling complete (invalid actions handled gracefully)
+- [x] Build passes
+
+---
+
 ## Build Status: ✅ PASSING (5:49 AM) - 79 Routes | Locations API Test Suite
 
 ## Night Build (5:49 AM) - Locations API Test Suite (IMPLEMENTED)

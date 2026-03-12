@@ -21,7 +21,8 @@ import {
   Keyboard,
   Download,
   ChevronDown,
-  Filter
+  Filter,
+  Printer
 } from 'lucide-react'
 
 interface Project {
@@ -122,6 +123,8 @@ export default function ProjectsPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const printMenuRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState({
     status: [] as string[],
     language: [] as string[],
@@ -202,6 +205,11 @@ export default function ProjectsPage() {
       e.preventDefault()
       setShowKeyboardHelp(prev => !prev)
     }
+    // P: Toggle print menu
+    else if (e.key.toLowerCase() === 'p') {
+      e.preventDefault()
+      setShowPrintMenu(prev => !prev)
+    }
     // E: Toggle export dropdown
     else if (e.key.toLowerCase() === 'e') {
       e.preventDefault()
@@ -220,11 +228,13 @@ export default function ProjectsPage() {
         setShowExportDropdown(false)
       } else if (showFilters) {
         setShowFilters(false)
+      } else if (showPrintMenu) {
+        setShowPrintMenu(false)
       } else if (search) {
         setSearch('')
       }
     }
-  }, [loadProjects, search, showKeyboardHelp, showExportDropdown, showFilters])
+  }, [loadProjects, search, showKeyboardHelp, showExportDropdown, showFilters, showPrintMenu])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -261,6 +271,119 @@ export default function ProjectsPage() {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showFilters])
+
+  // Click outside to close print menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
+    }
+    if (showPrintMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPrintMenu])
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
+    if (!printWindow) return
+    
+    const timestamp = new Date().toLocaleString('en-GB', { 
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    
+    const statusColors: Record<string, string> = {
+      planning: '#3b82f6',
+      active: '#10b981',
+      production: '#f59e0b',
+      post_production: '#a855f7',
+      completed: '#64748b'
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CinePilot - Projects Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 24px; color: #0f172a; }
+    .header .timestamp { font-size: 12px; color: #64748b; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat { background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #0f172a; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; }
+    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎬 CinePilot - Projects Report</h1>
+    <div class="timestamp">Generated: ${timestamp}</div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Total Projects</div>
+      <div class="stat-value">${filtered.length}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">In Production</div>
+      <div class="stat-value">${filtered.filter(p => p.status === 'production').length}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Planning</div>
+      <div class="stat-value">${filtered.filter(p => p.status === 'planning').length}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total Budget</div>
+      <div class="stat-value">₹${(filtered.reduce((sum, p) => sum + (parseInt(p.budget || '0')), 0) / 10000000).toFixed(1)}Cr</div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Project Name</th>
+        <th>Status</th>
+        <th>Language</th>
+        <th>Genre</th>
+        <th>Budget</th>
+        <th>Start Date</th>
+        <th>End Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filtered.map(p => `
+        <tr>
+          <td><strong>${p.name}</strong>${p.description ? `<br><small style="color:#64748b">${p.description}</small>` : ''}</td>
+          <td><span class="status" style="background:${statusColors[p.status] || '#64748b'}20;color:${statusColors[p.status] || '#64748b'}">${p.status.replace('_', ' ')}</span></td>
+          <td>${p.language || '-'}</td>
+          <td>${p.genre || '-'}</td>
+          <td>${p.budget ? '₹' + (parseInt(p.budget) / 10000000).toFixed(1) + 'Cr' : '-'}</td>
+          <td>${p.startDate || '-'}</td>
+          <td>${p.endDate || '-'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  <div class="footer">
+    CinePilot - Film Production Management System
+  </div>
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`
+    
+    printWindow.document.write(html)
+    printWindow.document.close()
+    setShowPrintMenu(false)
+  }
 
   const handleExport = (format: 'csv' | 'json') => {
     const exportData = filtered
@@ -523,6 +646,7 @@ export default function ProjectsPage() {
               title="Export (E)"
             >
               <Download className="w-4 h-4" />
+              Export
               <ChevronDown className={`w-3 h-3 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
             </button>
             {showExportDropdown && (
@@ -540,6 +664,28 @@ export default function ProjectsPage() {
                 >
                   <Download className="w-4 h-4" />
                   Export JSON
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={printMenuRef}>
+            <button 
+              onClick={() => setShowPrintMenu(!showPrintMenu)}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+              title="Print (P)"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            {showPrintMenu && (
+              <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                <button
+                  onClick={handlePrint}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Report
                 </button>
               </div>
             )}
@@ -983,10 +1129,11 @@ export default function ProjectsPage() {
                 { key: 'R', description: 'Refresh projects' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters' },
+                { key: 'P', description: 'Print projects report' },
                 { key: 'N', description: 'Create new project' },
                 { key: 'E', description: 'Export projects' },
                 { key: '?', description: 'Show this help' },
-                { key: 'Esc', description: 'Close modal / Clear search / Close filters' },
+                { key: 'Esc', description: 'Close modal / Clear search / Close filters / Close print menu' },
               ].map(({ key, description }) => (
                 <div 
                   key={key}

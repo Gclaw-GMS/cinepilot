@@ -5,7 +5,7 @@ import {
   Plane, Train, Bus, Car, Building, Wallet, Plus, Edit2, Trash2,
   DollarSign, Calendar, MapPin, Search, X, HelpCircle,
   Clock, CreditCard, Receipt, Filter, BarChart3, PieChart as PieChartIcon,
-  Loader2
+  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -60,7 +60,11 @@ interface CategorySummary {
 export default function TravelExpensesPage() {
   const [expenses, setExpenses] = useState<TravelExpense[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [editingExpense, setEditingExpense] = useState<TravelExpense | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -69,6 +73,8 @@ export default function TravelExpensesPage() {
   
   const searchInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLDivElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   const [formData, setFormData] = useState({
     category: 'flight',
@@ -113,7 +119,27 @@ export default function TravelExpensesPage() {
     }
   }, [])
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadExpenses()
+    setRefreshing(false)
+  }, [loadExpenses])
+
   useEffect(() => { loadExpenses() }, [loadExpenses])
+
+  // Click outside handlers for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false)
+      }
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const filteredExpenses = expenses.filter(e => {
     const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter
@@ -247,15 +273,137 @@ export default function TravelExpensesPage() {
     setShowForm(false)
   }
 
+  // Export functions
+  const handleExportCSV = () => {
+    const headers = ['Category', 'Description', 'Person', 'Role', 'Date', 'Vendor', 'From', 'To', 'Amount', 'Status', 'Notes']
+    const rows = filteredExpenses.map(e => [
+      EXPENSE_CATEGORIES.find(c => c.key === e.category)?.label || e.category,
+      e.description,
+      e.personName || '',
+      e.personRole || '',
+      e.date,
+      e.vendor || '',
+      e.fromLocation || '',
+      e.toLocation || '',
+      e.amount.toString(),
+      STATUS_OPTIONS.find(s => s.key === e.status)?.label || e.status,
+      e.notes || ''
+    ])
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJSON = () => {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      summary: {
+        totalExpenses: expenses.length,
+        totalAmount: totalExpenses,
+        pendingAmount: pendingExpenses,
+        approvedAmount: approvedExpenses,
+        reimbursedAmount: reimbursedExpenses,
+        categories: EXPENSE_CATEGORIES.map(cat => ({
+          name: cat.label,
+          count: expenses.filter(e => e.category === cat.key).length,
+          total: expenses.filter(e => e.category === cat.key).reduce((sum, e) => sum + e.amount, 0)
+        })),
+        statuses: STATUS_OPTIONS.map(s => ({
+          name: s.label,
+          count: expenses.filter(e => e.status === s.key).length,
+          total: expenses.filter(e => e.status === s.key).reduce((sum, e) => sum + e.amount, 0)
+        }))
+      },
+      filters: { search: searchQuery, category: categoryFilter, status: statusFilter },
+      expenses: filteredExpenses
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Print function
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    const categoryColors: Record<string, string> = {}
+    EXPENSE_CATEGORIES.forEach(cat => { categoryColors[cat.key] = cat.color })
+    const statusColors: Record<string, string> = {}
+    STATUS_OPTIONS.forEach(s => { statusColors[s.key] = s.color })
+
+    const html = `<!DOCTYPE html>
+<html><head><title>Travel Expenses Report - CinePilot</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:40px;color:#1e293b}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #6366f1}
+.header h1{font-size:28px;color:#6366f1}.header .date{color:#64748b;font-size:14px}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:30px}
+.summary-card{background:#f8fafc;padding:20px;border-radius:10px;border-left:4px solid #6366f1}
+.summary-card .label{font-size:12px;color:#64748b;text-transform:uppercase}
+.summary-card .value{font-size:24px;font-weight:bold;color:#1e293b}
+.summary-card.pending{border-left-color:#f59e0b}.summary-card.approved{border-left-color:#10b981}
+.summary-card.reimbursed{border-left-color:#3b82f6}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th{background:#6366f1;color:white;padding:12px;text-align:left;font-size:12px}
+td{padding:12px;border-bottom:1px solid #e2e8f0;font-size:13px}
+tr:nth-child(even){background:#f8fafc}
+.category-badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.status-badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.amount{font-weight:600;text-align:right}
+.footer{margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:center;color:#64748b;font-size:12px}
+@media print{body{padding:20px}}
+</style></head>
+<body>
+<div class="header"><h1>Travel Expenses Report</h1><div class="date">Generated: ${new Date().toLocaleString()}</div></div>
+<div class="summary">
+<div class="summary-card"><div class="label">Total</div><div class="value">${formatCurrency(totalExpenses)}</div></div>
+<div class="summary-card pending"><div class="label">Pending</div><div class="value">${formatCurrency(pendingExpenses)}</div></div>
+<div class="summary-card approved"><div class="label">Approved</div><div class="value">${formatCurrency(approvedExpenses)}</div></div>
+<div class="summary-card reimbursed"><div class="label">Reimbursed</div><div class="value">${formatCurrency(reimbursedExpenses)}</div></div>
+</div>
+<table><thead><tr><th>#</th><th>Category</th><th>Description</th><th>Person</th><th>Date</th><th>Vendor</th><th>Route</th><th>Amount</th><th>Status</th></tr></thead>
+<tbody>
+${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category-badge" style="background:${categoryColors[e.category]}20;color:${categoryColors[e.category]}">${EXPENSE_CATEGORIES.find(c => c.key === e.category)?.label}</span></td><td>${e.description}</td><td>${e.personName || '-'}</td><td>${new Date(e.date).toLocaleDateString('en-IN')}</td><td>${e.vendor || '-'}</td><td>${e.fromLocation && e.toLocation ? e.fromLocation + ' → ' + e.toLocation : '-'}</td><td class="amount">${formatCurrency(e.amount)}</td><td><span class="status-badge" style="background:${statusColors[e.status]}20;color:${statusColors[e.status]}">${STATUS_OPTIONS.find(s => s.key === e.status)?.label}</span></td></tr>`).join('')}
+</tbody></table>
+<div class="footer">CinePilot - AI Pre-Production Platform | Travel Expenses Report</div>
+<script>window.onload=function(){window.print()}</script></body></html>`
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    setShowPrintMenu(false)
+  }
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { if (showForm) resetForm() }
+      if (e.key === 'Escape') { 
+        if (showForm) resetForm()
+        else if (showExportMenu) setShowExportMenu(false)
+        else if (showPrintMenu) setShowPrintMenu(false)
+        else if (showHelp) setShowHelp(false)
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') { e.preventDefault(); searchInputRef.current?.focus() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); setShowForm(true) }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); setShowExportMenu(!showExportMenu) }
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) { setShowHelp(true) }
+      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        handleRefresh()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm])
+  }, [showForm, showExportMenu, showPrintMenu, showHelp])
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
   const getCategoryInfo = (category: string) => EXPENSE_CATEGORIES.find(c => c.key === category) || { key: category, label: category, icon: DollarSign, color: '#6b7280' }
@@ -284,10 +432,78 @@ export default function TravelExpensesPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Refresh Button */}
+              <button 
+                onClick={handleRefresh} 
+                disabled={refreshing}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition disabled:opacity-50"
+                title="Refresh (R)"
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Export Dropdown */}
+              <div className="relative" ref={exportMenuRef}>
+                <button 
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition"
+                  disabled={expenses.length === 0}
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button onClick={handleExportCSV} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition text-left">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                      <div><div className="text-sm font-medium">Export CSV</div><div className="text-xs text-slate-400">Spreadsheet format</div></div>
+                    </button>
+                    <button onClick={handleExportJSON} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition text-left">
+                      <FileJson className="w-4 h-4 text-amber-500" />
+                      <div><div className="text-sm font-medium">Export JSON</div><div className="text-xs text-slate-400">Full data export</div></div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Print Dropdown */}
+              <div className="relative" ref={printMenuRef}>
+                <button 
+                  onClick={() => setShowPrintMenu(!showPrintMenu)}
+                  className="flex items-center gap-2 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-lg font-medium transition"
+                  disabled={expenses.length === 0}
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <button onClick={handlePrint} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition text-left">
+                      <Printer className="w-4 h-4 text-amber-500" />
+                      <div><div className="text-sm font-medium">Print Report</div><div className="text-xs text-slate-400">Full expenses with summary</div></div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Help Button */}
+              <button 
+                onClick={() => setShowHelp(true)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                title="Keyboard shortcuts (?)"
+              >
+                <HelpCircle className="w-5 h-5" />
+              </button>
+
+              {/* View Mode Toggle */}
               <div className="flex bg-slate-700 rounded-lg p-1">
                 <button onClick={() => setViewMode('dashboard')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'dashboard' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><BarChart3 className="w-4 h-4 inline mr-1" />Dashboard</button>
                 <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'list' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><Receipt className="w-4 h-4 inline mr-1" />List</button>
               </div>
+
+              {/* Add Button */}
               <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-lg font-medium transition"><Plus className="w-4 h-4" />Add Expense</button>
             </div>
           </div>
@@ -437,6 +653,26 @@ export default function TravelExpensesPage() {
           </div>
         )}
       </div>
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowHelp(false)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <h2 className="text-xl font-semibold">Keyboard Shortcuts</h2>
+              <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between"><span className="text-slate-300">Refresh data</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">R</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+F</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Add new expense</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+N</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Export menu</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+E</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Close modal / Clear</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Esc</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Show shortcuts</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">?</kbd></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Form Modal */}
       {showForm && (

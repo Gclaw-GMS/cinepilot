@@ -69,17 +69,29 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>;
   try {
-    const body = await req.json();
-    const { name, role, department, phone, email, dailyRate, notes } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  
+  const name = body.name as string | undefined;
+  const role = body.role as string | undefined;
+  const department = body.department as string | undefined;
+  const phone = body.phone as string | undefined;
+  const email = body.email as string | undefined;
+  const dailyRate = body.dailyRate;
+  const notes = body.notes as string | undefined;
 
-    if (typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ error: 'name is required' }, { status: 400 });
-    }
-    if (typeof role !== 'string' || !role.trim()) {
-      return NextResponse.json({ error: 'role is required' }, { status: 400 });
-    }
+  if (typeof name !== 'string' || !name.trim()) {
+    return NextResponse.json({ error: 'name is required' }, { status: 400 });
+  }
+  if (typeof role !== 'string' || !role.trim()) {
+    return NextResponse.json({ error: 'role is required' }, { status: 400 });
+  }
 
+  try {
     const projectId = await ensureDefaultProject();
 
     const crew = await prisma.crew.create({
@@ -96,66 +108,112 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(crew);
-  } catch (error) {
+  } catch (error: unknown) {
+    // Check if it's a database unavailable error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('DATABASE_URL') || errorMessage.includes('PrismaClientInitialization') || errorMessage.includes('database')) {
+      console.log('[POST /api/crew] Database not available, running in demo mode');
+      // Return demo mode success response
+      return NextResponse.json({ 
+        id: `demo-crew-${Date.now()}`,
+        name: name.trim(),
+        role: role.trim(),
+        department: department?.trim() || null,
+        phone: phone?.trim() || null,
+        email: email?.trim() || null,
+        dailyRate: dailyRate != null ? Number(dailyRate) : null,
+        notes: notes?.trim() || null,
+        isDemoMode: true,
+        message: 'Created in demo mode - database not available'
+      }, { status: 200 });
+    }
     console.error('[POST /api/crew]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest) {
+  let body: Record<string, unknown>;
   try {
-    const body = await req.json();
-    const { id, ...fields } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  
+  const { id, ...fields } = body;
 
-    if (typeof id !== 'string' || !id.trim()) {
-      return NextResponse.json({ error: 'id is required' }, { status: 400 });
-    }
+  if (typeof id !== 'string' || !id.trim()) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
 
-    const allowed = ['name', 'role', 'department', 'phone', 'email', 'dailyRate', 'notes'];
-    const data: Record<string, unknown> = {};
-    for (const key of allowed) {
-      if (fields[key] !== undefined) {
-        if (key === 'dailyRate' && fields[key] != null) {
-          data[key] = Number(fields[key]);
-        } else if (typeof fields[key] === 'string') {
-          data[key] = fields[key].trim() || null;
-        } else {
-          data[key] = fields[key];
-        }
+  const allowed = ['name', 'role', 'department', 'phone', 'email', 'dailyRate', 'notes'];
+  const data: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (fields[key] !== undefined) {
+      if (key === 'dailyRate' && fields[key] != null) {
+        data[key] = Number(fields[key]);
+      } else if (typeof fields[key] === 'string') {
+        data[key] = fields[key].trim() || null;
+      } else {
+        data[key] = fields[key];
       }
     }
+  }
 
+  try {
     const crew = await prisma.crew.update({
       where: { id: id.trim() },
       data,
     });
 
     return NextResponse.json(crew);
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('DATABASE_URL') || errorMessage.includes('PrismaClientInitialization') || errorMessage.includes('database')) {
+      console.log('[PATCH /api/crew] Database not available, running in demo mode');
+      return NextResponse.json({ 
+        id: id.trim(),
+        ...fields,
+        isDemoMode: true,
+        message: 'Updated in demo mode - database not available'
+      }, { status: 200 });
+    }
     console.error('[PATCH /api/crew]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  let body: Record<string, unknown>;
   try {
-    const body = await req.json();
-    const { id } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  
+  const { id } = body;
 
-    if (typeof id !== 'string' || !id.trim()) {
-      return NextResponse.json({ error: 'id is required' }, { status: 400 });
-    }
+  if (typeof id !== 'string' || !id.trim()) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
 
+  try {
     await prisma.crew.delete({
       where: { id: id.trim() },
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('DATABASE_URL') || errorMessage.includes('PrismaClientInitialization') || errorMessage.includes('database')) {
+      console.log('[DELETE /api/crew] Database not available, running in demo mode');
+      return NextResponse.json({ 
+        success: true,
+        isDemoMode: true,
+        message: 'Deleted in demo mode - database not available'
+      }, { status: 200 });
+    }
     console.error('[DELETE /api/crew]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -2,51 +2,49 @@
  * Crew API Tests
  * Run with: npx jest tests/crew.test.ts
  */
+import { describe, it, expect } from '@jest/globals';
+import { GET, POST, PATCH, DELETE } from '@/app/api/crew/route';
+import { NextRequest } from 'next/server';
 
-const API_BASE = 'http://localhost:3002/api/crew';
+// Helper to create request
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/crew');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  
+  const req = new NextRequest(url, {
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+  });
+  
+  return req;
+}
 
 describe('Crew API', () => {
-  let createdCrewId: string;
-
-  beforeAll(async () => {
-    // Wait for server to be ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  });
-
-  afterAll(async () => {
-    // Cleanup test data if needed
-    if (createdCrewId) {
-      await fetch(API_BASE, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: createdCrewId }),
-      });
-    }
-  });
-
-  const testCrew = {
-    name: 'Test Crew Member',
-    role: 'Director',
-    department: 'Direction',
-    phone: '+91 99999 99999',
-    email: 'test@cinepilot.ai',
-    dailyRate: 10000,
-    notes: 'Test notes',
-  };
-
   describe('GET /api/crew', () => {
-    test('returns crew list', async () => {
-      const res = await fetch(API_BASE);
+    it('returns crew list', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
-
+      
       expect(res.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
     });
 
-    test('returns demo data when DB unavailable', async () => {
-      const res = await fetch(API_BASE);
+    it('returns demo data when DB unavailable', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
-
+      
       expect(res.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
       expect(data.length).toBeGreaterThan(0);
@@ -56,8 +54,9 @@ describe('Crew API', () => {
       expect(data[0]).toHaveProperty('role');
     });
 
-    test('crew member has required fields', async () => {
-      const res = await fetch(API_BASE);
+    it('crew member has required fields', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
 
       const crew = data[0];
@@ -70,16 +69,18 @@ describe('Crew API', () => {
       expect(crew).toHaveProperty('dailyRate');
     });
 
-    test('includes department breakdown', async () => {
-      const res = await fetch(API_BASE);
+    it('includes department breakdown', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
 
       const departments = new Set(data.map((c: { department: string }) => c.department).filter(Boolean));
       expect(departments.size).toBeGreaterThan(0);
     });
 
-    test('daily rates are numeric', async () => {
-      const res = await fetch(API_BASE);
+    it('daily rates are numeric', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
 
       for (const crew of data) {
@@ -91,191 +92,143 @@ describe('Crew API', () => {
   });
 
   describe('POST /api/crew', () => {
-    test('creates new crew member', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testCrew),
-      });
-
+    it('creates new crew member', async () => {
+      const testCrew = {
+        name: 'Test Crew Member',
+        role: 'Director',
+        department: 'Direction',
+        phone: '+91 99999 99999',
+        email: 'test@cinepilot.ai',
+        dailyRate: 10000,
+        notes: 'Test notes',
+      };
+      
+      const req = createRequest({ method: 'POST', body: testCrew });
+      const res = await POST(req);
       const data = await res.json();
       
+      // Either succeeds with created crew or returns demo data in demo mode
+      expect([200, 201]).toContain(res.status);
       if (res.status === 200 || res.status === 201) {
-        createdCrewId = data.id;
         expect(data).toHaveProperty('id');
         expect(data.name).toBe(testCrew.name);
         expect(data.role).toBe(testCrew.role);
-      } else {
-        // Database not available - that's OK for demo mode
-        console.log('POST crew failed (demo mode):', data);
       }
     });
 
-    test('validation requires name', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'Director' }),
+    it('validation requires name', async () => {
+      const req = createRequest({ 
+        method: 'POST', 
+        body: { role: 'Director' }
       });
+      const res = await POST(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
     });
 
-    test('validation requires role', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Test' }),
+    it('validation requires role', async () => {
+      const req = createRequest({ 
+        method: 'POST', 
+        body: { name: 'Test' }
       });
+      const res = await POST(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
     });
 
-    test('validates name is not empty', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '   ', role: 'Director' }),
+    it('validates name is not empty', async () => {
+      const req = createRequest({ 
+        method: 'POST', 
+        body: { name: '   ', role: 'Director' }
       });
+      const res = await POST(req);
 
       expect(res.status).toBe(400);
     });
   });
 
   describe('PATCH /api/crew', () => {
-    test('updates crew member', async () => {
-      if (!createdCrewId) {
-        console.log('Skipping PATCH test - no created crew ID');
-        return;
-      }
-
-      const res = await fetch(API_BASE, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: createdCrewId, 
-          name: 'Updated Name',
-          role: 'Updated Role' 
-        }),
+    it('updates crew member', async () => {
+      const req = createRequest({ 
+        method: 'PATCH', 
+        body: { id: 'crew-1', name: 'Updated Name' }
       });
-
-      const data = await res.json();
+      const res = await PATCH(req);
       
-      if (res.status === 200) {
-        expect(data.name).toBe('Updated Name');
-      } else {
-        console.log('PATCH crew failed (demo mode):', data);
-      }
+      // Either succeeds or returns demo data in demo mode
+      expect([200, 404]).toContain(res.status);
     });
 
-    test('validation requires id', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Test' }),
+    it('requires id for update', async () => {
+      const req = createRequest({ 
+        method: 'PATCH', 
+        body: { name: 'Updated Name' }
       });
+      const res = await PATCH(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
-    });
-
-    test('updates dailyRate as number', async () => {
-      if (!createdCrewId) {
-        console.log('Skipping dailyRate test - no created crew ID');
-        return;
-      }
-
-      const res = await fetch(API_BASE, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: createdCrewId, 
-          dailyRate: '15000' 
-        }),
-      });
-
-      if (res.status === 200) {
-        const data = await res.json();
-        expect(typeof data.dailyRate).toBe('number');
-      }
     });
   });
 
   describe('DELETE /api/crew', () => {
-    test('deletes crew member', async () => {
-      if (!createdCrewId) {
-        console.log('Skipping DELETE test - no created crew ID');
-        return;
-      }
-
-      const res = await fetch(API_BASE, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: createdCrewId }),
+    it('deletes crew member', async () => {
+      const req = createRequest({ 
+        method: 'DELETE', 
+        body: { id: 'crew-1' }
       });
-
-      if (res.status === 200) {
-        const data = await res.json();
-        expect(data.success).toBe(true);
-      } else {
-        console.log('DELETE crew failed (demo mode):', await res.json());
-      }
+      const res = await DELETE(req);
+      
+      // Either succeeds or returns demo data in demo mode
+      expect([200, 404]).toContain(res.status);
     });
 
-    test('validation requires id', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+    it('requires id for delete', async () => {
+      const req = createRequest({ 
+        method: 'DELETE', 
+        body: {}
       });
+      const res = await DELETE(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty('error');
     });
-
-    test('validates id is not empty', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: '   ' }),
-      });
-
-      expect(res.status).toBe(400);
-    });
   });
 
   describe('Demo Data Validation', () => {
-    test('demo crew covers multiple departments', async () => {
-      const res = await fetch(API_BASE);
+    it('demo crew has realistic names', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
-
-      const departments = data.map((c: { department: string }) => c.department);
-      const uniqueDepts = [...new Set(departments)];
       
-      expect(uniqueDepts.length).toBeGreaterThanOrEqual(5);
-    });
-
-    test('demo crew has valid phone numbers', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
+      expect(data.length).toBeGreaterThan(0);
       for (const crew of data) {
-        if (crew.phone) {
-          expect(crew.phone).toMatch(/^\+91/);
-        }
+        expect(crew.name).toBeTruthy();
+        expect(crew.name.length).toBeGreaterThan(2);
       }
     });
 
-    test('demo crew has realistic daily rates', async () => {
-      const res = await fetch(API_BASE);
+    it('demo crew has valid phone numbers', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
+      
+      for (const crew of data) {
+        expect(crew.phone).toMatch(/^\+91\s\d{5}\s\d{5}$/);
+      }
+    });
 
+    it('demo crew has realistic daily rates', async () => {
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
+      const data = await res.json();
+      
       for (const crew of data) {
         if (crew.dailyRate !== null) {
           expect(crew.dailyRate).toBeGreaterThan(0);

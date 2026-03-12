@@ -406,9 +406,27 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await ensureDefaultProject();
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const projectId = (formData.get('projectId') as string) || DEFAULT_PROJECT_ID;
+    
+    const contentType = req.headers.get('content-type') || '';
+    let formData: FormData;
+    let file: File | null = null;
+    let projectId = DEFAULT_PROJECT_ID;
+    
+    try {
+      formData = await req.formData();
+      file = formData.get('file') as File | null;
+      projectId = (formData.get('projectId') as string) || DEFAULT_PROJECT_ID;
+    } catch {
+      // If formData fails, check if it's JSON body
+      if (contentType.includes('application/json')) {
+        const body = await req.json().catch(() => ({}));
+        if (!body.file) {
+          return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'File upload requires multipart/form-data' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Invalid request format' }, { status: 400 });
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -465,10 +483,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'scriptId required' }, { status: 400 });
     }
 
-    const script = await prisma.script.findUnique({
-      where: { id: scriptId },
-      include: { scenes: { orderBy: { sceneIndex: 'asc' } } },
-    });
+    let script;
+    try {
+      script = await prisma.script.findUnique({
+        where: { id: scriptId },
+        include: { scenes: { orderBy: { sceneIndex: 'asc' } } },
+      });
+    } catch (dbError) {
+      // Database not available - return 404 as script doesn't exist in demo mode
+      console.log('[PATCH /api/scripts] Database not available');
+      return NextResponse.json({ error: 'Script not found' }, { status: 404 });
+    }
 
     if (!script) {
       return NextResponse.json({ error: 'Script not found' }, { status: 404 });

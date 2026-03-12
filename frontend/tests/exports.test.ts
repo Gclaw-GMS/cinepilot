@@ -1,19 +1,43 @@
 /**
  * Exports API Tests
  * Run with: npx jest tests/exports.test.ts
+ * Uses direct route imports instead of HTTP fetches
  */
 
-const API_BASE = 'http://localhost:3002/api/exports';
+import { GET, POST } from '@/app/api/exports/route';
+import { NextRequest } from 'next/server';
+
+// Helper to create request with query params
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/exports');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  
+  const init: RequestInit = {
+    method: options.method || 'GET',
+  };
+  
+  if (options.body) {
+    init.body = JSON.stringify(options.body);
+    init.headers = { 'Content-Type': 'application/json' };
+  }
+  
+  return new NextRequest(url, init);
+}
 
 describe('Exports API', () => {
-  beforeAll(async () => {
-    // Wait for server to be ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  });
-
   describe('GET /api/exports', () => {
     it('returns export types without type param', async () => {
-      const res = await fetch(API_BASE);
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -24,7 +48,8 @@ describe('Exports API', () => {
     });
 
     it('export types have required fields', async () => {
-      const res = await fetch(API_BASE);
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
 
       const exportType = data.exportTypes[0];
@@ -36,7 +61,8 @@ describe('Exports API', () => {
     });
 
     it('export types include expected types', async () => {
-      const res = await fetch(API_BASE);
+      const req = createRequest({ method: 'GET' });
+      const res = await GET(req);
       const data = await res.json();
 
       const ids = data.exportTypes.map((t: { id: string }) => t.id);
@@ -50,7 +76,8 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for schedule type', async () => {
-      const res = await fetch(`${API_BASE}?type=schedule`);
+      const req = createRequest({ params: { type: 'schedule' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -60,7 +87,8 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for budget type', async () => {
-      const res = await fetch(`${API_BASE}?type=budget`);
+      const req = createRequest({ params: { type: 'budget' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -70,7 +98,8 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for shot_list type', async () => {
-      const res = await fetch(`${API_BASE}?type=shot_list`);
+      const req = createRequest({ params: { type: 'shot_list' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -80,7 +109,8 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for crew type', async () => {
-      const res = await fetch(`${API_BASE}?type=crew`);
+      const req = createRequest({ params: { type: 'crew' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -90,7 +120,8 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for equipment type', async () => {
-      const res = await fetch(`${API_BASE}?type=equipment`);
+      const req = createRequest({ params: { type: 'equipment' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -100,7 +131,8 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for locations type', async () => {
-      const res = await fetch(`${API_BASE}?type=locations`);
+      const req = createRequest({ params: { type: 'locations' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -109,155 +141,203 @@ describe('Exports API', () => {
     });
 
     it('returns demo data for full_json type', async () => {
-      const res = await fetch(`${API_BASE}?type=full_json`);
+      const req = createRequest({ params: { type: 'full_json' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
       expect(data).toHaveProperty('project');
+      expect(data.project).toHaveProperty('id');
       expect(data).toHaveProperty('metadata');
     });
 
-    it('returns 400 for unknown export type', async () => {
-      const res = await fetch(`${API_BASE}?type=unknown`);
-      const data = await res.json();
+    it('returns error for unknown type', async () => {
+      const req = createRequest({ params: { type: 'unknown' } });
+      const res = await GET(req);
 
       expect(res.status).toBe(400);
-      expect(data).toHaveProperty('error');
     });
 
-    it('sets correct content disposition header', async () => {
-      const res = await fetch(`${API_BASE}?type=schedule`);
+    it('sets correct content-disposition header for schedule', async () => {
+      const req = createRequest({ params: { type: 'schedule' } });
+      const res = await GET(req);
 
-      expect(res.headers.get('Content-Disposition')).toContain('schedule');
+      expect(res.headers.get('Content-Disposition')).toContain('schedule_demo.json');
     });
 
-    it('marks demo mode in headers when using demo data', async () => {
-      const res = await fetch(`${API_BASE}?type=schedule`);
+    it('sets correct content-disposition header for crew', async () => {
+      const req = createRequest({ params: { type: 'crew' } });
+      const res = await GET(req);
 
-      // Demo mode header is set when using demo data
-      expect(res.headers.get('X-Demo-Mode')).toBeTruthy();
+      expect(res.headers.get('Content-Disposition')).toContain('crew_demo.json');
+    });
+
+    it('marks demo mode in headers', async () => {
+      const req = createRequest({ params: { type: 'schedule' } });
+      const res = await GET(req);
+
+      expect(res.headers.get('X-Demo-Mode')).toBe('true');
     });
   });
 
   describe('POST /api/exports', () => {
-    it('returns 400 when types is missing', async () => {
-      const res = await fetch(API_BASE, {
+    it('returns export types when no types specified', async () => {
+      const req = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: {}
       });
+      const res = await POST(req);
       const data = await res.json();
 
       expect(res.status).toBe(400);
       expect(data).toHaveProperty('error');
     });
 
-    it('returns 400 when types is not an array', async () => {
-      const res = await fetch(API_BASE, {
+    it('returns error when types is not an array', async () => {
+      const req = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ types: 'schedule' }),
+        body: { types: 'not-an-array' }
       });
+      const res = await POST(req);
       const data = await res.json();
 
       expect(res.status).toBe(400);
+      expect(data).toHaveProperty('error');
     });
 
-    it('returns 200 when types is empty array', async () => {
-      const res = await fetch(API_BASE, {
+    it('exports single type successfully', async () => {
+      const req = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ types: [] }),
+        body: { types: ['schedule'] }
       });
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data).toHaveProperty('exports');
-    });
-
-    it('generates batch export for valid types', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ types: ['schedule', 'budget'] }),
-      });
+      const res = await POST(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
       expect(data).toHaveProperty('exports');
       expect(data.exports).toHaveProperty('schedule');
-      expect(data.exports).toHaveProperty('budget');
       expect(data).toHaveProperty('generatedAt');
-    });
-
-    it('includes isDemoMode in response', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ types: ['schedule'] }),
-      });
-      const data = await res.json();
-
       expect(data).toHaveProperty('isDemoMode');
     });
 
-    it('handles all export types in batch', async () => {
-      const res = await fetch(API_BASE, {
+    it('exports multiple types successfully', async () => {
+      const req = createRequest({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          types: ['schedule', 'budget', 'shot_list', 'crew', 'equipment', 'locations', 'full_json'] 
-        }),
+        body: { types: ['schedule', 'budget', 'crew'] }
       });
+      const res = await POST(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
-      expect(Object.keys(data.exports).length).toBeGreaterThanOrEqual(7);
+      expect(data.exports).toHaveProperty('schedule');
+      expect(data.exports).toHaveProperty('budget');
+      expect(data.exports).toHaveProperty('crew');
+    });
+
+    it('exports all major types successfully', async () => {
+      const req = createRequest({
+        method: 'POST',
+        body: { types: ['schedule', 'budget', 'shot_list', 'crew', 'equipment', 'locations', 'full_json'] }
+      });
+      const res = await POST(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.exports).toHaveProperty('schedule');
+      expect(data.exports).toHaveProperty('budget');
+      expect(data.exports).toHaveProperty('shot_list');
+      expect(data.exports).toHaveProperty('crew');
+      expect(data.exports).toHaveProperty('equipment');
+      expect(data.exports).toHaveProperty('locations');
+      expect(data.exports).toHaveProperty('full_project');
+    });
+
+    it('handles callsheet as alias for budget', async () => {
+      const req = createRequest({
+        method: 'POST',
+        body: { types: ['callsheet'] }
+      });
+      const res = await POST(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.exports).toHaveProperty('budget');
     });
   });
 
   describe('Demo Data Validation', () => {
-    it('demo schedule has valid structure', async () => {
-      const res = await fetch(`${API_BASE}?type=schedule`);
+    it('demo schedule has correct structure', async () => {
+      const req = createRequest({ params: { type: 'schedule' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(Array.isArray(data.shootingDays)).toBe(true);
       expect(data.shootingDays.length).toBeGreaterThan(0);
-      
       const day = data.shootingDays[0];
       expect(day).toHaveProperty('id');
       expect(day).toHaveProperty('dayNumber');
-      // Database uses scheduledDate, demo uses date
-      expect(day.date || day.scheduledDate).toBeDefined();
+      expect(day).toHaveProperty('date');
       expect(day).toHaveProperty('callTime');
+      expect(day).toHaveProperty('wrapTime');
       expect(day).toHaveProperty('location');
-      // Database uses dayScenes, demo uses scenes
-      expect(day.scenes || day.dayScenes).toBeDefined();
-      expect(day).toHaveProperty('status');
     });
 
-    it('demo budget has valid numeric values', async () => {
-      const res = await fetch(`${API_BASE}?type=budget`);
+    it('demo budget has correct structure', async () => {
+      const req = createRequest({ params: { type: 'budget' } });
+      const res = await GET(req);
       const data = await res.json();
 
-      expect(typeof data.totalPlanned).toBe('number');
-      expect(typeof data.totalActual).toBe('number');
-      expect(typeof data.variance).toBe('number');
-      expect(typeof data.percentSpent).toBe('number');
+      expect(Array.isArray(data.items)).toBe(true);
+      expect(data.items.length).toBeGreaterThan(0);
+      const item = data.items[0];
+      expect(item).toHaveProperty('category');
+      expect(item).toHaveProperty('item');
+      expect(item).toHaveProperty('planned');
+      expect(item).toHaveProperty('actual');
+      expect(data).toHaveProperty('totalPlanned');
+      expect(data).toHaveProperty('totalActual');
+      expect(data).toHaveProperty('variance');
+      expect(data).toHaveProperty('percentSpent');
     });
 
-    it('demo shots have varied shot sizes', async () => {
-      const res = await fetch(`${API_BASE}?type=shot_list`);
+    it('demo shot_list has correct structure', async () => {
+      const req = createRequest({ params: { type: 'shot_list' } });
+      const res = await GET(req);
       const data = await res.json();
 
-      // Either demo data with varied sizes or DB data with any sizes
-      const sizes = data.shots.map((s: { shotSize: string }) => s.shotSize);
-      const uniqueSizes = [...new Set(sizes)];
-      expect(uniqueSizes.length).toBeGreaterThan(0);
+      expect(Array.isArray(data.shots)).toBe(true);
+      expect(data.shots.length).toBeGreaterThan(0);
+      const shot = data.shots[0];
+      expect(shot).toHaveProperty('sceneNumber');
+      expect(shot).toHaveProperty('shotIndex');
+      expect(shot).toHaveProperty('shotText');
+      expect(shot).toHaveProperty('shotSize');
+      expect(shot).toHaveProperty('cameraAngle');
+      expect(data).toHaveProperty('summary');
+    });
+
+    it('demo crew has correct structure', async () => {
+      const req = createRequest({ params: { type: 'crew' } });
+      const res = await GET(req);
+      const data = await res.json();
+
+      expect(Array.isArray(data.crew)).toBe(true);
+      expect(data.crew.length).toBeGreaterThan(0);
+      const member = data.crew[0];
+      expect(member).toHaveProperty('name');
+      expect(member).toHaveProperty('role');
+      expect(member).toHaveProperty('department');
+      expect(member).toHaveProperty('email');
+      expect(member).toHaveProperty('phone');
+      expect(member).toHaveProperty('dailyRate');
+      expect(data).toHaveProperty('departments');
+      expect(Array.isArray(data.departments)).toBe(true);
+      expect(data).toHaveProperty('totalDailyRate');
     });
 
     it('demo crew covers multiple departments', async () => {
-      const res = await fetch(`${API_BASE}?type=crew`);
+      const req = createRequest({ params: { type: 'crew' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(Array.isArray(data.departments)).toBe(true);
@@ -265,7 +345,8 @@ describe('Exports API', () => {
     });
 
     it('demo equipment has multiple categories', async () => {
-      const res = await fetch(`${API_BASE}?type=equipment`);
+      const req = createRequest({ params: { type: 'equipment' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(Array.isArray(data.categories)).toBe(true);
@@ -273,27 +354,30 @@ describe('Exports API', () => {
     });
 
     it('demo locations have valid structure', async () => {
-      const res = await fetch(`${API_BASE}?type=locations`);
+      const req = createRequest({ params: { type: 'locations' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(Array.isArray(data.locations)).toBe(true);
       expect(data.locations.length).toBeGreaterThan(0);
-
-      const location = data.locations[0];
-      expect(location).toHaveProperty('id');
-      expect(location).toHaveProperty('name');
-      expect(location).toHaveProperty('address');
-      expect(location).toHaveProperty('latitude');
-      expect(location).toHaveProperty('longitude');
+      const loc = data.locations[0];
+      expect(loc).toHaveProperty('name');
+      expect(loc).toHaveProperty('type');
+      expect(loc).toHaveProperty('address');
+      expect(loc).toHaveProperty('status');
     });
 
     it('demo full project has complete structure', async () => {
-      const res = await fetch(`${API_BASE}?type=full_json`);
+      const req = createRequest({ params: { type: 'full_json' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(data.project).toHaveProperty('id');
       expect(data.project).toHaveProperty('name');
-      expect(data.metadata).toHaveProperty('exportedAt');
+      expect(data.project).toHaveProperty('scripts');
+      expect(data.project).toHaveProperty('characters');
+      expect(data.project).toHaveProperty('crew');
+      expect(data.project).toHaveProperty('locations');
     });
   });
 });

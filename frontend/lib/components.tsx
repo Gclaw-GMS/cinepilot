@@ -402,7 +402,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
 
 // ==================== EXPORT ALL ====================
 
-export default {
+const CinePilotComponents = {
   Card,
   StatsCard,
   Button,
@@ -417,3 +417,5 @@ export default {
   Skeleton,
   EmptyState
 }
+
+export default CinePilotComponents

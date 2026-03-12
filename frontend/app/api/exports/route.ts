@@ -420,7 +420,14 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
         },
         orderBy: { dayNumber: 'asc' },
       });
-      data = { shootingDays };
+      // Fall back to demo data if no shooting days in DB
+      if (shootingDays.length === 0) {
+        data = DEMO_SCHEDULE;
+      } else {
+        const scheduledDays = shootingDays.filter(d => d.status === 'scheduled' || d.status === 'in_progress').length;
+        const completedDays = shootingDays.filter(d => d.status === 'completed').length;
+        data = { shootingDays, totalDays: shootingDays.length, scheduledDays, completedDays };
+      }
       filename = 'schedule.json';
       break;
     }
@@ -429,9 +436,16 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
         where: { projectId },
         orderBy: { category: 'asc' },
       });
-      const totalPlanned = items.reduce((sum, i) => sum + Number(i.total || 0), 0);
-      const totalActual = items.reduce((sum, i) => sum + Number(i.actualCost || 0), 0);
-      data = { items, totalPlanned, totalActual, variance: totalPlanned - totalActual };
+      // Fall back to demo data if no budget items in DB
+      if (items.length === 0) {
+        data = DEMO_BUDGET;
+      } else {
+        const totalPlanned = items.reduce((sum, i) => sum + Number(i.total || 0), 0);
+        const totalActual = items.reduce((sum, i) => sum + Number(i.actualCost || 0), 0);
+        const variance = totalPlanned - totalActual;
+        const percentSpent = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0;
+        data = { items, totalPlanned, totalActual, variance, percentSpent };
+      }
       filename = 'budget.json';
       break;
     }
@@ -448,6 +462,7 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
           },
         },
       });
+      // Fall back to demo data if no scripts/shots in DB
       const allShots = scripts.flatMap(s => 
         s.scenes.flatMap(scene => 
           scene.shots.map(shot => ({
@@ -462,7 +477,27 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
           }))
         )
       );
-      data = { shots: allShots, totalShots: allShots.length };
+      if (allShots.length === 0) {
+        data = DEMO_SHOTS;
+      } else {
+        // Calculate summary statistics
+        const bySize: Record<string, number> = {};
+        const byMovement: Record<string, number> = {};
+        let totalDuration = 0;
+        allShots.forEach(shot => {
+          const size = shot.shotSize || 'Unknown';
+          const movement = shot.cameraMovement || 'Unknown';
+          bySize[size] = (bySize[size] || 0) + 1;
+          byMovement[movement] = (byMovement[movement] || 0) + 1;
+          totalDuration += shot.durationEstSec || 0;
+        });
+        const summary = {
+          bySize,
+          byMovement,
+          avgDuration: allShots.length > 0 ? totalDuration / allShots.length : 0
+        };
+        data = { shots: allShots, totalShots: allShots.length, summary };
+      }
       filename = 'shot_list.json';
       break;
     }
@@ -471,7 +506,14 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
         where: { projectId },
         orderBy: { department: 'asc' },
       });
-      data = { crew };
+      // Fall back to demo data if no crew in DB
+      if (crew.length === 0) {
+        data = DEMO_CREW;
+      } else {
+        const departments = [...new Set(crew.map(c => c.department))];
+        const totalDailyRate = crew.reduce((sum, c) => sum + Number(c.dailyRate || 0), 0);
+        data = { crew, totalCrew: crew.length, departments, totalDailyRate };
+      }
       filename = 'crew.json';
       break;
     }
@@ -479,7 +521,14 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
       const equipment = await prisma.equipmentRental.findMany({
         where: { projectId },
       });
-      data = { equipment };
+      // Fall back to demo data if no equipment in DB
+      if (equipment.length === 0) {
+        data = DEMO_EQUIPMENT;
+      } else {
+        const categories = [...new Set(equipment.map(e => e.category))];
+        const totalValue = equipment.reduce((sum, e) => sum + Number(e.dailyRate || 0), 0);
+        data = { equipment, totalItems: equipment.length, totalValue, categories };
+      }
       filename = 'equipment.json';
       break;
     }
@@ -487,17 +536,22 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
       const locations = await prisma.location.findMany({
         where: { projectId },
       });
-      const locationIntents = await prisma.locationIntent.findMany({
-        where: { scene: { script: { projectId } } },
-        include: { candidates: true },
-      });
-      const locationsWithCandidates = locations.map(loc => ({
-        ...loc,
-        candidateCount: locationIntents.filter(li => 
-          li.candidates.some(c => Number(c.latitude) === Number(loc.latitude) && Number(c.longitude) === Number(loc.longitude))
-        ).reduce((sum, li) => sum + li.candidates.length, 0)
-      }));
-      data = { locations: locationsWithCandidates };
+      // Fall back to demo data if no locations in DB
+      if (locations.length === 0) {
+        data = DEMO_LOCATIONS;
+      } else {
+        const locationIntents = await prisma.locationIntent.findMany({
+          where: { scene: { script: { projectId } } },
+          include: { candidates: true },
+        });
+        const locationsWithCandidates = locations.map(loc => ({
+          ...loc,
+          candidateCount: locationIntents.filter(li => 
+            li.candidates.some(c => Number(c.latitude) === Number(loc.latitude) && Number(c.longitude) === Number(loc.longitude))
+          ).reduce((sum, li) => sum + li.candidates.length, 0)
+        }));
+        data = { locations: locationsWithCandidates, totalLocations: locations.length };
+      }
       filename = 'locations.json';
       break;
     }
@@ -513,7 +567,12 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
           budgetItems: true,
         },
       });
-      data = { project };
+      const metadata = {
+        exportedAt: new Date().toISOString(),
+        version: '1.0',
+        projectType: 'database'
+      };
+      data = { project, metadata };
       filename = 'full_project.json';
       break;
     }
@@ -525,6 +584,7 @@ async function handleDbExport(req: NextRequest, projectId: string, type: string)
     headers: {
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Type': 'application/json',
+      'X-Demo-Mode': 'false'
     },
   });
 }
@@ -574,58 +634,61 @@ export async function POST(req: NextRequest) {
       await handleDbExportSingle(projectId, type, exports);
     }
 
-    return NextResponse.json({ exports, generatedAt: new Date().toISOString() });
+    return NextResponse.json({ exports, generatedAt: new Date().toISOString(), isDemoMode: false });
   } catch (error) {
     console.error('[POST /api/exports] Database error, falling back to demo:', error);
     return handleDemoBatchExport(req);
   }
 }
 
-function handleDemoBatchExport(req: NextRequest) {
-  // Parse body for types
-  req.json().then(body => {
-    const { types } = body || {};
-    
-    if (!types || !Array.isArray(types)) {
-      return NextResponse.json({ error: 'types array required' }, { status: 400 });
-    }
-
-    const exports: Record<string, unknown> = {};
-
-    for (const type of types) {
-      switch (type) {
-        case 'schedule':
-          exports.schedule = DEMO_SCHEDULE;
-          break;
-        case 'budget':
-        case 'callsheet':
-          exports.budget = DEMO_BUDGET;
-          break;
-        case 'shot_list':
-          exports.shot_list = DEMO_SHOTS;
-          break;
-        case 'crew':
-          exports.crew = DEMO_CREW;
-          break;
-        case 'equipment':
-          exports.equipment = DEMO_EQUIPMENT;
-          break;
-        case 'locations':
-          exports.locations = DEMO_LOCATIONS;
-          break;
-        case 'full_json':
-          exports.full_project = DEMO_FULL_PROJECT;
-          break;
-      }
-    }
-
-    return NextResponse.json({ 
-      exports, 
-      generatedAt: new Date().toISOString(),
-      isDemoMode: true 
-    });
-  }).catch(() => {
+async function handleDemoBatchExport(req: NextRequest) {
+  // Parse body for types - async approach
+  let body: { types?: unknown[] };
+  try {
+    body = await req.json();
+  } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+  
+  const { types } = body || {};
+  
+  if (!types || !Array.isArray(types)) {
+    return NextResponse.json({ error: 'types array required' }, { status: 400 });
+  }
+
+  const exports: Record<string, unknown> = {};
+
+  for (const type of types) {
+    switch (type) {
+      case 'schedule':
+        exports.schedule = DEMO_SCHEDULE;
+        break;
+      case 'budget':
+      case 'callsheet':
+        exports.budget = DEMO_BUDGET;
+        break;
+      case 'shot_list':
+        exports.shot_list = DEMO_SHOTS;
+        break;
+      case 'crew':
+        exports.crew = DEMO_CREW;
+        break;
+      case 'equipment':
+        exports.equipment = DEMO_EQUIPMENT;
+        break;
+      case 'locations':
+        exports.locations = DEMO_LOCATIONS;
+        break;
+      case 'full_json':
+        exports.full_project = DEMO_FULL_PROJECT;
+        break;
+    }
+  }
+
+  return NextResponse.json({ 
+    exports, 
+    generatedAt: new Date().toISOString(),
+    isDemoMode: true 
   });
 }
 
@@ -640,7 +703,8 @@ async function handleDbExportSingle(projectId: string, type: string, exports: Re
       exports.schedule = shootingDays;
       break;
     }
-    case 'budget': {
+    case 'budget':
+    case 'callsheet': {
       const items = await prisma.budgetItem.findMany({ where: { projectId } });
       exports.budget = { items, count: items.length };
       break;
@@ -665,6 +729,26 @@ async function handleDbExportSingle(projectId: string, type: string, exports: Re
     case 'locations': {
       const locations = await prisma.location.findMany({ where: { projectId } });
       exports.locations = { locations, count: locations.length };
+      break;
+    }
+    case 'full_json': {
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          scripts: { include: { scenes: { include: { shots: true } } } },
+          characters: true,
+          crew: true,
+          locations: true,
+          shootingDays: { include: { dayScenes: true } },
+          budgetItems: true,
+        },
+      });
+      const metadata = {
+        exportedAt: new Date().toISOString(),
+        version: '1.0',
+        projectType: 'database'
+      };
+      exports.full_project = { project, metadata };
       break;
     }
   }

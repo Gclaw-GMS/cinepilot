@@ -65,6 +65,7 @@ export default function TravelExpensesPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [editingExpense, setEditingExpense] = useState<TravelExpense | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -75,6 +76,7 @@ export default function TravelExpensesPage() {
   const formRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const [formData, setFormData] = useState({
     category: 'flight',
@@ -127,7 +129,7 @@ export default function TravelExpensesPage() {
 
   useEffect(() => { loadExpenses() }, [loadExpenses])
 
-  // Click outside handlers for dropdowns
+  // Click outside handlers for dropdowns and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -136,10 +138,13 @@ export default function TravelExpensesPage() {
       if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [showFilters])
 
   const filteredExpenses = expenses.filter(e => {
     const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter
@@ -387,23 +392,34 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        if (e.key === 'Escape') {
+          (e.target as HTMLInputElement).blur()
+        }
+        return
+      }
+      
       if (e.key === 'Escape') { 
         if (showForm) resetForm()
         else if (showExportMenu) setShowExportMenu(false)
         else if (showPrintMenu) setShowPrintMenu(false)
         else if (showHelp) setShowHelp(false)
+        else if (showFilters) setShowFilters(false)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') { e.preventDefault(); searchInputRef.current?.focus() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); setShowForm(true) }
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); setShowExportMenu(!showExportMenu) }
       if (e.key === '?' || (e.shiftKey && e.key === '/')) { setShowHelp(true) }
-      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); searchInputRef.current?.focus() }
+      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         handleRefresh()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, showHelp])
+  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters])
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
   const getCategoryInfo = (category: string) => EXPENSE_CATEGORIES.find(c => c.key === category) || { key: category, label: category, icon: DollarSign, color: '#6b7280' }
@@ -532,26 +548,82 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input ref={searchInputRef} type="text" placeholder="Search... (Ctrl+F)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+        {/* Filters Row with Toggle */}
+        <div className="flex items-center gap-4 mb-4">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              ref={searchInputRef}
+              type="text" 
+              placeholder="Search expenses... (Press /)" 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+            />
+          </div>
+
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              showFilters 
+                ? 'bg-amber-600 text-white' 
+                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+            title="Toggle Filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {(categoryFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+              <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
+                {(categoryFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)}
+              </span>
+            )}
+          </button>
+
+          {/* Clear Filters */}
+          {(categoryFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+            <button
+              onClick={() => { setCategoryFilter('all'); setStatusFilter('all'); setSearchQuery('') }}
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+              title="Clear all filters"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Collapsible Filter Panel */}
+        {showFilters && (
+          <div 
+            ref={filterPanelRef}
+            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-medium text-slate-300">Filters:</span>
+              </div>
+              <select 
+                value={categoryFilter} 
+                onChange={(e) => setCategoryFilter(e.target.value)} 
+                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
+              >
                 <option value="all">All Categories</option>
                 {EXPENSE_CATEGORIES.map(cat => <option key={cat.key} value={cat.key}>{cat.label}</option>)}
               </select>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+              <select 
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)} 
+                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
+              >
                 <option value="all">All Status</option>
                 {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
               </select>
             </div>
           </div>
-        </div>
+        )}
 
         {viewMode === 'dashboard' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -663,8 +735,9 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Refresh data</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">R</kbd></div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+F</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Add new expense</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+N</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Export menu</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+E</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Close modal / Clear</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Esc</kbd></div>

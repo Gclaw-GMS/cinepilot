@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown } from 'lucide-react'
+import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown, Filter } from 'lucide-react'
 
 interface WhatsAppTemplate { id: string; name: string; category: string; content: string; variables: string[]; createdAt: string }
 interface SentMessage { id: string; recipient: string; recipientName?: string; message: string; status: string; timestamp: string }
@@ -49,6 +49,23 @@ export default function WhatsAppPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   
+  // Filter panel state
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate active filter count
+  const activeFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (roleFilter !== 'all' ? 1 : 0)
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setCategoryFilter('all')
+    setStatusFilter('all')
+    setRoleFilter('all')
+    setSearchQuery('')
+  }
+  
   // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
@@ -91,6 +108,10 @@ export default function WhatsAppPage() {
         case 'r':
           e.preventDefault()
           handleRefresh()
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -136,6 +157,7 @@ export default function WhatsAppPage() {
           setShowTemplateEditor(false)
           setShowPrintMenu(false)
           setShowExportDropdown(false)
+          setShowFilterPanel(false)
           setSearchQuery('')
           break
       }
@@ -145,7 +167,7 @@ export default function WhatsAppPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close dropdowns
+  // Click outside to close dropdowns and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
@@ -154,12 +176,18 @@ export default function WhatsAppPage() {
       if (showExportDropdown && exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
         setShowExportDropdown(false)
       }
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button
+        const filterButton = document.querySelector('[data-filter-toggle]')
+        if (filterButton && filterButton.contains(e.target as Node)) return
+        setShowFilterPanel(false)
+      }
     }
-    if (showPrintMenu || showExportDropdown) {
+    if (showPrintMenu || showExportDropdown || showFilterPanel) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showPrintMenu, showExportDropdown])
+  }, [showPrintMenu, showExportDropdown, showFilterPanel])
 
   const handleTemplateSelect = (template: WhatsAppTemplate) => {
     setSelectedTemplate(template); setMessage(template.content)
@@ -355,9 +383,21 @@ export default function WhatsAppPage() {
     setShowExportDropdown(false)
   }
 
-  const filteredMessages = messages.filter(m => !searchQuery || m.recipient.includes(searchQuery) || m.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()))
-  const filteredTemplates = templates.filter(t => (categoryFilter === 'all' || t.category === categoryFilter) && (!searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase())))
-  const filteredContacts = contacts.filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.phone.includes(searchQuery))
+  const filteredMessages = messages.filter(m => {
+    const matchSearch = !searchQuery || m.recipient.includes(searchQuery) || m.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()) || m.message.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchStatus = statusFilter === 'all' || m.status === statusFilter
+    return matchSearch && matchStatus
+  })
+  const filteredTemplates = templates.filter(t => {
+    const matchCategory = categoryFilter === 'all' || t.category === categoryFilter
+    const matchSearch = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.content.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchCategory && matchSearch
+  })
+  const filteredContacts = contacts.filter(c => {
+    const matchSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.phone.includes(searchQuery)
+    const matchRole = roleFilter === 'all' || c.role?.toLowerCase().includes(roleFilter.toLowerCase())
+    return matchSearch && matchRole
+  })
 
   const STATUS_COLORS: Record<string, string> = { pending: 'bg-yellow-500/20 text-yellow-400', sent: 'bg-blue-500/20 text-blue-400', delivered: 'bg-green-500/20 text-green-400', read: 'bg-emerald-500/20 text-emerald-400', failed: 'bg-red-500/20 text-red-400' }
 
@@ -393,6 +433,21 @@ export default function WhatsAppPage() {
             className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
           >
             <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+          
+          {/* Filter Toggle Button */}
+          <button 
+            onClick={() => setShowFilterPanel(!showFilterPanel)}
+            className={`p-2 rounded-lg flex items-center gap-2 ${showFilterPanel || activeFilterCount > 0 ? 'bg-green-500/20 text-green-400' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'}`}
+            title={`Filters (F) - ${activeFilterCount} active`}
+            data-filter-toggle
+          >
+            <Filter className="w-5 h-5" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
           
           {/* Keyboard Help Button */}
@@ -482,13 +537,90 @@ export default function WhatsAppPage() {
         
         {/* Active tab stats */}
         <div className="text-sm text-gray-500">
-          {activeTab === 'templates' && `${filteredTemplates.length} templates`}
-          {activeTab === 'history' && `${filteredMessages.length} messages`}
-          {activeTab === 'contacts' && `${filteredContacts.length} contacts`}
+          {activeTab === 'templates' && `${filteredTemplates.length} of ${templates.length} templates`}
+          {activeTab === 'history' && `${filteredMessages.length} of ${messages.length} messages`}
+          {activeTab === 'contacts' && `${filteredContacts.length} of ${contacts.length} contacts`}
           {activeTab === 'compose' && `${templates.length} templates available`}
-          {searchQuery && ` (filtered)`}
+          {activeFilterCount > 0 && ` (filtered)`}
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilterPanel && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4" ref={filterPanelRef}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-white flex items-center gap-2">
+              <Filter className="w-4 h-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full">
+                  {activeFilterCount} active
+                </span>
+              )}
+            </h3>
+            {activeFilterCount > 0 && (
+              <button 
+                onClick={clearFilters}
+                className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Category Filter (for Templates) */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Template Category</label>
+              <select 
+                value={categoryFilter} 
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+              >
+                <option value="all">All Categories</option>
+                <option value="schedule">Schedule</option>
+                <option value="reminder">Reminder</option>
+                <option value="call_sheet">Call Sheet</option>
+                <option value="update">Update</option>
+              </select>
+            </div>
+            
+            {/* Status Filter (for History) */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Message Status</label>
+              <select 
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="sent">Sent</option>
+                <option value="delivered">Delivered</option>
+                <option value="read">Read</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            
+            {/* Role Filter (for Contacts) */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Contact Role</label>
+              <select 
+                value={roleFilter} 
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+              >
+                <option value="all">All Roles</option>
+                <option value="Lead Actor">Lead Actor</option>
+                <option value="Lead Actress">Lead Actress</option>
+                <option value="Supporting Actor">Supporting Actor</option>
+                <option value="Cinematographer">Cinematographer</option>
+                <option value="Music Director">Music Director</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'compose' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -520,11 +652,11 @@ export default function WhatsAppPage() {
         </div>
       )}
 
-      {activeTab === 'templates' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="flex gap-2"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"><option value="all">All</option><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option></select></div><button onClick={() => { setEditingTemplate(null); setTemplateFormData({ name: '', category: 'schedule', content: '' }); setShowTemplateEditor(true) }} className="flex items-center gap-2 px-4 py-2 bg-green-500 text-black rounded-lg text-sm font-medium"><Plus className="w-4 h-4" />New</button></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredTemplates.map(t => (<div key={t.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-start justify-between mb-2"><div><h4 className="font-medium text-white">{t.name}</h4><span className="text-xs text-gray-500">{t.category}</span></div><div className="flex gap-1"><button onClick={() => { setEditingTemplate(t); setTemplateFormData({ name: t.name, category: t.category, content: t.content }); setShowTemplateEditor(true) }} className="p-1 text-gray-400 hover:text-white"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDeleteTemplate(t.id)} className="p-1 text-gray-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></button></div></div><pre className="text-xs text-gray-400 whitespace-pre-wrap bg-gray-800/50 rounded p-2 max-h-24 overflow-hidden">{t.content}</pre></div>))}</div></div>)}
+      {activeTab === 'templates' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search templates..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-64" /></div><button onClick={() => { setEditingTemplate(null); setTemplateFormData({ name: '', category: 'schedule', content: '' }); setShowTemplateEditor(true) }} className="flex items-center gap-2 px-4 py-2 bg-green-500 text-black rounded-lg text-sm font-medium"><Plus className="w-4 h-4" />New Template</button></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredTemplates.length > 0 ? filteredTemplates.map(t => (<div key={t.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-green-500/30 transition-colors"><div className="flex items-start justify-between mb-2"><div><h4 className="font-medium text-white">{t.name}</h4><span className="text-xs text-gray-500">{t.category}</span></div><div className="flex gap-1"><button onClick={() => { setEditingTemplate(t); setTemplateFormData({ name: t.name, category: t.category, content: t.content }); setShowTemplateEditor(true) }} className="p-1 text-gray-400 hover:text-white"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDeleteTemplate(t.id)} className="p-1 text-gray-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></button></div></div><pre className="text-xs text-gray-400 whitespace-pre-wrap bg-gray-800/50 rounded p-2 max-h-24 overflow-hidden">{t.content}</pre></div>)) : (<div className="col-span-full text-center py-12 text-gray-500">No templates found. Create one to get started!</div>)}</div></div>)}
 
-      {activeTab === 'history' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><button onClick={handleExportJSON} className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300"><Download className="w-4 h-4 inline" />Export</button></div><div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-gray-800/50"><tr><th className="text-left p-4 text-xs text-gray-400">Recipient</th><th className="text-left p-4 text-xs text-gray-400">Message</th><th className="text-center p-4 text-xs text-gray-400">Status</th><th className="text-right p-4 text-xs text-gray-400">Time</th></tr></thead><tbody className="divide-y divide-gray-800">{filteredMessages.map(m => (<tr key={m.id} className="hover:bg-gray-800/30"><td className="p-4"><p className="text-white">{m.recipientName || m.recipient}</p><p className="text-gray-500 text-xs">{m.recipient}</p></td><td className="p-4"><p className="text-gray-300 text-sm line-clamp-1">{m.message}</p></td><td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-xs ${STATUS_COLORS[m.status] || 'bg-gray-800 text-gray-400'}`}>{m.status}</span></td><td className="p-4 text-right text-gray-500 text-sm">{formatTime(m.timestamp)}</td></tr>))}</tbody></table></div></div>)}
+      {activeTab === 'history' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-64" /></div><button onClick={handleExportJSON} className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300"><Download className="w-4 h-4 inline mr-2" />Export</button></div><div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">{filteredMessages.length > 0 ? (<table className="w-full"><thead className="bg-gray-800/50"><tr><th className="text-left p-4 text-xs text-gray-400">Recipient</th><th className="text-left p-4 text-xs text-gray-400">Message</th><th className="text-center p-4 text-xs text-gray-400">Status</th><th className="text-right p-4 text-xs text-gray-400">Time</th></tr></thead><tbody className="divide-y divide-gray-800">{filteredMessages.map(m => (<tr key={m.id} className="hover:bg-gray-800/30"><td className="p-4"><p className="text-white">{m.recipientName || m.recipient}</p><p className="text-gray-500 text-xs">{m.recipient}</p></td><td className="p-4"><p className="text-gray-300 text-sm line-clamp-1">{m.message}</p></td><td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-xs ${STATUS_COLORS[m.status] || 'bg-gray-800 text-gray-400'}`}>{m.status}</span></td><td className="p-4 text-right text-gray-500 text-sm">{formatTime(m.timestamp)}</td></tr>))}</tbody></table>) : (<div className="text-center py-12 text-gray-500">No messages found.</div>)}</div></div>)}
 
-      {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-48" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>))}</div></div>)}
+      {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search contacts..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-64" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.length > 0 ? filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-green-500/30 transition-colors"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>)) : (<div className="col-span-full text-center py-12 text-gray-500">No contacts found.</div>)}</div></div>)}
 
       {showTemplateEditor && (<div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"><div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6"><div className="flex items-center justify-between mb-6"><h3 className="text-xl font-semibold text-white">{editingTemplate ? 'Edit' : 'New'} Template</h3><button onClick={() => setShowTemplateEditor(false)}><X className="w-5 h-5 text-gray-400" /></button></div><div className="space-y-4"><div><label className="block text-sm text-gray-400 mb-1">Name</label><input type="text" value={templateFormData.name} onChange={(e) => setTemplateFormData(p => ({...p, name: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><select value={templateFormData.category} onChange={(e) => setTemplateFormData(p => ({...p, category: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white"><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option><option value="update">Update</option></select></div><div><label className="block text-sm text-gray-400 mb-1">Content (use {'{var}'})</label><textarea value={templateFormData.content} onChange={(e) => setTemplateFormData(p => ({...p, content: e.target.value}))} rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white resize-none" /></div><button onClick={handleSaveTemplate} disabled={savingTemplate} className="w-full py-3 bg-green-500 hover:bg-green-400 disabled:opacity-50 text-black font-semibold rounded-lg flex items-center justify-center gap-2">{savingTemplate ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Save Template</button></div></div></div>)}
 
@@ -545,6 +677,7 @@ export default function WhatsAppPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh data' },
+                { key: 'F', description: 'Toggle filter panel' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'C', description: 'Switch to Compose tab' },
                 { key: 'T', description: 'Switch to Templates tab' },

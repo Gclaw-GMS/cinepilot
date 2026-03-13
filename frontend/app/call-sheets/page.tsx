@@ -5,7 +5,7 @@ import {
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
   Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2,
-  Keyboard, Search
+  Keyboard, Search, Filter
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -70,7 +70,11 @@ export default function CallSheetsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterLocation, setFilterLocation] = useState('all')
+  const [filterMonth, setFilterMonth] = useState('all')
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -155,6 +159,12 @@ export default function CallSheetsPage() {
             startEditing()
           }
           break
+        case 'f':
+          e.preventDefault()
+          if (!creating && !isEditing) {
+            setShowFilters(prev => !prev)
+          }
+          break
         case 'x':
           e.preventDefault()
           if (selected && !isEditing) {
@@ -183,6 +193,8 @@ export default function CallSheetsPage() {
             setShowKeyboardHelp(false)
           } else if (showExportMenu) {
             setShowExportMenu(false)
+          } else if (showFilters) {
+            setShowFilters(false)
           } else if (isEditing) {
             cancelEditing()
           }
@@ -192,31 +204,93 @@ export default function CallSheetsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, fetchCallSheets])
+  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets])
 
-  // Click outside to close export menu
+  // Click outside to close export menu and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
-    if (showExportMenu) {
+    if (showExportMenu || showFilters) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu])
+  }, [showExportMenu, showFilters])
 
-  // Filter call sheets by search
+  // Filter call sheets by search and filters
   const filteredCallSheets = useMemo(() => {
-    if (!searchQuery) return callSheets
-    const query = searchQuery.toLowerCase()
-    return callSheets.filter(sheet => 
-      (sheet.title?.toLowerCase() || '').includes(query) ||
-      sheet.date?.toLowerCase().includes(query) ||
-      (sheet.content?.location?.toLowerCase() || '').includes(query)
-    )
-  }, [callSheets, searchQuery])
+    let result = callSheets
+    
+    // Apply search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(sheet => 
+        (sheet.title?.toLowerCase() || '').includes(query) ||
+        sheet.date?.toLowerCase().includes(query) ||
+        (sheet.content?.location?.toLowerCase() || '').includes(query)
+      )
+    }
+    
+    // Apply location filter
+    if (filterLocation !== 'all') {
+      result = result.filter(sheet => 
+        sheet.content?.location?.toLowerCase() === filterLocation.toLowerCase()
+      )
+    }
+    
+    // Apply month filter
+    if (filterMonth !== 'all') {
+      result = result.filter(sheet => {
+        const sheetDate = new Date(sheet.date)
+        const monthKey = `${sheetDate.getFullYear()}-${String(sheetDate.getMonth() + 1).padStart(2, '0')}`
+        return monthKey === filterMonth
+      })
+    }
+    
+    return result
+  }, [callSheets, searchQuery, filterLocation, filterMonth])
+
+  // Get unique locations for filter
+  const uniqueLocations = useMemo(() => {
+    const locations = new Set<string>()
+    callSheets.forEach(sheet => {
+      if (sheet.content?.location) {
+        locations.add(sheet.content.location)
+      }
+    })
+    return Array.from(locations).sort()
+  }, [callSheets])
+
+  // Get unique months for filter
+  const uniqueMonths = useMemo(() => {
+    const months = new Set<string>()
+    callSheets.forEach(sheet => {
+      if (sheet.date) {
+        const date = new Date(sheet.date)
+        months.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
+      }
+    })
+    return Array.from(months).sort().reverse()
+  }, [callSheets])
+
+  // Active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterLocation !== 'all') count++
+    if (filterMonth !== 'all') count++
+    return count
+  }, [filterLocation, filterMonth])
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilterLocation('all')
+    setFilterMonth('all')
+  }
 
   const createNew = async () => {
     try {
@@ -597,6 +671,74 @@ export default function CallSheetsPage() {
           >
             <Keyboard className="w-4 h-4" />
           </button>
+          {/* Filter Toggle Button */}
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-cyan-600 border-cyan-500 text-white'
+                  : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
+              }`}
+              title="Filter (F)"
+            >
+              <Filter className="w-4 h-4" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                  <span className="text-sm font-medium">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-xs text-cyan-400 hover:text-cyan-300"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Location Filter */}
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Location</label>
+                    <select
+                      value={filterLocation}
+                      onChange={(e) => setFilterLocation(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+                    >
+                      <option value="all">All Locations</option>
+                      {uniqueLocations.map(loc => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Month Filter */}
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Month</label>
+                    <select
+                      value={filterMonth}
+                      onChange={(e) => setFilterMonth(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+                    >
+                      <option value="all">All Months</option>
+                      {uniqueMonths.map(month => {
+                        const [year, m] = month.split('-')
+                        const monthName = new Date(parseInt(year), parseInt(m) - 1).toLocaleString('default', { month: 'short', year: 'numeric' })
+                        return (
+                          <option key={month} value={month}>{monthName}</option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={createNew}
             disabled={creating}
@@ -1268,13 +1410,14 @@ export default function CallSheetsPage() {
               {[
                 { key: 'R', description: 'Refresh call sheets' },
                 { key: '/', description: 'Focus search input' },
+                { key: 'F', description: 'Toggle filters' },
                 { key: 'N', description: 'New call sheet' },
                 { key: 'E', description: 'Edit selected sheet' },
                 { key: 'X', description: 'Export dropdown menu' },
                 { key: 'D', description: 'Delete selected sheet' },
                 { key: 'P', description: 'Print selected sheet' },
                 { key: '?', description: 'Show keyboard shortcuts' },
-                { key: 'Esc', description: 'Close modal / Cancel editing' },
+                { key: 'Esc', description: 'Close modal / filters / Cancel editing' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

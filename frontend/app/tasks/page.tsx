@@ -113,6 +113,10 @@ export default function TasksPage() {
   const [filterPriority, setFilterPriority] = useState<FilterPriority>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  
+  // Calculate active filter count
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)
+  
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [formData, setFormData] = useState({
@@ -869,7 +873,7 @@ export default function TasksPage() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                showFilters 
+                showFilters || activeFilterCount > 0
                   ? 'bg-purple-600 text-white' 
                   : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600'
               }`}
@@ -877,9 +881,9 @@ export default function TasksPage() {
             >
               <Filter className="w-4 h-4" />
               <span>Filters</span>
-              {(filterStatus !== 'all' || filterPriority !== 'all') && (
+              {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded">
-                  {(filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)}
+                  {activeFilterCount}
                 </span>
               )}
             </button>

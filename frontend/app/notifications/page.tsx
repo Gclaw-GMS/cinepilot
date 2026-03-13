@@ -187,6 +187,10 @@ export default function NotificationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Calculate active filter count
+  const activeFilterCount = (channelFilter !== 'all' ? 1 : 0)
+  
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);

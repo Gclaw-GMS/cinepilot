@@ -114,6 +114,9 @@ export default function CrewPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Calculate active filter count
+  const activeFilterCount = deptFilter !== 'all' ? 1 : 0;
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -852,7 +855,7 @@ export default function CrewPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-              showFilters 
+              showFilters || activeFilterCount > 0
                 ? 'bg-emerald-600 text-white' 
                 : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
             }`}
@@ -860,8 +863,8 @@ export default function CrewPage() {
           >
             <Filter className="w-4 h-4" />
             Filters
-            {deptFilter !== 'all' && (
-              <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-xs rounded-full">1</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-xs rounded-full">{activeFilterCount}</span>
             )}
           </button>
           <span className="text-sm text-slate-500">{filtered.length} of {crew.length}</span>

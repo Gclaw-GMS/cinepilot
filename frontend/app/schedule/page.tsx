@@ -240,6 +240,9 @@ export default function SchedulePage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterLocation, setFilterLocation] = useState<string>('all')
   
+  // Calculate active filter count
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)
+  
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -779,7 +782,7 @@ export default function SchedulePage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-              showFilters 
+              showFilters || activeFilterCount > 0
                 ? 'bg-indigo-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
@@ -787,9 +790,9 @@ export default function SchedulePage() {
           >
             <Filter className="w-4 h-4" />
             Filters
-            {(filterStatus !== 'all' || filterLocation !== 'all') && (
+            {activeFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
-                {(filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)}
+                {activeFilterCount}
               </span>
             )}
           </button>

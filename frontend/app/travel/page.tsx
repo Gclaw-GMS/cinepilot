@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Plane,
   Train,
@@ -85,6 +85,7 @@ export default function TravelExpensesPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' })
   const [showDateFilter, setShowDateFilter] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -105,26 +106,9 @@ export default function TravelExpensesPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
-
-  // Filter panel state
-  const [showFilterPanel, setShowFilterPanel] = useState(false)
-  const filterPanelRef = useRef<HTMLDivElement>(null)
-
-  // Calculate active filter count
-  const activeFilterCount = [
-    filterCategory !== 'all' ? 1 : 0,
-    filterStatus !== 'all' ? 1 : 0,
-    dateRange.start || dateRange.end ? 1 : 0,
-  ].reduce((a, b) => a + b, 0)
-
-  // Clear all filters
-  const clearFilters = () => {
-    setFilterCategory('all')
-    setFilterStatus('all')
-    setDateRange({ start: '', end: '' })
-  }
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
@@ -174,10 +158,6 @@ export default function TravelExpensesPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
-        case 'f':
-          e.preventDefault()
-          setShowFilterPanel(prev => !prev)
-          break
         case 'n':
           e.preventDefault()
           setShowForm(true)
@@ -197,7 +177,11 @@ export default function TravelExpensesPage() {
           setShowForm(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
-          setShowFilterPanel(false)
+          setShowFilters(false)
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case 'p':
           e.preventDefault()
@@ -212,7 +196,7 @@ export default function TravelExpensesPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close menus and filter panel
+  // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -221,18 +205,28 @@ export default function TravelExpensesPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
-      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
-        // Don't close if clicking on the filter toggle button
-        const filterButton = document.querySelector('[data-filter-toggle]')
-        if (filterButton && filterButton.contains(e.target as Node)) return
-        setShowFilterPanel(false)
-      }
     }
-    if (showExportMenu || showPrintMenu || showFilterPanel) {
+    if (showExportMenu || showPrintMenu) {
       document.addEventListener('click', handleClickOutside)
     }
     return () => document.removeEventListener('click', handleClickOutside)
-  }, [showExportMenu, showPrintMenu, showFilterPanel])
+  }, [showExportMenu, showPrintMenu, showFilters])
+
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handleFilterClickOutside = (e: MouseEvent) => {
+      if (showFilters && filterPanelRef.current) {
+        const target = e.target as HTMLElement
+        if (!filterPanelRef.current.contains(target) && !target.closest('.filter-toggle')) {
+          setShowFilters(false)
+        }
+      }
+    }
+    if (showFilters) {
+      document.addEventListener('mousedown', handleFilterClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleFilterClickOutside)
+  }, [showFilters])
 
   // CSV Export function
   const exportToCSV = () => {
@@ -507,6 +501,15 @@ export default function TravelExpensesPage() {
     )
   })
 
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterCategory !== 'all') count++
+    if (filterStatus !== 'all') count++
+    if (dateRange.start || dateRange.end) count++
+    return count
+  }, [filterCategory, filterStatus, dateRange])
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -545,97 +548,21 @@ export default function TravelExpensesPage() {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
               {/* Filter Toggle Button */}
-              <div className="relative" ref={filterPanelRef}>
-                <button
-                  data-filter-toggle
-                  onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
-                    showFilterPanel || activeFilterCount > 0
-                      ? 'bg-cyan-600 border-cyan-500 text-white'
-                      : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
-                  }`}
-                  title="Filter (F)"
-                >
-                  <Filter className="w-4 h-4" />
-                  {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-                {showFilterPanel && (
-                  <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                      <span className="text-sm font-medium text-white">Filters</span>
-                      {activeFilterCount > 0 && (
-                        <button
-                          onClick={clearFilters}
-                          className="text-xs text-cyan-400 hover:text-cyan-300"
-                        >
-                          Clear all
-                        </button>
-                      )}
-                    </div>
-                    <div className="p-4 space-y-4">
-                      {/* Category Filter */}
-                      <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Category</label>
-                        <select
-                          value={filterCategory}
-                          onChange={(e) => setFilterCategory(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                        >
-                          <option value="all">All Categories</option>
-                          {CATEGORIES.map(cat => (
-                            <option key={cat.key} value={cat.key}>{cat.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {/* Status Filter */}
-                      <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Status</label>
-                        <select
-                          value={filterStatus}
-                          onChange={(e) => setFilterStatus(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                        >
-                          <option value="all">All Statuses</option>
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
-                          <option value="rejected">Rejected</option>
-                          <option value="reimbursed">Reimbursed</option>
-                        </select>
-                      </div>
-                      {/* Date Range Filter */}
-                      <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Date Range</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="date"
-                            value={dateRange.start}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                          />
-                          <input
-                            type="date"
-                            value={dateRange.end}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                          />
-                        </div>
-                        {(dateRange.start || dateRange.end) && (
-                          <button
-                            onClick={clearFilters}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 mt-2"
-                          >
-                            Clear dates
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-colors filter-toggle ${
+                  showFilters 
+                    ? 'bg-cyan-600 text-white' 
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                }`}
+                title="Toggle Filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-cyan-500 text-white text-xs rounded-full">{activeFilterCount}</span>
                 )}
-              </div>
+              </button>
               {/* Keyboard Help Button */}
               <button
                 onClick={() => setShowKeyboardHelp(true)}
@@ -668,6 +595,79 @@ export default function TravelExpensesPage() {
           <div className="flex items-center gap-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl px-5 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
             Preview mode — Connect a PostgreSQL database to save travel expenses
+          </div>
+        )}
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div 
+            ref={filterPanelRef}
+            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-medium text-slate-300">Filters:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Category:</label>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="all">All Categories</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat.key} value={cat.key}>{cat.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Status:</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="reimbursed">Reimbursed</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Date Range:</label>
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                />
+                <span className="text-slate-500">to</span>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              {(filterCategory !== 'all' || filterStatus !== 'all' || dateRange.start || dateRange.end) && (
+                <button
+                  onClick={() => {
+                    setFilterCategory('all')
+                    setFilterStatus('all')
+                    setDateRange({ start: '', end: '' })
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-sm text-slate-400 hover:text-white"
+                >
+                  <X className="w-3 h-3" /> Clear Filters
+                </button>
+              )}
+              <div className="ml-auto text-sm text-slate-400">
+                Showing {filteredExpenses.length} of {expenses.length} expenses
+              </div>
+            </div>
           </div>
         )}
 

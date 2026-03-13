@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard } from 'lucide-react'
+import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter } from 'lucide-react'
 
 interface FrameData {
   id: string
@@ -63,6 +63,9 @@ export default function StoryboardPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sceneFilter, setSceneFilter] = useState<string>('all')
   const [printing, setPrinting] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   
@@ -327,10 +330,16 @@ export default function StoryboardPage() {
           setShowPrintMenu(false)
         }
       }
+      if (showFilters) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.filter-menu')) {
+          setShowFilters(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   useEffect(() => {
     fetchFrames()
@@ -356,6 +365,10 @@ export default function StoryboardPage() {
         case 'r':
           e.preventDefault()
           handleRefresh()
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -396,6 +409,7 @@ export default function StoryboardPage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           break
       }
@@ -405,20 +419,57 @@ export default function StoryboardPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Filter scenes based on search query
+  // Filter scenes based on search query and filters
   const filteredScenes = useMemo(() => {
-    if (!searchQuery.trim()) return scenes
-    const query = searchQuery.toLowerCase()
-    return scenes.filter(scene => 
-      scene.sceneNumber.toString().includes(query) ||
-      (scene.heading?.toLowerCase().includes(query)) ||
-      scene.frames.some(frame => 
-        frame.shot.shotText?.toLowerCase().includes(query) ||
-        frame.shot.shotSize?.toLowerCase().includes(query) ||
-        frame.directorNotes?.toLowerCase().includes(query)
+    let result = scenes
+    
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(scene => 
+        scene.sceneNumber.toString().includes(query) ||
+        (scene.heading?.toLowerCase().includes(query)) ||
+        scene.frames.some(frame => 
+          frame.shot.shotText?.toLowerCase().includes(query) ||
+          frame.shot.shotSize?.toLowerCase().includes(query) ||
+          frame.directorNotes?.toLowerCase().includes(query)
+        )
       )
-    )
-  }, [scenes, searchQuery])
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(scene => {
+        if (statusFilter === 'approved') {
+          return scene.frames.some(f => f.isApproved)
+        } else if (statusFilter === 'pending') {
+          return scene.frames.some(f => !f.isApproved && f.status !== 'failed')
+        } else if (statusFilter === 'failed') {
+          return scene.frames.some(f => f.status === 'failed')
+        }
+        return true
+      })
+    }
+    
+    // Apply scene filter
+    if (sceneFilter !== 'all') {
+      result = result.filter(scene => 
+        scene.sceneNumber.toString() === sceneFilter
+      )
+    }
+    
+    return result
+  }, [scenes, searchQuery, statusFilter, sceneFilter])
+  
+  // Calculate active filter count
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (sceneFilter !== 'all' ? 1 : 0)
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setSceneFilter('all')
+    setSearchQuery('')
+  }
 
   const handleGenerateScene = async (sceneId: string) => {
     setGeneratingScene(sceneId)
@@ -553,6 +604,82 @@ export default function StoryboardPage() {
             >
               <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+            {/* Filter Toggle Button */}
+            <div className="relative filter-menu">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-violet-600 border-violet-500 text-white'
+                    : 'bg-[#1a1a1a] border-gray-700 hover:bg-[#222] text-gray-400'
+                }`}
+                title="Filter (F)"
+              >
+                <Filter className="w-5 h-5" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-violet-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {showFilters && (
+                <div className="absolute right-0 mt-2 w-64 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                    <span className="text-sm font-medium">Filters</span>
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={clearFilters}
+                        className="text-xs text-violet-400 hover:text-violet-300"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* Status Filter */}
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Status</label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { key: 'all', label: 'All' },
+                          { key: 'approved', label: 'Approved' },
+                          { key: 'pending', label: 'Pending' },
+                          { key: 'failed', label: 'Failed' },
+                        ].map(status => (
+                          <button
+                            key={status.key}
+                            onClick={() => setStatusFilter(status.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                              statusFilter === status.key
+                                ? 'bg-violet-600 text-white'
+                                : 'bg-[#222] text-gray-400 hover:bg-[#333] hover:text-white'
+                            }`}
+                          >
+                            {status.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Scene Filter */}
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Scene</label>
+                      <select
+                        value={sceneFilter}
+                        onChange={e => setSceneFilter(e.target.value)}
+                        className="w-full bg-[#222] border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      >
+                        <option value="all">All Scenes</option>
+                        {scenes.map(scene => (
+                          <option key={scene.sceneId} value={scene.sceneNumber.toString()}>
+                            Scene {scene.sceneNumber}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Keyboard Help Button */}
             <button
               onClick={() => setShowKeyboardHelp(true)}
@@ -895,6 +1022,7 @@ export default function StoryboardPage() {
               <div className="space-y-3">
                 {[
                   { key: 'R', action: 'Refresh storyboard data' },
+                  { key: 'F', action: 'Toggle filters' },
                   { key: 'P', action: 'Print storyboard report' },
                   { key: '/', action: 'Focus search input' },
                   { key: '1', action: 'Switch to Clean Line Art style' },

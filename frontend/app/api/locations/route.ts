@@ -60,20 +60,22 @@ export async function GET(req: NextRequest) {
 
     // If no scripts found in database, fall back to demo data
     if (scriptIds.length === 0) {
+      const demoScenes = DEMO_SCENES.map(s => ({
+        sceneNumber: s.sceneNumber,
+        headingRaw: s.headingRaw,
+        location: s.location,
+        candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
+      }));
+      
       if (statsOnly) {
         return NextResponse.json({
-          scenes: DEMO_SCENES.map(s => ({
-            sceneNumber: s.sceneNumber,
-            headingRaw: s.headingRaw,
-            location: s.location,
-            candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
-          })),
-          _demo: true,
+          scenes: demoScenes,
+          isDemoMode: true,
         });
       }
       return NextResponse.json({ 
         scenes: DEMO_SCENES,
-        _demo: true,
+        isDemoMode: true,
       });
     }
 
@@ -126,12 +128,13 @@ export async function GET(req: NextRequest) {
           location: s.location,
           candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
         })),
+        isDemoMode: false,
       });
     }
 
-    return NextResponse.json({ scenes });
+    return NextResponse.json({ scenes, isDemoMode: false });
   } catch (error) {
-    console.error('[GET /api/locations] Database not available, using demo data');
+    console.error('[GET /api/locations] Database not available, using demo data:', error);
     // Use demo data when database is not available
     if (sceneId) {
       return NextResponse.json({ 
@@ -141,25 +144,28 @@ export async function GET(req: NextRequest) {
           keywords: ['demo', 'location'], 
           terrainType: 'urban',
           candidates: getDemoCandidates(sceneId)
-        } 
+        },
+        isDemoMode: true,
       });
     }
     
+    const demoScenes = DEMO_SCENES.map(s => ({
+      sceneNumber: s.sceneNumber,
+      headingRaw: s.headingRaw,
+      location: s.location,
+      candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
+    }));
+    
     if (statsOnly) {
       return NextResponse.json({
-        scenes: DEMO_SCENES.map(s => ({
-          sceneNumber: s.sceneNumber,
-          headingRaw: s.headingRaw,
-          location: s.location,
-          candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
-        })),
-        _demo: true,
+        scenes: demoScenes,
+        isDemoMode: true,
       });
     }
     
     return NextResponse.json({ 
       scenes: DEMO_SCENES,
-      _demo: true,
+      isDemoMode: true,
     });
   }
 }

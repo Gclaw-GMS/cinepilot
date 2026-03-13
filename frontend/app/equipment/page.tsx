@@ -145,6 +145,7 @@ export default function EquipmentPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  const handlePrintRef = useRef<() => void>()
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -263,7 +264,7 @@ export default function EquipmentPage() {
         case 'p':
           e.preventDefault()
           if (equipment.length > 0) {
-            handlePrint()
+            handlePrintRef.current?.()
           }
           break
         case 'escape':
@@ -281,7 +282,7 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalOpen, editModalOpen, showExportMenu])
+  }, [modalOpen, editModalOpen, showExportMenu, equipment.length])
 
   // Click outside to close export menu
   useEffect(() => {
@@ -570,6 +571,11 @@ export default function EquipmentPage() {
     }
     setPrinting(false)
   }
+
+  // Assign handlePrint to ref for keyboard shortcuts
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
 
   const handleEdit = (eq: EquipmentRental) => {
     setEditingEquipment(eq)

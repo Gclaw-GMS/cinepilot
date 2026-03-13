@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Plane, Train, Bus, Car, Building, Wallet, Plus, Edit2, Trash2,
   DollarSign, Calendar, MapPin, Search, X, HelpCircle,
@@ -71,7 +71,23 @@ export default function TravelExpensesPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('dashboard')
-  
+
+  // Calculate active filter count using useMemo for efficiency
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (categoryFilter !== 'all') count++
+    if (statusFilter !== 'all') count++
+    if (searchQuery) count++
+    return count
+  }, [categoryFilter, statusFilter, searchQuery])
+
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setCategoryFilter('all')
+    setStatusFilter('all')
+    setSearchQuery('')
+  }, [])
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -575,17 +591,17 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
           >
             <Filter className="w-4 h-4" />
             Filters
-            {(categoryFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+            {activeFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
-                {(categoryFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)}
+                {activeFilterCount}
               </span>
             )}
           </button>
 
           {/* Clear Filters */}
-          {(categoryFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+          {activeFilterCount > 0 && (
             <button
-              onClick={() => { setCategoryFilter('all'); setStatusFilter('all'); setSearchQuery('') }}
+              onClick={clearFilters}
               className="text-sm text-slate-400 hover:text-white transition-colors"
               title="Clear all filters"
             >

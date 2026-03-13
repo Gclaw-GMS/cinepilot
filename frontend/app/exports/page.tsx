@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   Download, FileSpreadsheet, FileJson, Calendar, Loader2, 
   CheckCircle, X, RefreshCw, FileText, Package, Clock,
   CheckSquare, Square, File, Archive, Film, Clapperboard,
   DollarSign, Users, MapPin, User, Camera, FileCheck,
   Folder, Image, ClipboardList, BarChart3, TrendingUp,
-  UsersRound, Briefcase, Search, HelpCircle
+  UsersRound, Briefcase, Search, HelpCircle, Filter, ChevronDown
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -124,6 +124,12 @@ export default function ExportsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [formatFilter, setFormatFilter] = useState('all')
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -141,6 +147,10 @@ export default function ExportsPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -149,6 +159,7 @@ export default function ExportsPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setSearchQuery('')
+          setShowFilters(false)
           break
       }
     }
@@ -166,9 +177,21 @@ export default function ExportsPage() {
     setTimeout(() => setRefreshing(false), 500)
   }, [])
 
-  // Filter categories by search query
-  const filteredCategories = searchQuery
-    ? EXPORT_CATEGORIES.map(category => ({
+  // Count active filters
+  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length
+  
+  // Filter categories by search query and filters
+  const filteredCategories = useMemo(() => {
+    let categories = EXPORT_CATEGORIES
+    
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      categories = categories.filter(cat => cat.id === categoryFilter)
+    }
+    
+    // Apply search query
+    if (searchQuery) {
+      categories = categories.map(category => ({
         ...category,
         exports: category.exports.filter(exp =>
           exp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -176,7 +199,23 @@ export default function ExportsPage() {
           exp.format.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(category => category.exports.length > 0)
-    : EXPORT_CATEGORIES
+    }
+    
+    // Apply format filter
+    if (formatFilter !== 'all') {
+      categories = categories.map(category => ({
+        ...category,
+        exports: category.exports.filter(exp => 
+          exp.format.toLowerCase() === formatFilter.toLowerCase()
+        )
+      })).filter(category => category.exports.length > 0)
+    }
+    
+    return categories
+  }, [searchQuery, categoryFilter, formatFilter])
+  
+  // Get total export count
+  const totalExports = filteredCategories.reduce((sum, cat) => sum + cat.exports.length, 0)
 
   const handleExport = async (type: string) => {
     setLoading(type)
@@ -291,6 +330,25 @@ export default function ExportsPage() {
       setSelectedExports(prev => [...new Set([...prev, ...categoryIds])])
     }
   }
+  
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Check if click is on filter button
+        const filterButton = document.querySelector('[title="Toggle filters (F)"]')
+        if (filterButton && !filterButton.contains(e.target as Node)) {
+          setShowFilters(false)
+        }
+      }
+    }
+    
+    if (showFilters) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showFilters])
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp)
@@ -337,6 +395,25 @@ export default function ExportsPage() {
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600 pointer-events-none">/</span>
             </div>
             
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+              }`}
+              title="Toggle filters (F)"
+            >
+              <Filter className="w-4 h-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
@@ -378,6 +455,66 @@ export default function ExportsPage() {
             )}
           </div>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="mb-6 p-4 bg-slate-900 border border-slate-800 rounded-xl" ref={filterPanelRef}>
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Category Filter */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-500" />
+                <span className="text-sm text-slate-400">Category:</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="production">Production</option>
+                  <option value="financial">Financial</option>
+                  <option value="creative">Creative</option>
+                  <option value="admin">Administrative</option>
+                </select>
+              </div>
+              
+              {/* Format Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400">Format:</span>
+                <select
+                  value={formatFilter}
+                  onChange={(e) => setFormatFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  <option value="all">All Formats</option>
+                  <option value="pdf">PDF</option>
+                  <option value="xlsx">XLSX</option>
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                  <option value="zip">ZIP</option>
+                </select>
+              </div>
+              
+              {/* Clear Filters */}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setCategoryFilter('all')
+                    setFormatFilter('all')
+                  }}
+                  className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Clear Filters
+                </button>
+              )}
+              
+              {/* Results Count */}
+              <div className="text-sm text-slate-500">
+                Showing {totalExports} export{totalExports !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Message Banner */}
         {message && (
@@ -603,6 +740,10 @@ export default function ExportsPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Focus search</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Toggle filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Show shortcuts</span>

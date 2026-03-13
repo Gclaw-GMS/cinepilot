@@ -126,9 +126,27 @@ export default function LocationsPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    placeType: 'all',
+    intExt: 'all',
+    timeOfDay: 'all',
+    favoritesOnly: false,
+  })
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.placeType !== 'all') count++
+    if (filters.intExt !== 'all') count++
+    if (filters.timeOfDay !== 'all') count++
+    if (filters.favoritesOnly) count++
+    return count
+  }, [filters])
 
   const fetchScenes = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -181,6 +199,9 @@ export default function LocationsPage() {
         case '2':
           setViewMode('chart')
           break
+        case 'f':
+          setShowFilters(prev => !prev)
+          break
         case 'e':
           setShowExportMenu(prev => !prev)
           break
@@ -194,6 +215,7 @@ export default function LocationsPage() {
           setShowShortcuts(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           break
       }
@@ -492,6 +514,12 @@ export default function LocationsPage() {
           setShowPrintMenu(false)
         }
       }
+      if (showFilters && filterPanelRef.current) {
+        const target = e.target as HTMLElement
+        if (!filterPanelRef.current.contains(target) && !target.closest('.filter-toggle')) {
+          setShowFilters(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -509,17 +537,41 @@ export default function LocationsPage() {
       s.timeOfDay?.toLowerCase().includes(query)
     )
   }, [scenes, searchQuery])
-  const extScenes = filteredScenes.filter(s => s.intExt === 'EXT')
-  const intScenes = filteredScenes.filter(s => s.intExt !== 'EXT')
+  
+  // Apply additional scene filters
+  const finalFilteredScenes = useMemo(() => {
+    let result = filteredScenes
+    if (filters.intExt !== 'all') {
+      result = result.filter(s => s.intExt === filters.intExt)
+    }
+    if (filters.timeOfDay !== 'all') {
+      result = result.filter(s => s.timeOfDay?.toUpperCase() === filters.timeOfDay.toUpperCase())
+    }
+    return result
+  }, [filteredScenes, filters])
+  
+  const extScenes = finalFilteredScenes.filter(s => s.intExt === 'EXT')
+  const intScenes = finalFilteredScenes.filter(s => s.intExt !== 'EXT')
 
   // Filter and sort candidates
   const filteredCandidates = useMemo(() => {
     let result = candidates.filter(c => c.scoreTotal >= filterScore)
+    
+    // Apply place type filter
+    if (filters.placeType !== 'all') {
+      result = result.filter(c => c.placeType?.toLowerCase() === filters.placeType)
+    }
+    
+    // Apply favorites filter
+    if (filters.favoritesOnly) {
+      result = result.filter(c => c.id && favorites.has(c.id))
+    }
+    
     if (sortBy === 'score') {
       return result.sort((a, b) => b.scoreTotal - a.scoreTotal)
     }
     return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-  }, [candidates, filterScore, sortBy])
+  }, [candidates, filterScore, sortBy, filters, favorites])
 
   // Statistics
   const stats = useMemo(() => {
@@ -606,6 +658,23 @@ export default function LocationsPage() {
             <RefreshCw className={`w-5 h-5 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-colors filter-toggle ${
+              showFilters 
+                ? 'bg-emerald-600 text-white' 
+                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+            }`}
+            title="Toggle Filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+            )}
+          </button>
+
           {/* Keyboard Shortcuts Button */}
           <button
             onClick={() => setShowShortcuts(true)}
@@ -687,6 +756,93 @@ export default function LocationsPage() {
         </div>
       </div>
 
+      {/* Filter Panel */}
+      {showFilters && (
+        <div 
+          ref={filterPanelRef}
+          className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm font-medium text-slate-300">Filters:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Place Type:</label>
+              <select
+                value={filters.placeType}
+                onChange={(e) => setFilters(prev => ({ ...prev, placeType: e.target.value }))}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="all">All Types</option>
+                <option value="beach">🏖️ Beach</option>
+                <option value="restaurant">🍽️ Restaurant</option>
+                <option value="park">🌳 Park</option>
+                <option value="warehouse">🏭 Warehouse</option>
+                <option value="hotel">🏨 Hotel</option>
+                <option value="temple">🛕 Temple</option>
+                <option value="office">🏢 Office</option>
+                <option value="resort">🏝️ Resort</option>
+                <option value="mountain">⛰️ Mountain</option>
+                <option value="forest">🌲 Forest</option>
+                <option value="studio">🎬 Studio</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Int/Ext:</label>
+              <select
+                value={filters.intExt}
+                onChange={(e) => setFilters(prev => ({ ...prev, intExt: e.target.value }))}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="all">All</option>
+                <option value="EXT">Exterior</option>
+                <option value="INT">Interior</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Time:</label>
+              <select
+                value={filters.timeOfDay}
+                onChange={(e) => setFilters(prev => ({ ...prev, timeOfDay: e.target.value }))}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="all">All Times</option>
+                <option value="DAY">Day</option>
+                <option value="NIGHT">Night</option>
+                <option value="MORNING">Morning</option>
+                <option value="EVENING">Evening</option>
+                <option value="SUNSET">Sunset</option>
+                <option value="DUSK">Dusk</option>
+                <option value="DAWN">Dawn</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.favoritesOnly}
+                  onChange={(e) => setFilters(prev => ({ ...prev, favoritesOnly: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                />
+                <span className="text-sm text-slate-300">Favorites Only</span>
+              </label>
+            </div>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })}
+                className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Clear Filters
+              </button>
+            )}
+            <span className="text-sm text-slate-500 ml-auto">
+              {finalFilteredScenes.length} scenes, {filteredCandidates.length} candidates
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Error Banner */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 flex items-center justify-between">
@@ -717,6 +873,7 @@ export default function LocationsPage() {
               {[
                 { key: 'R', action: 'Refresh location data' },
                 { key: '/', action: 'Focus search input' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: '1', action: 'Switch to Cards view' },
                 { key: '2', action: 'Switch to Analysis view' },
                 { key: 'E', action: 'Toggle export menu' },
@@ -751,9 +908,9 @@ export default function LocationsPage() {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Script Scenes</h3>
-                {searchQuery && (
+                {(searchQuery || activeFilterCount > 0) && (
                   <span className="text-xs text-emerald-400">
-                    {filteredScenes.length} found
+                    {finalFilteredScenes.length} found
                   </span>
                 )}
               </div>

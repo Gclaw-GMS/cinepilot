@@ -26,6 +26,7 @@ import {
   FileText,
   FileJson,
   Printer,
+  Clock,
 } from 'lucide-react';
 import {
   LineChart,
@@ -56,6 +57,21 @@ interface WeatherDay {
   icon: string;
   recommendation: string;
   productionScore: number;
+}
+
+interface HourlyWeatherData {
+  hour: string;
+  time: string;
+  temperature: number;
+  humidity: number;
+  windSpeed: number;
+  precipitationChance: number;
+  precipitation: number;
+  cloudCover: number;
+  visibility: number;
+  condition: string;
+  icon: string;
+  recommendation: string;
 }
 
 interface ScheduledDay {
@@ -190,11 +206,14 @@ function getScoreLabel(score: number): { label: string; color: string; bg: strin
 export default function WeatherPage() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [hourlyData, setHourlyData] = useState<HourlyWeatherData[] | null>(null);
+  const [hourlyLoading, setHourlyLoading] = useState(false);
+  const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'forecast' | 'analytics' | 'schedule'>('forecast');
+  const [viewMode, setViewMode] = useState<'forecast' | 'hourly' | 'analytics' | 'schedule'>('forecast');
   const [showCustomLocation, setShowCustomLocation] = useState(false);
   const [customLocationInput, setCustomLocationInput] = useState('');
   const [customLocationLoading, setCustomLocationLoading] = useState(false);
@@ -273,6 +292,34 @@ export default function WeatherPage() {
     }
   }, []);
 
+  const fetchHourlyWeather = useCallback(async (location: Location, date: string) => {
+    setHourlyLoading(true);
+    try {
+      const params = new URLSearchParams({
+        lat: String(location.lat),
+        lng: String(location.lng),
+        location: location.name,
+        type: 'hourly',
+        date: date,
+      });
+      const res = await fetch(`/api/weather?${params}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error('Failed to fetch hourly weather:', data.error);
+        setHourlyData(null);
+        return;
+      }
+
+      setHourlyData(data.hourly || []);
+    } catch (e) {
+      console.error('Failed to fetch hourly weather:', e);
+      setHourlyData(null);
+    } finally {
+      setHourlyLoading(false);
+    }
+  }, []);
+
   const refreshWeather = useCallback(() => {
     if (selectedLocation) {
       setRefreshing(true);
@@ -308,9 +355,13 @@ export default function WeatherPage() {
           break
         case '2':
           e.preventDefault()
-          setViewMode('analytics')
+          setViewMode('hourly')
           break
         case '3':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '4':
           e.preventDefault()
           setViewMode('schedule')
           break
@@ -610,6 +661,28 @@ export default function WeatherPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showExportMenu, showPrintMenu]);
 
+  // Fetch hourly data when switching to hourly view
+  useEffect(() => {
+    if (viewMode === 'hourly' && selectedLocation && weatherData?.forecast?.length) {
+      // Check if selected date is in the forecast
+      const dateInForecast = weatherData.forecast.find(d => d.date === selectedHourlyDate);
+      if (dateInForecast) {
+        fetchHourlyWeather(selectedLocation, selectedHourlyDate);
+      } else if (weatherData.forecast[0]) {
+        // Default to first available date
+        setSelectedHourlyDate(weatherData.forecast[0].date);
+        fetchHourlyWeather(selectedLocation, weatherData.forecast[0].date);
+      }
+    }
+  }, [viewMode, selectedLocation, weatherData?.forecast?.length]);
+
+  // Fetch hourly data when date changes
+  useEffect(() => {
+    if (viewMode === 'hourly' && selectedLocation && selectedHourlyDate) {
+      fetchHourlyWeather(selectedLocation, selectedHourlyDate);
+    }
+  }, [selectedHourlyDate, viewMode, selectedLocation, fetchHourlyWeather]);
+
   // Analytics calculations
   const analytics = useMemo(() => {
     if (!weatherData?.forecast?.length) return null;
@@ -713,8 +786,9 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['R']} description="Refresh weather data" />
                 <ShortcutRow keys={['/']} description="Search locations" />
                 <ShortcutRow keys={['1']} description="Switch to Forecast view" />
-                <ShortcutRow keys={['2']} description="Switch to Analytics view" />
-                <ShortcutRow keys={['3']} description="Switch to Schedule view" />
+                <ShortcutRow keys={['2']} description="Switch to Hourly view" />
+                <ShortcutRow keys={['3']} description="Switch to Analytics view" />
+                <ShortcutRow keys={['4']} description="Switch to Schedule view" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
                 <ShortcutRow keys={['P']} description="Print forecast report" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
@@ -759,6 +833,16 @@ export default function WeatherPage() {
                     }`}
                   >
                     Forecast
+                  </button>
+                  <button
+                    onClick={() => setViewMode('hourly')}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                      viewMode === 'hourly'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Hourly
                   </button>
                   <button
                     onClick={() => setViewMode('analytics')}
@@ -1048,6 +1132,99 @@ export default function WeatherPage() {
                     <span className="text-sm text-slate-500 font-normal">/{analytics.stats.totalDays}</span>
                   </p>
                 </div>
+              </div>
+            )}
+
+            {viewMode === 'hourly' && (
+              /* Hourly Forecast */
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-cyan-500/20">
+                      <Clock className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-white">Hourly Forecast</h2>
+                  </div>
+                  
+                  {/* Date Selector */}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <select
+                      value={selectedHourlyDate}
+                      onChange={(e) => setSelectedHourlyDate(e.target.value)}
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    >
+                      {weatherData?.forecast?.map((day) => (
+                        <option key={day.date} value={day.date}>
+                          {new Date(day.date).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {hourlyLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  </div>
+                ) : hourlyData && hourlyData.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                    {hourlyData.map((hour) => {
+                      const Icon = getConditionIcon(hour.condition);
+                      const recColor = getRecommendationColor(hour.recommendation);
+                      
+                      return (
+                        <div
+                          key={hour.hour}
+                          className="p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/40 transition-all"
+                        >
+                          {/* Time */}
+                          <p className="text-sm font-semibold text-white mb-2">{hour.hour}</p>
+                          
+                          {/* Icon & Condition */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <Icon className="w-5 h-5 text-cyan-400" />
+                            <span className="text-xs text-slate-400">{hour.condition}</span>
+                          </div>
+                          
+                          {/* Temperature */}
+                          <p className="text-xl font-bold text-white mb-2">{hour.temperature}°</p>
+                          
+                          {/* Details */}
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-1 text-slate-400">
+                              <Droplets className="w-3 h-3" />
+                              <span>{hour.humidity}%</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-slate-400">
+                              <Wind className="w-3 h-3" />
+                              <span>{hour.windSpeed} km/h</span>
+                            </div>
+                            {hour.precipitationChance > 0 && (
+                              <div className="flex items-center gap-1 text-blue-400">
+                                <CloudRain className="w-3 h-3" />
+                                <span>{hour.precipitationChance}%</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Recommendation */}
+                          <div className={`mt-3 pt-2 border-t border-slate-800 text-xs ${
+                            recColor === 'green' ? 'text-emerald-400' : 
+                            recColor === 'amber' ? 'text-amber-400' : 'text-red-400'
+                          }`}>
+                            {hour.recommendation.split('—')[0].trim()}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Select a date to view hourly forecast</p>
+                  </div>
+                )}
               </div>
             )}
 

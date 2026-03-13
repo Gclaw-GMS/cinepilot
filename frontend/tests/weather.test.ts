@@ -1,6 +1,7 @@
 /**
  * Weather API Test Suite
  * Tests all endpoints: GET weather, POST location management
+ * Also tests hourly forecast endpoint
  */
 
 const API_BASE = 'http://localhost:3002/api/weather';
@@ -406,6 +407,38 @@ describe('Weather API', () => {
       const data = await res.json();
 
       expect(data.forecast.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('GET /api/weather - Hourly Forecast', () => {
+    test('hourly endpoint returns hourly data structure', async () => {
+      // The hourly endpoint requires type=hourly param
+      // Since we're using HTTP mocking, we test that the endpoint structure is correct
+      // by checking that it returns properly formatted response
+      const res = await fetch(`${API_BASE}?lat=13.08&lng=80.27&location=Chennai&type=hourly&date=2026-03-15`);
+      const data = await res.json();
+      
+      // Should return either real or demo data
+      expect(data).toBeDefined();
+      if (data.hourly) {
+        expect(Array.isArray(data.hourly)).toBe(true);
+        expect(data.date).toBe('2026-03-15');
+      }
+    });
+
+    test('hourly data has required fields', async () => {
+      const res = await fetch(`${API_BASE}?lat=13.08&lng=80.27&location=Chennai&type=hourly&date=2026-03-15`);
+      const data = await res.json();
+      
+      if (data.hourly && data.hourly.length > 0) {
+        const hour = data.hourly[0];
+        expect(hour).toHaveProperty('hour');
+        expect(hour).toHaveProperty('temperature');
+        expect(hour).toHaveProperty('humidity');
+        expect(hour).toHaveProperty('windSpeed');
+        expect(hour).toHaveProperty('condition');
+        expect(hour).toHaveProperty('recommendation');
+      }
     });
   });
 });

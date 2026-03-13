@@ -47,10 +47,23 @@ interface OpenMeteoDaily {
   weather_code: number[];
 }
 
+interface OpenMeteoHourly {
+  time: string[];
+  temperature_2m: number[];
+  relative_humidity_2m: number[];
+  wind_speed_10m: number[];
+  precipitation_probability: number[];
+  precipitation: number[];
+  weather_code: number[];
+  cloud_cover: number[];
+  visibility: number[];
+}
+
 interface OpenMeteoResponse {
   latitude: number;
   longitude: number;
   daily: OpenMeteoDaily;
+  hourly?: OpenMeteoHourly;
 }
 
 export interface WeatherForecastDay {
@@ -63,6 +76,31 @@ export interface WeatherForecastDay {
   precipitation: number;
   icon: string;
   recommendation: string;
+}
+
+export interface HourlyWeatherData {
+  hour: string;
+  time: string;
+  temperature: number;
+  humidity: number;
+  windSpeed: number;
+  precipitationChance: number;
+  precipitation: number;
+  cloudCover: number;
+  visibility: number;
+  condition: string;
+  icon: string;
+  recommendation: string;
+}
+
+export interface HourlyWeatherResponse {
+  location: string;
+  lat: number;
+  lng: number;
+  date: string;
+  hourly: HourlyWeatherData[];
+  isDemo?: boolean;
+  error?: string;
 }
 
 export interface WeatherResponse {
@@ -144,6 +182,82 @@ function getShootingRecommendation(
   return '✅ Suitable for filming with appropriate preparation';
 }
 
+function getHourlyShootingRecommendation(
+  condition: string,
+  precipitation: number,
+  precipitationChance: number,
+  windSpeed: number,
+  humidity: number,
+  cloudCover: number,
+  visibility: number
+): string {
+  const conditionLower = condition.toLowerCase();
+  const windKmh = windSpeed;
+
+  // Visibility check (in meters)
+  if (visibility < 1000) {
+    return '🌫️ Very low visibility — atmospheric shots only, plan indoor alternatives';
+  }
+  if (visibility < 3000) {
+    return '🌫️ Reduced visibility — good for moody scenes, consider timing';
+  }
+
+  // Thunderstorm check
+  if (conditionLower.includes('thunderstorm')) {
+    return '⛈️ Thunderstorms — avoid outdoor shooting, plan indoor alternatives';
+  }
+
+  // Snow check
+  if (conditionLower.includes('snow')) {
+    return '❄️ Snow conditions — plan indoor alternatives or winter gear';
+  }
+
+  // Rain check
+  if (precipitation > 5 || precipitationChance > 70 || conditionLower.includes('rain') || conditionLower.includes('drizzle')) {
+    return '🌧️ High rain chance — plan indoor alternatives';
+  }
+  if (precipitation > 0 || precipitationChance > 40 || conditionLower.includes('showers')) {
+    return '🌦️ Possible rain — have indoor backup ready';
+  }
+
+  // Wind check
+  if (windKmh > 40) {
+    return '💨 Dangerous winds — avoid outdoor, secure equipment';
+  }
+  if (windKmh > 25) {
+    return '💨 Strong winds — use wind protection, secure lighting';
+  }
+  if (windKmh > 15) {
+    return '💨 Moderate winds — watch for sound issues';
+  }
+
+  // Humidity check
+  if (humidity > 90) {
+    return '💧 Very humid — equipment concerns, plan accordingly';
+  }
+  if (humidity > 80) {
+    return '💧 High humidity — monitor equipment';
+  }
+
+  // Cloud cover for filming
+  if (cloudCover > 80) {
+    return '☁️ Overcast — excellent for even lighting, no harsh shadows';
+  }
+  if (cloudCover > 50) {
+    return '⛅ Partly cloudy — good conditions, watch for changing light';
+  }
+
+  // Clear skies
+  if (conditionLower.includes('clear') || conditionLower.includes('sunny')) {
+    if (humidity < 60 && windKmh < 15) {
+      return '☀️ Perfect conditions — ideal for outdoor shooting';
+    }
+    return '☀️ Clear skies — good for filming';
+  }
+
+  return '✅ Suitable for filming';
+}
+
 // Default location: Chennai (Tamil Nadu) - hub for Tamil film industry
 const DEFAULT_LOCATION = {
   lat: 13.0827,
@@ -180,11 +294,95 @@ function generateDemoForecast(locationName: string): WeatherForecastDay[] {
   return forecast;
 }
 
+// Generate demo hourly data for a specific date
+function generateDemoHourlyForecast(locationName: string, dateStr: string): HourlyWeatherData[] {
+  const hourly: HourlyWeatherData[] = [];
+  const baseDate = new Date(dateStr);
+  
+  // Simulate realistic daily weather pattern
+  const isRainyDay = Math.random() > 0.7;
+  const baseTemp = 25 + Math.random() * 8; // 25-33°C
+  
+  for (let hour = 0; hour < 24; hour++) {
+    // Temperature curve: coldest at 5am, hottest at 2pm
+    const hourFactor = Math.sin((hour - 5) * Math.PI / 12);
+    const temperature = Math.round(baseTemp + hourFactor * 6);
+    
+    // Humidity inversely related to temperature
+    const humidity = Math.round(70 - hourFactor * 20 + Math.random() * 10);
+    
+    // Wind varies throughout day
+    const windSpeed = Math.round(8 + Math.random() * 12 + Math.max(0, hourFactor * 10));
+    
+    // Rain pattern
+    let precipitationChance = 0;
+    let precipitation = 0;
+    let condition = 'Clear';
+    let icon = '01d';
+    
+    if (isRainyDay) {
+      // Rain more likely afternoon/evening
+      if (hour >= 14 && hour <= 20) {
+        precipitationChance = Math.round(50 + Math.random() * 40);
+        precipitation = precipitationChance > 50 ? Math.round(Math.random() * 8) : 0;
+        condition = precipitation > 3 ? 'Rain' : 'Showers';
+        icon = '10d';
+      } else if (hour >= 10) {
+        precipitationChance = Math.round(Math.random() * 30);
+        condition = precipitationChance > 15 ? 'Cloudy' : 'Partly Cloudy';
+        icon = '02d';
+      }
+    } else {
+      // Clear day with some clouds
+      if (hour >= 10 && hour <= 16) {
+        condition = hour % 3 === 0 ? 'Partly Cloudy' : 'Clear';
+        icon = condition === 'Clear' ? '01d' : '02d';
+      } else {
+        condition = 'Clear';
+        icon = '01d';
+      }
+    }
+    
+    // Cloud cover follows temperature pattern
+    const cloudCover = condition === 'Clear' ? Math.round(Math.random() * 20) : 
+                       condition === 'Partly Cloudy' ? Math.round(30 + Math.random() * 30) :
+                       Math.round(60 + Math.random() * 30);
+    
+    // Visibility better in clear conditions
+    const visibility = condition === 'Clear' ? Math.round(9000 + Math.random() * 1000) :
+                      Math.round(6000 + Math.random() * 2000);
+    
+    const timeStr = baseDate.toISOString().split('T')[0] + ' ' + 
+                   hour.toString().padStart(2, '0') + ':00';
+    
+    hourly.push({
+      hour: hour.toString().padStart(2, '0') + ':00',
+      time: timeStr,
+      temperature,
+      humidity: Math.max(30, Math.min(95, humidity)),
+      windSpeed: Math.max(0, windSpeed),
+      precipitationChance,
+      precipitation: Math.round(precipitation * 10) / 10,
+      cloudCover,
+      visibility,
+      condition,
+      icon,
+      recommendation: getHourlyShootingRecommendation(
+        condition, precipitation, precipitationChance, windSpeed, humidity, cloudCover, visibility
+      ),
+    });
+  }
+  
+  return hourly;
+}
+
 export async function GET(req: NextRequest) {
   // Get lat/lng from query params, fall back to defaults
   let lat = req.nextUrl.searchParams.get('lat');
   let lng = req.nextUrl.searchParams.get('lng');
   let location = req.nextUrl.searchParams.get('location');
+  const type = req.nextUrl.searchParams.get('type');
+  const dateParam = req.nextUrl.searchParams.get('date');
 
   // Use default location if not provided
   if (!lat || !lng) {
@@ -205,6 +403,136 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Handle hourly forecast request
+  if (type === 'hourly') {
+    // Determine which date to get hourly data for
+    let targetDate: Date;
+    if (dateParam) {
+      targetDate = new Date(dateParam);
+      if (isNaN(targetDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format. Use YYYY-MM-DD' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Default to today
+      targetDate = new Date();
+    }
+
+    const dateStr = targetDate.toISOString().split('T')[0];
+
+    try {
+      // Fetch hourly data from Open-Meteo
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latNum}&longitude=${lngNum}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation,weather_code,cloud_cover,visibility&timezone=auto&forecast_days=7`;
+      
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('[GET /api/weather hourly] Open-Meteo error:', res.status, errText);
+        // Fall back to demo hourly data
+        const hourly = generateDemoHourlyForecast(location, dateStr);
+        return NextResponse.json({
+          location,
+          lat: latNum,
+          lng: lngNum,
+          date: dateStr,
+          hourly,
+          isDemo: true,
+          error: 'Using demo data - API call failed',
+        } satisfies HourlyWeatherResponse);
+      }
+
+      const data: OpenMeteoResponse = await res.json();
+      
+      if (!data.hourly) {
+        // Fall back to demo hourly data if no hourly data available
+        const hourly = generateDemoHourlyForecast(location, dateStr);
+        return NextResponse.json({
+          location,
+          lat: latNum,
+          lng: lngNum,
+          date: dateStr,
+          hourly,
+          isDemo: true,
+          error: 'Using demo data - No hourly data available',
+        } satisfies HourlyWeatherResponse);
+      }
+
+      // Find the index of the target date in the hourly data
+      const hourlyData: HourlyWeatherData[] = [];
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+      
+      for (let i = 0; i < data.hourly.time.length; i++) {
+        const hourDateTime = data.hourly.time[i];
+        if (hourDateTime.startsWith(targetDateStr)) {
+          const hour = new Date(hourDateTime).getHours();
+          const weatherInfo = getWeatherCondition(data.hourly.weather_code[i]);
+          
+          hourlyData.push({
+            hour: hour.toString().padStart(2, '0') + ':00',
+            time: hourDateTime,
+            temperature: Math.round(data.hourly.temperature_2m[i]),
+            humidity: Math.round(data.hourly.relative_humidity_2m[i] || 0),
+            windSpeed: Math.round(data.hourly.wind_speed_10m[i] || 0),
+            precipitationChance: Math.round(data.hourly.precipitation_probability[i] || 0),
+            precipitation: Math.round((data.hourly.precipitation[i] || 0) * 10) / 10,
+            cloudCover: Math.round(data.hourly.cloud_cover[i] || 0),
+            visibility: Math.round(data.hourly.visibility[i] || 10000),
+            condition: weatherInfo.condition,
+            icon: weatherInfo.icon,
+            recommendation: getHourlyShootingRecommendation(
+              weatherInfo.condition,
+              data.hourly.precipitation[i] || 0,
+              data.hourly.precipitation_probability[i] || 0,
+              data.hourly.wind_speed_10m[i] || 0,
+              data.hourly.relative_humidity_2m[i] || 0,
+              data.hourly.cloud_cover[i] || 0,
+              data.hourly.visibility[i] || 10000
+            ),
+          });
+        }
+      }
+
+      // If no data for the target date, generate demo data
+      if (hourlyData.length === 0) {
+        const hourly = generateDemoHourlyForecast(location, dateStr);
+        return NextResponse.json({
+          location,
+          lat: latNum,
+          lng: lngNum,
+          date: dateStr,
+          hourly,
+          isDemo: true,
+          error: 'Using demo data - No data for selected date',
+        } satisfies HourlyWeatherResponse);
+      }
+
+      return NextResponse.json({
+        location,
+        lat: latNum,
+        lng: lngNum,
+        date: dateStr,
+        hourly: hourlyData,
+      } satisfies HourlyWeatherResponse);
+    } catch (error) {
+      console.error('[GET /api/weather hourly]', error);
+      // Fall back to demo hourly data on any error
+      const hourly = generateDemoHourlyForecast(location, dateStr);
+      return NextResponse.json({
+        location,
+        lat: latNum,
+        lng: lngNum,
+        date: dateStr,
+        hourly,
+        isDemo: true,
+        error: 'Using demo data - API call failed',
+      } satisfies HourlyWeatherResponse);
+    }
+  }
+
+  // Default: daily forecast
   try {
     // Use Open-Meteo API (free, no API key required)
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latNum}&longitude=${lngNum}&daily=weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_max,wind_speed_10m_max,precipitation_sum&timezone=auto&forecast_days=7`;

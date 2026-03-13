@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface ShotData {
   id: string
@@ -483,6 +484,69 @@ export default function ShotHubPage() {
     return m > 0 ? `${m}m ${s}s` : `${s}s`
   }
 
+  // Analytics data computation
+  const shotSizeData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    shots.forEach(shot => {
+      const size = shot.shotSize || 'Unspecified'
+      counts[size] = (counts[size] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [shots])
+
+  const cameraAngleData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    shots.forEach(shot => {
+      const angle = shot.cameraAngle || 'Unspecified'
+      counts[angle] = (counts[angle] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [shots])
+
+  const cameraMovementData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    shots.forEach(shot => {
+      const movement = shot.cameraMovement || 'Unspecified'
+      counts[movement] = (counts[movement] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [shots])
+
+  const lensData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    shots.forEach(shot => {
+      const lens = shot.focalLengthMm ? `${shot.focalLengthMm}mm` : 'Unspecified'
+      counts[lens] = (counts[lens] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [shots])
+
+  const durationBySizeData = useMemo(() => {
+    const totals: Record<string, { count: number; total: number }> = {}
+    shots.forEach(shot => {
+      const size = shot.shotSize || 'Unspecified'
+      if (!totals[size]) totals[size] = { count: 0, total: 0 }
+      totals[size].count++
+      totals[size].total += shot.durationEstSec || 0
+    })
+    return Object.entries(totals)
+      .map(([name, data]) => ({ 
+        name, 
+        avgDuration: data.count > 0 ? Math.round(data.total / data.count) : 0 
+      }))
+      .sort((a, b) => b.avgDuration - a.avgDuration)
+  }, [shots])
+
+  const CHART_COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#64748b']
+
   if (loading) {
     return (
       <div className="p-6">
@@ -654,6 +718,140 @@ export default function ShotHubPage() {
           <div className="text-xs text-gray-500">Scenes</div>
         </div>
       </div>
+
+      {/* Analytics Charts Row */}
+      {shots.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Shot Size Distribution */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <PieChartIcon className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-medium text-gray-300">Shot Sizes</h3>
+            </div>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={shotSizeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={30}
+                    outerRadius={55}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {shotSizeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {shotSizeData.slice(0, 4).map((entry, i) => (
+                <span key={entry.name} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '30', color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                  {entry.name}: {entry.value}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Camera Angles */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Camera className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-medium text-gray-300">Camera Angles</h3>
+            </div>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={cameraAngleData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis type="number" stroke="#6b7280" fontSize={10} />
+                  <YAxis type="category" dataKey="name" stroke="#6b7280" fontSize={10} width={50} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                  <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Camera Movements */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-medium text-gray-300">Movements</h3>
+            </div>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={cameraMovementData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#6b7280" fontSize={9} />
+                  <YAxis stroke="#6b7280" fontSize={10} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                  <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Lens Usage */}
+          <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-medium text-gray-300">Lens Usage</h3>
+            </div>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={lensData.slice(0, 6)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#6b7280" fontSize={9} />
+                  <YAxis stroke="#6b7280" fontSize={10} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    itemStyle={{ color: '#9ca3af' }}
+                  />
+                  <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duration Analysis Row */}
+      {shots.length > 0 && durationBySizeData.length > 0 && (
+        <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Timer className="w-4 h-4 text-pink-400" />
+            <h3 className="text-sm font-medium text-gray-300">Average Duration by Shot Size</h3>
+          </div>
+          <div className="h-32">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={durationBySizeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="name" stroke="#6b7280" fontSize={10} />
+                <YAxis stroke="#6b7280" fontSize={10} unit="s" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  itemStyle={{ color: '#9ca3af' }}
+                  formatter={(value: number) => [`${value}s`, 'Avg Duration']}
+                />
+                <Bar dataKey="avgDuration" fill="#ec4899" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {!scriptId ? (
         <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">

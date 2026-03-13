@@ -1,5 +1,76 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (6:29 PM) - Reports Page Filter Count Badge FIXED + Tests Pass
+
+## Night Build (6:29 PM) - Reports Page Filter Count Badge Fix (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Reports Page - Filter Count Badge Fix**: Fixed hardcoded filter count badge to properly count all active filters
+  - **Added useMemo**: Imported and added activeFilterCount calculation using useMemo
+  - **Proper Filter Count**: Now counts both tabFilter AND searchQuery
+  - **Dynamic Badge**: Badge shows correct count (1 or 2) based on active filters
+  - **Button Styling**: Filter button now highlights when any filter is active (not just panel open)
+  - **Clear Filters Fix**: Clear Filters button now resets both tabFilter and searchQuery
+  - **Visual Feedback**: Clear button now shows red when filters are active, gray when not
+
+### Reports Filter Count Badge Fix Details
+1. **Added useMemo**: Imported useMemo from React for activeFilterCount calculation
+2. **Filter Count**: Now properly counts tabFilter + searchQuery (was hardcoded to 1)
+3. **Visual Badge**: Shows correct number when filters are active
+4. **Button State**: Highlights when filters are active (indigo theme)
+5. **Clear All**: Clear Filters button now resets all filters including searchQuery
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Reports Filter Count Badge Fix Checklist
+- [x] Feature works 100% (badge shows correct count)
+- [x] UI professional & visual (indigo theme, consistent with other pages)
+- [x] Filter count properly calculated (tabFilter + searchQuery)
+- [x] Button styling updates when filters active
+- [x] Clear Filters resets all filters
+- [x] Error handling complete
+- [x] Build passes
+
+---
+
+## Build Status: ✅ PASSING (6:09 PM) - Timeline Page Filter Count Badge COMPLETE + Tests Pass
+
+## Night Build (6:09 PM) - Timeline Page Filter Count Badge Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Timeline Page - Filter Count Badge**: Added active filter count badge to Timeline page
+  - **Active Filter Count**: New activeFilterCount calculation for filterType + searchQuery
+  - **Filter Badge**: Shows count of active filters on the filter toggle button
+  - **Button Styling**: Filter button highlights when filters are active (purple theme)
+  - **Clear Filters Enhancement**: Clear Filters button now also clears search query
+
+### Timeline Filter Count Badge Enhancements
+1. **Filter Count**: Proper count of active filters (filterType + searchQuery)
+2. **Visual Badge**: Purple badge shows count when filters are active
+3. **Button State**: Button styling changes when filters are active
+4. **Clear All**: Clear Filters button resets both filterType and searchQuery
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Timeline Filter Count Badge Checklist
+- [x] Feature works 100% (badge shows correct count)
+- [x] UI professional & visual (purple theme, consistent with other pages)
+- [x] Filter count properly calculated (filterType + searchQuery)
+- [x] Button styling updates when filters active
+- [x] Clear Filters resets both filters and search
+- [x] Error handling complete
+- [x] Build passes
+
+---
+
 ## Build Status: ✅ PASSING (5:49 PM) - Filter Count Badges COMPLETE + Tests Pass
 
 ## Night Build (5:49 PM) - Filter Count Badges Feature (IMPLEMENTED)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   FileText, BarChart3, Download, RefreshCw, Loader2, 
   ChevronRight, TrendingUp, Target, Film, Users, 
@@ -95,6 +95,14 @@ export default function ReportsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [tabFilter, setTabFilter] = useState<string>('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (tabFilter !== 'all') count++
+    if (searchQuery) count++
+    return count
+  }, [tabFilter, searchQuery])
 
   const fetchReport = useCallback(async () => {
     try {
@@ -493,7 +501,7 @@ export default function ReportsPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-              showFilters 
+              showFilters || activeFilterCount > 0
                 ? 'bg-indigo-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
@@ -501,8 +509,10 @@ export default function ReportsPage() {
           >
             <Filter className="w-4 h-4" />
             Filters
-            {tabFilter !== 'all' && (
-              <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">1</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
+                {activeFilterCount}
+              </span>
             )}
           </button>
           <div className="relative" ref={exportMenuRef}>
@@ -600,8 +610,13 @@ export default function ReportsPage() {
               </select>
             </div>
             <button
-              onClick={() => setTabFilter('all')}
-              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+              onClick={() => { setTabFilter('all'); setSearchQuery('') }}
+              className={`px-3 py-1.5 text-sm transition-colors ${
+                activeFilterCount > 0 
+                  ? 'text-red-400 hover:text-red-300' 
+                  : 'text-slate-500 cursor-not-allowed'
+              }`}
+              disabled={activeFilterCount === 0}
             >
               Clear Filters
             </button>

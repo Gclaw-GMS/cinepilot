@@ -40,6 +40,10 @@ export default function TimelinePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Calculate active filter count
+  const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)
+  
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -607,11 +611,17 @@ export default function TimelinePage() {
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  showFilters ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                  showFilters || activeFilterCount > 0 ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
                 }`}
+                title="Toggle Filters (F)"
               >
                 <Filter className="w-4 h-4" />
                 Filters
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
 
               {/* Zoom */}
@@ -721,7 +731,7 @@ export default function TimelinePage() {
                     </select>
                   </div>
                   <button
-                    onClick={() => setFilterType('all')}
+                    onClick={() => { setFilterType('all'); setSearchQuery('') }}
                     className="text-sm text-purple-400 hover:text-purple-300"
                   >
                     Clear Filters

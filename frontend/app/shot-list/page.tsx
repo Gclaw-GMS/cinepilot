@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -79,6 +79,36 @@ export default function ShotHubPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
+
+  // Filter state
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [filters, setFilters] = useState({
+    sceneId: 'all',
+    shotSize: 'all',
+    cameraAngle: 'all',
+    cameraMovement: 'all',
+  })
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.sceneId !== 'all') count++
+    if (filters.shotSize !== 'all') count++
+    if (filters.cameraAngle !== 'all') count++
+    if (filters.cameraMovement !== 'all') count++
+    return count
+  }, [filters])
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilters({
+      sceneId: 'all',
+      shotSize: 'all',
+      cameraAngle: 'all',
+      cameraMovement: 'all',
+    })
+  }, [])
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -171,11 +201,16 @@ export default function ShotHubPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilterPanel(false)
           setSceneFilter('')
           setSelectedSceneId(null)
           break
@@ -190,9 +225,9 @@ export default function ShotHubPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [scriptId, generating, saving, exporting, shots.length])
+  }, [scriptId, generating, saving, exporting, shots.length, showFilterPanel])
 
-  // Click outside to close export menu
+  // Click outside to close menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -201,14 +236,17 @@ export default function ShotHubPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilterPanel) {
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   const handleGenerateAll = async () => {
     if (!scriptId) return
@@ -478,6 +516,17 @@ export default function ShotHubPage() {
     ? shots.filter(s => s.scene.id === selectedSceneId)
     : shots
 
+  // Apply filters to shots
+  const filteredShots = useMemo(() => {
+    return activeSceneShots.filter(shot => {
+      if (filters.sceneId !== 'all' && shot.scene.id !== filters.sceneId) return false
+      if (filters.shotSize !== 'all' && shot.shotSize !== filters.shotSize) return false
+      if (filters.cameraAngle !== 'all' && shot.cameraAngle !== filters.cameraAngle) return false
+      if (filters.cameraMovement !== 'all' && shot.cameraMovement !== filters.cameraMovement) return false
+      return true
+    })
+  }, [activeSceneShots, filters])
+
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60)
     const s = Math.round(sec % 60)
@@ -674,6 +723,103 @@ export default function ShotHubPage() {
               </div>
             )}
           </div>
+          {/* Filter Toggle Button */}
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilterPanel(!showFilterPanel)}
+              className={`px-4 py-2 border rounded font-medium text-sm flex items-center gap-2 ${
+                showFilterPanel || activeFilterCount > 0
+                  ? 'bg-violet-600 border-violet-500 text-white'
+                  : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+              }`}
+              title="Toggle filters (F)"
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-white text-violet-600 text-xs rounded-full font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {showFilterPanel && (
+              <div className="absolute right-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-white">Filter Shots</h3>
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-xs text-violet-400 hover:text-violet-300"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                
+                {/* Scene Filter */}
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-400 mb-1">Scene</label>
+                  <select
+                    value={filters.sceneId}
+                    onChange={e => setFilters(prev => ({ ...prev, sceneId: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white"
+                  >
+                    <option value="all">All Scenes</option>
+                    {scenes.map(scene => (
+                      <option key={scene.id} value={scene.id}>
+                        {scene.sceneNumber}: {scene.headingRaw?.substring(0, 30) || 'Untitled'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shot Size Filter */}
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-400 mb-1">Shot Size</label>
+                  <select
+                    value={filters.shotSize}
+                    onChange={e => setFilters(prev => ({ ...prev, shotSize: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white"
+                  >
+                    <option value="all">All Sizes</option>
+                    {SHOT_SIZES.map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Camera Angle Filter */}
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-400 mb-1">Camera Angle</label>
+                  <select
+                    value={filters.cameraAngle}
+                    onChange={e => setFilters(prev => ({ ...prev, cameraAngle: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white"
+                  >
+                    <option value="all">All Angles</option>
+                    {ANGLES.map(angle => (
+                      <option key={angle} value={angle}>{angle}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Camera Movement Filter */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Camera Movement</label>
+                  <select
+                    value={filters.cameraMovement}
+                    onChange={e => setFilters(prev => ({ ...prev, cameraMovement: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white"
+                  >
+                    <option value="all">All Movements</option>
+                    {MOVEMENTS.map(movement => (
+                      <option key={movement} value={movement}>{movement}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="p-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-gray-400 hover:text-white"
@@ -702,8 +848,11 @@ export default function ShotHubPage() {
       {/* Stats Row */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-cinepilot-accent">{stats.totalShots}</div>
-          <div className="text-xs text-gray-500">Total Shots</div>
+          <div className="text-2xl font-bold text-cinepilot-accent">
+            {activeFilterCount > 0 ? filteredShots.length : stats.totalShots}
+            {activeFilterCount > 0 && <span className="text-sm text-gray-500 ml-1">/ {stats.totalShots}</span>}
+          </div>
+          <div className="text-xs text-gray-500">Total Shots{activeFilterCount > 0 && ' (filtered)'}</div>
         </div>
         <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-cinepilot-accent">{formatDuration(stats.totalDuration)}</div>
@@ -917,16 +1066,25 @@ export default function ShotHubPage() {
 
           {/* Main Panel: Shot Table */}
           <div className="col-span-3">
-            {activeSceneShots.length === 0 ? (
+            {filteredShots.length === 0 ? (
               <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
                 <div className="text-gray-500 mb-2">
-                  {selectedSceneId ? 'No shots generated for this scene' : 'No shots generated yet'}
+                  {selectedSceneId ? 'No shots generated for this scene' : activeFilterCount > 0 ? 'No shots match your filters' : 'No shots generated yet'}
                 </div>
-                <p className="text-gray-600 text-sm">Click "Generate All Shots" or generate per scene</p>
+                {activeFilterCount > 0 ? (
+                  <button
+                    onClick={clearFilters}
+                    className="text-violet-400 hover:text-violet-300 text-sm"
+                  >
+                    Clear filters
+                  </button>
+                ) : (
+                  <p className="text-gray-600 text-sm">Click "Generate All Shots" or generate per scene</p>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
-                {activeSceneShots.map(shot => (
+                {filteredShots.map(shot => (
                   <ShotRow
                     key={shot.id}
                     shot={shot}
@@ -961,6 +1119,10 @@ export default function ShotHubPage() {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Search scenes</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Toggle filters</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">F</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Generate all shots</span>

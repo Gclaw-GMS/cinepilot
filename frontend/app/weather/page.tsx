@@ -21,6 +21,7 @@ import {
   Plus,
   X,
   Search,
+  Filter,
   HelpCircle,
   ChevronDown,
   FileText,
@@ -224,7 +225,57 @@ export default function WeatherPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    condition: 'all',
+    dateRange: 'all',
+  });
   const printMenuRef = useRef<HTMLDivElement>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
+
+  // Calculate active filter count
+  const activeFilterCount = (filters.condition !== 'all' ? 1 : 0) + (filters.dateRange !== 'all' ? 1 : 0);
+
+  // Clear filters
+  const clearFilters = () => {
+    setFilters({ condition: 'all', dateRange: 'all' });
+  };
+
+  // Filtered weather forecast
+  const filteredForecast = useMemo(() => {
+    if (!weatherData?.forecast) return [];
+    
+    let result = [...weatherData.forecast];
+    
+    // Filter by condition
+    if (filters.condition !== 'all') {
+      result = result.filter(day => day.condition.toLowerCase().includes(filters.condition));
+    }
+    
+    // Filter by date range
+    if (filters.dateRange !== 'all') {
+      if (filters.dateRange === '3') {
+        result = result.slice(0, 3);
+      } else if (filters.dateRange === '5') {
+        result = result.slice(0, 5);
+      } else if (filters.dateRange === 'weekend') {
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+        const saturday = new Date(today);
+        saturday.setDate(today.getDate() + daysUntilSaturday);
+        const sunday = new Date(saturday);
+        sunday.setDate(saturday.getDate() + 1);
+        
+        result = result.filter(day => {
+          const dayDate = new Date(day.date);
+          return dayDate.getDay() === 6 || dayDate.getDay() === 0;
+        });
+      }
+    }
+    
+    return result;
+  }, [weatherData?.forecast, filters]);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -380,6 +431,11 @@ export default function WeatherPage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case 'p':
           e.preventDefault()
@@ -656,10 +712,13 @@ export default function WeatherPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false);
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showExportMenu, showPrintMenu]);
+  }, [showExportMenu, showPrintMenu, showFilters]);
 
   // Fetch hourly data when switching to hourly view
   useEffect(() => {
@@ -789,6 +848,7 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['2']} description="Switch to Hourly view" />
                 <ShortcutRow keys={['3']} description="Switch to Analytics view" />
                 <ShortcutRow keys={['4']} description="Switch to Schedule view" />
+                <ShortcutRow keys={['F']} description="Toggle filters" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
                 <ShortcutRow keys={['P']} description="Print forecast report" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
@@ -878,6 +938,22 @@ export default function WeatherPage() {
                     <RefreshCw className="w-4 h-4" />
                   )}
                   Refresh
+                </button>
+                {/* Filter Toggle Button */}
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                    showFilters 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                  }`}
+                  title="Toggle Filters (F)"
+                >
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+                  )}
                 </button>
                 <button
                   onClick={exportToCSV}
@@ -977,6 +1053,60 @@ export default function WeatherPage() {
             </button>
           </div>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && weatherData?.forecast && (
+          <div 
+            ref={filterPanelRef}
+            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-medium text-slate-300">Filters:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Condition:</label>
+                <select
+                  value={filters.condition}
+                  onChange={(e) => setFilters(prev => ({ ...prev, condition: e.target.value }))}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">All Conditions</option>
+                  <option value="sunny">☀️ Sunny</option>
+                  <option value="partly_cloudy">⛅ Partly Cloudy</option>
+                  <option value="cloudy">☁️ Cloudy</option>
+                  <option value="rain">🌧️ Rain</option>
+                  <option value="thunderstorm">⛈️ Thunderstorm</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Date Range:</label>
+                <select
+                  value={filters.dateRange}
+                  onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value }))}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">All Days</option>
+                  <option value="3">Next 3 Days</option>
+                  <option value="5">Next 5 Days</option>
+                  <option value="weekend">This Weekend</option>
+                </select>
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => setFilters({ condition: 'all', dateRange: 'all' })}
+                  className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+              <span className="text-sm text-slate-500 ml-auto">
+                {weatherData.forecast.length} days available
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Custom Location Input */}
         {showCustomLocation && (

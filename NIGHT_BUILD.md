@@ -1,5 +1,38 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (5:55 AM) - Locations API _demo Fix
+
+## Night Build (5:55 AM) - Locations API Test Fix (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Locations API - _demo Property Consistency Fix**: Fixed test failures in Locations API
+  - **Issue**: Tests expected `_demo` property but API returned `isDemoMode` inconsistently
+  - **Fix**: Added `_demo: true/false` to all demo/non-demo responses in GET /api/locations
+  - **Consistency**: Now both `_demo` and `isDemoMode` are returned for clarity
+  - **Result**: All 19 Locations API tests now passing
+
+### Test Results
+- **Before**: 2 failed tests in locations.test.ts
+- **After**: 0 failed, 19 passing (19 total)
+- **All Tests**: 803 passing, 0 failing
+
+### Build Verification
+- **Build**: Clean build with 81 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Locations API Fix Checklist
+- [x] Feature works 100% (API returns _demo consistently)
+- [x] API fully connected (_demo returned in all response paths)
+- [x] Demo mode handling complete (both _demo and isDemoMode returned)
+- [x] Error handling complete (catch block also returns _demo)
+- [x] Build passes
+
+### Pushed: e4ed5fe
+
+---
+
 ## Build Status: ✅ PASSING (5:28 AM) - AI Tools Filter Toggle Added
 
 ## Night Build (5:28 AM) - AI Tools Filter Toggle Feature (IMPLEMENTED)

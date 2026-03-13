@@ -5,7 +5,7 @@ import {
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw, HelpCircle, X, Search, Printer
+  Loader2, RefreshCw, HelpCircle, X, Search, Printer, Filter
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -146,13 +146,20 @@ export default function MissionControl() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  
+  // Filter states
+  const [filterDepartment, setFilterDepartment] = useState('all')
+  const [filterRiskLevel, setFilterRiskLevel] = useState('all')
+  const [filterLocation, setFilterLocation] = useState('all')
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -513,6 +520,22 @@ export default function MissionControl() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showExportMenu, showPrintMenu])
 
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false)
+      }
+    }
+    if (showFilterPanel) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showFilterPanel])
+
+  // Active filter count
+  const activeFilterCount = (filterDepartment !== 'all' ? 1 : 0) + (filterRiskLevel !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -542,11 +565,16 @@ export default function MissionControl() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilterPanel(false)
           setSearchQuery('')
           break
       }
@@ -671,6 +699,87 @@ export default function MissionControl() {
                 </div>
               )}
             </div>
+            {/* Filter Toggle Button */}
+            <div className="relative" ref={filterPanelRef}>
+              <button 
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
+                  showFilterPanel || activeFilterCount > 0
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                }`}
+                title="Toggle Filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="text-sm">Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-cyan-500 text-white text-xs font-bold rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {showFilterPanel && (
+                <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <h3 className="text-sm font-medium text-white">Filter Mission Control</h3>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* Department Filter */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-2">Department</label>
+                      <select
+                        value={filterDepartment}
+                        onChange={(e) => setFilterDepartment(e.target.value)}
+                        className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="all">All Departments</option>
+                        {data?.departments.map(dept => (
+                          <option key={dept.name} value={dept.name}>{dept.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Risk Level Filter */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-2">Risk Level</label>
+                      <select
+                        value={filterRiskLevel}
+                        onChange={(e) => setFilterRiskLevel(e.target.value)}
+                        className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="all">All Risk Levels</option>
+                        <option value="high">High Risk</option>
+                        <option value="medium">Medium Risk</option>
+                        <option value="low">Low Risk</option>
+                      </select>
+                    </div>
+                    {/* Location Filter */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-2">Location</label>
+                      <select
+                        value={filterLocation}
+                        onChange={(e) => setFilterLocation(e.target.value)}
+                        className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="all">All Locations</option>
+                        {data?.locations.map(loc => (
+                          <option key={loc.name} value={loc.name}>{loc.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <div className="px-4 py-3 border-t border-white/10 bg-slate-800/50">
+                      <button
+                        onClick={() => { setFilterDepartment('all'); setFilterRiskLevel('all'); setFilterLocation('all'); }}
+                        className="w-full text-center text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                      >
+                        Clear All Filters
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
               <button 
                 onClick={handleRefresh}
@@ -778,6 +887,7 @@ export default function MissionControl() {
             <div className="space-y-3">
               <ShortcutRow keys={['R']} description="Refresh mission data" />
               <ShortcutRow keys={['/']} description="Focus search input" />
+              <ShortcutRow keys={['F']} description="Toggle filters panel" />
               <ShortcutRow keys={['E']} description="Export dropdown menu" />
               <ShortcutRow keys={['P']} description="Print mission report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />

@@ -5,7 +5,7 @@ import {
   Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
   Film, Star, Clock, CheckCircle, MoreHorizontal, Loader2,
   Trash2, Edit2, X, DollarSign, Briefcase, Send, RefreshCw,
-  TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText, Printer
+  TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText, Printer, Filter
 } from 'lucide-react'
 
 interface TeamMember {
@@ -75,7 +75,7 @@ export default function CollaborationPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [deptFilter, setDeptFilter] = useState('all')
+
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -85,11 +85,20 @@ export default function CollaborationPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    department: 'all',
+    status: 'all',
+  })
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = (filters.department !== 'all' ? 1 : 0) + (filters.status !== 'all' ? 1 : 0)
   const filteredMembersRef = useRef<TeamMember[]>([])
 
   const [formData, setFormData] = useState({
@@ -168,13 +177,18 @@ export default function CollaborationPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearch('')
-          setDeptFilter('all')
+          setFilters({ department: 'all', status: 'all' })
           break
         case 'p':
           e.preventDefault()
@@ -187,14 +201,15 @@ export default function CollaborationPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, search, deptFilter])
+  }, [showForm, showExportMenu, showPrintMenu, showFilters, search])
 
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.role.toLowerCase().includes(search.toLowerCase()) ||
       m.email?.toLowerCase().includes(search.toLowerCase())
-    const matchesDept = deptFilter === 'all' || m.department === deptFilter
-    return matchesSearch && matchesDept
+    const matchesDept = filters.department === 'all' || m.department === filters.department
+    const matchesStatus = filters.status === 'all' || m.status === filters.status
+    return matchesSearch && matchesDept && matchesStatus
   })
   
   // Update ref for keyboard shortcuts
@@ -460,7 +475,7 @@ export default function CollaborationPage() {
     setShowPrintMenu(false)
   }
 
-  // Click outside handler for export menu and print menu
+  // Click outside handler for export menu, print menu and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -469,10 +484,17 @@ export default function CollaborationPage() {
       if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button
+        const target = e.target as HTMLElement
+        if (!target.closest('.filter-toggle')) {
+          setShowFilters(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [showFilters])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
@@ -569,6 +591,73 @@ export default function CollaborationPage() {
           >
             <HelpCircle className="w-4 h-4" />
           </button>
+          
+          {/* Filter Toggle Button */}
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors filter-toggle ${
+                showFilters 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              }`}
+              title="Toggle Filters (F)"
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+              )}
+            </button>
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-white font-medium mb-3">Filter Team</h3>
+                  
+                  {/* Department Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm text-slate-400 mb-2">Department</label>
+                    <select
+                      value={filters.department}
+                      onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all">All Departments</option>
+                      {DEPARTMENTS.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm text-slate-400 mb-2">Status</label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="busy">Busy</option>
+                      <option value="offline">Offline</option>
+                    </select>
+                  </div>
+                  
+                  {/* Clear Filters */}
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={() => setFilters({ department: 'all', status: 'all' })}
+                      className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                    >
+                      Clear Filters ({activeFilterCount})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
           <button
             onClick={openNewForm}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg font-medium transition-colors"
@@ -652,33 +741,16 @@ export default function CollaborationPage() {
               className="w-full pl-10 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
             />
           </div>
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          >
-            <option value="all">All Departments</option>
-            {DEPARTMENTS.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-6">
-        <select
-          value={deptFilter}
-          onChange={(e) => setDeptFilter(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="all">All Departments</option>
-          {DEPARTMENTS.map(dept => (
-            <option key={dept} value={dept}>{dept}</option>
-          ))}
-        </select>
+      {/* Results count */}
+      <div className="mb-6">
         <span className="text-slate-400 text-sm">
           {filteredMembers.length} member{filteredMembers.length !== 1 ? 's' : ''} found
+          {activeFilterCount > 0 && (
+            <span className="ml-2 text-indigo-400">(filtered)</span>
+          )}
         </span>
       </div>
 
@@ -949,6 +1021,10 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Focus search</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle filters</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">F</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export team data</span>

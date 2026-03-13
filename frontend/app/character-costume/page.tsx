@@ -92,6 +92,17 @@ export default function CharacterCostumePage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate active filter count
+  const activeFilterCount = filterRole !== 'all' ? 1 : 0
+  
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setSearchTerm('')
+    setFilterRole('all')
+  }, [])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
@@ -169,6 +180,10 @@ export default function CharacterCostumePage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -196,6 +211,7 @@ export default function CharacterCostumePage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchTerm('')
           setFilterRole('all')
           break
@@ -220,7 +236,7 @@ export default function CharacterCostumePage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showForm])
 
-  // Click outside handler for export menu
+  // Click outside handler for export menu and filter panel
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
@@ -229,12 +245,15 @@ export default function CharacterCostumePage() {
       if (printMenuRef.current && !printMenuRef.current.contains(event.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(event.target as Node) && !(event.target as HTMLElement).closest('.filter-toggle')) {
+        setShowFilters(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilters) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -688,6 +707,59 @@ export default function CharacterCostumePage() {
             >
               <HelpCircle className="w-4 h-4" />
             </button>
+            {/* Filter Toggle Button */}
+            <div className="relative filter-toggle" ref={filterPanelRef}>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                }`}
+                title="Toggle filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs font-medium">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {/* Filter Panel */}
+              {showFilters && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                    <span className="text-sm font-medium">Filters</span>
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={clearFilters}
+                        className="text-xs text-purple-400 hover:text-purple-300"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Role</label>
+                    <select
+                      value={filterRole}
+                      onChange={(e) => setFilterRole(e.target.value)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="protagonist">Protagonist</option>
+                      <option value="antagonist">Antagonist</option>
+                      <option value="supporting">Supporting</option>
+                      <option value="comic">Comic</option>
+                      <option value="romantic">Romantic</option>
+                      <option value="mentor">Mentor</option>
+                      <option value="tragic">Tragic</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
               className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -1393,6 +1465,10 @@ export default function CharacterCostumePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Toggle filters</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Focus search</span>

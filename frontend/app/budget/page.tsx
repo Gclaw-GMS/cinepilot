@@ -131,9 +131,22 @@ export default function BudgetPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [subcategoryFilter, setSubcategoryFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState('all')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Get unique categories from items
+  const categories = [...new Set(items.map(item => item.category))].sort()
+  const subcategories = [...new Set(items.map(item => item.subcategory).filter(Boolean))].sort() as string[]
+  const sources = [...new Set(items.map(item => item.source))].sort()
+
+  // Count active filters
+  const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length
 
   // Export functions
   const handleExportCSV = () => {
@@ -407,8 +420,14 @@ export default function BudgetPage() {
           setShowKeyboardHelp(false)
           setShowAddExpense(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           searchInputRef.current?.blur()
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case '1':
           e.preventDefault()
@@ -440,6 +459,20 @@ export default function BudgetPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button
+        const filterButton = document.querySelector('[data-filter-toggle]')
+        if (filterButton && filterButton.contains(e.target as Node)) return
+        setShowFilters(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showFilters])
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -500,22 +533,34 @@ export default function BudgetPage() {
     return `₹${n.toLocaleString('en-IN')}`
   }
 
-  // Filter items and expenses based on search query
-  const filteredItems = searchQuery 
-    ? items.filter(item => 
-        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.subcategory?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-        (item.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-      )
-    : items
+  // Filter items and expenses based on search query and filters
+  const filteredItems = items.filter(item => {
+    // Search filter
+    if (searchQuery && 
+        !item.category.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !(item.subcategory?.toLowerCase() || '').includes(searchQuery.toLowerCase()) &&
+        !(item.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    ) return false
+    // Category filter
+    if (categoryFilter !== 'all' && item.category !== categoryFilter) return false
+    // Subcategory filter
+    if (subcategoryFilter !== 'all' && item.subcategory !== subcategoryFilter) return false
+    // Source filter
+    if (sourceFilter !== 'all' && item.source !== sourceFilter) return false
+    return true
+  })
 
-  const filteredExpenses = searchQuery
-    ? expenses.filter(exp =>
-        exp.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        exp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (exp.vendor?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-      )
-    : expenses
+  const filteredExpenses = expenses.filter(exp => {
+    // Search filter
+    if (searchQuery && 
+        !exp.category.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !exp.description.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !(exp.vendor?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    ) return false
+    // Category filter for expenses
+    if (categoryFilter !== 'all' && exp.category !== categoryFilter) return false
+    return true
+  })
 
   const totalPlanned = filteredItems.reduce((s, i) => s + Number(i.total || 0), 0)
   const totalActual = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0)
@@ -567,6 +612,24 @@ export default function BudgetPage() {
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">/</span>
           </div>
+          {/* Filter Toggle Button */}
+          <button
+            data-filter-toggle
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+              showFilters 
+                ? 'bg-indigo-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title="Toggle Filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+            )}
+          </button>
+          <span className="text-sm text-gray-500">{filteredItems.length} of {items.length}</span>
           <button 
             onClick={handleRefresh} 
             disabled={refreshing}
@@ -725,6 +788,64 @@ export default function BudgetPage() {
             }`}>{tab.label}</button>
         ))}
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div 
+          ref={filterPanelRef}
+          className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm font-medium text-slate-300">Filters:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Category:</label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Categories</option>
+                {categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Subcategory:</label>
+              <select
+                value={subcategoryFilter}
+                onChange={(e) => setSubcategoryFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Subcategories</option>
+                {subcategories.map((sub) => (<option key={sub} value={sub}>{sub}</option>))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Source:</label>
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Sources</option>
+                {sources.map((src) => (<option key={src} value={src}>{src === 'ai' ? 'AI Generated' : 'Manual'}</option>))}
+              </select>
+            </div>
+            <button
+              onClick={() => {
+                setCategoryFilter('all')
+                setSubcategoryFilter('all')
+                setSourceFilter('all')
+              }}
+              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
@@ -1120,6 +1241,7 @@ export default function BudgetPage() {
               {[
                 { key: 'R', action: 'Refresh budget data' },
                 { key: '/', action: 'Search budget items' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: 'N', action: 'Add new expense' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Print budget report' },

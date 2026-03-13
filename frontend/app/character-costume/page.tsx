@@ -92,17 +92,6 @@ export default function CharacterCostumePage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
-  const [showFilters, setShowFilters] = useState(false)
-  const filterPanelRef = useRef<HTMLDivElement>(null)
-  
-  // Calculate active filter count
-  const activeFilterCount = filterRole !== 'all' ? 1 : 0
-  
-  // Clear all filters
-  const clearFilters = useCallback(() => {
-    setSearchTerm('')
-    setFilterRole('all')
-  }, [])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)

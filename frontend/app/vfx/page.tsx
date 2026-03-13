@@ -166,6 +166,7 @@ export default function VfxPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [complexityFilter, setComplexityFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
@@ -175,6 +176,15 @@ export default function VfxPage() {
   const fetchDataRef = useRef<() => void | Promise<void>>();
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (typeFilter !== 'all') count++;
+    if (complexityFilter !== 'all') count++;
+    return count;
+  }, [typeFilter, complexityFilter]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -210,9 +220,14 @@ export default function VfxPage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           setTypeFilter('all')
           setComplexityFilter('all')
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case 'e':
           if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
@@ -243,9 +258,9 @@ export default function VfxPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedScript, showNoteForm, vfxNotes.length, vfxWarnings.length])
+  }, [selectedScript, showNoteForm, vfxNotes.length, vfxWarnings.length, showFilters])
 
-  // Click outside to close export menu
+  // Click outside to close export menu and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -254,11 +269,14 @@ export default function VfxPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
     
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -930,7 +948,7 @@ export default function VfxPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Search and Filter Toggle */}
         {vfxNotes.length > 0 && (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -944,34 +962,75 @@ export default function VfxPage() {
                 className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 w-48"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="all">All Types</option>
-                {VFX_CATEGORIES.map(cat => (
-                  <option key={cat.key} value={cat.key}>{cat.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={complexityFilter}
-                onChange={(e) => setComplexityFilter(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="all">All Complexity</option>
-                <option value="simple">Simple</option>
-                <option value="moderate">Moderate</option>
-                <option value="complex">Complex</option>
-              </select>
-            </div>
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                showFilters 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              }`}
+              title="Toggle Filters (F)"
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+              )}
+            </button>
             <span className="text-xs text-slate-500 ml-auto">
-              Showing {filteredNotes.length} of {vfxNotes.length} notes
+              {filteredNotes.length} of {vfxNotes.length} notes
             </span>
+          </div>
+        )}
+
+        {/* Filter Panel */}
+        {showFilters && vfxNotes.length > 0 && (
+          <div 
+            ref={filterPanelRef}
+            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-purple-400" />
+                <span className="text-sm font-medium text-slate-300">Filters:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Type:</label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="all">All Types</option>
+                  {VFX_CATEGORIES.map(cat => (
+                    <option key={cat.key} value={cat.key}>{cat.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Complexity:</label>
+                <select
+                  value={complexityFilter}
+                  onChange={(e) => setComplexityFilter(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="all">All Complexity</option>
+                  <option value="simple">Simple</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="complex">Complex</option>
+                </select>
+              </div>
+              <button
+                onClick={() => {
+                  setTypeFilter('all')
+                  setComplexityFilter('all')
+                }}
+                className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
           </div>
         )}
 
@@ -1503,6 +1562,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Search notes</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Toggle filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Add new VFX shot</span>

@@ -1,6 +1,47 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (10:50 PM) - 81 Routes | More Test Suite Conversion
+## Build Status: ✅ PASSING (12:07 AM) - 81 Routes | Scripts Copy Feature
+
+## Night Build (12:07 AM) - Scripts Copy to Clipboard Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Scripts Page Copy to Clipboard**: Added copy functionality to share script information
+  - **Copy Scene Details**: Each scene row now has a copy button to copy scene details including:
+    - Scene heading (INT/EXT, location, time of day)
+    - Characters in the scene
+    - Locations
+    - Props
+    - VFX Notes
+    - Warnings
+  - **Copy Script Summary**: Added copy button in Breakdown Summary section header to copy:
+    - Script title and version
+    - Total scenes count
+    - INT/EXT breakdown
+    - Day/Night breakdown
+    - Character count
+    - Location count
+    - VFX notes count
+    - Warnings count
+  - **Visual Feedback**: Checkmark appears for 2 seconds after copying
+  - **Consistent with DOOD**: Matches the copy feature pattern used in DOOD page
+
+### Build Verification
+- **Build**: Clean build with 81 routes ✅
+- **Next.js Build:** Successful
+- **TypeScript:** No errors ✅
+- **Tests:** 801 passing ✅
+
+### Scripts Copy Feature Checklist
+- [x] Feature works 100% (copy buttons functional)
+- [x] Copy scene details working (heading, characters, locations, props, VFX, warnings)
+- [x] Copy script summary working (all stats included)
+- [x] UI professional & visual (check mark feedback)
+- [x] Error handling complete (try/catch for clipboard API)
+- [x] Build passes
+
+### Pushed: 894bb76
+
+---
 
 ## Night Build (10:50 PM) - More Test Suite Conversion (IMPLEMENTED)
 

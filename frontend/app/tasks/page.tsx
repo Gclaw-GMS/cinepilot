@@ -884,34 +884,51 @@ export default function TasksPage() {
               )}
             </button>
 
-            {/* Status Filter - shown when filters enabled */}
+            {/* Filter Panel */}
             {showFilters && (
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value="all">All Status</option>
-                <option value="overdue">⚠️ Overdue</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="blocked">Blocked</option>
-              </select>
-            )}
-
-            {/* Priority Filter - shown when filters enabled */}
-            {showFilters && (
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
-                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value="all">All Priority</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
+              <div className="flex flex-wrap items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl p-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm font-medium text-slate-300">Filters:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-400">Status:</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+                    className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="overdue">⚠️ Overdue</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="blocked">Blocked</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-400">Priority:</label>
+                  <select
+                    value={filterPriority}
+                    onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
+                    className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="all">All Priority</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => {
+                    setFilterStatus('all')
+                    setFilterPriority('all')
+                  }}
+                  className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+                >
+                  Clear Filters
+                </button>
+              </div>
             )}
 
             {/* View Mode Toggle */}

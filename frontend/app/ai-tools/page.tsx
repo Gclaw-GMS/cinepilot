@@ -381,6 +381,7 @@ export default function AIToolsPage() {
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchToolsRef = useRef<() => void>(() => {})
+  const handlePrintRef = useRef<() => void>(() => {})
 
   // Fetch tools from API on mount
   useEffect(() => {
@@ -595,6 +596,11 @@ export default function AIToolsPage() {
     setShowPrintMenu(false)
   }
 
+  // Assign handlePrint to ref for keyboard shortcuts
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
+
   // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -634,7 +640,7 @@ export default function AIToolsPage() {
         setShowExportMenu(prev => !prev)
       } else if (e.key === 'p' || e.key === 'P') {
         e.preventDefault()
-        handlePrint()
+        handlePrintRef.current?.()
       } else if (e.key === '?') {
         e.preventDefault()
         setShowKeyboardHelp(true)

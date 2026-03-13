@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
-  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, Printer
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, Printer, Filter
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -75,12 +75,18 @@ export default function CateringPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    mealType: 'all' as 'all' | 'breakfast' | 'lunch' | 'snacks' | 'dinner',
+    dietary: 'all' as 'all' | string
+  })
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void>(() => {})
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -306,8 +312,13 @@ export default function CateringPage() {
           setSearchQuery('')
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setShowDayForm(false)
           setShowMealForm(false)
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case 'e':
           e.preventDefault()
@@ -324,18 +335,42 @@ export default function CateringPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleRefresh])
 
-  // Filter shoot days by search query
+  // Filter shoot days by search query and filters
   const filteredShootDays = plan?.shootDays.filter(sd => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
-    const mealMatch = sd.meals.some(m => 
-      m.menu.some(item => item.toLowerCase().includes(query)) ||
-      m.type.toLowerCase().includes(query) ||
-      m.dietary.some(d => d.toLowerCase().includes(query))
-    )
-    return dateMatch || mealMatch
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
+      const mealMatch = sd.meals.some(m => 
+        m.menu.some(item => item.toLowerCase().includes(query)) ||
+        m.type.toLowerCase().includes(query) ||
+        m.dietary.some(d => d.toLowerCase().includes(query))
+      )
+      if (!dateMatch && !mealMatch) return false
+    }
+    
+    // Apply meal type filter
+    if (filters.mealType !== 'all') {
+      const hasMealType = sd.meals.some(m => m.type === filters.mealType)
+      if (!hasMealType) return false
+    }
+    
+    // Apply dietary filter
+    if (filters.dietary !== 'all') {
+      const hasDietary = sd.meals.some(m => m.dietary.includes(filters.dietary))
+      if (!hasDietary) return false
+    }
+    
+    return true
   }) || []
+  
+  // Count active filters
+  const activeFilterCount = (filters.mealType !== 'all' ? 1 : 0) + (filters.dietary !== 'all' ? 1 : 0)
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({ mealType: 'all', dietary: 'all' })
+  }
 
   // Stats for filtered data
   const filteredStats = {
@@ -355,12 +390,15 @@ export default function CateringPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilters) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   const handleAddShootDay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -497,6 +535,7 @@ export default function CateringPage() {
             <div className="space-y-3">
               <ShortcutRow keys={['R']} description="Refresh catering data" />
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
+              <ShortcutRow keys={['F']} description="Toggle filters" />
               <ShortcutRow keys={['N']} description="Add new shoot day" />
               <ShortcutRow keys={['E']} description="Export menu" />
               <ShortcutRow keys={['P']} description="Print catering report" />
@@ -546,6 +585,75 @@ export default function CateringPage() {
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+
+              {/* Filter Toggle Button */}
+              <div className="relative" ref={filterPanelRef}>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors text-sm ${
+                    activeFilterCount > 0 
+                      ? 'bg-amber-600 border-amber-500 text-white' 
+                      : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+                  }`}
+                  title="Filter (F)"
+                >
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white text-amber-600 text-xs font-bold rounded-full">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                {showFilters && (
+                  <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <div className="p-4 border-b border-slate-700">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-white">Filter Options</h3>
+                        {activeFilterCount > 0 && (
+                          <button
+                            onClick={clearFilters}
+                            className="text-xs text-amber-400 hover:text-amber-300"
+                          >
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Meal Type Filter */}
+                      <div className="mb-3">
+                        <label className="text-xs text-slate-400 block mb-1">Meal Type</label>
+                        <select
+                          value={filters.mealType}
+                          onChange={(e) => setFilters(prev => ({ ...prev, mealType: e.target.value as typeof filters.mealType }))}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"
+                        >
+                          <option value="all">All Meal Types</option>
+                          <option value="breakfast">Breakfast</option>
+                          <option value="lunch">Lunch</option>
+                          <option value="snacks">Snacks</option>
+                          <option value="dinner">Dinner</option>
+                        </select>
+                      </div>
+                      
+                      {/* Dietary Filter */}
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">Dietary</label>
+                        <select
+                          value={filters.dietary}
+                          onChange={(e) => setFilters(prev => ({ ...prev, dietary: e.target.value }))}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"
+                        >
+                          <option value="all">All Dietary</option>
+                          {DIETARY_OPTIONS.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               
               {/* Export Dropdown */}
               <div className="relative" ref={exportMenuRef}>
@@ -646,10 +754,14 @@ export default function CateringPage() {
         ) : (
           <div className="space-y-6">
             {/* Search Results Info */}
-            {searchQuery && (
+            {(searchQuery || activeFilterCount > 0) && (
               <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 text-sm flex items-center gap-3">
-                <Search className="w-4 h-4 shrink-0" />
-                Found {filteredStats.shootDays} shoot day(s) and {filteredStats.meals} meal(s) matching "{searchQuery}"
+                <Filter className="w-4 h-4 shrink-0" />
+                {activeFilterCount > 0 ? (
+                  <span>Showing {filteredStats.shootDays} of {plan.shootDays.length} shoot day(s) with {activeFilterCount} filter(s) active</span>
+                ) : (
+                  <span>Found {filteredStats.shootDays} shoot day(s) and {filteredStats.meals} meal(s) matching "{searchQuery}"</span>
+                )}
               </div>
             )}
 

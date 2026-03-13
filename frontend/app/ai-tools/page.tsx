@@ -367,6 +367,7 @@ export default function AIToolsPage() {
     is_night_shoots: false,
   })
   const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -374,6 +375,8 @@ export default function AIToolsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -601,10 +604,13 @@ export default function AIToolsPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilterPanel && filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   // Keyboard shortcuts handler
   useEffect(() => {
@@ -614,7 +620,10 @@ export default function AIToolsPage() {
         return
       }
       
-      if (e.key === 'r' || e.key === 'R') {
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        setShowFilterPanel(!showFilterPanel)
+      } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         handleRefresh()
       } else if (e.key === '/') {
@@ -633,22 +642,24 @@ export default function AIToolsPage() {
         setShowKeyboardHelp(false)
         setShowExportMenu(false)
         setShowPrintMenu(false)
+        setShowFilterPanel(false)
         setSearchQuery('')
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh])
+  }, [handleRefresh, showFilterPanel])
 
-  // Convert tools to renderable format with search filtering
-  const filteredTools = searchQuery.trim()
-    ? tools.filter(t => 
-        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.category.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : tools
+  // Convert tools to renderable format with search and category filtering
+  const filteredTools = tools.filter(t => {
+    const matchesSearch = !searchQuery.trim() || 
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.category.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter
+    return matchesSearch && matchesCategory
+  })
   const aiFeatures = filteredTools.map(apiToolToFeature)
 
   const runAnalysis = async (featureId: string) => {
@@ -706,6 +717,63 @@ export default function AIToolsPage() {
                   className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600">(/)</span>
+              </div>
+              
+              {/* Filter Toggle Button */}
+              <div className="relative" ref={filterRef}>
+                <button 
+                  onClick={() => setShowFilterPanel(!showFilterPanel)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                    categoryFilter !== 'all' 
+                      ? 'bg-indigo-500 text-white' 
+                      : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                  }`}
+                  title="Toggle filters (F)"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="text-sm">Filters</span>
+                  {categoryFilter !== 'all' && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white text-indigo-500 text-xs rounded-full">1</span>
+                  )}
+                </button>
+                {showFilterPanel && (
+                  <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="p-4 border-b border-slate-700">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold">Filter Tools</h3>
+                        {categoryFilter !== 'all' && (
+                          <button 
+                            onClick={() => setCategoryFilter('all')}
+                            className="text-xs text-indigo-400 hover:text-indigo-300"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Category</label>
+                        <select 
+                          value={categoryFilter} 
+                          onChange={(e) => setCategoryFilter(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                        >
+                          <option value="all">All Categories</option>
+                          {categories.length > 0 ? categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          )) : (
+                            <>
+                              <option value="Script">Script</option>
+                              <option value="Finance">Finance</option>
+                              <option value="Production">Production</option>
+                              <option value="Planning">Planning</option>
+                              <option value="Risk">Risk</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Refresh Button */}
@@ -1092,6 +1160,10 @@ export default function AIToolsPage() {
               </div>
               
               <div className="space-y-3">
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Toggle filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">F</kbd>
+                </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Refresh tools</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">R</kbd>

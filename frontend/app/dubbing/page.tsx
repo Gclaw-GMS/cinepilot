@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -67,6 +67,20 @@ export default function DubbingPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterMenuRef = useRef<HTMLDivElement>(null)
+  
+  // Filter state
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [languageFilter, setLanguageFilter] = useState('all')
+  
+  // Computed filtered versions
+  const filteredVersions = useMemo(() => {
+    if (languageFilter === 'all') return dubbedVersions
+    return dubbedVersions.filter(d => d.language === languageFilter)
+  }, [dubbedVersions, languageFilter])
+  
+  // Active filter count
+  const activeFilterCount = languageFilter !== 'all' ? 1 : 0
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -89,6 +103,10 @@ export default function DubbingPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(!showFilterPanel)
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
@@ -108,6 +126,7 @@ export default function DubbingPage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilterPanel(false)
           setSearchQuery('')
           break
       }
@@ -115,7 +134,7 @@ export default function DubbingPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu, showPrintMenu, dubbedVersions.length])
+  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length])
 
   // Click outside handler for export menu
   useEffect(() => {
@@ -126,12 +145,15 @@ export default function DubbingPage() {
       if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilterPanel) {
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   useEffect(() => {
     async function loadScripts() {
@@ -453,11 +475,12 @@ export default function DubbingPage() {
   // Compute language distribution for chart
   const languageDistribution = useMemo(() => {
     const counts: Record<string, number> = {}
-    dubbedVersions.forEach(dub => {
+    const versionsToUse = languageFilter !== 'all' ? filteredVersions : dubbedVersions
+    versionsToUse.forEach(dub => {
       counts[dub.language] = (counts[dub.language] || 0) + 1
     })
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
-  }, [dubbedVersions])
+  }, [dubbedVersions, filteredVersions, languageFilter])
 
   return (
     <div className="min-h-screen bg-slate-950 p-6">
@@ -482,6 +505,52 @@ export default function DubbingPage() {
                 <span className="text-xs font-medium text-amber-400">Demo Mode</span>
               </div>
             )}
+            {/* Filter Toggle */}
+            <div className="relative" ref={filterMenuRef}>
+              <button
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+                title="Filter (F)"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="text-xs">Filter</span>
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 text-xs rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {showFilterPanel && (
+                <div className="absolute left-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-700">
+                    <h3 className="text-sm font-medium text-white">Filter Dubbed Versions</h3>
+                  </div>
+                  <div className="p-4">
+                    <label className="block text-xs text-slate-400 mb-2">Language</label>
+                    <select
+                      value={languageFilter}
+                      onChange={(e) => setLanguageFilter(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="all">All Languages</option>
+                      {TARGET_LANGUAGES.map(lang => (
+                        <option key={lang.value} value={lang.value}>{lang.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <div className="px-4 py-3 border-t border-slate-700 bg-slate-800/50">
+                      <button
+                        onClick={() => setLanguageFilter('all')}
+                        className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {/* Export Dropdown */}
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -565,7 +634,9 @@ export default function DubbingPage() {
               <Languages className="w-4 h-4 text-green-400" />
               <span className="text-sm text-slate-400">Dubbed Versions</span>
             </div>
-            <p className="text-2xl font-semibold text-white">{dubbedVersions.length}</p>
+            <p className="text-2xl font-semibold text-white">
+              {activeFilterCount > 0 ? filteredVersions.length : dubbedVersions.length}
+            </p>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -584,11 +655,14 @@ export default function DubbingPage() {
         </div>
 
         {/* Language Distribution Chart */}
-        {dubbedVersions.length > 0 && (
+        {filteredVersions.length > 0 && (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Globe className="w-5 h-5 text-indigo-400" />
               Language Distribution
+              {activeFilterCount > 0 && (
+                <span className="text-xs text-slate-400">(Filtered)</span>
+              )}
             </h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -702,9 +776,14 @@ export default function DubbingPage() {
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               <Languages className="w-5 h-5 text-indigo-400" />
               Dubbed Versions
+              {activeFilterCount > 0 && (
+                <span className="text-xs text-slate-400">
+                  ({filteredVersions.length} of {dubbedVersions.length})
+                </span>
+              )}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {dubbedVersions.map((dub) => (
+              {filteredVersions.map((dub) => (
                 <div
                   key={dub.id}
                   className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 flex items-start justify-between"
@@ -801,6 +880,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Focus search</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Toggle filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>

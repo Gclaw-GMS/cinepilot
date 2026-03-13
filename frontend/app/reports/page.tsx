@@ -5,7 +5,7 @@ import {
   FileText, BarChart3, Download, RefreshCw, Loader2, 
   ChevronRight, TrendingUp, Target, Film, Users, 
   MapPin, DollarSign, Calendar, PieChart, Shield,
-  AlertTriangle, CheckCircle, Keyboard, Search, Printer
+  AlertTriangle, CheckCircle, Keyboard, Search, Printer, Filter
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -92,6 +92,9 @@ export default function ReportsPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [tabFilter, setTabFilter] = useState<string>('all')
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const fetchReport = useCallback(async () => {
     try {
@@ -165,12 +168,18 @@ export default function ReportsPage() {
           e.preventDefault()
           handleGenerate()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
+          setTabFilter('all')
           break
       }
     }
@@ -188,10 +197,13 @@ export default function ReportsPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -477,6 +489,22 @@ export default function ReportsPage() {
               className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-600 text-gray-300 rounded-lg text-sm w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             />
           </div>
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+              showFilters 
+                ? 'bg-indigo-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title="Toggle Filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {tabFilter !== 'all' && (
+              <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">1</span>
+            )}
+          </button>
           <div className="relative" ref={exportMenuRef}>
             <button 
               onClick={() => setShowExportMenu(!showExportMenu)} 
@@ -542,6 +570,42 @@ export default function ReportsPage() {
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-red-400" />
           <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div 
+          ref={filterPanelRef}
+          className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm font-medium text-slate-300">Filters:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Report Tab:</label>
+              <select
+                value={tabFilter}
+                onChange={(e) => setTabFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="all">All Tabs</option>
+                <option value="overview">Overview</option>
+                <option value="production">Production</option>
+                <option value="schedule">Schedule</option>
+                <option value="crew">Crew</option>
+                <option value="censor">Censor</option>
+              </select>
+            </div>
+            <button
+              onClick={() => setTabFilter('all')}
+              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
         </div>
       )}
 
@@ -861,6 +925,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Focus search</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">/</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Toggle filters</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">F</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle export menu</span>

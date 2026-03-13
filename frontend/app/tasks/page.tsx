@@ -93,14 +93,14 @@ type FilterPriority = 'all' | 'high' | 'medium' | 'low'
 
 // Demo data fallback for when database is not connected
 const DEMO_TASKS: Task[] = [
-  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'in_progress', priority: 'high', assignee: 'Director', dueDate: '2026-03-08', createdAt: '2026-03-01' },
-  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'pending', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-09', createdAt: '2026-03-01' },
-  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-05', createdAt: '2026-02-28' },
-  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-10', createdAt: '2026-03-02' },
-  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-12', createdAt: '2026-03-01' },
-  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'pending', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-07', createdAt: '2026-03-01' },
-  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-04', createdAt: '2026-02-27' },
-  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-06', createdAt: '2026-03-01' },
+  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'completed', priority: 'high', assignee: 'Director', dueDate: '2026-03-12', createdAt: '2026-03-01' },
+  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'in_progress', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-15', createdAt: '2026-03-01' },
+  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-10', createdAt: '2026-02-28' },
+  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-16', createdAt: '2026-03-02' },
+  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-18', createdAt: '2026-03-01' },
+  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'blocked', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-11', createdAt: '2026-03-01' },
+  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-08', createdAt: '2026-02-27' },
+  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-11', createdAt: '2026-03-01' },
 ]
 
 export default function TasksPage() {

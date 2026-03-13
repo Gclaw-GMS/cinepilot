@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer, Copy, Check } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
 
@@ -180,7 +180,20 @@ export default function ScriptsPage() {
 
   const [sceneFilter, setSceneFilter] = useState('')
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
   const [selectedScene, setSelectedScene] = useState<SceneData | null>(null)
+
+  // Compute active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (intExtFilter !== 'all') count++
+    return count
+  }, [intExtFilter])
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setIntExtFilter('all')
+  }, [])
   const [runningAnalysis, setRunningAnalysis] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState('')
   const [isDemoMode, setIsDemoMode] = useState(false)
@@ -190,6 +203,7 @@ export default function ScriptsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const filterMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => Promise<void>>()
 
   // Keyboard shortcuts
@@ -221,10 +235,15 @@ export default function ScriptsPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowFilters(false)
           setSceneFilter('')
           setIntExtFilter('all')
           break
@@ -271,6 +290,19 @@ export default function ScriptsPage() {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showExportMenu])
+
+  // Click outside to close filter menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
+        setShowFilters(false)
+      }
+    }
+    if (showFilters) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showFilters])
 
   const fetchData = useCallback(async () => {
     try {
@@ -739,6 +771,65 @@ Warnings: ${allWarnings.length}`
               <span>Print</span>
             </button>
           )}
+          {/* Filter Toggle Button */}
+          <div className="relative" ref={filterMenuRef}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-400'
+              }`}
+              title="Filter (F)"
+            >
+              <Filter className="w-5 h-5" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                  <span className="text-sm font-medium">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-xs text-indigo-400 hover:text-indigo-300"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Interior/Exterior Filter */}
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Interior/Exterior</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'all', label: 'All' },
+                        { key: 'INT', label: 'Interior' },
+                        { key: 'EXT', label: 'Exterior' },
+                      ].map(opt => (
+                        <button
+                          key={opt.key}
+                          onClick={() => setIntExtFilter(opt.key)}
+                          className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                            intExtFilter === opt.key
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
@@ -1222,6 +1313,7 @@ Warnings: ${allWarnings.length}`
                 { key: 'R', action: 'Refresh scripts' },
                 { key: 'E', action: 'Export menu' },
                 { key: 'P', action: 'Print script' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: '/', action: 'Focus search' },
                 { key: '1', action: 'Upload tab' },
                 { key: '2', action: 'Scenes tab' },

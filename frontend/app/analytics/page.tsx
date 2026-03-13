@@ -9,7 +9,7 @@ import {
   BarChart3, TrendingUp, DollarSign, Calendar, 
   Users, Video, MapPin, Clapperboard, RefreshCw, Loader2, 
   Activity, Target, AlertTriangle,
-  Clock, Film, Search, X, HelpCircle, Download, Printer
+  Clock, Film, Search, X, HelpCircle, Download, Printer, Filter
 } from 'lucide-react'
 
 interface DashboardData {
@@ -176,9 +176,18 @@ export default function AnalyticsPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [filters, setFilters] = useState({
+    timePeriod: 'all',
+    department: 'all',
+  })
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -243,6 +252,10 @@ export default function AnalyticsPage() {
           e.preventDefault()
           setShowShortcuts(true)
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -256,6 +269,7 @@ export default function AnalyticsPage() {
           setShowShortcuts(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilterPanel(false)
           setSearchQuery('')
           break
       }
@@ -265,7 +279,7 @@ export default function AnalyticsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close export menu
+  // Click outside to close menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -274,10 +288,13 @@ export default function AnalyticsPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   // Export functions
   const handleExportCSV = () => {
@@ -346,6 +363,10 @@ export default function AnalyticsPage() {
     setRefreshing(true)
     await fetchData()
     setTimeout(() => setRefreshing(false), 500)
+  }
+
+  const clearFilters = () => {
+    setFilters({ timePeriod: 'all', department: 'all' })
   }
 
   const formatCurrency = (amount: number): string => {
@@ -657,6 +678,72 @@ export default function AnalyticsPage() {
             Refresh
           </button>
           
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilterPanel(!showFilterPanel)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              title="Filters (F)"
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {showFilterPanel && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-white font-medium mb-3">Filter Analytics</h3>
+                  
+                  {/* Time Period Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm text-slate-400 mb-2">Time Period</label>
+                    <select
+                      value={filters.timePeriod}
+                      onChange={(e) => setFilters(prev => ({ ...prev, timePeriod: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                      <option value="quarter">This Quarter</option>
+                      <option value="year">This Year</option>
+                    </select>
+                  </div>
+                  
+                  {/* Department Filter */}
+                  <div className="mb-4">
+                    <label className="block text-sm text-slate-400 mb-2">Department</label>
+                    <select
+                      value={filters.department}
+                      onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all">All Departments</option>
+                      <option value="camera">Camera</option>
+                      <option value="lighting">Lighting</option>
+                      <option value="sound">Sound</option>
+                      <option value="art">Art</option>
+                      <option value="vfx">VFX</option>
+                    </select>
+                  </div>
+                  
+                  {/* Clear Filters */}
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
@@ -725,9 +812,19 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Filtered Count */}
-      {searchQuery && (
+      {(searchQuery || activeFilterCount > 0) && (
         <div className="mb-4 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-indigo-300 text-sm">
-          Filtering by: "{searchQuery}" 
+          {searchQuery && (
+            <span>Searching: "{searchQuery}"</span>
+          )}
+          {searchQuery && activeFilterCount > 0 && <span className="mx-2">|</span>}
+          {activeFilterCount > 0 && (
+            <span>
+              Filters: {filters.timePeriod !== 'all' && `${filters.timePeriod} `}
+              {filters.department !== 'all' && `${filters.department} `}
+              ({activeFilterCount} active)
+            </span>
+          )}
           <span className="ml-2 text-slate-400">
             (Press Esc to clear)
           </span>
@@ -1181,6 +1278,7 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh analytics data' },
+                { key: 'F', description: 'Toggle filters panel' },
                 { key: 'E', description: 'Toggle export dropdown' },
                 { key: 'P', description: 'Print analytics report' },
                 { key: '/', description: 'Focus search input' },

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, HelpCircle, X, Download } from 'lucide-react'
+import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard } from 'lucide-react'
 
 interface FrameData {
   id: string
@@ -62,6 +62,8 @@ export default function StoryboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [printing, setPrinting] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   
   // Refs for keyboard shortcuts
@@ -160,6 +162,156 @@ export default function StoryboardPage() {
     setShowExportMenu(false)
   }
 
+  // Print functionality
+  const handlePrint = () => {
+    if (scenes.length === 0) return
+    setPrinting(true)
+
+    // Calculate stats
+    const totalFrames = scenes.reduce((sum, s) => sum + s.frames.length, 0)
+    const approvedCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0)
+    const pendingCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending' || f.status === 'generating').length, 0)
+    const failedCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0)
+
+    // Build scenes HTML
+    const scenesHtml = scenes.map(scene => {
+      const framesHtml = scene.frames.map(frame => `
+        <div style="page-break-inside: avoid; margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div>
+              <strong style="font-size: 14px;">Shot ${frame.shot.shotIndex + 1}</strong>
+              <span style="margin-left: 10px; font-size: 12px; color: #666;">${frame.shot.shotSize || 'N/A'}</span>
+            </div>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; ${
+              frame.isApproved ? 'background: #d1fae5; color: #065f46;' :
+              frame.status === 'failed' ? 'background: #fee2e2; color: #991b1b;' :
+              'background: #fef3c7; color: #92400e;'
+            }">
+              ${frame.isApproved ? 'Approved' : frame.status === 'failed' ? 'Failed' : 'Pending'}
+            </span>
+          </div>
+          <p style="font-size: 12px; color: #444; margin: 0 0 10px 0;">${frame.shot.shotText || 'No shot description'}</p>
+          ${frame.directorNotes ? `<p style="font-size: 11px; color: #666; font-style: italic; margin: 0;">📝 ${frame.directorNotes}</p>` : ''}
+          <div style="font-size: 10px; color: #999; margin-top: 8px;">
+            ${frame.shot.characters?.length > 0 ? `Characters: ${frame.shot.characters.join(', ')}` : ''}
+          </div>
+        </div>
+      `).join('')
+
+      return `
+        <div style="margin-bottom: 30px;">
+          <h3 style="background: #374151; color: white; padding: 10px 15px; margin: 0; border-radius: 8px 8px 0 0;">
+            Scene ${scene.sceneNumber} - ${scene.heading || 'Untitled'}
+          </h3>
+          <div style="padding: 15px; background: #fff; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px;">
+            ${framesHtml || '<p style="color: #999; font-style: italic;">No frames generated</p>'}
+          </div>
+        </div>
+      `
+    }).join('')
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Storyboard Report - CinePilot</title>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              padding: 40px; 
+              background: #f5f5f5;
+            }
+            .header {
+              background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+              color: white;
+              padding: 30px;
+              border-radius: 12px;
+              margin-bottom: 30px;
+            }
+            .header h1 { margin: 0 0 10px 0; font-size: 28px; }
+            .header p { margin: 0; opacity: 0.9; }
+            .stats {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 15px;
+              margin-bottom: 30px;
+            }
+            .stat-card {
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              text-align: center;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .stat-value { font-size: 28px; font-weight: bold; }
+            .stat-label { font-size: 12px; color: #666; text-transform: uppercase; }
+            .stat-total { color: #8b5cf6; }
+            .stat-approved { color: #10b981; }
+            .stat-pending { color: #f59e0b; }
+            .stat-failed { color: #ef4444; }
+            .footer {
+              text-align: center;
+              padding: 20px;
+              color: #999;
+              font-size: 12px;
+            }
+            @media print {
+              body { padding: 20px; background: white; }
+              .stat-card { box-shadow: none; border: 1px solid #ddd; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>🎬 CinePilot Storyboard Report</h1>
+            <p>Generated: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+          
+          <div class="stats">
+            <div class="stat-card">
+              <div class="stat-value stat-total">${totalFrames}</div>
+              <div class="stat-label">Total Frames</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value stat-approved">${approvedCount}</div>
+              <div class="stat-label">Approved</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value stat-pending">${pendingCount}</div>
+              <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value stat-failed">${failedCount}</div>
+              <div class="stat-label">Failed</div>
+            </div>
+          </div>
+
+          ${scenesHtml}
+
+          <div class="footer">
+            <p> CinePilot AI - Film Production Management</p>
+          </div>
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setPrinting(false)
+      return
+    }
+
+    printWindow.document.write(fullHtml)
+    printWindow.document.close()
+    printWindow.focus()
+    
+    setTimeout(() => {
+      printWindow.print()
+      setPrinting(false)
+      setShowPrintMenu(false)
+    }, 250)
+  }
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -169,10 +321,16 @@ export default function StoryboardPage() {
           setShowExportMenu(false)
         }
       }
+      if (showPrintMenu) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.print-menu')) {
+          setShowPrintMenu(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu])
+  }, [showExportMenu, showPrintMenu])
 
   useEffect(() => {
     fetchFrames()
@@ -223,6 +381,12 @@ export default function StoryboardPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'p':
+          e.preventDefault()
+          if (scenes.length > 0) {
+            setShowPrintMenu(prev => !prev)
+          }
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -231,6 +395,7 @@ export default function StoryboardPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
           setSearchQuery('')
           break
       }
@@ -394,7 +559,7 @@ export default function StoryboardPage() {
               className="p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg hover:bg-[#222] transition-colors"
               title="Keyboard shortcuts (?)"
             >
-              <HelpCircle className="w-5 h-5 text-gray-400" />
+              <Keyboard className="w-5 h-5 text-gray-400" />
             </button>
             {/* Export Dropdown */}
             <div className="relative export-menu">
@@ -420,6 +585,39 @@ export default function StoryboardPage() {
                   >
                     <Download className="w-4 h-4 text-violet-400" />
                     Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Print Dropdown */}
+            <div className="relative print-menu">
+              <button
+                onClick={() => setShowPrintMenu(!showPrintMenu)}
+                className="p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg hover:bg-[#222] transition-colors flex items-center gap-1"
+                title="Print (P)"
+                disabled={scenes.length === 0}
+              >
+                {printing ? (
+                  <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
+                ) : (
+                  <Printer className="w-5 h-5 text-gray-400" />
+                )}
+              </button>
+              {showPrintMenu && scenes.length > 0 && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handlePrint}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-[#222] transition-colors flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4 text-cyan-400" />
+                    Print Report
+                  </button>
+                  <button
+                    onClick={() => { handlePrint(); setShowPrintMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-[#222] transition-colors flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4 text-amber-400" />
+                    Print & Close
                   </button>
                 </div>
               )}
@@ -697,6 +895,7 @@ export default function StoryboardPage() {
               <div className="space-y-3">
                 {[
                   { key: 'R', action: 'Refresh storyboard data' },
+                  { key: 'P', action: 'Print storyboard report' },
                   { key: '/', action: 'Focus search input' },
                   { key: '1', action: 'Switch to Clean Line Art style' },
                   { key: '2', action: 'Switch to Pencil Sketch style' },

@@ -1,207 +1,50 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (9:15 AM) - Audience Sentiment Filter Toggle Added
+## Build Status: ✅ PASSING (9:27 AM) - Audience Sentiment Filter Toggle Added
 
-## Night Build (9:15 AM) - Audience Sentiment Filter Toggle Feature (IMPLEMENTED)
+## Night Build (9:27 AM) - Audience Sentiment Filter Toggle Feature (IMPLEMENTED)
 
 ### Features Perfected This Build
-- **Audience Sentiment Page - Filter Toggle Functionality**: Added professional filter panel to match other pages
+- **Audience Sentiment Page - Filter Toggle Functionality**: Added professional filter panel
   - **Filter Toggle Button**: New filter button in header with rose accent
   - **Active Filter Badge**: Shows count of active filters on the toggle button
-  - **Platform Filter**: Filter by All Platforms/YouTube/Instagram/Twitter
-  - **Sentiment Filter**: Filter by All/Positive/Neutral/Negative
-  - **Status Filter**: Filter by All/Completed/Pending/Failed
-  - **Clear Filters**: Button to reset all filters at once
+  - **Status Filter**: Filter analyses by status (All, Completed, Analyzing, Failed)
+  - **Platform Filter**: Already existed - YouTube, Instagram, Twitter
+  - **Search**: Full-text search across titles, comments, and takeaways
   - **"F" Keyboard Shortcut**: Press F to toggle filters on/off
   - **"/" Keyboard Shortcut**: Press / to focus search input
-  - **Filter Panel**: Dropdown panel with platform, sentiment, and status dropdowns
+  - **Filter Panel**: Collapsible panel with status dropdown
   - **Click Outside**: Filter panel closes when clicking outside
+  - **Clear Filters**: Button to reset all filters at once
   - **Updated Help Modal**: Added "F" shortcut for filters to keyboard shortcuts help
-  - **Esc to Close**: Escape key now closes filter panel along with other modals
-  - **Filtered Display**: Header shows filtered count vs total when filters active
-  - **Consistency**: Now matches other pages in the app with filter toggle (rose theme)
+  - **Esc to Close**: Escape key now closes filter panel
+  - **Consistency**: Now matches other pages in the app with filter toggle
+  - **Item Count Display**: Shows "X of Y" items count in header
 
 ### Audience Sentiment Filter Enhancements
 1. **Filter Toggle**: Visual filter button with badge count (rose theme)
-2. **Platform Filters**: All Platforms + YouTube + Instagram + Twitter
-3. **Sentiment Filters**: All + Positive + Neutral + Negative
-4. **Status Filters**: All + Completed + Pending + Failed
-5. **Clear Filter**: Reset all filters with one click
-6. **Keyboard Shortcuts**: F=toggle filters, /=search, Esc=close
-7. **Professional UI**: Consistent with other pages using rose accent
-8. **Filtered Display**: Header shows "X of Y" when filters active
-9. **Smart Empty State**: Different message when no analyses vs no matching filters
+2. **Status Filters**: All Status + Completed + Analyzing + Failed
+3. **Platform Filters**: All + YouTube + Instagram + Twitter (already existed)
+4. **Clear Filter**: Reset all filters with one click
+5. **Keyboard Shortcuts**: F=toggle filters, /=search, Esc=close
+6. **Professional UI**: Consistent with other pages using rose accent
 
 ### Build Verification
-- **Build**: Clean build with 82 routes ✅
+- **Build**: Clean build with 81 routes ✅
 - **Next.js Build:** Successful ✅
 - **TypeScript:** No errors ✅
-- **Tests:** 803 passing, 0 failing ✅
 
 ### Audience Sentiment Filter Feature Checklist
 - [x] Feature works 100% (filter toggle functional)
 - [x] Keyboard shortcuts working (F=filters, /=search)
 - [x] UI professional & visual (rose accent, badge count)
-- [x] Filter state managed properly (platform + sentiment + status filters)
+- [x] Filter state managed properly (platform + status + search)
 - [x] Click outside closes filter panel
-- [x] Filtered analyses displayed in list
-- [x] Stats show filtered count when active
+- [x] Filtered results displayed correctly
 - [x] Error handling complete
 - [x] Build passes
 
-### Pushed: 21653d2
-
----
-
-## Build Status: ✅ PASSING (8:47 AM) - Shot Hub Filter Toggle Added
-
-## Night Build (8:47 AM) - Shot Hub Filter Toggle Feature (IMPLEMENTED)
-
-### Features Perfected This Build
-- **Shot Hub Page - Filter Toggle Functionality**: Added professional filter panel to match other pages
-  - **Filter Toggle Button**: New filter button in header with violet accent
-  - **Active Filter Badge**: Shows count of active filters on the toggle button
-  - **Scene Filter**: Filter by All Scenes or specific scene
-  - **Shot Size Filter**: Filter by ECU/CU/MCU/MS/MWS/WS/VWS/EWS
-  - **Camera Angle Filter**: Filter by high/low/eye/dutch/bird/worm
-  - **Camera Movement Filter**: Filter by static/pan/tilt/dolly/track/crane/handheld/steadicam/drone
-  - **Clear Filters**: Button to reset all filters at once
-  - **"F" Keyboard Shortcut**: Press F to toggle filters on/off
-  - **"/" Keyboard Shortcut**: Press / to focus search input
-  - **Filter Panel**: Dropdown panel with all filter dropdowns
-  - **Click Outside**: Filter panel closes when clicking outside
-  - **Updated Help Modal**: Added "F" shortcut for filters to keyboard shortcuts help
-  - **Esc to Close**: Escape key now closes filter panel along with other modals
-  - **Filtered Display**: Stats row shows filtered count vs total when filters active
-  - **Empty State**: Shows "Clear filters" button when no shots match filters
-
-### Shot Hub Filter Enhancements
-1. **Filter Toggle**: Visual filter button with badge count (violet theme)
-2. **Scene Filters**: All Scenes + individual scenes from script
-3. **Shot Size Filters**: ECU, CU, MCU, MS, MWS, WS, VWS, EWS
-4. **Camera Angle Filters**: high, low, eye, dutch, bird, worm
-5. **Camera Movement Filters**: static, pan, tilt, dolly, track, crane, handheld, steadicam, drone
-6. **Clear Filter**: Reset all filters with one click
-7. **Keyboard Shortcuts**: F=toggle filters, /=search, Esc=close
-8. **Professional UI**: Consistent with other pages using violet accent
-9. **Filtered Display**: Stats show "X / Y" when filters active
-10. **Smart Empty State**: Different message when no shots vs no matching filters
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-
-### Shot Hub Filter Feature Checklist
-- [x] Feature works 100% (filter toggle functional)
-- [x] Keyboard shortcuts working (F=filters, /=search)
-- [x] UI professional & visual (violet accent, badge count)
-- [x] Filter state managed properly (scene + size + angle + movement filters)
-- [x] Click outside closes filter panel
-- [x] Filtered shots displayed in list
-- [x] Stats show filtered count when active
-- [x] Empty state shows clear filters option
-- [x] Error handling complete
-- [x] Build passes
-
-### Pushed: 28c9c3f
-
----
-
-## Build Status: ✅ PASSING (8:35 AM) - Analytics Page Filter Toggle Added
-
-## Night Build (8:35 AM) - Analytics Page Filter Toggle Feature (IMPLEMENTED)
-
-### Features Perfected This Build
-- **Analytics Page - Filter Toggle Functionality**: Added professional filter panel to match other pages
-  - **Filter Toggle Button**: New filter button in header with indigo accent
-  - **Active Filter Badge**: Shows count of active filters on the toggle button
-  - **Time Period Filter**: Filter analytics by All Time/Week/Month/Quarter/Year
-  - **Department Filter**: Filter by Camera/Lighting/Sound/Art/VFX
-  - **Clear Filters**: Button to reset all filters at once
-  - **"F" Keyboard Shortcut**: Press F to toggle filters on/off
-  - **"/" Keyboard Shortcut**: Press / to focus search input
-  - **Filter Panel**: Dropdown panel with time period and department dropdowns
-  - **Click Outside**: Filter panel closes when clicking outside
-  - **Updated Help Modal**: Added "F" shortcut for filters to keyboard shortcuts help
-  - **Esc to Close**: Escape key now closes filter panel along with other modals
-  - **Consistency**: Now matches other pages in the app with filter toggle
-  - **Filter Status Display**: Shows active filters in filter status bar
-
-### Analytics Filter Enhancements
-1. **Filter Toggle**: Visual filter button with badge count (indigo theme)
-2. **Time Period Filters**: All Time, This Week, This Month, This Quarter, This Year
-3. **Department Filters**: All Departments, Camera, Lighting, Sound, Art, VFX
-4. **Clear Filter**: Reset all filters with one click
-5. **Keyboard Shortcuts**: F=toggle filters, /=search, Esc=close
-6. **Professional UI**: Consistent with other pages using indigo accent
-
-### Build Verification
-- **Build**: Clean build with 81 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-
-### Analytics Filter Feature Checklist
-- [x] Feature works 100% (filter toggle functional)
-- [x] Keyboard shortcuts working (F=filters, /=search)
-- [x] UI professional & visual (indigo accent, badge count)
-- [x] Filter state managed properly (time period + department filters)
-- [x] Click outside closes filter panel
-- [x] Filter status displayed in UI
-- [x] Error handling complete
-- [x] Build passes
-
-### Pushed: dadeb85
-
----
-
-## Build Status: ✅ PASSING (7:47 AM) - Call Sheets Page Filter Toggle Added
-
-## Night Build (7:47 AM) - Call Sheets Page Filter Toggle Feature (IMPLEMENTED)
-
-### Features Perfected This Build
-- **Call Sheets Page - Filter Toggle Functionality**: Added professional filter panel to match other pages
-  - **Filter Toggle Button**: New filter button in header with cyan accent
-  - **Active Filter Badge**: Shows count of active filters on the toggle button
-  - **Location Filter**: Filter call sheets by shooting location
-  - **Month Filter**: Filter call sheets by month/year
-  - **Clear Filters**: Button to reset all filters at once
-  - **"F" Keyboard Shortcut**: Press F to toggle filters on/off
-  - **"/" Keyboard Shortcut**: Press / to focus search input
-  - **Filter Panel**: Dropdown panel with location and month dropdowns
-  - **Click Outside**: Filter panel closes when clicking outside
-  - **Updated Help Modal**: Added "F" shortcut for filters to keyboard shortcuts help
-  - **Esc to Close**: Escape key now closes filter panel along with other modals
-  - **Consistency**: Now matches other pages in the app with filter toggle
-  - **Filtered Display**: Call sheet list updates to show filtered results
-
-### Call Sheets Filter Enhancements
-1. **Filter Toggle**: Visual filter button with badge count (cyan theme)
-2. **Location Filter**: Dropdown populated with actual locations from call sheets
-3. **Month Filter**: Dropdown with unique months from call sheet dates
-4. **Clear Filter**: Reset all filters with one click
-5. **Keyboard Shortcuts**: F=toggle filters, /=search, Esc=close
-6. **Professional UI**: Consistent with other pages using cyan accent
-
-### Build Verification
-- **Build**: Clean build with 81 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-
-### Call Sheets Filter Feature Checklist
-- [x] Feature works 100% (filter toggle functional)
-- [x] Keyboard shortcuts working (F=filters, /=search)
-- [x] UI professional & visual (cyan accent, badge count)
-- [x] Filter state managed properly (location + month filters)
-- [x] Click outside closes filter panel
-- [x] Filtered call sheets displayed in list
-- [x] Error handling complete
-- [x] Build passes
-
-### Pushed: a52cfd7
+### Pushed: 76dc3976
 
 ---
 

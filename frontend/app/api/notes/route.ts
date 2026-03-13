@@ -47,12 +47,12 @@ interface Note {
 const DEMO_NOTES: Note[] = [
   { 
     id: '1', 
-    title: 'Day 1 Shoot - Factory Sequence', 
-    content: 'Key points:\n- 200 extras confirmed\n- Safety officer on set\n- Backup generator arranged\n- Weather contingency: indoor warehouse shots', 
+    title: 'Day 1 Shoot - Marina Beach Sequence', 
+    content: 'Key points:\n- 200 extras confirmed\n- Safety officer on set\n- Backup generator arranged\n- Weather contingency: indoor studio shots', 
     category: 'production', 
     tags: ['shoot', 'action', 'extras'], 
-    createdAt: '2024-02-10T10:00:00Z', 
-    updatedAt: '2024-02-12T14:30:00Z',
+    createdAt: '2026-03-10T10:00:00Z', 
+    updatedAt: '2026-03-12T14:30:00Z',
     isPinned: true
   },
   { 
@@ -61,26 +61,26 @@ const DEMO_NOTES: Note[] = [
     content: 'Primary: ARRI Alexa Mini LF\nBackup: RED Komodo\nLenses: Cooke S7/i Full Frame Plus\nStabilizer: DJI Ronin RS3 Pro', 
     category: 'technical', 
     tags: ['camera', 'equipment', 'backup'], 
-    createdAt: '2024-02-08T09:00:00Z', 
-    updatedAt: '2024-02-08T09:00:00Z' 
+    createdAt: '2026-03-08T09:00:00Z', 
+    updatedAt: '2026-03-08T09:00:00Z' 
   },
   { 
     id: '3', 
-    title: 'Location Change - Song Sequence', 
-    content: 'Original: Marina Beach\nChanged to: EVP Studios (Indoor)\nReason: Weather forecast shows rain\nBudget impact: +₹2L for studio rental', 
+    title: 'Location Change - Temple Sequence', 
+    content: 'Original: Kapaleeshwarar Temple\nChanged to: EVP Studios (Indoor)\nReason: Weather forecast shows rain\nBudget impact: +₹2L for studio rental', 
     category: 'logistics', 
     tags: ['location', 'weather', 'budget'], 
-    createdAt: '2024-02-05T16:00:00Z', 
-    updatedAt: '2024-02-06T11:00:00Z' 
+    createdAt: '2026-03-05T16:00:00Z', 
+    updatedAt: '2026-03-06T11:00:00Z' 
   },
   { 
     id: '4', 
     title: 'Actor Schedule Conflict', 
-    content: 'Ajith sir has a clash with another project on Feb 20th.\nNeed to reschedule temple shoot to Feb 18th or 19th.\nDiscuss with director and producer.', 
+    content: 'Vijay sir has a clash with another project on March 20th.\nNeed to reschedule temple shoot to March 18th or 19th.\nDiscuss with director and producer.', 
     category: 'production', 
     tags: ['schedule', 'cast', 'urgent'], 
-    createdAt: '2024-02-03T08:00:00Z', 
-    updatedAt: '2024-02-04T10:00:00Z',
+    createdAt: '2026-03-03T08:00:00Z', 
+    updatedAt: '2026-03-04T10:00:00Z',
     isPinned: true
   },
   { 
@@ -89,8 +89,8 @@ const DEMO_NOTES: Note[] = [
     content: 'Scene 12: Explosion - 45 frames\nScene 23: Glow effect - 30 frames\nScene 31: Blood removal - 15 frames\nTotal VFX shots: 90 frames estimated', 
     category: 'creative', 
     tags: ['vfx', 'shots', 'planning'], 
-    createdAt: '2024-01-28T14:00:00Z', 
-    updatedAt: '2024-01-30T09:00:00Z' 
+    createdAt: '2026-03-01T14:00:00Z', 
+    updatedAt: '2026-03-02T09:00:00Z' 
   },
   { 
     id: '6', 
@@ -98,8 +98,8 @@ const DEMO_NOTES: Note[] = [
     content: 'Per day: ₹50,000\nTotal shoot days: 20\nBuffer (10%): ₹1,00,000\nTotal budget: ₹11,00,000', 
     category: 'budget', 
     tags: ['catering', 'budget', 'expenses'], 
-    createdAt: '2024-01-25T11:00:00Z', 
-    updatedAt: '2024-01-25T11:00:00Z' 
+    createdAt: '2026-02-28T11:00:00Z', 
+    updatedAt: '2026-02-28T11:00:00Z' 
   },
 ]
 

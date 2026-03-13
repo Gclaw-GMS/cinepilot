@@ -129,6 +129,9 @@ export default function CharacterCostumePage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterStatus, setFilterStatus] = useState('all')
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   const [exporting, setExporting] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
 
@@ -214,6 +217,11 @@ export default function CharacterCostumePage() {
           setShowFilters(false)
           setSearchTerm('')
           setFilterRole('all')
+          setFilterStatus('all')
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
           break
         case 'p':
           if (!e.ctrlKey && !e.metaKey) {
@@ -234,7 +242,7 @@ export default function CharacterCostumePage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm])
+  }, [showForm, showFilters, filterRole, filterStatus])
 
   // Click outside handler for export menu and filter panel
   useEffect(() => {
@@ -568,8 +576,18 @@ export default function CharacterCostumePage() {
     const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       char.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = filterRole === 'all' || char.role === filterRole
-    return matchesSearch && matchesRole
+    const matchesStatus = filterStatus === 'all' || char.status === filterStatus
+    return matchesSearch && matchesRole && matchesStatus
   })
+
+  // Calculate active filter count
+  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0)
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilterRole('all')
+    setFilterStatus('all')
+  }
 
   const roleData = summary ? Object.entries(summary.byRole).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -947,19 +965,73 @@ export default function CharacterCostumePage() {
               className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
             />
           </div>
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+          
+          {/* Filter Toggle Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`filter-toggle flex items-center gap-2 bg-slate-800 border rounded-lg px-4 py-2 text-white focus:outline-none transition-colors ${
+              showFilters || activeFilterCount > 0 ? 'border-purple-500 bg-purple-500/20' : 'border-slate-700 hover:border-purple-500'
+            }`}
+            title="Toggle filters (F)"
           >
-            <option value="all">All Roles</option>
-            <option value="protagonist">Protagonist</option>
-            <option value="antagonist">Antagonist</option>
-            <option value="supporting">Supporting</option>
-            <option value="comic">Comic</option>
-            <option value="romantic">Romantic</option>
-            <option value="mentor">Mentor</option>
-          </select>
+            <Filter className="w-4 h-4" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+            )}
+          </button>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <div 
+              ref={filterPanelRef}
+              className="absolute mt-12 right-6 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 w-64"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-medium">Filters</h3>
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-purple-400 hover:text-purple-300"
+                >
+                  Clear All
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-xs mb-2">Role</label>
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="protagonist">Protagonist</option>
+                    <option value="antagonist">Antagonist</option>
+                    <option value="supporting">Supporting</option>
+                    <option value="comic">Comic</option>
+                    <option value="romantic">Romantic</option>
+                    <option value="mentor">Mentor</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-slate-400 text-xs mb-2">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="planning">Planning</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="reviewed">Reviewed</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Characters Grid */}
@@ -1473,6 +1545,10 @@ export default function CharacterCostumePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Focus search</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">/</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Toggle filters</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Export data</span>

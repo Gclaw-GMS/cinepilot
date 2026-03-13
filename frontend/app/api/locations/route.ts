@@ -70,11 +70,13 @@ export async function GET(req: NextRequest) {
       if (statsOnly) {
         return NextResponse.json({
           scenes: demoScenes,
+          _demo: true,
           isDemoMode: true,
         });
       }
       return NextResponse.json({ 
         scenes: DEMO_SCENES,
+        _demo: true,
         isDemoMode: true,
       });
     }
@@ -111,11 +113,13 @@ export async function GET(req: NextRequest) {
             candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
           })),
           _demo: true,
+          isDemoMode: true,
         });
       }
       return NextResponse.json({ 
         scenes: DEMO_SCENES,
         _demo: true,
+        isDemoMode: true,
       });
     }
 
@@ -128,11 +132,12 @@ export async function GET(req: NextRequest) {
           location: s.location,
           candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
         })),
+        _demo: false,
         isDemoMode: false,
       });
     }
 
-    return NextResponse.json({ scenes, isDemoMode: false });
+    return NextResponse.json({ scenes, _demo: false, isDemoMode: false });
   } catch (error) {
     console.error('[GET /api/locations] Database not available, using demo data:', error);
     // Use demo data when database is not available
@@ -145,6 +150,7 @@ export async function GET(req: NextRequest) {
           terrainType: 'urban',
           candidates: getDemoCandidates(sceneId)
         },
+        _demo: true,
         isDemoMode: true,
       });
     }
@@ -156,15 +162,9 @@ export async function GET(req: NextRequest) {
       candidates: s.locationIntents.reduce((sum, intent) => sum + intent._count.candidates, 0),
     }));
     
-    if (statsOnly) {
-      return NextResponse.json({
-        scenes: demoScenes,
-        isDemoMode: true,
-      });
-    }
-    
     return NextResponse.json({ 
       scenes: DEMO_SCENES,
+      _demo: true,
       isDemoMode: true,
     });
   }

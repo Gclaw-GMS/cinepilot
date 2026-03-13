@@ -128,6 +128,23 @@ export default function NotesPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
+  
+  // Filter panel state
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterCategory !== 'all') count++
+    return count
+  }, [filterCategory])
+  
+  // Clear filters
+  const clearFilters = () => {
+    setFilterCategory('all')
+  }
+  
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
@@ -216,6 +233,10 @@ export default function NotesPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
+          break
         case 'n':
           e.preventDefault()
           setShowForm(true)
@@ -259,6 +280,8 @@ export default function NotesPage() {
             setShowExportMenu(false)
           } else if (showPrintMenu) {
             setShowPrintMenu(false)
+          } else if (showFilterPanel) {
+            setShowFilterPanel(false)
           } else {
             setSearch('')
             setFilterCategory('all')
@@ -269,9 +292,9 @@ export default function NotesPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu])
+  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu, showFilterPanel])
 
-  // Click outside to close export and print menus
+  // Click outside to close export, print menus, and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -280,12 +303,18 @@ export default function NotesPage() {
       if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button
+        const filterButton = document.querySelector('[data-filter-toggle]')
+        if (filterButton && filterButton.contains(e.target as Node)) return
+        setShowFilterPanel(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilterPanel) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -674,6 +703,57 @@ export default function NotesPage() {
               <RefreshCw className={`w-4 h-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+            {/* Filter Toggle Button */}
+            <div className="relative" ref={filterPanelRef}>
+              <button
+                data-filter-toggle
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                  showFilterPanel || activeFilterCount > 0
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
+                }`}
+                title="Filter (F)"
+              >
+                <Filter className="w-4 h-4" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {showFilterPanel && (
+                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Filters</span>
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={clearFilters}
+                        className="text-xs text-indigo-400 hover:text-indigo-300"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    {/* Category Filter */}
+                    <div>
+                      <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Category</label>
+                      <select
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="all">All Categories</option>
+                        {CATEGORIES.map(cat => (
+                          <option key={cat.value} value={cat.value}>{cat.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowKeyboardHelp(true)}
               className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors"
@@ -1153,6 +1233,7 @@ export default function NotesPage() {
               {[
                 { key: 'R', action: 'Refresh notes' },
                 { key: '/', action: 'Focus search' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: 'N', action: 'Create new note' },
                 { key: 'P', action: 'Pin/unpin selected note' },
                 { key: 'D', action: 'Duplicate selected note' },

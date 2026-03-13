@@ -27,6 +27,7 @@ import {
   Search,
   Download,
   Printer,
+  Filter,
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -78,7 +79,11 @@ export default function AudienceSentimentPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [sentimentFilter, setSentimentFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   const [formData, setFormData] = useState({
     title: '',
     platform: 'youtube',
@@ -89,7 +94,7 @@ export default function AudienceSentimentPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
-  // Filter analyses by platform and search query
+  // Filter analyses by platform, search, sentiment, and status
   const filteredAnalyses = analyses.filter(a => {
     const matchesPlatform = platformFilter === 'all' || a.platform === platformFilter
     const matchesSearch = !searchQuery || 
@@ -97,8 +102,28 @@ export default function AudienceSentimentPage() {
       (a.topPositive?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
       (a.topNegative?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
       (a.takeaways?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())))
-    return matchesPlatform && matchesSearch
+    
+    // Sentiment filter
+    let matchesSentiment = true
+    if (sentimentFilter === 'positive') {
+      matchesSentiment = a.avgSentiment > 0.3
+    } else if (sentimentFilter === 'negative') {
+      matchesSentiment = a.avgSentiment < -0.3
+    } else if (sentimentFilter === 'neutral') {
+      matchesSentiment = a.avgSentiment >= -0.3 && a.avgSentiment <= 0.3
+    }
+    
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || a.status === statusFilter
+    
+    return matchesPlatform && matchesSearch && matchesSentiment && matchesStatus
   })
+
+  // Calculate active filter count
+  const activeFilterCount = 
+    (platformFilter !== 'all' ? 1 : 0) +
+    (sentimentFilter !== 'all' ? 1 : 0) +
+    (statusFilter !== 'all' ? 1 : 0)
 
   const fetchAnalyses = useCallback(async () => {
     setError(null)
@@ -160,6 +185,10 @@ export default function AudienceSentimentPage() {
           e.preventDefault()
           setPlatformFilter('twitter')
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -177,6 +206,8 @@ export default function AudienceSentimentPage() {
           setShowKeyboardHelp(false)
           setShowForm(false)
           setShowExportMenu(false)
+          setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           break
       }
@@ -445,10 +476,16 @@ export default function AudienceSentimentPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && e.target) {
+        const target = e.target as HTMLElement
+        if (!filterPanelRef.current.contains(target) && !target.closest('[data-filter-toggle]')) {
+          setShowFilters(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   // Close export menu on Escape
   useEffect(() => {
@@ -459,10 +496,13 @@ export default function AudienceSentimentPage() {
       if (e.key === 'Escape' && showPrintMenu) {
         setShowPrintMenu(false)
       }
+      if (e.key === 'Escape' && showFilters) {
+        setShowFilters(false)
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   const selectedAnalysis = filteredAnalyses[0]
 
@@ -479,7 +519,7 @@ export default function AudienceSentimentPage() {
               <div>
                 <h1 className="text-xl font-semibold text-white">Audience Sentiment</h1>
                 <p className="text-sm text-slate-400">
-                  {searchQuery || platformFilter !== 'all'
+                  {searchQuery || platformFilter !== 'all' || sentimentFilter !== 'all' || statusFilter !== 'all' || showFilters
                     ? `${filteredAnalyses.length} of ${analyses.length} analyses`
                     : `${analyses.length} analyses total`}
                 </p>
@@ -531,6 +571,25 @@ export default function AudienceSentimentPage() {
                   All
                 </button>
               </div>
+              
+              {/* Filter Toggle Button */}
+              <button
+                data-filter-toggle
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                  showFilters 
+                    ? 'bg-rose-600 text-white' 
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                }`}
+                title="Toggle Filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-rose-500 text-white text-xs rounded-full">{activeFilterCount}</span>
+                )}
+              </button>
+              
               <button
                 onClick={() => fetchDataRef.current?.()}
                 disabled={refreshing}
@@ -605,6 +664,68 @@ export default function AudienceSentimentPage() {
           </div>
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div 
+          ref={filterPanelRef}
+          className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-rose-400" />
+              <span className="text-sm font-medium text-slate-300">Filters:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Platform:</label>
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+              >
+                <option value="all">All Platforms</option>
+                {PLATFORMS.map((p) => (<option key={p.key} value={p.key}>{p.label}</option>))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Sentiment:</label>
+              <select
+                value={sentimentFilter}
+                onChange={(e) => setSentimentFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+              >
+                <option value="all">All Sentiments</option>
+                <option value="positive">Positive</option>
+                <option value="neutral">Neutral</option>
+                <option value="negative">Negative</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Status:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-rose-500"
+              >
+                <option value="all">All Statuses</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <button
+              onClick={() => {
+                setPlatformFilter('all')
+                setSentimentFilter('all')
+                setStatusFilter('all')
+              }}
+              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 py-6">
         {loading ? (
@@ -1014,6 +1135,10 @@ export default function AudienceSentimentPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Search analyses</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">New analysis</span>

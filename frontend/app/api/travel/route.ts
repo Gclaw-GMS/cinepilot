@@ -25,7 +25,20 @@ function calculateSummary(expenses: any[]) {
   let totalAmount = 0;
   
   for (const expense of expenses) {
-    totalAmount += expense.amount;
+    // Handle both string and number amounts - also handle Decimal from Prisma
+    let amount: number;
+    if (typeof expense.amount === 'string') {
+      amount = parseFloat(expense.amount);
+    } else if (typeof expense.amount === 'number') {
+      amount = expense.amount;
+    } else if (expense.amount && typeof expense.amount.toNumber === 'function') {
+      // Handle Prisma Decimal
+      amount = expense.amount.toNumber();
+    } else {
+      amount = 0;
+    }
+    
+    totalAmount = totalAmount + amount;
     byCategory[expense.category] = (byCategory[expense.category] || 0) + 1;
     byStatus[expense.status] = (byStatus[expense.status] || 0) + 1;
   }

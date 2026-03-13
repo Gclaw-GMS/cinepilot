@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer } from 'lucide-react'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer, Copy, Check } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
 
 interface ScriptData {
@@ -187,6 +187,7 @@ export default function ScriptsPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => Promise<void>>()
@@ -499,6 +500,50 @@ export default function ScriptsPage() {
     }, 250)
   }
 
+  // Copy scene to clipboard
+  const handleCopyScene = async (scene: SceneData) => {
+    const text = `${scene.headingRaw}
+
+Characters: ${scene.sceneCharacters.map(c => c.character.name).join(', ') || 'None'}
+Locations: ${scene.sceneLocations.map(l => l.name).join(', ') || 'None'}
+Props: ${scene.sceneProps.map(p => p.prop.name).join(', ') || 'None'}
+VFX Notes: ${scene.vfxNotes.map(v => v.description).join(', ') || 'None'}
+${scene.warnings.length > 0 ? `Warnings: ${scene.warnings.map(w => w.description).join(', ')}` : ''}`
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(scene.id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
+  // Copy script summary to clipboard
+  const handleCopyScriptSummary = async () => {
+    if (!activeScript) return
+
+    const text = `${activeScript.title} (v${activeScript.version})
+
+Total Scenes: ${scenes.length}
+INT Scenes: ${scenes.filter(s => s.intExt === 'INT').length}
+EXT Scenes: ${scenes.filter(s => s.intExt === 'EXT').length}
+Day Scenes: ${scenes.filter(s => s.timeOfDay === 'DAY').length}
+Night Scenes: ${scenes.filter(s => s.timeOfDay === 'NIGHT').length}
+Total Characters: ${new Set(scenes.flatMap(s => s.sceneCharacters.map(c => c.character.name))).size}
+Locations: ${new Set(scenes.map(s => s.location)).size}
+VFX Notes: ${allVfx.length}
+Warnings: ${allWarnings.length}`
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId('summary')
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   const activeScript = scripts[0]
   const scenes = activeScript?.scenes || []
   const qualityAnalysis = analyses.find(a => a.analysisType === 'quality_score')
@@ -784,7 +829,21 @@ export default function ScriptsPage() {
           {/* Summary Cards (if data exists) */}
           {summaryAnalysis?.result && (
             <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h2 className="font-semibold mb-4">Breakdown Summary</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-semibold">Breakdown Summary</h2>
+                <button
+                  onClick={handleCopyScriptSummary}
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
+                  title="Copy summary to clipboard"
+                >
+                  {copiedId === 'summary' ? (
+                    <Check className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                  <span>{copiedId === 'summary' ? 'Copied!' : 'Copy'}</span>
+                </button>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard label="Scenes" value={summaryAnalysis.result.total_scenes} />
                 <StatCard label="Characters" value={summaryAnalysis.result.unique_characters} />
@@ -882,6 +941,20 @@ export default function ScriptsPage() {
                       {scene.startLine && scene.endLine && (
                         <span>L{scene.startLine}-{scene.endLine}</span>
                       )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopyScene(scene)
+                        }}
+                        className="ml-2 p-1.5 rounded hover:bg-gray-700 transition-colors"
+                        title="Copy scene details"
+                      >
+                        {copiedId === scene.id ? (
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
                     </div>
                   </div>
 

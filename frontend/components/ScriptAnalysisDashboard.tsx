@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { aiAnalysis } from '@/lib/api'
 
 interface ScriptAnalysisDashboardProps {
@@ -13,13 +13,7 @@ export default function ScriptAnalysisDashboard({ scriptContent }: ScriptAnalysi
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<any>(null)
 
-  useEffect(() => {
-    if (scriptContent) {
-      analyze()
-    }
-  }, [scriptContent])
-
-  const analyze = async () => {
+  const analyze = useCallback(async () => {
     setLoading(true)
     try {
       let data
@@ -42,7 +36,13 @@ export default function ScriptAnalysisDashboard({ scriptContent }: ScriptAnalysi
       console.error('Analysis failed:', error)
     }
     setLoading(false)
-  }
+  }, [scriptContent, activeTab])
+
+  useEffect(() => {
+    if (scriptContent) {
+      analyze()
+    }
+  }, [scriptContent, analyze])
 
   const tabs = [
     { id: 'pacing', label: 'Pacing', icon: '⏱️' },

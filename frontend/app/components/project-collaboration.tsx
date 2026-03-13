@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { collaborationNew } from '../lib/api'
 
@@ -45,9 +45,9 @@ export default function ProjectCollaboration({ projectId }: { projectId: number 
 
   useEffect(() => {
     loadData()
-  }, [projectId])
+  }, [projectId, loadData])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!projectId) return
     setLoading(true)
     try {
@@ -63,7 +63,7 @@ export default function ProjectCollaboration({ projectId }: { projectId: number 
       console.error('Failed to load collaboration data:', e)
     }
     setLoading(false)
-  }
+  }, [projectId])
 
   const addTask = async () => {
     if (!newTaskTitle.trim() || !projectId) return

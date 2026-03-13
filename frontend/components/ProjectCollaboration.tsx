@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { collaboration, type Activity, type ProjectTask, type ProjectExpenses } from '@/lib/api'
 
 interface ProjectCollaborationProps {
@@ -20,7 +20,7 @@ export default function ProjectCollaboration({ projectId }: ProjectCollaboration
     loadData()
   }, [projectId, activeTab])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       if (activeTab === 'activity') {
@@ -34,7 +34,7 @@ export default function ProjectCollaboration({ projectId }: ProjectCollaboration
       console.error('Failed to load data:', error)
     }
     setLoading(false)
-  }
+  }, [projectId, activeTab])
 
   const handleCreateTask = async () => {
     if (!newTask.title) return

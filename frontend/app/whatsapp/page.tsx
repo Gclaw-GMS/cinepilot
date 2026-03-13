@@ -91,11 +91,11 @@ export default function WhatsAppPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   // Handle refresh with loading state
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     await fetchData()
     setTimeout(() => setIsRefreshing(false), 500)
-  }
+  }, [fetchData])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -170,7 +170,7 @@ export default function WhatsAppPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [handleRefresh])
 
   // Click outside to close dropdowns and filter panel
   useEffect(() => {

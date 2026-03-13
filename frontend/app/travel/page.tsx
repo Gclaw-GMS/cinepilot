@@ -108,6 +108,24 @@ export default function TravelExpensesPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
 
+  // Filter panel state
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = [
+    filterCategory !== 'all' ? 1 : 0,
+    filterStatus !== 'all' ? 1 : 0,
+    dateRange.start || dateRange.end ? 1 : 0,
+  ].reduce((a, b) => a + b, 0)
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilterCategory('all')
+    setFilterStatus('all')
+    setDateRange({ start: '', end: '' })
+  }
+
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -156,6 +174,10 @@ export default function TravelExpensesPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
+          break
         case 'n':
           e.preventDefault()
           setShowForm(true)
@@ -175,6 +197,7 @@ export default function TravelExpensesPage() {
           setShowForm(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilterPanel(false)
           break
         case 'p':
           e.preventDefault()
@@ -189,7 +212,7 @@ export default function TravelExpensesPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close export menu
+  // Click outside to close menus and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -198,12 +221,18 @@ export default function TravelExpensesPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button
+        const filterButton = document.querySelector('[data-filter-toggle]')
+        if (filterButton && filterButton.contains(e.target as Node)) return
+        setShowFilterPanel(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilterPanel) {
       document.addEventListener('click', handleClickOutside)
     }
     return () => document.removeEventListener('click', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   // CSV Export function
   const exportToCSV = () => {
@@ -515,6 +544,98 @@ export default function TravelExpensesPage() {
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
+              {/* Filter Toggle Button */}
+              <div className="relative" ref={filterPanelRef}>
+                <button
+                  data-filter-toggle
+                  onClick={() => setShowFilterPanel(!showFilterPanel)}
+                  className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                    showFilterPanel || activeFilterCount > 0
+                      ? 'bg-cyan-600 border-cyan-500 text-white'
+                      : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
+                  }`}
+                  title="Filter (F)"
+                >
+                  <Filter className="w-4 h-4" />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                {showFilterPanel && (
+                  <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                      <span className="text-sm font-medium text-white">Filters</span>
+                      {activeFilterCount > 0 && (
+                        <button
+                          onClick={clearFilters}
+                          className="text-xs text-cyan-400 hover:text-cyan-300"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <div className="p-4 space-y-4">
+                      {/* Category Filter */}
+                      <div>
+                        <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Category</label>
+                        <select
+                          value={filterCategory}
+                          onChange={(e) => setFilterCategory(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        >
+                          <option value="all">All Categories</option>
+                          {CATEGORIES.map(cat => (
+                            <option key={cat.key} value={cat.key}>{cat.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {/* Status Filter */}
+                      <div>
+                        <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Status</label>
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="reimbursed">Reimbursed</option>
+                        </select>
+                      </div>
+                      {/* Date Range Filter */}
+                      <div>
+                        <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Date Range</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="date"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <input
+                            type="date"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        {(dateRange.start || dateRange.end) && (
+                          <button
+                            onClick={clearFilters}
+                            className="text-xs text-cyan-400 hover:text-cyan-300 mt-2"
+                          >
+                            Clear dates
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               {/* Keyboard Help Button */}
               <button
                 onClick={() => setShowKeyboardHelp(true)}
@@ -1026,6 +1147,10 @@ export default function TravelExpensesPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Focus search</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">F</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Add new expense</span>

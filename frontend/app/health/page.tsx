@@ -5,7 +5,7 @@ import {
   Heart, Activity, Database, HardDrive, Cpu, AlertTriangle, 
   CheckCircle, XCircle, RefreshCw, Clock, Server, 
   Zap, Thermometer, Gauge, Loader2, HelpCircle, X,
-  Search, Download, Printer
+  Search, Download, Printer, Filter
 } from 'lucide-react'
 import { 
   AreaChart, Area, BarChart, Bar, 
@@ -61,18 +61,37 @@ export default function HealthPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<'all' | 'healthy' | 'degraded' | 'unhealthy'>('all')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Filtered checks based on search
+  // Calculate active filter count
+  const activeFilterCount = filterStatus !== 'all' ? 1 : 0
+  
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilterStatus('all')
+    setSearchQuery('')
+  }, [])
+  
+  // Filtered checks based on search and status filter
   const filteredChecks = healthData?.checks.filter(check => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      check.component.toLowerCase().includes(query) ||
-      check.status.toLowerCase().includes(query) ||
-      (check.message?.toLowerCase().includes(query) ?? false)
-    )
+    // Apply status filter
+    if (filterStatus !== 'all' && check.status !== filterStatus) {
+      return false
+    }
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      return (
+        check.component.toLowerCase().includes(query) ||
+        check.status.toLowerCase().includes(query) ||
+        (check.message?.toLowerCase().includes(query) ?? false)
+      )
+    }
+    return true
   }) || []
 
   // Export functions
@@ -313,6 +332,10 @@ export default function HealthPage() {
           e.preventDefault()
           document.querySelector<HTMLInputElement>('[data-health-search]')?.focus()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -330,6 +353,7 @@ export default function HealthPage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           break
       }
@@ -339,7 +363,7 @@ export default function HealthPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Click outside to close export menu
+  // Click outside to close menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -348,10 +372,14 @@ export default function HealthPage() {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node) && 
+          !(e.target as Element).closest('.filter-toggle')) {
+        setShowFilters(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true)
@@ -453,6 +481,59 @@ export default function HealthPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-48 transition-colors"
               />
+            </div>
+            
+            {/* Filter Toggle Button */}
+            <div className="relative" ref={filterPanelRef}>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`filter-toggle flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 hover:bg-slate-600 text-white'
+                }`}
+                title="Toggle filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs font-medium">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              
+              {/* Filter Panel */}
+              {showFilters && (
+                <div className="filter-menu absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                  <div className="p-3 border-b border-slate-700">
+                    <h3 className="text-sm font-medium text-white">Filter Components</h3>
+                  </div>
+                  <div className="p-3">
+                    <label className="block text-xs text-slate-400 mb-2">Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="healthy">Healthy</option>
+                      <option value="degraded">Degraded</option>
+                      <option value="unhealthy">Unhealthy</option>
+                    </select>
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <div className="p-3 border-t border-slate-700">
+                      <button
+                        onClick={clearFilters}
+                        className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        Clear All Filters
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             {/* Export Dropdown */}
@@ -853,6 +934,10 @@ export default function HealthPage() {
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Search components</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">/</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Toggle filters</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">F</kbd>
               </div>
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Export data</span>

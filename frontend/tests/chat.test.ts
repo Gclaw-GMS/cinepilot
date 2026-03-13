@@ -1,278 +1,312 @@
 /**
  * Chat API Tests
  * Run with: npx jest tests/chat.test.ts
+ * Uses direct route imports instead of HTTP fetches
  */
 
-const API_BASE = 'http://localhost:3002/api/chat';
+import { describe, it, expect } from '@jest/globals';
+import { GET, POST } from '@/app/api/chat/route';
+import { NextRequest } from 'next/server';
 
-describe('Chat API', () => {
-  describe('GET /api/chat', () => {
-    test('returns chat capabilities and context', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data).toHaveProperty('capabilities');
-      expect(data).toHaveProperty('context');
-      expect(data).toHaveProperty('isDemoMode');
+// Helper to create request with query params
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/chat');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
     });
+  }
+  
+  const req = new NextRequest(url, {
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+  });
+  
+  return req;
+}
 
-    test('capabilities is an array', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
+describe('GET /api/chat', () => {
+  test('returns chat capabilities and context', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
 
-      expect(Array.isArray(data.capabilities)).toBe(true);
-      expect(data.capabilities.length).toBeGreaterThan(0);
-    });
+    expect(res.status).toBe(200);
+    expect(data).toHaveProperty('capabilities');
+    expect(data).toHaveProperty('context');
+    expect(data).toHaveProperty('isDemoMode');
+  });
 
-    test('capabilities includes expected values', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
+  test('capabilities is an array', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
 
-      const expectedCapabilities = [
-        'schedule_query',
-        'budget_analysis',
-        'crew_management',
-        'script_insights',
-        'risk_assessment',
-        'general_assistance'
-      ];
-      
-      expectedCapabilities.forEach(cap => {
-        expect(data.capabilities).toContain(cap);
-      });
-    });
+    expect(Array.isArray(data.capabilities)).toBe(true);
+    expect(data.capabilities.length).toBeGreaterThan(0);
+  });
 
-    test('context has required fields', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
+  test('capabilities includes expected values', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
 
-      expect(data.context).toHaveProperty('scriptsCount');
-      expect(data.context).toHaveProperty('scenesCount');
-      expect(data.context).toHaveProperty('budgetTotal');
-      expect(data.context).toHaveProperty('scheduleDays');
-      expect(data.context).toHaveProperty('crewCount');
-      expect(data.context).toHaveProperty('warningsCount');
-    });
-
-    test('context values are numbers', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      expect(typeof data.context.scriptsCount).toBe('number');
-      expect(typeof data.context.scenesCount).toBe('number');
-      expect(typeof data.context.budgetTotal).toBe('number');
-      expect(typeof data.context.scheduleDays).toBe('number');
-      expect(typeof data.context.crewCount).toBe('number');
-      expect(typeof data.context.warningsCount).toBe('number');
-    });
-
-    test('isDemoMode is boolean', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      expect(typeof data.isDemoMode).toBe('boolean');
-    });
-
-    test('aiEnabled is boolean', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      expect(typeof data.aiEnabled).toBe('boolean');
-    });
-
-    test('suggstions is an array', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      expect(Array.isArray(data.suggestions)).toBe(true);
-      expect(data.suggestions.length).toBeGreaterThan(0);
-    });
-
-    test('suggestions contain production-related prompts', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      const allSuggestions = data.suggestions.join(' ').toLowerCase();
-      expect(allSuggestions).toMatch(/schedule|budget|crew|risk|script/);
-    });
-
-    test('demo mode flag is present', async () => {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-
-      // isDemoMode should exist and be boolean
-      expect(data.isDemoMode !== undefined).toBe(true);
-      expect(typeof data.isDemoMode).toBe('boolean');
+    const expectedCapabilities = [
+      'schedule_query',
+      'budget_analysis',
+      'crew_management',
+      'script_insights',
+      'risk_assessment',
+      'general_assistance'
+    ];
+    
+    expectedCapabilities.forEach(cap => {
+      expect(data.capabilities).toContain(cap);
     });
   });
 
-  describe('POST /api/chat', () => {
-    test('sends message and receives response', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Hello' }),
-      });
+  test('context has required fields', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
 
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data).toHaveProperty('response');
+    expect(data.context).toHaveProperty('scriptsCount');
+    expect(data.context).toHaveProperty('scenesCount');
+    expect(data.context).toHaveProperty('budgetTotal');
+    expect(data.context).toHaveProperty('scheduleDays');
+    expect(data.context).toHaveProperty('crewCount');
+    expect(data.context).toHaveProperty('warningsCount');
+  });
+
+  test('context values are numbers', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(typeof data.context.scriptsCount).toBe('number');
+    expect(typeof data.context.scenesCount).toBe('number');
+    expect(typeof data.context.budgetTotal).toBe('number');
+    expect(typeof data.context.scheduleDays).toBe('number');
+    expect(typeof data.context.crewCount).toBe('number');
+    expect(typeof data.context.warningsCount).toBe('number');
+  });
+
+  test('isDemoMode is boolean', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(typeof data.isDemoMode).toBe('boolean');
+  });
+
+  test('aiEnabled is boolean', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(typeof data.aiEnabled).toBe('boolean');
+  });
+
+  test('suggstions is an array', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(Array.isArray(data.suggestions)).toBe(true);
+    expect(data.suggestions.length).toBeGreaterThan(0);
+  });
+
+  test('suggestions contain production-related prompts', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
+
+    const allSuggestions = data.suggestions.join(' ').toLowerCase();
+    expect(allSuggestions).toMatch(/schedule|budget|crew|risk|script/);
+  });
+
+  test('demo mode flag is present', async () => {
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
+    const data = await res.json();
+
+    // isDemoMode should exist and be boolean
+    expect(data.isDemoMode !== undefined).toBe(true);
+    expect(typeof data.isDemoMode).toBe('boolean');
+  });
+});
+
+describe('POST /api/chat', () => {
+  test('sends message and receives response', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'Hello' } 
     });
+    const res = await POST(req);
 
-    test('message is required', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toHaveProperty('response');
+  });
 
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data).toHaveProperty('error');
+  test('message is required', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: {} 
     });
+    const res = await POST(req);
 
-    test('empty message returns error', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '' }),
-      });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data).toHaveProperty('error');
+  });
 
-      expect(res.status).toBe(400);
+  test('empty message returns error', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: '' } 
     });
+    const res = await POST(req);
 
-    test('handles history parameter', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'What about budget?',
-          history: [
-            { role: 'user', content: 'Hello' },
-            { role: 'assistant', content: 'Hi there!' }
-          ]
-        }),
-      });
+    expect(res.status).toBe(400);
+  });
 
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data).toHaveProperty('response');
+  test('handles history parameter', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: {
+        message: 'What about budget?',
+        history: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi there!' }
+        ]
+      }
     });
+    const res = await POST(req);
 
-    test('response contains production info for schedule query', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Show me the shooting schedule' }),
-      });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toHaveProperty('response');
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      // Response should be a string (either demo, AI, or error message)
-      expect(typeof data.response).toBe('string');
-      expect(data.response.length).toBeGreaterThan(0);
+  test('response contains production info for schedule query', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'Show me the shooting schedule' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('response contains production info for budget query', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'What is the budget status?' }),
-      });
+    expect(res.status).toBe(200);
+    // Response should be a string (either demo, AI, or error message)
+    expect(typeof data.response).toBe('string');
+    expect(data.response.length).toBeGreaterThan(0);
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      expect(typeof data.response).toBe('string');
-      expect(data.response.length).toBeGreaterThan(0);
+  test('response contains production info for budget query', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'What is the budget status?' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('response contains production info for crew query', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Show me crew availability' }),
-      });
+    expect(res.status).toBe(200);
+    expect(typeof data.response).toBe('string');
+    expect(data.response.length).toBeGreaterThan(0);
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      expect(typeof data.response).toBe('string');
-      expect(data.response.length).toBeGreaterThan(0);
+  test('response contains production info for crew query', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'Show me crew availability' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('response contains production info for script query', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Tell me about the script' }),
-      });
+    expect(res.status).toBe(200);
+    expect(typeof data.response).toBe('string');
+    expect(data.response.length).toBeGreaterThan(0);
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      expect(typeof data.response).toBe('string');
-      expect(data.response.length).toBeGreaterThan(0);
+  test('response contains production info for script query', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'Tell me about the script' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('response contains production info for risk query', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'What are the production risks?' }),
-      });
+    expect(res.status).toBe(200);
+    expect(typeof data.response).toBe('string');
+    expect(data.response.length).toBeGreaterThan(0);
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      expect(data.response).toMatch(/risk|warning|issue|problem/i);
+  test('response contains production info for risk query', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'What are the production risks?' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('handles invalid JSON body', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'test' }),
-      });
+    expect(res.status).toBe(200);
+    expect(data.response).toMatch(/risk|warning|issue|problem/i);
+  });
 
-      expect(res.status).toBe(200);
+  test('handles invalid JSON body', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'test' } 
     });
+    const res = await POST(req);
 
-    test('handles message with special characters', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'What about ₹50,000 budget?!' }),
-      });
+    expect(res.status).toBe(200);
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      expect(data).toHaveProperty('response');
+  test('handles message with special characters', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'What about ₹50,000 budget?!' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('handles very long message', async () => {
-      const longMessage = 'Tell me about '.repeat(100);
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: longMessage }),
-      });
+    expect(res.status).toBe(200);
+    expect(data).toHaveProperty('response');
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      expect(data).toHaveProperty('response');
+  test('handles very long message', async () => {
+    const longMessage = 'Tell me about '.repeat(100);
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: longMessage } 
     });
+    const res = await POST(req);
+    const data = await res.json();
 
-    test('demo mode returns demo response', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Hello AI' }),
-      });
+    expect(res.status).toBe(200);
+    expect(data).toHaveProperty('response');
+  });
 
-      const data = await res.json();
-      expect(res.status).toBe(200);
-      // Demo mode should return demo responses
-      expect(data.response).toBeDefined();
-      expect(typeof data.response).toBe('string');
-      expect(data.response.length).toBeGreaterThan(0);
+  test('demo mode returns demo response', async () => {
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { message: 'Hello AI' } 
     });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    // Demo mode should return demo responses
+    expect(data.response).toBeDefined();
+    expect(typeof data.response).toBe('string');
+    expect(data.response.length).toBeGreaterThan(0);
   });
 });

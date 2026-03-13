@@ -1,15 +1,42 @@
 /**
  * Character Costume API Tests
  * Run with: npx jest tests/character-costume.test.ts
+ * Uses direct route imports instead of HTTP fetches
  */
 
-const API_BASE = 'http://localhost:3002/api/character-costume';
+import { describe, it, expect } from '@jest/globals';
+import { GET, POST, PUT, DELETE } from '@/app/api/character-costume/route';
+import { NextRequest } from 'next/server';
+
+// Helper to create request with query params
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/character-costume');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  
+  const req = new NextRequest(url, {
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+  });
+  
+  return req;
+}
 
 describe('Character Costume API', () => {
   let createdCharacterId: string;
 
   test('GET /api/character-costume returns characters list', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -19,7 +46,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume with role filter', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project&role=protagonist`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project', role: 'protagonist' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -32,10 +60,9 @@ describe('Character Costume API', () => {
   });
 
   test('POST /api/character-costume creates new character', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const req = createRequest({ 
+      method: 'POST', 
+      body: {
         projectId: 'demo-project',
         name: 'TEST_Character',
         age: 'Young Adult (20-35)',
@@ -49,10 +76,11 @@ describe('Character Costume API', () => {
         colorPalette: ['#000000', '#FF0000'],
         description: 'Test character for QA',
         estimatedBudget: 50000
-      })
+      }
     });
-    
+    const res = await POST(req);
     const data = await res.json();
+    
     expect([200, 201]).toContain(res.status);
     
     if (data.id) {
@@ -66,17 +94,17 @@ describe('Character Costume API', () => {
       return;
     }
     
-    const res = await fetch(API_BASE, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const req = createRequest({ 
+      method: 'PUT', 
+      body: {
         id: createdCharacterId,
         estimatedBudget: 75000,
         costumeNotes: 'Updated by test'
-      })
+      }
     });
-    
+    const res = await PUT(req);
     const data = await res.json();
+    
     expect([200, 201]).toContain(res.status);
   });
 
@@ -86,15 +114,18 @@ describe('Character Costume API', () => {
       return;
     }
     
-    const res = await fetch(`${API_BASE}?id=${createdCharacterId}`, {
-      method: 'DELETE'
+    const req = createRequest({ 
+      method: 'DELETE', 
+      params: { id: createdCharacterId } 
     });
+    const res = await DELETE(req);
     
     expect([200, 204]).toContain(res.status);
   });
 
   test('GET /api/character-costume returns costume summary', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -104,7 +135,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume with search term', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project&search=hero`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project', search: 'hero' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -114,7 +146,8 @@ describe('Character Costume API', () => {
 
   // Filter Tests - API only supports role and search filters
   test('GET /api/character-costume with role and search combined', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project&role=protagonist&search=arjun`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project', role: 'protagonist', search: 'arjun' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -124,7 +157,8 @@ describe('Character Costume API', () => {
 
   // Demo Mode Tests
   test('GET /api/character-costume returns isDemoMode flag', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -132,7 +166,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume returns demo data when no project', async () => {
-    const res = await fetch(`${API_BASE}`);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -141,7 +176,8 @@ describe('Character Costume API', () => {
 
   // Character Data Validation Tests
   test('GET /api/character-costume returns characters with required fields', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -156,7 +192,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume returns summary with required fields', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -167,7 +204,8 @@ describe('Character Costume API', () => {
 
   // Role Breakdown Tests
   test('GET /api/character-costume returns role breakdown', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -178,7 +216,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume returns budget breakdown', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -188,37 +227,39 @@ describe('Character Costume API', () => {
 
   // Error Handling Tests
   test('POST /api/character-costume handles missing required fields', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const req = createRequest({ 
+      method: 'POST', 
+      body: {
         projectId: 'demo-project'
         // Missing required fields
-      })
+      }
     });
+    const res = await POST(req);
     
     // Should either succeed with defaults or return error
     expect([200, 201, 400, 500]).toContain(res.status);
   });
 
   test('PUT /api/character-costume handles invalid id', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const req = createRequest({ 
+      method: 'PUT', 
+      body: {
         id: 'invalid-id-12345',
         estimatedBudget: 100000
-      })
+      }
     });
+    const res = await PUT(req);
     
     // Should return 400 for missing id or handle gracefully
     expect([200, 400, 404, 500]).toContain(res.status);
   });
 
   test('DELETE /api/character-costume handles invalid id', async () => {
-    const res = await fetch(`${API_BASE}?id=invalid-id-12345`, {
-      method: 'DELETE'
+    const req = createRequest({ 
+      method: 'DELETE', 
+      params: { id: 'invalid-id-12345' } 
     });
+    const res = await DELETE(req);
     
     // Should handle gracefully
     expect([200, 404, 500]).toContain(res.status);
@@ -226,7 +267,8 @@ describe('Character Costume API', () => {
 
   // Character Property Tests
   test('GET /api/character-costume characters have appearance traits', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -238,7 +280,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume characters have personality traits', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -250,7 +293,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume characters have costume details', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -264,7 +308,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume characters have color palette', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -276,7 +321,8 @@ describe('Character Costume API', () => {
   });
 
   test('GET /api/character-costume characters have budget info', async () => {
-    const res = await fetch(`${API_BASE}?projectId=demo-project`);
+    const req = createRequest({ method: 'GET', params: { projectId: 'demo-project' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);

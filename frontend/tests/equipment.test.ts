@@ -1,38 +1,53 @@
 /**
  * Equipment API Tests
  * Run with: npx jest tests/equipment.test.ts
+ * Uses direct route imports instead of HTTP fetches
  */
 
-const API_BASE = 'http://localhost:3002/api/equipment';
+import { describe, it, expect } from '@jest/globals';
+import { GET, POST, PATCH, DELETE } from '@/app/api/equipment/route';
+import { NextRequest } from 'next/server';
+
+// Helper to create request with query params
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/equipment');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  
+  const req = new NextRequest(url, {
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+  });
+  
+  return req;
+}
+
+const testEquipment = {
+  name: 'Test Camera',
+  category: 'camera',
+  dateStart: '2026-04-01',
+  dateEnd: '2026-04-15',
+  dailyRate: 5000,
+  vendor: 'Test Vendor',
+  notes: 'Test notes',
+};
 
 describe('Equipment API', () => {
   let createdEquipmentId: string;
 
-  beforeAll(async () => {
-    // Wait for server to be ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  });
-
-  afterAll(async () => {
-    // Cleanup test data if needed
-    if (createdEquipmentId) {
-      await fetch(`${API_BASE}?id=${createdEquipmentId}`, { method: 'DELETE' });
-    }
-  });
-
-  const testEquipment = {
-    name: 'Test Camera',
-    category: 'camera',
-    dateStart: '2026-04-01',
-    dateEnd: '2026-04-15',
-    dailyRate: 5000,
-    vendor: 'Test Vendor',
-    notes: 'Test notes',
-  };
-
   describe('GET /api/equipment', () => {
     test('returns equipment list with stats', async () => {
-      const res = await fetch(API_BASE + '?action=noseed');
+      const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -42,7 +57,8 @@ describe('Equipment API', () => {
     });
 
     test('includes stats with required fields', async () => {
-      const res = await fetch(API_BASE + '?action=noseed');
+      const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+      const res = await GET(req);
       const data = await res.json();
 
       expect(data.stats).toHaveProperty('totalItems');
@@ -54,7 +70,8 @@ describe('Equipment API', () => {
     });
 
     test('returns demo data when database unavailable', async () => {
-      const res = await fetch(API_BASE + '?action=noseed');
+      const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+      const res = await GET(req);
       const data = await res.json();
 
       // Should return demo data structure
@@ -72,11 +89,11 @@ describe('Equipment API', () => {
 
   describe('POST /api/equipment', () => {
     test('creates new equipment rental with all fields', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testEquipment),
+      const req = createRequest({ 
+        method: 'POST', 
+        body: testEquipment 
       });
+      const res = await POST(req);
       const data = await res.json();
 
       expect(res.status).toBe(200);
@@ -90,11 +107,11 @@ describe('Equipment API', () => {
     });
 
     test('fails without required fields', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Incomplete' }),
+      const req = createRequest({ 
+        method: 'POST', 
+        body: { name: 'Incomplete' } 
       });
+      const res = await POST(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
@@ -106,31 +123,32 @@ describe('Equipment API', () => {
     test('updates equipment rental', async () => {
       // First get an equipment ID if we don't have one
       if (!createdEquipmentId) {
-        const res = await fetch(API_BASE + '?action=noseed');
-        const data = await res.json();
-        if (data.rentals.length > 0) {
-          createdEquipmentId = data.rentals[0].id;
+        const getReq = createRequest({ method: 'GET', params: { action: 'noseed' } });
+        const getRes = await GET(getReq);
+        const getData = await getRes.json();
+        if (getData.rentals.length > 0) {
+          createdEquipmentId = getData.rentals[0].id;
         } else {
           // Create one if none exists
-          const createRes = await fetch(API_BASE, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(testEquipment),
+          const createReq = createRequest({ 
+            method: 'POST', 
+            body: testEquipment 
           });
+          const createRes = await POST(createReq);
           const createData = await createRes.json();
           createdEquipmentId = createData.rental.id;
         }
       }
 
-      const res = await fetch(API_BASE, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const req = createRequest({ 
+        method: 'PATCH', 
+        body: {
           id: createdEquipmentId,
           dailyRate: 7500,
           vendor: 'Updated Vendor',
-        }),
+        }
       });
+      const res = await PATCH(req);
 
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -138,11 +156,11 @@ describe('Equipment API', () => {
     });
 
     test('fails without equipment ID', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'New Name' }),
+      const req = createRequest({ 
+        method: 'PATCH', 
+        body: { name: 'New Name' } 
       });
+      const res = await PATCH(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
@@ -153,21 +171,23 @@ describe('Equipment API', () => {
   describe('DELETE /api/equipment', () => {
     test('deletes equipment rental', async () => {
       // First create equipment to delete
-      const createRes = await fetch(API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const createReq = createRequest({ 
+        method: 'POST', 
+        body: {
           ...testEquipment,
           name: 'To Delete ' + Date.now(),
-        }),
+        }
       });
+      const createRes = await POST(createReq);
       const createData = await createRes.json();
 
       const idToDelete = createData.rental.id;
 
-      const res = await fetch(API_BASE + '?id=' + idToDelete, {
-        method: 'DELETE',
+      const req = createRequest({ 
+        method: 'DELETE', 
+        params: { id: idToDelete } 
       });
+      const res = await DELETE(req);
 
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -175,9 +195,8 @@ describe('Equipment API', () => {
     });
 
     test('fails without equipment ID', async () => {
-      const res = await fetch(API_BASE, {
-        method: 'DELETE',
-      });
+      const req = createRequest({ method: 'DELETE' });
+      const res = await DELETE(req);
 
       expect(res.status).toBe(400);
       const data = await res.json();
@@ -188,7 +207,8 @@ describe('Equipment API', () => {
 
 describe('Equipment Data Validation', () => {
   test('has valid status values', async () => {
-    const res = await fetch(API_BASE + '?action=noseed');
+    const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+    const res = await GET(req);
     const data = await res.json();
 
     const validStatuses = ['available', 'in-use', 'maintenance', 'returned'];
@@ -199,7 +219,8 @@ describe('Equipment Data Validation', () => {
   });
 
   test('calculates correct daily rate totals', async () => {
-    const res = await fetch(API_BASE + '?action=noseed');
+    const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+    const res = await GET(req);
     const data = await res.json();
 
     const calculatedTotal = data.rentals.reduce(
@@ -211,7 +232,8 @@ describe('Equipment Data Validation', () => {
   });
 
   test('calculates correct available count', async () => {
-    const res = await fetch(API_BASE + '?action=noseed');
+    const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+    const res = await GET(req);
     const data = await res.json();
 
     const availableCount = data.rentals.filter(
@@ -222,7 +244,8 @@ describe('Equipment Data Validation', () => {
   });
 
   test('calculates correct in-use count', async () => {
-    const res = await fetch(API_BASE + '?action=noseed');
+    const req = createRequest({ method: 'GET', params: { action: 'noseed' } });
+    const res = await GET(req);
     const data = await res.json();
 
     const inUseCount = data.rentals.filter(

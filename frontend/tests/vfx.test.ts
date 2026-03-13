@@ -1,13 +1,40 @@
 /**
  * VFX Feature API Tests
- * Tests all endpoints for VFX notes, warnings, and props
+ * Run with: npx jest tests/vfx.test.ts
+ * Uses direct route imports instead of HTTP fetches
  */
 
-const API_BASE = 'http://localhost:3002/api/vfx';
+import { describe, it, expect } from '@jest/globals';
+import { GET, POST } from '@/app/api/vfx/route';
+import { NextRequest } from 'next/server';
+
+// Helper to create request with query params
+function createRequest(options: {
+  method?: string;
+  body?: unknown;
+  params?: Record<string, string>;
+} = {}): NextRequest {
+  const url = new URL('http://localhost:3000/api/vfx');
+  
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+  }
+  
+  const req = new NextRequest(url, {
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body ? { 'Content-Type': 'application/json' } : {},
+  });
+  
+  return req;
+}
 
 describe('GET /api/vfx', () => {
   it('returns VFX data with all required sections', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -18,7 +45,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('VFX notes have required fields', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     if (data.vfxNotes && data.vfxNotes.length > 0) {
@@ -34,7 +62,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('VFX warnings have required fields', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     if (data.vfxWarnings && data.vfxWarnings.length > 0) {
@@ -49,7 +78,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('Summary has required fields', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(data.summary).toHaveProperty('totalScenes');
@@ -59,7 +89,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('Complexity breakdown has simple, moderate, complex', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(data.summary.complexityBreakdown).toHaveProperty('simple');
@@ -68,7 +99,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('VFX notes have numeric confidence values', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     if (data.vfxNotes && data.vfxNotes.length > 0) {
@@ -80,7 +112,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('Demo mode flag is present when using demo data', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     // Demo mode should include _demo flag or vfxNotes from demo data
@@ -88,7 +121,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('Scene info includes sceneNumber and headingRaw', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     if (data.vfxNotes && data.vfxNotes.length > 0) {
@@ -99,7 +133,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('VFX types are valid categories', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     const validTypes = ['environment', 'weather', 'stunt', 'practical', 'lighting', 'transition', 'cgi', 'compositing', 'wireRemoval', 'implied'];
@@ -111,7 +146,8 @@ describe('GET /api/vfx', () => {
   });
 
   it('Warning severity levels are valid', async () => {
-    const res = await fetch(API_BASE);
+    const req = createRequest({ method: 'GET' });
+    const res = await GET(req);
     const data = await res.json();
     
     const validSeverities = ['high', 'medium', 'low'];
@@ -125,7 +161,8 @@ describe('GET /api/vfx', () => {
 
 describe('GET /api/vfx with scriptId', () => {
   it('returns VFX data when scriptId is provided', async () => {
-    const res = await fetch(`${API_BASE}?scriptId=test-script`);
+    const req = createRequest({ method: 'GET', params: { scriptId: 'test-script' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -136,7 +173,8 @@ describe('GET /api/vfx with scriptId', () => {
   });
 
   it('handles invalid scriptId gracefully', async () => {
-    const res = await fetch(`${API_BASE}?scriptId=invalid-id-12345`);
+    const req = createRequest({ method: 'GET', params: { scriptId: 'invalid-id-12345' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -147,12 +185,11 @@ describe('GET /api/vfx with scriptId', () => {
 
 describe('POST /api/vfx', () => {
   it('generates VFX analysis with valid scriptId', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptId: 'demo-script' }),
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { scriptId: 'demo-script' } 
     });
-    
+    const res = await POST(req);
     const data = await res.json();
     
     expect(res.status).toBe(200);
@@ -162,11 +199,11 @@ describe('POST /api/vfx', () => {
   });
 
   it('returns 400 when scriptId is missing', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+    const req = createRequest({ 
+      method: 'POST', 
+      body: {} 
     });
+    const res = await POST(req);
     
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -174,22 +211,21 @@ describe('POST /api/vfx', () => {
   });
 
   it('handles empty body gracefully', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+    const req = createRequest({ 
+      method: 'POST', 
+      body: {} 
     });
+    const res = await POST(req);
     
     expect(res.status).toBe(400);
   });
 
   it('summary includes analysis counts', async () => {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptId: 'demo-script' }),
+    const req = createRequest({ 
+      method: 'POST', 
+      body: { scriptId: 'demo-script' } 
     });
-    
+    const res = await POST(req);
     const data = await res.json();
     
     // In demo mode, summary has different fields
@@ -206,7 +242,8 @@ describe('POST /api/vfx', () => {
 
 describe('Demo Data Validation', () => {
   it('demo data contains VFX notes', async () => {
-    const res = await fetch(`${API_BASE}?demo=true`);
+    const req = createRequest({ method: 'GET', params: { demo: 'true' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(data.vfxNotes).toBeDefined();
@@ -215,7 +252,8 @@ describe('Demo Data Validation', () => {
   });
 
   it('demo VFX notes cover multiple types', async () => {
-    const res = await fetch(`${API_BASE}?demo=true`);
+    const req = createRequest({ method: 'GET', params: { demo: 'true' } });
+    const res = await GET(req);
     const data = await res.json();
     
     const types = new Set(data.vfxNotes.map((n: { vfxType: string }) => n.vfxType));
@@ -223,7 +261,8 @@ describe('Demo Data Validation', () => {
   });
 
   it('demo warnings have mixed severity levels', async () => {
-    const res = await fetch(`${API_BASE}?demo=true`);
+    const req = createRequest({ method: 'GET', params: { demo: 'true' } });
+    const res = await GET(req);
     const data = await res.json();
     
     const severities = new Set(data.vfxWarnings.map((w: { severity: string }) => w.severity));
@@ -231,7 +270,8 @@ describe('Demo Data Validation', () => {
   });
 
   it('demo props are present', async () => {
-    const res = await fetch(`${API_BASE}?demo=true`);
+    const req = createRequest({ method: 'GET', params: { demo: 'true' } });
+    const res = await GET(req);
     const data = await res.json();
     
     expect(data.props).toBeDefined();

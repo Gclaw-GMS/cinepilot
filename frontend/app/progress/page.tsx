@@ -6,7 +6,7 @@ import {
   Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
-  TrendingUp, Activity, Search, X, Keyboard, Download, Printer
+  TrendingUp, Activity, Search, X, Keyboard, Download, Printer, Filter
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -97,7 +97,21 @@ export default function ProgressPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in_progress' | 'pending' | 'delayed' | 'blocked'>('all')
+  const [filterPriority, setFilterPriority] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate active filter count
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilterStatus('all')
+    setFilterPriority('all')
+    setSearchQuery('')
+  }, [])
 
   const fetchProgress = useCallback(async () => {
     setLoading(true)
@@ -407,10 +421,16 @@ export default function ProgressPage() {
           setShowPrintMenu(false)
         }
       }
+      if (showFilters) {
+        const target = e.target as HTMLElement
+        if (!target.closest('.filter-panel') && !target.closest('.filter-btn')) {
+          setShowFilters(false)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   useEffect(() => {
     fetchProgress()
@@ -451,6 +471,10 @@ export default function ProgressPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case 'p':
           e.preventDefault()
           if (progress) setShowPrintMenu(prev => !prev)
@@ -464,6 +488,7 @@ export default function ProgressPage() {
           setShowHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearchQuery('')
           searchInputRef.current?.blur()
           break
@@ -511,27 +536,51 @@ export default function ProgressPage() {
     return { taskStatus, priorityDist, milestoneProgress, phaseProgress }
   }, [progress])
 
-  // Filter tasks based on search query
+  // Filter tasks based on search, status, and priority filters
   const filteredTasks = useMemo(() => {
-    if (!progress?.tasks || !searchQuery) return progress?.tasks || []
-    const query = searchQuery.toLowerCase()
-    return progress.tasks.filter(task => 
-      task.name.toLowerCase().includes(query) ||
-      task.description?.toLowerCase().includes(query) ||
-      task.status.toLowerCase().includes(query) ||
-      task.priority.toLowerCase().includes(query)
-    )
-  }, [progress?.tasks, searchQuery])
+    if (!progress?.tasks) return []
+    return progress.tasks.filter(task => {
+      // Apply status filter
+      if (filterStatus !== 'all' && task.status !== filterStatus) {
+        return false
+      }
+      // Apply priority filter
+      if (filterPriority !== 'all' && task.priority !== filterPriority) {
+        return false
+      }
+      // Apply search query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return (
+          task.name.toLowerCase().includes(query) ||
+          (task.description?.toLowerCase().includes(query) ?? false) ||
+          task.status.toLowerCase().includes(query) ||
+          task.priority.toLowerCase().includes(query)
+        )
+      }
+      return true
+    })
+  }, [progress?.tasks, filterStatus, filterPriority, searchQuery])
 
-  // Filter milestones based on search query
+  // Filter milestones based on search and status filters
   const filteredMilestones = useMemo(() => {
-    if (!progress?.milestones || !searchQuery) return progress?.milestones || []
-    const query = searchQuery.toLowerCase()
-    return progress.milestones.filter(milestone => 
-      milestone.name.toLowerCase().includes(query) ||
-      milestone.status.toLowerCase().includes(query)
-    )
-  }, [progress?.milestones, searchQuery])
+    if (!progress?.milestones) return []
+    return progress.milestones.filter(milestone => {
+      // Apply status filter
+      if (filterStatus !== 'all' && milestone.status !== filterStatus) {
+        return false
+      }
+      // Apply search query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return (
+          milestone.name.toLowerCase().includes(query) ||
+          milestone.status.toLowerCase().includes(query)
+        )
+      }
+      return true
+    })
+  }, [progress?.milestones, filterStatus, searchQuery])
 
   const handleInitialize = async () => {
     setInitializing(true)
@@ -648,6 +697,25 @@ export default function ProgressPage() {
           >
             <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
+          {/* Filter Toggle Button */}
+          <div className="relative filter-btn">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-cyan-500 text-black'
+                  : 'bg-slate-800 hover:bg-slate-700'
+              }`}
+              title="Toggle Filters (F)"
+            >
+              <Filter className="w-5 h-5" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-cyan-400 text-black text-xs font-bold rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
           <button
             onClick={() => setShowHelp(true)}
             className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
@@ -708,6 +776,88 @@ export default function ProgressPage() {
         </div>
       </div>
 
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl p-4 filter-panel">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+              <Filter className="w-4 h-4 text-cyan-400" />
+              Filters
+            </h3>
+            <button
+              onClick={clearFilters}
+              className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              Clear All
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status Filter */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+              >
+                <option value="all">All Status</option>
+                <option value="completed">Completed</option>
+                <option value="in_progress">In Progress</option>
+                <option value="pending">Pending</option>
+                <option value="delayed">Delayed</option>
+                <option value="blocked">Blocked</option>
+              </select>
+            </div>
+            {/* Priority Filter */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Priority</label>
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value as typeof filterPriority)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+              >
+                <option value="all">All Priority</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            {/* View Mode Filter (for reference) */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">View</label>
+              <div className="flex bg-slate-800 rounded-lg p-1">
+                {(['timeline', 'tasks', 'kanban'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      viewMode === mode
+                        ? 'bg-cyan-400 text-black'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filtered Item Count */}
+      {hasData && (filterStatus !== 'all' || filterPriority !== 'all' || searchQuery) && (
+        <div className="mb-4 text-sm text-slate-400 flex items-center gap-2">
+          <Filter className="w-4 h-4" />
+          Showing <span className="text-cyan-400 font-semibold">{filteredTasks.length}</span> tasks
+          and <span className="text-cyan-400 font-semibold">{filteredMilestones.length}</span> milestones
+          {activeFilterCount > 0 && (
+            <span className="text-slate-500">of {progress?.tasks?.length || 0} tasks and {progress?.milestones?.length || 0} milestones</span>
+          )}
+        </div>
+      )}
+
       {/* Keyboard Shortcuts Help Modal */}
       {showHelp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowHelp(false)}>
@@ -728,6 +878,7 @@ export default function ProgressPage() {
               {[
                 { key: 'R', action: 'Refresh data' },
                 { key: '/', action: 'Focus search' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: '1', action: 'Timeline view' },
                 { key: '2', action: 'Tasks view' },
                 { key: '3', action: 'Kanban view' },

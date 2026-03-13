@@ -48,6 +48,7 @@ export default function WhatsAppPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  // Filter panel state (using showFilterPanel)
   
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -150,6 +151,10 @@ export default function WhatsAppPage() {
         case 'e':
           e.preventDefault()
           setShowExportDropdown(prev => !prev)
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
           break
         case 'escape':
           e.preventDefault()
@@ -412,7 +417,7 @@ export default function WhatsAppPage() {
           <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative">
           {/* Search Input */}
           <div className="relative">
             <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -425,6 +430,61 @@ export default function WhatsAppPage() {
               className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm w-48 placeholder-gray-500 focus:outline-none focus:border-green-500"
             />
           </div>
+          
+          {/* Filter Toggle Button */}
+          <button
+            data-filter-toggle
+            onClick={() => setShowFilterPanel(!showFilterPanel)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              showFilterPanel 
+                ? 'bg-green-600 text-white' 
+                : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700 hover:border-gray-600'
+            }`}
+            title="Toggle filters (F)"
+          >
+            <Filter className="w-4 h-4" />
+            <span>Filters</span>
+            {(categoryFilter !== 'all' || searchQuery) && (
+              <span className="ml-1 px-1.5 py-0.5 bg-green-500 text-white text-xs rounded">
+                {(categoryFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)}
+              </span>
+            )}
+          </button>
+
+          {/* Filter Panel */}
+          {showFilterPanel && (
+            <div 
+              ref={filterPanelRef}
+              className="absolute right-0 top-full mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
+            >
+              <div className="p-4 border-b border-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-white">Filter Options</h3>
+                  <button 
+                    onClick={() => { setCategoryFilter('all'); setSearchQuery('') }}
+                    className="text-xs text-green-400 hover:text-green-300"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+                
+                {/* Category Filter */}
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Category</label>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="schedule">Schedule</option>
+                    <option value="reminder">Reminder</option>
+                    <option value="call_sheet">Call Sheet</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Refresh Button */}
           <button 
@@ -679,11 +739,14 @@ export default function WhatsAppPage() {
                 { key: 'R', description: 'Refresh data' },
                 { key: 'F', description: 'Toggle filter panel' },
                 { key: '/', description: 'Focus search input' },
+                { key: 'F', description: 'Toggle filters' },
                 { key: 'C', description: 'Switch to Compose tab' },
                 { key: 'T', description: 'Switch to Templates tab' },
                 { key: 'H', description: 'Switch to History tab' },
                 { key: 'O', description: 'Switch to Contacts tab' },
                 { key: 'N', description: 'Create new template' },
+                { key: 'P', description: 'Toggle print menu' },
+                { key: 'E', description: 'Toggle export menu' },
                 { key: '?', description: 'Show this help' },
                 { key: 'Esc', description: 'Close modal / Clear search' },
               ].map(({ key, description }) => (

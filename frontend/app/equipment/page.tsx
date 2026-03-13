@@ -123,6 +123,22 @@ export default function EquipmentPage() {
   const [exporting, setExporting] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterCat !== 'all') count++
+    if (filterStatus !== 'all') count++
+    return count
+  }, [filterCat, filterStatus])
+  
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilterCat('all')
+    setFilterStatus('all')
+    setSearch('')
+  }, [])
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -221,6 +237,10 @@ export default function EquipmentPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -251,6 +271,7 @@ export default function EquipmentPage() {
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowFilters(false)
           setSearch('')
           setFilterCat('all')
           setFilterStatus('all')
@@ -276,6 +297,22 @@ export default function EquipmentPage() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showExportMenu])
+
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (showFilters && !target.closest('.filter-menu')) {
+        setShowFilters(false)
+      }
+    }
+    if (showFilters) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showFilters])
 
   // Click outside to close print menu
   useEffect(() => {
@@ -625,6 +662,93 @@ export default function EquipmentPage() {
               <HelpCircle className="w-4 h-4" />
               <span className="text-xs">?</span>
             </button>
+            {/* Filter Toggle Button */}
+            <div className="relative filter-menu">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
+                }`}
+                title="Filter (F)"
+              >
+                <Filter className="w-5 h-5" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {showFilters && (
+                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                    <span className="text-sm font-medium">Filters</span>
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={clearFilters}
+                        className="text-xs text-indigo-400 hover:text-indigo-300"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* Category Filter */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Category</label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { key: 'all', label: 'All' },
+                          { key: 'camera', label: 'Camera' },
+                          { key: 'lighting', label: 'Lighting' },
+                          { key: 'sound', label: 'Sound' },
+                          { key: 'grip', label: 'Grip' },
+                          { key: 'art', label: 'Art' },
+                        ].map(cat => (
+                          <button
+                            key={cat.key}
+                            onClick={() => setFilterCat(cat.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                              filterCat === cat.key
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+                            }`}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Status Filter */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Status</label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { key: 'all', label: 'All' },
+                          { key: 'available', label: 'Available' },
+                          { key: 'in-use', label: 'In Use' },
+                          { key: 'maintenance', label: 'Maintenance' },
+                          { key: 'returned', label: 'Returned' },
+                        ].map(status => (
+                          <button
+                            key={status.key}
+                            onClick={() => setFilterStatus(status.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                              filterStatus === status.key
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+                            }`}
+                          >
+                            {status.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -783,32 +907,38 @@ export default function EquipmentPage() {
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-500" />
-              <select
-                value={filterCat}
-                onChange={(e) => setFilterCat(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value="all">All Categories</option>
-                {CATEGORIES.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.label}</option>
-                ))}
-              </select>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value="all">All Status</option>
-                <option value="available">Available</option>
-                <option value="in-use">In Use</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="returned">Returned</option>
-              </select>
-            </div>
+            {/* Inline Filters - hidden when filter panel is open */}
+            {!showFilters && (
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-500" />
+                <select
+                  value={filterCat}
+                  onChange={(e) => setFilterCat(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="all">All Categories</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="available">Available</option>
+                  <option value="in-use">In Use</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="returned">Returned</option>
+                </select>
+              </div>
+            )}
             <span className="text-xs text-slate-500">
               Showing {filtered.length} of {equipment.length} items
+              {activeFilterCount > 0 && showFilters && (
+                <span className="ml-2 text-indigo-400">({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>
+              )}
             </span>
           </div>
         </div>
@@ -1129,6 +1259,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh equipment data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Toggle filters</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Focus search input</span>

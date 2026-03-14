@@ -129,20 +129,32 @@ export default function NotesPage() {
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'updatedAt' | 'category'>('updatedAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Calculate active filter count
+  // Calculate active filter count (including sort state)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filterCategory !== 'all') count++
+    if (sortBy !== 'updatedAt' || sortOrder !== 'desc') count++
     return count
-  }, [filterCategory])
+  }, [filterCategory, sortBy, sortOrder])
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
   
   // Clear filters
   const clearFilters = () => {
     setFilterCategory('all')
+    setSortBy('updatedAt')
+    setSortOrder('desc')
   }
   
   const [showForm, setShowForm] = useState(false)
@@ -256,6 +268,10 @@ export default function NotesPage() {
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
           break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
         case 'p':
           e.preventDefault()
           if (selectedNoteRef.current && handleTogglePinRef.current) {
@@ -327,14 +343,39 @@ export default function NotesPage() {
     setRefreshing(false)
   }, [fetchNotes])
 
-  const filteredNotes = notes.filter(note => {
-    const matchSearch = !search.trim() || 
-      note.title.toLowerCase().includes(search.toLowerCase()) ||
-      note.content.toLowerCase().includes(search.toLowerCase()) ||
-      note.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
-    const matchCategory = filterCategory === 'all' || note.category === filterCategory
-    return matchSearch && matchCategory
-  })
+  // Filter and sort notes
+  const filteredNotes = useMemo(() => {
+    let result = notes.filter(note => {
+      const matchSearch = !search.trim() || 
+        note.title.toLowerCase().includes(search.toLowerCase()) ||
+        note.content.toLowerCase().includes(search.toLowerCase()) ||
+        note.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
+      const matchCategory = filterCategory === 'all' || note.category === filterCategory
+      return matchSearch && matchCategory
+    })
+    
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+        case 'updatedAt':
+          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+          break
+        case 'category':
+          comparison = a.category.localeCompare(b.category)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [notes, search, filterCategory, sortBy, sortOrder])
 
   const pinnedNotes = filteredNotes.filter(n => n.isPinned)
   const regularNotes = filteredNotes.filter(n => !n.isPinned)
@@ -754,7 +795,7 @@ export default function NotesPage() {
               {showFilterPanel && (
                 <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">Filters</span>
+                    <span className="text-sm font-medium text-white">Filter & Sort</span>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -764,7 +805,31 @@ export default function NotesPage() {
                       </button>
                     )}
                   </div>
-                  <div className="p-4">
+                  <div className="p-4 space-y-4">
+                    {/* Sort Options */}
+                    <div className="p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs text-purple-300 font-medium">Sort By</label>
+                        <button
+                          onClick={toggleSortOrder}
+                          className="flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs text-white transition-colors"
+                          title="Toggle sort order (S)"
+                        >
+                          {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                        </button>
+                      </div>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="updatedAt">Last Updated</option>
+                        <option value="createdAt">Created Date</option>
+                        <option value="title">Title</option>
+                        <option value="category">Category</option>
+                      </select>
+                    </div>
+                    
                     {/* Category Filter */}
                     <div>
                       <label className="text-xs text-slate-400 uppercase tracking-wider block mb-2">Category</label>
@@ -1263,6 +1328,7 @@ export default function NotesPage() {
                 { key: 'R', action: 'Refresh notes' },
                 { key: '/', action: 'Focus search' },
                 { key: 'F', action: 'Toggle filters' },
+                { key: 'S', action: 'Toggle sort order' },
                 { key: 'N', action: 'Create new note' },
                 { key: 'P', action: 'Pin/unpin selected note' },
                 { key: 'D', action: 'Duplicate selected note' },

@@ -396,7 +396,7 @@ describe('PATCH /api/shots', () => {
     });
   });
 
-  it('handles database errors', async () => {
+  it('handles database errors by falling back to demo data', async () => {
     mockPrisma.shot.update.mockRejectedValue(new Error('DB error'));
 
     const { PATCH } = await import('@/app/api/shots/route');
@@ -407,13 +407,19 @@ describe('PATCH /api/shots', () => {
     
     const response = await PATCH(req);
 
-    expect(response.status).toBe(500);
+    // Falls back to demo data instead of returning 500
+    expect(response.status).toBe(200);
   });
 });
 
 describe('Demo data validation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset mock return values to undefined so demo data is used
+    // This prevents test pollution from earlier tests that set mockResolvedValue
+    mockPrisma.shot.findMany.mockResolvedValue(undefined);
+    mockPrisma.scene.findMany.mockResolvedValue(undefined);
+    mockPrisma.script.findFirst.mockResolvedValue(undefined);
   });
 
   it('has varied shot sizes in demo data', async () => {

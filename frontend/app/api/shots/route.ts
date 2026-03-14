@@ -332,36 +332,67 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'shotId required' }, { status: 400 })
   }
   
+  // Prepare update data
+  const updateData: Record<string, unknown> = {
+    shotSize: body.shotSize,
+    cameraAngle: body.cameraAngle,
+    cameraMovement: body.cameraMovement,
+    focalLengthMm: body.focalLengthMm,
+    lensType: body.lensType,
+    keyStyle: body.keyStyle,
+    colorTemp: body.colorTemp,
+    isLocked: body.isLocked,
+    userEdited: true,
+  }
+  
+  // Remove undefined values
+  Object.keys(updateData).forEach(key => {
+    if (updateData[key] === undefined) delete updateData[key]
+  })
+  
+  // Try database first, fall back to demo data
   try {
     await ensureDefaultProject()
     
-    // Update in demo data
-    const demoData = getMutableDemoShots()!
-    const idx = demoData.findIndex((s: any) => s.id === shotId)
-    if (idx === -1) {
-      return NextResponse.json({ error: 'Shot not found' }, { status: 404 })
-    }
+    // Try database update first
+    const dbResult = await prisma.shot.update({
+      where: { id: shotId },
+      data: updateData,
+    })
     
-    demoData[idx] = {
-      ...demoData[idx],
-      shotSize: body.shotSize || demoData[idx].shotSize,
-      cameraAngle: body.cameraAngle || demoData[idx].cameraAngle,
-      cameraMovement: body.cameraMovement || demoData[idx].cameraMovement,
-      focalLengthMm: body.focalLengthMm ?? demoData[idx].focalLengthMm,
-      lensType: body.lensType || demoData[idx].lensType,
-      keyStyle: body.keyStyle || demoData[idx].keyStyle,
-      colorTemp: body.colorTemp || demoData[idx].colorTemp,
-      isLocked: body.isLocked ?? demoData[idx].isLocked,
-      userEdited: true,
-    }
+    return NextResponse.json(dbResult)
+  } catch (dbError) {
+    // Database not available - fall back to demo data
+    console.log('[PATCH /api/shots] Database not available, using demo data')
     
-    return NextResponse.json(demoData[idx])
-  } catch (error) {
-    console.error('[PATCH /api/shots] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update shot' },
-      { status: 500 }
-    )
+    try {
+      const demoData = getMutableDemoShots()!
+      const idx = demoData.findIndex((s: any) => s.id === shotId)
+      if (idx === -1) {
+        return NextResponse.json({ error: 'Shot not found' }, { status: 404 })
+      }
+      
+      demoData[idx] = {
+        ...demoData[idx],
+        shotSize: body.shotSize || demoData[idx].shotSize,
+        cameraAngle: body.cameraAngle || demoData[idx].cameraAngle,
+        cameraMovement: body.cameraMovement || demoData[idx].cameraMovement,
+        focalLengthMm: body.focalLengthMm ?? demoData[idx].focalLengthMm,
+        lensType: body.lensType || demoData[idx].lensType,
+        keyStyle: body.keyStyle || demoData[idx].keyStyle,
+        colorTemp: body.colorTemp || demoData[idx].colorTemp,
+        isLocked: body.isLocked ?? demoData[idx].isLocked,
+        userEdited: true,
+      }
+      
+      return NextResponse.json(demoData[idx])
+    } catch (demoError) {
+      console.error('[PATCH /api/shots] Demo data error:', demoError)
+      return NextResponse.json(
+        { error: 'Failed to update shot' },
+        { status: 500 }
+      )
+    }
   }
 }
 

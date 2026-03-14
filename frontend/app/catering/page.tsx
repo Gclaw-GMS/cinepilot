@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
@@ -80,6 +80,8 @@ export default function CateringPage() {
     mealType: 'all' as 'all' | 'breakfast' | 'lunch' | 'snacks' | 'dinner',
     dietary: 'all' as 'all' | string
   })
+  const [sortBy, setSortBy] = useState<'date' | 'budget' | 'mealType' | 'people'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -137,8 +139,8 @@ export default function CateringPage() {
     const headers = ['Date', 'Meal Type', 'Menu', 'Dietary', 'Budget', 'Actual Cost']
     const rows: string[][] = []
     
-    plan.shootDays.forEach(sd => {
-      sd.meals.forEach(meal => {
+    sortedShootDays.forEach((sd: ShootDayMeal) => {
+      sd.meals.forEach((meal: Meal) => {
         rows.push([
           sd.date,
           meal.type,
@@ -167,15 +169,15 @@ export default function CateringPage() {
       exportDate: new Date().toISOString(),
       projectId: plan.projectId,
       summary: {
-        totalShootDays: plan.shootDays.length,
-        totalMeals: plan.shootDays.reduce((sum, sd) => sum + sd.meals.length, 0),
+        totalShootDays: sortedShootDays.length,
+        totalMeals: sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => sum + sd.meals.length, 0),
         totalBudget: plan.totalBudget,
-        totalSpent: plan.shootDays.reduce((sum, sd) => 
-          sum + sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0), 0),
+        totalSpent: sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => 
+          sum + sd.meals.reduce((s: number, m: Meal) => s + (m.actualCost || m.budget), 0), 0),
         catererId: plan.catererId,
         dietaryRestrictions: plan.dietaryRestrictions
       },
-      shootDays: plan.shootDays,
+      shootDays: sortedShootDays,
       caterers: caterers
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -195,11 +197,11 @@ export default function CateringPage() {
     const printWindow = window.open('', '_blank', 'width=800,height=600')
     if (!printWindow) return
     
-    const totalSpent = plan.shootDays.reduce((sum, sd) => 
-      sum + sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0), 0)
+    const totalSpent = sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => 
+      sum + sd.meals.reduce((s: number, m: Meal) => s + (m.actualCost || m.budget), 0), 0)
     
     let mealsTable = ''
-    plan.shootDays.forEach((sd, idx) => {
+    sortedShootDays.forEach((sd: ShootDayMeal, idx: number) => {
       mealsTable += `
         <tr style="background: ${idx % 2 === 0 ? '#f8fafc' : '#fff'}">
           <td style="padding: 12px; border: 1px solid #e2e8f0;">${new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td>
@@ -334,6 +336,10 @@ export default function CateringPage() {
           e.preventDefault()
           if (planRef.current) setShowPrintMenu(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
       }
     }
     
@@ -342,40 +348,77 @@ export default function CateringPage() {
   }, [handleRefresh])
 
   // Filter shoot days by search query and filters
-  const filteredShootDays = plan?.shootDays.filter(sd => {
-    // Apply search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
-      const mealMatch = sd.meals.some(m => 
-        m.menu.some(item => item.toLowerCase().includes(query)) ||
-        m.type.toLowerCase().includes(query) ||
-        m.dietary.some(d => d.toLowerCase().includes(query))
-      )
-      if (!dateMatch && !mealMatch) return false
-    }
-    
-    // Apply meal type filter
-    if (filters.mealType !== 'all') {
-      const hasMealType = sd.meals.some(m => m.type === filters.mealType)
-      if (!hasMealType) return false
-    }
-    
-    // Apply dietary filter
-    if (filters.dietary !== 'all') {
-      const hasDietary = sd.meals.some(m => m.dietary.includes(filters.dietary))
-      if (!hasDietary) return false
-    }
-    
-    return true
-  }) || []
+  const filteredShootDays = useMemo(() => {
+    return plan?.shootDays.filter(sd => {
+      // Apply search query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
+        const mealMatch = sd.meals.some(m => 
+          m.menu.some(item => item.toLowerCase().includes(query)) ||
+          m.type.toLowerCase().includes(query) ||
+          m.dietary.some(d => d.toLowerCase().includes(query))
+        )
+        if (!dateMatch && !mealMatch) return false
+      }
+      
+      // Apply meal type filter
+      if (filters.mealType !== 'all') {
+        const hasMealType = sd.meals.some(m => m.type === filters.mealType)
+        if (!hasMealType) return false
+      }
+      
+      // Apply dietary filter
+      if (filters.dietary !== 'all') {
+        const hasDietary = sd.meals.some(m => m.dietary.includes(filters.dietary))
+        if (!hasDietary) return false
+      }
+      
+      return true
+    }) || []
+  }, [plan, searchQuery, filters])
   
-  // Count active filters
-  const activeFilterCount = (filters.mealType !== 'all' ? 1 : 0) + (filters.dietary !== 'all' ? 1 : 0)
+  // Sort filtered shoot days
+  const sortedShootDays = useMemo(() => {
+    return [...filteredShootDays].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+          break
+        case 'budget':
+          const budgetA = a.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+          const budgetB = b.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+          comparison = budgetA - budgetB
+          break
+        case 'mealType':
+          const typesA = a.meals.map(m => m.type).join(',')
+          const typesB = b.meals.map(m => m.type).join(',')
+          comparison = typesA.localeCompare(typesB)
+          break
+        case 'people':
+          comparison = (a.totalCrew + a.totalCast) - (b.totalCrew + b.totalCast)
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [filteredShootDays, sortBy, sortOrder])
+  
+  // Count active filters (including sort state)
+  const activeFilterCount = (filters.mealType !== 'all' ? 1 : 0) + (filters.dietary !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
   
   // Clear all filters
   const clearFilters = () => {
     setFilters({ mealType: 'all', dietary: 'all' })
+    setSortBy('date')
+    setSortOrder('asc')
   }
 
   // Stats for filtered data
@@ -542,6 +585,7 @@ export default function CateringPage() {
               <ShortcutRow keys={['R']} description="Refresh catering data" />
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
               <ShortcutRow keys={['F']} description="Toggle filters" />
+              <ShortcutRow keys={['S']} description="Toggle sort order" />
               <ShortcutRow keys={['N']} description="Add new shoot day" />
               <ShortcutRow keys={['E']} description="Export menu" />
               <ShortcutRow keys={['P']} description="Print catering report" />
@@ -612,10 +656,10 @@ export default function CateringPage() {
                   )}
                 </button>
                 {showFilters && (
-                  <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
                     <div className="p-4 border-b border-slate-700">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-white">Filter Options</h3>
+                        <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
                         {activeFilterCount > 0 && (
                           <button
                             onClick={clearFilters}
@@ -624,6 +668,30 @@ export default function CateringPage() {
                             Clear All
                           </button>
                         )}
+                      </div>
+                      
+                      {/* Sort Options */}
+                      <div className="mb-4 p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs text-purple-300 font-medium">Sort By</label>
+                          <button
+                            onClick={toggleSortOrder}
+                            className="flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs text-white transition-colors"
+                            title="Toggle sort order (S)"
+                          >
+                            {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                          </button>
+                        </div>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"
+                        >
+                          <option value="date">Date</option>
+                          <option value="budget">Budget</option>
+                          <option value="mealType">Meal Type</option>
+                          <option value="people">People</option>
+                        </select>
                       </div>
                       
                       {/* Meal Type Filter */}
@@ -883,7 +951,7 @@ export default function CateringPage() {
                 Meal Schedule
                 {searchQuery && <span className="text-sm font-normal text-amber-400">({filteredStats.shootDays} of {plan.shootDays.length} days)</span>}
               </h3>
-              {filteredShootDays.length === 0 ? (
+              {sortedShootDays.length === 0 ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
                   {searchQuery ? (
                     <>
@@ -896,7 +964,7 @@ export default function CateringPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {filteredShootDays.map((shootDay) => (
+                  {sortedShootDays.map((shootDay) => (
                     <div key={shootDay.date} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
                       <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-800">
                         <div className="flex items-center gap-4">

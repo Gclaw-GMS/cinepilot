@@ -105,6 +105,9 @@ export default function TravelExpensesPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'category' | 'status' | 'vendor'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -195,6 +198,10 @@ export default function TravelExpensesPage() {
             setShowPrintMenu(prev => !prev)
           }
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
       }
     }
     
@@ -234,10 +241,10 @@ export default function TravelExpensesPage() {
     return () => document.removeEventListener('mousedown', handleFilterClickOutside)
   }, [showFilters])
 
-  // CSV Export function
+  // CSV Export function (uses sorted/filtered data)
   const exportToCSV = () => {
     const headers = ['Date', 'Person', 'Category', 'Description', 'Vendor', 'Amount', 'Status']
-    const rows = expenses.map(exp => {
+    const rows = filteredExpenses.map(exp => {
       const match = exp.description.match(/^([^:]+):\s*(.*)$/)
       const personName = match ? match[1] : ''
       const description = match ? match[2] : exp.description
@@ -262,15 +269,15 @@ export default function TravelExpensesPage() {
     URL.revokeObjectURL(url)
   }
 
-  // JSON Export function
+  // JSON Export function (uses sorted/filtered data)
   const exportToJSON = () => {
     const data = {
       exportedAt: new Date().toISOString(),
-      totalExpenses: expenses.length,
+      totalExpenses: filteredExpenses.length,
       totalAmount: summary.totalAmount,
       byCategory: summary.byCategory,
       byStatus: summary.byStatus,
-      expenses: expenses.map(exp => ({
+      expenses: filteredExpenses.map(exp => ({
         date: exp.date,
         person: exp.description.match(/^([^:]+):/)?.[1] || '',
         category: exp.category,
@@ -311,7 +318,7 @@ export default function TravelExpensesPage() {
       'Daily Allowance': '#14b8a6',
     }
 
-    const expensesRows = expenses.map(exp => {
+    const expensesRows = filteredExpenses.map(exp => {
       const match = exp.description.match(/^([^:]+):\s*(.*)$/)
       const personName = match ? match[1] : ''
       const description = match ? match[2] : exp.description
@@ -511,26 +518,56 @@ export default function TravelExpensesPage() {
       }))
   }, [expenses])
 
-  // Filter expenses by search query
-  const filteredExpenses = expenses.filter(exp => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      exp.description.toLowerCase().includes(query) ||
-      exp.category.toLowerCase().includes(query) ||
-      exp.vendor?.toLowerCase().includes(query) ||
-      exp.status.toLowerCase().includes(query)
-    )
-  })
+  // Filter and sort expenses
+  const filteredExpenses = useMemo(() => {
+    let result = [...expenses]
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(exp =>
+        exp.description.toLowerCase().includes(query) ||
+        exp.category.toLowerCase().includes(query) ||
+        exp.vendor?.toLowerCase().includes(query) ||
+        exp.status.toLowerCase().includes(query)
+      )
+    }
+    
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+          break
+        case 'amount':
+          comparison = a.amount - b.amount
+          break
+        case 'category':
+          comparison = a.category.localeCompare(b.category)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'vendor':
+          comparison = (a.vendor || '').localeCompare(b.vendor || '')
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [expenses, searchQuery, sortBy, sortOrder])
 
-  // Calculate active filter count
+  // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filterCategory !== 'all') count++
     if (filterStatus !== 'all') count++
     if (dateRange.start || dateRange.end) count++
+    if (sortBy) count++ // Count sort as an active filter
     return count
-  }, [filterCategory, filterStatus, dateRange])
+  }, [filterCategory, filterStatus, dateRange, sortBy])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -629,7 +666,7 @@ export default function TravelExpensesPage() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm font-medium text-slate-300">Filters:</span>
+                <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-slate-400">Category:</label>
@@ -674,12 +711,40 @@ export default function TravelExpensesPage() {
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
                 />
               </div>
-              {(filterCategory !== 'all' || filterStatus !== 'all' || dateRange.start || dateRange.end) && (
+              {/* Sort Controls */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-400">Sort By:</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="category">Category</option>
+                  <option value="status">Status</option>
+                  <option value="vendor">Vendor</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                    sortOrder === 'asc' 
+                      ? 'bg-cyan-600 text-white' 
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title="Toggle sort order (S)"
+                >
+                  {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                </button>
+              </div>
+              {(filterCategory !== 'all' || filterStatus !== 'all' || dateRange.start || dateRange.end || sortBy) && (
                 <button
                   onClick={() => {
                     setFilterCategory('all')
                     setFilterStatus('all')
                     setDateRange({ start: '', end: '' })
+                    setSortBy('date')
+                    setSortOrder('desc')
                   }}
                   className="flex items-center gap-1 px-2 py-1 text-sm text-slate-400 hover:text-white"
                 >
@@ -996,13 +1061,38 @@ export default function TravelExpensesPage() {
               <table className="w-full">
                 <thead className="bg-slate-800/50">
                   <tr>
-                    <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Date</th>
+                    <th 
+                      className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-cyan-400 transition-colors"
+                      onClick={() => setSortBy('date')}
+                    >
+                      Date {sortBy === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Person</th>
-                    <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Category</th>
+                    <th 
+                      className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-cyan-400 transition-colors"
+                      onClick={() => setSortBy('category')}
+                    >
+                      Category {sortBy === 'category' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Description</th>
-                    <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Vendor</th>
-                    <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Amount</th>
-                    <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Status</th>
+                    <th 
+                      className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-cyan-400 transition-colors"
+                      onClick={() => setSortBy('vendor')}
+                    >
+                      Vendor {sortBy === 'vendor' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="text-right text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-cyan-400 transition-colors"
+                      onClick={() => setSortBy('amount')}
+                    >
+                      Amount {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="text-center text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3 cursor-pointer hover:text-cyan-400 transition-colors"
+                      onClick={() => setSortBy('status')}
+                    >
+                      Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-3">Actions</th>
                   </tr>
                 </thead>
@@ -1222,6 +1312,10 @@ export default function TravelExpensesPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Print report</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">P</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">S</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

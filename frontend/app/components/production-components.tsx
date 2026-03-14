@@ -2,7 +2,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { productionTimeline, type Milestone } from '../lib/api'
 
 interface ProductionTimelineProps {
@@ -12,12 +12,11 @@ interface ProductionTimelineProps {
 export function ProductionTimeline({ projectId }: ProductionTimelineProps) {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Ref for useEffect dependencies
+  const loadTimelineRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadTimeline()
-  }, [projectId])
-
-  const loadTimeline = async () => {
+  const loadTimeline = useCallback(async () => {
     try {
       const data = await productionTimeline.get(projectId)
       setMilestones(data.milestones)
@@ -34,7 +33,16 @@ export function ProductionTimeline({ projectId }: ProductionTimelineProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadTimelineRef.current = loadTimeline
+  }, [loadTimeline])
+
+  useEffect(() => {
+    loadTimelineRef.current()
+  }, [projectId])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -106,7 +114,7 @@ export function ProductionTimeline({ projectId }: ProductionTimelineProps) {
 // Cast Availability Component
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { castAvailability, type CastMember } from '../lib/api'
 
 interface CastAvailabilityProps {
@@ -117,12 +125,11 @@ export function CastAvailability({ projectId }: CastAvailabilityProps) {
   const [cast, setCast] = useState<CastMember[]>([])
   const [conflicts, setConflicts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Ref for useEffect dependencies
+  const loadCastRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadCast()
-  }, [projectId])
-
-  const loadCast = async () => {
+  const loadCast = useCallback(async () => {
     try {
       const data = await castAvailability.get(projectId)
       setCast(data.cast)
@@ -138,7 +145,16 @@ export function CastAvailability({ projectId }: CastAvailabilityProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadCastRef.current = loadCast
+  }, [loadCast])
+
+  useEffect(() => {
+    loadCastRef.current()
+  }, [projectId])
 
   if (loading) {
     return <div className="animate-pulse h-32 bg-gray-200 rounded"></div>
@@ -185,7 +201,7 @@ export function CastAvailability({ projectId }: CastAvailabilityProps) {
 // Equipment Management Component
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { equipment, type EquipmentCategory } from '../lib/api'
 import { utils } from '../lib/api'
 
@@ -198,12 +214,11 @@ export function EquipmentList({ projectId }: EquipmentListProps) {
   const [totalEstimate, setTotalEstimate] = useState(0)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string[]>([])
+  
+  // Ref for useEffect dependencies
+  const loadEquipmentRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadEquipment()
-  }, [projectId])
-
-  const loadEquipment = async () => {
+  const loadEquipment = useCallback(async () => {
     try {
       const data = await equipment.list(projectId)
       setCategories(data.categories)
@@ -238,7 +253,16 @@ export function EquipmentList({ projectId }: EquipmentListProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadEquipmentRef.current = loadEquipment
+  }, [loadEquipment])
+
+  useEffect(() => {
+    loadEquipmentRef.current()
+  }, [projectId])
 
   const toggleCategory = (name: string) => {
     setExpanded(prev => 
@@ -313,7 +337,7 @@ export function EquipmentList({ projectId }: EquipmentListProps) {
 // Script Version History Component
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { scriptVersions, type ScriptVersion } from '../lib/api'
 
 interface ScriptVersionHistoryProps {
@@ -323,12 +347,11 @@ interface ScriptVersionHistoryProps {
 export function ScriptVersionHistory({ projectId }: ScriptVersionHistoryProps) {
   const [versions, setVersions] = useState<ScriptVersion[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Ref for useEffect dependencies
+  const loadVersionsRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadVersions()
-  }, [projectId])
-
-  const loadVersions = async () => {
+  const loadVersions = useCallback(async () => {
     try {
       const data = await scriptVersions.list(projectId)
       setVersions(data.versions)
@@ -343,7 +366,16 @@ export function ScriptVersionHistory({ projectId }: ScriptVersionHistoryProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadVersionsRef.current = loadVersions
+  }, [loadVersions])
+
+  useEffect(() => {
+    loadVersionsRef.current()
+  }, [projectId])
 
   if (loading) {
     return <div className="animate-pulse h-32 bg-gray-200 rounded"></div>

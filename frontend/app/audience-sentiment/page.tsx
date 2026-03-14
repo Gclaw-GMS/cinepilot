@@ -95,6 +95,7 @@ export default function AudienceSentimentPage() {
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  const printSentimentReportRef = useRef<() => void>(() => {})
 
   // Filter analyses by platform, status, and search query
   const filteredAnalyses = analyses.filter(a => {
@@ -174,7 +175,7 @@ export default function AudienceSentimentPage() {
           break
         case 'p':
           e.preventDefault()
-          printSentimentReport()
+          printSentimentReportRef.current?.()
           break
         case '?':
           e.preventDefault()
@@ -324,7 +325,7 @@ export default function AudienceSentimentPage() {
   }
 
   // Print function
-  const printSentimentReport = () => {
+  const printSentimentReport = useCallback(() => {
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
     
@@ -445,7 +446,12 @@ export default function AudienceSentimentPage() {
     printWindow.document.write(html)
     printWindow.document.close()
     printWindow.print()
-  }
+  }, [filteredAnalyses])
+
+  // Update ref when printSentimentReport changes
+  useEffect(() => {
+    printSentimentReportRef.current = printSentimentReport
+  }, [printSentimentReport])
 
   // Click outside handler
   useEffect(() => {

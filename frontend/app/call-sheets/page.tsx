@@ -78,6 +78,9 @@ export default function CallSheetsPage() {
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const deleteSheetRef = useRef<(id: string) => Promise<void>>()
+  const startEditingRef = useRef<() => void>()
+  const cancelEditingRef = useRef<() => void>()
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -156,7 +159,7 @@ export default function CallSheetsPage() {
         case 'e':
           e.preventDefault()
           if (selected && !isEditing) {
-            startEditing()
+            startEditingRef.current?.()
           }
           break
         case 'f':
@@ -174,7 +177,7 @@ export default function CallSheetsPage() {
         case 'd':
           e.preventDefault()
           if (selected && !isEditing && !deleting) {
-            deleteSheet(selected.id)
+            deleteSheetRef.current?.(selected.id)
           }
           break
         case 'p':
@@ -196,7 +199,7 @@ export default function CallSheetsPage() {
           } else if (showFilters) {
             setShowFilters(false)
           } else if (isEditing) {
-            cancelEditing()
+            cancelEditingRef.current?.()
           }
           break
       }
@@ -340,7 +343,7 @@ export default function CallSheetsPage() {
     }
   }
 
-  const deleteSheet = async (id: string) => {
+  const deleteSheet = useCallback(async (id: string) => {
     try {
       setDeleting(id)
       const res = await fetch('/api/call-sheets', {
@@ -362,7 +365,7 @@ export default function CallSheetsPage() {
     } finally {
       setDeleting(null)
     }
-  }
+  }, [selected, setCallSheets, setSelected, setIsEditing, setError, setDeleting])
 
   const selectSheet = (sheet: CallSheet) => {
     setSelected(sheet)
@@ -373,7 +376,7 @@ export default function CallSheetsPage() {
     setEditDate(sheet.date ? sheet.date.split('T')[0] : '')
   }
 
-  const startEditing = () => {
+  const startEditing = useCallback(() => {
     if (!selected) return
     setEditForm(selected.content || {
       callTime: '06:00',
@@ -388,15 +391,28 @@ export default function CallSheetsPage() {
     setEditTitle(selected.title || '')
     setEditDate(selected.date ? selected.date.split('T')[0] : '')
     setIsEditing(true)
-  }
+  }, [selected, setEditForm, setEditNotes, setEditTitle, setEditDate, setIsEditing])
 
-  const cancelEditing = () => {
+  const cancelEditing = useCallback(() => {
     setIsEditing(false)
     if (selected) {
       setEditForm(selected.content || {})
       setEditNotes(selected.notes || '')
     }
-  }
+  }, [selected, setEditForm, setEditNotes, setIsEditing])
+
+  // Update refs for keyboard shortcuts
+  useEffect(() => {
+    deleteSheetRef.current = deleteSheet
+  }, [deleteSheet])
+
+  useEffect(() => {
+    startEditingRef.current = startEditing
+  }, [startEditing])
+
+  useEffect(() => {
+    cancelEditingRef.current = cancelEditing
+  }, [cancelEditing])
 
   const saveChanges = async () => {
     if (!selected) return

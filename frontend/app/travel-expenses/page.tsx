@@ -143,6 +143,12 @@ export default function TravelExpensesPage() {
     setRefreshing(false)
   }, [loadExpenses])
 
+  // Store handleRefresh in ref for keyboard shortcuts
+  const handleRefreshRef = useRef(handleRefresh)
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
+
   useEffect(() => { loadExpenses() }, [loadExpenses])
 
   // Click outside handlers for dropdowns and filter panel
@@ -430,7 +436,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); searchInputRef.current?.focus() }
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        handleRefresh()
+        handleRefreshRef.current?.()
       }
     }
     window.addEventListener('keydown', handleKeyDown)

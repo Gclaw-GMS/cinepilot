@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -359,11 +359,17 @@ export default function AnalyticsPage() {
     setExporting(false)
   }
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     await fetchData()
     setTimeout(() => setRefreshing(false), 500)
-  }
+  }, [fetchData])
+
+  // Store handleRefresh in ref for keyboard shortcuts
+  const handleRefreshRef = useRef(handleRefresh)
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
 
   const clearFilters = () => {
     setFilters({ timePeriod: 'all', department: 'all' })

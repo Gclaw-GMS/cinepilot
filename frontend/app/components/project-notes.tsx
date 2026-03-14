@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ProjectNote, getNotes, createNote, deleteNote } from '../lib/api-phase28'
 
 interface ProjectNotesProps {
@@ -18,19 +18,27 @@ export default function ProjectNotes({ projectId, currentUser = 'User' }: Projec
   const [notes, setNotes] = useState<ProjectNote[]>([])
   const [showForm, setShowForm] = useState(false)
   const [newNote, setNewNote] = useState({ content: '', category: 'general' as const })
+  
+  // Ref for useEffect dependencies
+  const loadNotesRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadNotes()
-  }, [projectId])
-
-  const loadNotes = async () => {
+  const loadNotes = useCallback(async () => {
     try {
       const data = await getNotes(projectId)
       setNotes(data)
     } catch (e) {
       setNotes([])
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadNotesRef.current = loadNotes
+  }, [loadNotes])
+
+  useEffect(() => {
+    loadNotesRef.current()
+  }, [projectId])
 
   const handleCreate = async () => {
     if (!newNote.content.trim()) return

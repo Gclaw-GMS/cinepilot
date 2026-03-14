@@ -5,7 +5,7 @@
  */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { analytics, type Project } from '../lib/api'
 
 interface AnalyticsDashboardProps {
@@ -16,13 +16,12 @@ export function AnalyticsDashboard({ project }: AnalyticsDashboardProps) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState<any[]>([])
+  
+  // Refs for useEffect dependencies
+  const loadAnalyticsRef = useRef<() => void>(() => {})
+  const loadActivityRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadAnalytics()
-    loadActivity()
-  }, [project.id])
-
-  const loadActivity = async () => {
+  const loadActivity = useCallback(async () => {
     // Demo data (API integration pending)
     setActivities([
       { type: 'scene_added', user: 'Writer', scene: 46, timestamp: '2026-02-14T15:30:00Z' },
@@ -30,9 +29,9 @@ export function AnalyticsDashboard({ project }: AnalyticsDashboardProps) {
       { type: 'budget_approved', user: 'Producer', amount: 5000000, timestamp: '2026-02-14T12:00:00Z' },
     ])
     setLoading(false)
-  }
+  }, [])
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     try {
       const result = await analytics.get(project.id)
       setData(result)
@@ -63,7 +62,18 @@ export function AnalyticsDashboard({ project }: AnalyticsDashboardProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [project.id])
+
+  // Update refs when functions change
+  useEffect(() => {
+    loadAnalyticsRef.current = loadAnalytics
+    loadActivityRef.current = loadActivity
+  }, [loadAnalytics, loadActivity])
+
+  useEffect(() => {
+    loadAnalyticsRef.current()
+    loadActivityRef.current()
+  }, [project.id])
 
   if (loading) {
     return (
@@ -196,12 +206,11 @@ interface ActivityFeedProps {
 export function ActivityFeed({ projectId }: ActivityFeedProps) {
   const [activities, setActivities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Ref for useEffect dependencies
+  const loadActivityRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadActivity()
-  }, [projectId])
-
-  const loadActivity = async () => {
+  const loadActivity = useCallback(async () => {
     // Demo data (API integration pending)
     setActivities([
       { type: 'scene_added', user: 'Writer', scene: 46, timestamp: '2026-02-14T15:30:00Z' },
@@ -209,7 +218,16 @@ export function ActivityFeed({ projectId }: ActivityFeedProps) {
       { type: 'budget_approved', user: 'Producer', amount: 5000000, timestamp: '2026-02-14T12:00:00Z' },
     ])
     setLoading(false)
-  }
+  }, [])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadActivityRef.current = loadActivity
+  }, [loadActivity])
+
+  useEffect(() => {
+    loadActivityRef.current()
+  }, [projectId])
 
   const getActivityIcon = (type: string) => {
     switch (type) {

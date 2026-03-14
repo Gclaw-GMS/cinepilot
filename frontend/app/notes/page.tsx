@@ -198,6 +198,11 @@ export default function NotesPage() {
   const selectedNoteRef = useRef<Note | null>(null)
   const handleTogglePinRef = useRef<((note: Note) => Promise<void>) | null>(null)
   const handleDuplicateRef = useRef<((note: Note) => Promise<void>) | null>(null)
+  const handleRefreshRef = useRef<() => void>(() => {})
+  const printNotesReportRef = useRef<() => void>(() => {})
+  const notesLengthRef = useRef(0)
+  const notesRef = useRef<Note[]>([])
+  const filteredNotesRef = useRef<Note[]>([])
 
   // Update refs when values change
   useEffect(() => {
@@ -227,7 +232,7 @@ export default function NotesPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -259,8 +264,8 @@ export default function NotesPage() {
           break
         case 'o':
           e.preventDefault()
-          if (notes.length > 0) {
-            printNotesReport()
+          if (notesLengthRef.current > 0) {
+            printNotesReportRef.current?.()
           }
           break
         case 'd':
@@ -424,7 +429,7 @@ export default function NotesPage() {
     // Simulate small delay for UX
     await new Promise(resolve => setTimeout(resolve, 300))
     
-    const data = filteredNotes.map(note => ({
+    const data = filteredNotesRef.current.map(note => ({
       title: note.title,
       content: note.content,
       category: note.category,
@@ -484,8 +489,8 @@ export default function NotesPage() {
   }
 
   // Print Notes Report
-  function printNotesReport() {
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
+  const printNotesReport = useCallback(() => {
+    const printWindow = window.open('', '_blank', 'width:900,height=700');
     if (!printWindow) return;
     
     const categoryColors: Record<string, string> = {
@@ -553,19 +558,19 @@ export default function NotesPage() {
   <div class="summary">
     <div class="summary-card">
       <div class="label">Total Notes</div>
-      <div class="value">${notes.length}</div>
+      <div class="value">${notesRef.current.length}</div>
     </div>
     <div class="summary-card pinned">
       <div class="label">Pinned</div>
-      <div class="value">${notes.filter(n => n.isPinned).length}</div>
+      <div class="value">${notesRef.current.filter(n => n.isPinned).length}</div>
     </div>
     <div class="summary-card category">
       <div class="label">Categories</div>
-      <div class="value">${new Set(notes.map(n => n.category)).size}</div>
+      <div class="value">${new Set(notesRef.current.map(n => n.category)).size}</div>
     </div>
     <div class="summary-card">
       <div class="label">Total Tags</div>
-      <div class="value">${new Set(notes.flatMap(n => n.tags)).size}</div>
+      <div class="value">${new Set(notesRef.current.flatMap(n => n.tags)).size}</div>
     </div>
   </div>
   
@@ -581,7 +586,7 @@ export default function NotesPage() {
       </tr>
     </thead>
     <tbody>
-      ${filteredNotes.map(note => `
+      ${filteredNotesRef.current.map(note => `
         <tr class="${note.isPinned ? 'pinned-row' : ''}">
           <td>${note.isPinned ? '📌' : ''}</td>
           <td><strong>${note.title}</strong></td>
@@ -608,7 +613,7 @@ export default function NotesPage() {
       printWindow.print();
     }, 250);
     setShowPrintMenu(false);
-  }
+  }, [])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return
@@ -661,6 +666,30 @@ export default function NotesPage() {
   useEffect(() => {
     handleDuplicateRef.current = handleDuplicate
   }, [handleDuplicate])
+
+  // Update ref when handleRefresh changes
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
+
+  // Update ref when printNotesReport changes
+  useEffect(() => {
+    printNotesReportRef.current = printNotesReport
+  }, [printNotesReport])
+
+  // Update ref when notes.length changes
+  useEffect(() => {
+    notesLengthRef.current = notes.length
+  }, [notes.length])
+
+  // Update refs when notes or filteredNotes changes
+  useEffect(() => {
+    notesRef.current = notes
+  }, [notes])
+
+  useEffect(() => {
+    filteredNotesRef.current = filteredNotes
+  }, [filteredNotes])
 
   // Refs for keyboard shortcuts
 

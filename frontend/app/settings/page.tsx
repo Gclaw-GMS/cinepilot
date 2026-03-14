@@ -154,6 +154,10 @@ export default function SettingsPage() {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Refs for keyboard shortcuts
+  const saveRef = useRef<() => void>(() => {});
+  const handlePrintRef = useRef<() => void>(() => {});
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,7 +183,7 @@ export default function SettingsPage() {
       // S: Save settings
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
-        save();
+        saveRef.current?.();
       }
 
       // ?: Show shortcuts
@@ -191,7 +195,7 @@ export default function SettingsPage() {
       // P: Print settings
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
-        handlePrint();
+        handlePrintRef.current?.();
       }
 
       // Escape: Close modal
@@ -205,15 +209,16 @@ export default function SettingsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fetchSettings]);
 
-  const set = (key: string, value: unknown) => {
+  const set = useCallback((key: string, value: unknown) => {
     setLocal((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
-  const get = (key: string): unknown => {
+  const get = useCallback((key: string): unknown => {
     return local[key] ?? settings[key];
-  };
+  }, [local, settings]);
 
-  const save = async () => {
+  // useCallback for save function
+  const save = useCallback(async () => {
     setSaving(true);
     setSaved(false);
     
@@ -240,12 +245,21 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 2000);
       setSaving(false);
     }
-  };
+  }, [local]);
+
+  // Update saveRef when save changes
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
 
   // Print settings report
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     setPrinting(true);
     setShowPrintMenu(false);
+    
+    // Capture current settings values
+    const currentSettings = { ...settings, ...local };
+    const currentGet = (key: string): unknown => currentSettings[key];
     
     const html = `
 <!DOCTYPE html>
@@ -322,7 +336,12 @@ export default function SettingsPage() {
       printWindow.print();
     }
     setPrinting(false);
-  };
+  }, [local, settings, get]);
+
+  // Update handlePrintRef when handlePrint changes
+  useEffect(() => {
+    handlePrintRef.current = handlePrint;
+  }, [handlePrint]);
 
   // Click outside to close print menu
   useEffect(() => {

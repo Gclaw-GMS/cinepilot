@@ -141,6 +141,12 @@ export default function TravelExpensesPage() {
   // Assign to ref for keyboard shortcuts
   fetchDataRef.current = fetchExpenses
 
+  // Store expenses length in ref for keyboard shortcuts
+  const expensesLengthRef = useRef(expenses.length)
+  useEffect(() => {
+    expensesLengthRef.current = expenses.length
+  }, [expenses.length])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -185,7 +191,7 @@ export default function TravelExpensesPage() {
           break
         case 'p':
           e.preventDefault()
-          if (expenses.length > 0) {
+          if (expensesLengthRef.current > 0) {
             setShowPrintMenu(prev => !prev)
           }
           break

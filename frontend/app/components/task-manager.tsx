@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Task, getTasks, createTask, updateTask, deleteTask } from '../lib/api-phase28'
 
 interface TaskManagerProps {
@@ -17,19 +17,27 @@ export default function TaskManager({ projectId }: TaskManagerProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [showForm, setShowForm] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' as const, assignee: '' })
+  
+  // Ref for useEffect dependencies
+  const loadTasksRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadTasks()
-  }, [projectId])
-
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     try {
       const data = await getTasks(projectId)
       setTasks(data)
     } catch (e) {
       setTasks([])
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadTasksRef.current = loadTasks
+  }, [loadTasks])
+
+  useEffect(() => {
+    loadTasksRef.current()
+  }, [projectId])
 
   const handleCreate = async () => {
     if (!newTask.title.trim()) return

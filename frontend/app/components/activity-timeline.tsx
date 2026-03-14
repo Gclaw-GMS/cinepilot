@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Activity, getActivity } from '../lib/api-phase28'
 
 interface ActivityTimelineProps {
@@ -16,12 +16,11 @@ interface ActivityTimelineProps {
 export default function ActivityTimeline({ projectId }: ActivityTimelineProps) {
   const [activities, setActivities] = useState<Activity[]>([])
   const [filter, setFilter] = useState<string>('all')
+  
+  // Refs for keyboard shortcuts and useEffect dependencies
+  const loadActivityRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    loadActivity()
-  }, [projectId, filter])
-
-  const loadActivity = async () => {
+  const loadActivity = useCallback(async () => {
     try {
       const data = await getActivity(projectId, 50)
       if (filter !== 'all') {
@@ -38,7 +37,16 @@ export default function ActivityTimeline({ projectId }: ActivityTimelineProps) {
         { id: 4, project_id: projectId, type: 'crew', action: 'Added', details: 'New crew member: Anbu (Art Director)', user: 'HR', created_at: new Date(Date.now() - 86400000).toISOString() },
       ])
     }
-  }
+  }, [projectId, filter])
+
+  // Update ref when loadActivity changes
+  useEffect(() => {
+    loadActivityRef.current = loadActivity
+  }, [loadActivity])
+
+  useEffect(() => {
+    loadActivityRef.current()
+  }, [projectId, filter])
 
   const typeIcons: Record<string, string> = {
     scene: '🎬',

@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { aiAnalysis, scriptUpload, whatsappEnhanced, collaborationNew } from '../lib/api'
 
@@ -26,14 +26,11 @@ export default function ScriptAnalysisDashboard({ projectId }: { projectId?: num
   const [tasks, setTasks] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
+  
+  // Ref for useEffect dependencies
+  const loadProjectDataRef = useRef<() => void>(() => {})
 
-  useEffect(() => {
-    if (projectId) {
-      loadProjectData()
-    }
-  }, [projectId])
-
-  const loadProjectData = async () => {
+  const loadProjectData = useCallback(async () => {
     if (!projectId) return
     try {
       const [tasksData, activityData, expensesData] = await Promise.all([
@@ -47,7 +44,18 @@ export default function ScriptAnalysisDashboard({ projectId }: { projectId?: num
     } catch (e) {
       console.error('Failed to load project data:', e)
     }
-  }
+  }, [projectId])
+
+  // Update ref when function changes
+  useEffect(() => {
+    loadProjectDataRef.current = loadProjectData
+  }, [loadProjectData])
+
+  useEffect(() => {
+    if (projectId) {
+      loadProjectDataRef.current()
+    }
+  }, [projectId])
 
   const runAllAnalysis = async () => {
     if (!scriptContent.trim()) return

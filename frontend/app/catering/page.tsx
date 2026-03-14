@@ -84,6 +84,7 @@ export default function CateringPage() {
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void>(() => {})
+  const planRef = useRef(plan)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -117,6 +118,11 @@ export default function CateringPage() {
   useEffect(() => {
     fetchDataRef.current = fetchData
   }, [fetchData])
+
+  // Update plan ref when plan changes
+  useEffect(() => {
+    planRef.current = plan
+  }, [plan])
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -326,7 +332,7 @@ export default function CateringPage() {
           break
         case 'p':
           e.preventDefault()
-          if (plan) setShowPrintMenu(prev => !prev)
+          if (planRef.current) setShowPrintMenu(prev => !prev)
           break
       }
     }

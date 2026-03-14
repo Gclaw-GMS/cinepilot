@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   Brain, Sparkles, FileText, Clapperboard, DollarSign, 
   Calendar, AlertTriangle, MessageSquare, Wand2,
@@ -382,6 +382,10 @@ export default function AIToolsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchToolsRef = useRef<() => void>(() => {})
   const handlePrintRef = useRef<() => void>(() => {})
+  
+  // Refs to store latest values for handlePrint function
+  const filteredToolsRef = useRef<typeof tools>([])
+  const allCategoriesRef = useRef<string[]>([])
 
   // Fetch tools from API on mount
   useEffect(() => {
@@ -481,14 +485,18 @@ export default function AIToolsPage() {
   }
 
   // Print functionality
-  const handlePrint = () => {
+  // Print functionality - uses refs to avoid dependency issues
+  const handlePrint = useCallback(() => {
     const timestamp = new Date().toLocaleString('en-GB', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     })
 
-    const toolCategories = allCategories.reduce((acc: Record<string, number>, cat) => {
-      acc[cat] = filteredTools.filter(t => t.category === cat).length
+    const currentFilteredTools = filteredToolsRef.current
+    const currentAllCategories = allCategoriesRef.current
+    
+    const toolCategories = currentAllCategories.reduce((acc: Record<string, number>, cat) => {
+      acc[cat] = currentFilteredTools.filter(t => t.category === cat).length
       return acc
     }, {})
 
@@ -534,19 +542,19 @@ export default function AIToolsPage() {
   </div>
   <div class="stats">
     <div class="stat">
-      <div class="stat-value">${filteredTools.length}</div>
+      <div class="stat-value">${currentFilteredTools.length}</div>
       <div class="stat-label">Total Tools</div>
     </div>
     <div class="stat">
-      <div class="stat-value">${allCategories.length}</div>
+      <div class="stat-value">${currentAllCategories.length}</div>
       <div class="stat-label">Categories</div>
     </div>
     <div class="stat">
-      <div class="stat-value">${filteredTools.filter(t => t.endpoint?.includes('script')).length}</div>
+      <div class="stat-value">${currentFilteredTools.filter(t => t.endpoint?.includes('script')).length}</div>
       <div class="stat-label">Script Tools</div>
     </div>
     <div class="stat">
-      <div class="stat-value">${filteredTools.filter(t => t.endpoint?.includes('budget')).length}</div>
+      <div class="stat-value">${currentFilteredTools.filter(t => t.endpoint?.includes('budget')).length}</div>
       <div class="stat-label">Budget Tools</div>
     </div>
   </div>
@@ -570,7 +578,7 @@ export default function AIToolsPage() {
         </tr>
       </thead>
       <tbody>
-        ${filteredTools.map(tool => `
+        ${currentFilteredTools.map(tool => `
           <tr>
             <td class="tool-name">${tool.name}</td>
             <td class="tool-desc">${tool.desc}</td>
@@ -594,9 +602,9 @@ export default function AIToolsPage() {
     printWindow.document.close()
     printWindow.focus()
     setShowPrintMenu(false)
-  }
+  }, [])  // Empty deps - uses refs
 
-  // Assign handlePrint to ref for keyboard shortcuts
+  // Update ref when handlePrint changes
   useEffect(() => {
     handlePrintRef.current = handlePrint
   }, [handlePrint])
@@ -693,9 +701,17 @@ export default function AIToolsPage() {
   const getFeatureColor = (color: string) => COLORS_MAP[color] || COLORS_MAP.slate
 
   // Get unique categories from tools
-  const allCategories = categories.length > 0 
-    ? categories 
-    : [...new Set(aiFeatures.map(f => f.category))]
+  const allCategories = useMemo(() => {
+    return categories.length > 0 
+      ? categories 
+      : [...new Set(aiFeatures.map(f => f.category))]
+  }, [categories, aiFeatures])
+  
+  // Update refs when filteredTools or allCategories change
+  useEffect(() => {
+    filteredToolsRef.current = filteredTools
+    allCategoriesRef.current = allCategories
+  }, [filteredTools, allCategories])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">

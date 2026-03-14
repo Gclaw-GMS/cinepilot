@@ -248,6 +248,11 @@ export default function SchedulePage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const handlePrintRef = useRef<() => void>(() => {})
+  const handleOptimizeRef = useRef<() => void>(() => {})
+  const fetchDataRef = useRef<() => void>(() => {})
+  const shootingDaysRef = useRef<ShootingDayData[]>([])
+  const filteredShootingDaysRef = useRef<ShootingDayData[]>([])
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -292,6 +297,21 @@ export default function SchedulePage() {
     fetchData() 
   }, [fetchData])
 
+  // Update refs when functions change
+  useEffect(() => {
+    fetchDataRef.current = fetchData
+  }, [fetchData])
+
+  // Update data refs when they change
+  useEffect(() => {
+    shootingDaysRef.current = shootingDays
+  }, [shootingDays])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    filteredShootingDaysRef.current = filteredShootingDays
+  }, [shootingDays])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -303,7 +323,7 @@ export default function SchedulePage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          fetchData()
+          fetchDataRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -319,7 +339,7 @@ export default function SchedulePage() {
           break
         case 'o':
           e.preventDefault()
-          handleOptimize()
+          handleOptimizeRef.current?.()
           break
         case '?':
           e.preventDefault()
@@ -339,7 +359,7 @@ export default function SchedulePage() {
           break
         case 'p':
           e.preventDefault()
-          handlePrint()
+          handlePrintRef.current?.()
           break
         case 'f':
           e.preventDefault()
@@ -350,7 +370,7 @@ export default function SchedulePage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [fetchData])
+  }, [])
 
   // Click outside to close export menu, print menu, and filter panel
   useEffect(() => {
@@ -438,13 +458,16 @@ export default function SchedulePage() {
   }
 
   const handlePrint = () => {
+    const currentShootingDays = shootingDaysRef.current
+    const currentFilteredDays = filteredShootingDaysRef.current
+    
     const stats = {
-      totalDays: shootingDays.length,
-      completed: shootingDays.filter(d => d.status === 'completed').length,
-      inProgress: shootingDays.filter(d => d.status === 'in_progress').length,
-      scheduled: shootingDays.filter(d => d.status === 'scheduled').length,
-      delayed: shootingDays.filter(d => d.status === 'delayed').length,
-      totalScenes: shootingDays.reduce((sum, d) => sum + d.dayScenes.length, 0),
+      totalDays: currentShootingDays.length,
+      completed: currentShootingDays.filter(d => d.status === 'completed').length,
+      inProgress: currentShootingDays.filter(d => d.status === 'in_progress').length,
+      scheduled: currentShootingDays.filter(d => d.status === 'scheduled').length,
+      delayed: currentShootingDays.filter(d => d.status === 'delayed').length,
+      totalScenes: currentShootingDays.reduce((sum, d) => sum + d.dayScenes.length, 0),
     }
 
     const statsHtml = `
@@ -459,7 +482,7 @@ export default function SchedulePage() {
       </div>
     `
     
-    const tableRows = filteredShootingDays.map((day, i) => {
+    const tableRows = currentFilteredDays.map((day, i) => {
       const statusColors: Record<string, string> = {
         completed: '#22c55e',
         in_progress: '#3b82f6',
@@ -537,7 +560,7 @@ export default function SchedulePage() {
     setShowPrintMenu(false)
   }
 
-  const handleOptimize = async () => {
+  const handleOptimize = useCallback(async () => {
     setOptimizing(true)
     setError(null)
     try {
@@ -554,7 +577,16 @@ export default function SchedulePage() {
     } finally {
       setOptimizing(false)
     }
-  }
+  }, [fetchData, startDate, mode])
+
+  // Update refs when functions change
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
+
+  useEffect(() => {
+    handleOptimizeRef.current = handleOptimize
+  }, [handleOptimize])
 
   // Copy schedule to clipboard
   const handleCopyToClipboard = async () => {

@@ -456,7 +456,7 @@ export default function EquipmentPage() {
   }
 
   // Print functionality
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     setPrinting(true)
     setShowPrintMenu(false)
     
@@ -570,7 +570,7 @@ export default function EquipmentPage() {
       }
     }
     setPrinting(false)
-  }
+  }, [filtered, stats])
 
   // Assign handlePrint to ref for keyboard shortcuts
   useEffect(() => {

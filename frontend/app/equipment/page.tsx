@@ -124,6 +124,8 @@ export default function EquipmentPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [sortBy, setSortBy] = useState<'name' | 'category' | 'status' | 'dailyRate' | 'dateEnd'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -337,6 +339,26 @@ export default function EquipmentPage() {
     const matchCat = filterCat === 'all' || eq.category === filterCat
     const matchStatus = filterStatus === 'all' || eq.status === filterStatus
     return matchSearch && matchCat && matchStatus
+  }).sort((a, b) => {
+    let comparison = 0
+    switch (sortBy) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name)
+        break
+      case 'category':
+        comparison = a.category.localeCompare(b.category)
+        break
+      case 'status':
+        comparison = a.status.localeCompare(b.status)
+        break
+      case 'dailyRate':
+        comparison = a.dailyRate - b.dailyRate
+        break
+      case 'dateEnd':
+        comparison = new Date(a.dateEnd).getTime() - new Date(b.dateEnd).getTime()
+        break
+    }
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -749,6 +771,38 @@ export default function EquipmentPage() {
                             {status.label}
                           </button>
                         ))}
+                      </div>
+                    </div>
+                    {/* Sort Options */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Sort By</label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { key: 'name', label: 'Name' },
+                          { key: 'category', label: 'Category' },
+                          { key: 'status', label: 'Status' },
+                          { key: 'dailyRate', label: 'Daily Rate' },
+                          { key: 'dateEnd', label: 'End Date' },
+                        ].map(sort => (
+                          <button
+                            key={sort.key}
+                            onClick={() => setSortBy(sort.key as typeof sortBy)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                              sortBy === sort.key
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+                            }`}
+                          >
+                            {sort.label}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                          className="px-3 py-1.5 rounded-lg text-xs transition-all bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white flex items-center gap-1"
+                          title="Toggle sort order"
+                        >
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </button>
                       </div>
                     </div>
                   </div>

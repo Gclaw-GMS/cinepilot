@@ -28,7 +28,7 @@ import {
   Printer,
 } from 'lucide-react'
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
 } from 'recharts'
 
 const CATEGORIES = [
@@ -495,6 +495,22 @@ export default function TravelExpensesPage() {
     color: STATUS_COLORS[name] || '#64748b',
   }))
 
+  // Monthly trend data - group expenses by month
+  const monthlyTrendData = useMemo(() => {
+    const monthlyMap: Record<string, number> = {}
+    expenses.forEach(exp => {
+      const month = exp.date.substring(0, 7) // YYYY-MM format
+      monthlyMap[month] = (monthlyMap[month] || 0) + exp.amount
+    })
+    return Object.entries(monthlyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6) // Last 6 months
+      .map(([month, amount]) => ({
+        month: new Date(month + '-01').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+        amount,
+      }))
+  }, [expenses])
+
   // Filter expenses by search query
   const filteredExpenses = expenses.filter(exp => {
     if (!searchQuery) return true
@@ -798,6 +814,43 @@ export default function TravelExpensesPage() {
             )}
           </div>
         </div>
+
+        {/* Monthly Trend Chart */}
+        {monthlyTrendData.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Monthly Spending Trend</h3>
+              <span className="text-sm text-slate-500">Last 6 months</span>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyTrendData}>
+                  <defs>
+                    <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorAmount)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Filters & List */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl">

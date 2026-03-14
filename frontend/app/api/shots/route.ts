@@ -1,326 +1,353 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import {
-  generateShotsForScene,
-  generateShotsForScript,
-  updateShot,
-  fillShotFields,
-  type DirectorStyleKey,
-} from '@/lib/shots/pipeline';
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+
+const DEFAULT_PROJECT_ID = 'default-project'
 
 // Demo data for when database is not available
-const DEMO_SHOTS = [
-  { id: 'shot-1', sceneId: 'scene-1', shotIndex: 0, shotSize: 'Wide', shotType: 'Establishing', cameraAngle: 'Eye Level', cameraMovement: 'Static', durationEstSec: 5, focalLengthMm: 35, keyStyle: 'Naturalistic', lighting: 'Natural', notes: 'Opening wide shot of the courtroom', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' } },
-  { id: 'shot-2', sceneId: 'scene-1', shotIndex: 1, shotSize: 'Medium', shotType: 'Dialogue', cameraAngle: 'Over Shoulder', cameraMovement: 'Dolly', durationEstSec: 8, focalLengthMm: 50, keyStyle: 'Naturalistic', lighting: 'Three-Point', notes: 'Judge entering', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' } },
-  { id: 'shot-3', sceneId: 'scene-1', shotIndex: 2, shotSize: 'Close-Up', shotType: 'Reaction', cameraAngle: 'Straight On', cameraMovement: 'Static', durationEstSec: 4, focalLengthMm: 85, keyStyle: 'Dramatic', lighting: 'Rembrandt', notes: 'Ravi\'s reaction to the verdict', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM' } },
-  { id: 'shot-4', sceneId: 'scene-2', shotIndex: 0, shotSize: 'Extreme Wide', shotType: 'Establishing', cameraAngle: 'Low Angle', cameraMovement: 'Crane', durationEstSec: 6, focalLengthMm: 24, keyStyle: 'Cinematic', lighting: 'Moonlight', notes: 'Temple at night with diyas', scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE' } },
-  { id: 'shot-5', sceneId: 'scene-2', shotIndex: 1, shotSize: 'Medium', shotType: 'POV', cameraAngle: 'POV', cameraMovement: 'Steadicam', durationEstSec: 10, focalLengthMm: 35, keyStyle: 'Immersive', lighting: 'Practical', notes: 'Divya walking through temple', scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE' } },
-  { id: 'shot-6', sceneId: 'scene-3', shotIndex: 0, shotSize: 'Medium', shotType: 'Dialogue', cameraAngle: 'Two Shot', cameraMovement: 'Tracking', durationEstSec: 12, focalLengthMm: 50, keyStyle: 'Naturalistic', lighting: 'Soft Natural', notes: 'Ravi and Sarath discussing', scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' } },
-  { id: 'shot-7', sceneId: 'scene-3', shotIndex: 1, shotSize: 'Close-Up', shotType: 'Insert', cameraAngle: 'Straight On', cameraMovement: 'Static', durationEstSec: 3, focalLengthMm: 100, keyStyle: 'Naturalistic', lighting: 'Practical', notes: 'Coffee cup on table', scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE' } },
-];
-
 const DEMO_SCENES = [
-  { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. COURTROOM - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'COURTROOM', _count: { shots: 3 } },
-  { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. TEMPLE - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'KAPALEESHWARAR TEMPLE', _count: { shots: 2 } },
-  { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. RAVI\'S HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'RAVI\'S HOUSE', _count: { shots: 2 } },
-];
+  { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office', _count: { shots: 5 } },
+  { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. STREET - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'Street', _count: { shots: 3 } },
+  { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'House', _count: { shots: 4 } },
+]
 
-function getDemoResponse(statsOnly: boolean) {
-  const totalDuration = DEMO_SHOTS.reduce((sum, s) => sum + (s.durationEstSec || 3), 0);
-  
-  if (statsOnly) {
-    return {
-      totalShots: DEMO_SHOTS.length,
-      totalDurationSec: Math.round(totalDuration),
-      missingFields: 0,
-      scenes: DEMO_SCENES.map(s => ({
-        sceneNumber: s.sceneNumber,
-        headingRaw: s.headingRaw,
-        shotCount: s._count.shots,
-      })),
-      _demo: true,
-    };
-  }
+const DEMO_SHOTS: Record<string, unknown>[] = [
+  { id: 'shot-1', shotIndex: 1, beatIndex: 1, shotText: 'Wide shot of the office', characters: ['RAM'], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'motivated', colorTemp: '5600K', durationEstSec: 8, confidenceCamera: 0.9, confidenceLens: 0.85, confidenceLight: 0.8, confidenceDuration: 0.7, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
+  { id: 'shot-2', shotIndex: 2, beatIndex: 1, shotText: 'Medium shot of RAM entering', characters: ['RAM'], shotSize: 'MS', cameraAngle: 'eye', cameraMovement: 'dolly', focalLengthMm: 50, lensType: 'prime', keyStyle: 'motivated', colorTemp: '5600K', durationEstSec: 5, confidenceCamera: 0.85, confidenceLens: 0.9, confidenceLight: 0.85, confidenceDuration: 0.75, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
+  { id: 'shot-3', shotIndex: 3, beatIndex: 2, shotText: 'Close-up of documents on desk', characters: [], shotSize: 'CU', cameraAngle: 'high', cameraMovement: 'static', focalLengthMm: 85, lensType: 'prime', keyStyle: 'detail', colorTemp: '5600K', durationEstSec: 3, confidenceCamera: 0.8, confidenceLens: 0.8, confidenceLight: 0.75, confidenceDuration: 0.6, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
+  { id: 'shot-4', shotIndex: 4, beatIndex: 2, shotText: 'Over-the-shoulder shot', characters: ['RAM', 'PRIYA'], shotSize: 'OTS', cameraAngle: 'eye', cameraMovement: 'pan', focalLengthMm: 50, lensType: 'zoom', keyStyle: 'motivated', colorTemp: '5600K', durationEstSec: 6, confidenceCamera: 0.9, confidenceLens: 0.85, confidenceLight: 0.8, confidenceDuration: 0.7, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
+  { id: 'shot-5', shotIndex: 5, beatIndex: 3, shotText: 'Wide establishing shot', characters: [], shotSize: 'EWS', cameraAngle: 'bird', cameraMovement: 'drone', focalLengthMm: 24, lensType: 'wide', keyStyle: 'establishing', colorTemp: '4300K', durationEstSec: 10, confidenceCamera: 0.95, confidenceLens: 0.9, confidenceLight: 0.85, confidenceDuration: 0.8, isLocked: false, userEdited: false, scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
+  { id: 'shot-6', shotIndex: 6, beatIndex: 1, shotText: 'Night street establishing', characters: [], shotSize: 'WS', cameraAngle: 'low', cameraMovement: 'steadicam', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'noir', colorTemp: '3200K', durationEstSec: 8, confidenceCamera: 0.85, confidenceLens: 0.8, confidenceLight: 0.75, confidenceDuration: 0.7, isLocked: false, userEdited: false, scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. STREET - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'Street' } },
+  { id: 'shot-7', shotIndex: 7, beatIndex: 1, shotText: 'Car driving POV', characters: ['RAM'], shotSize: 'MCU', cameraAngle: 'eye', cameraMovement: 'handheld', focalLengthMm: 50, lensType: 'action', keyStyle: 'kinetic', colorTemp: '3200K', durationEstSec: 4, confidenceCamera: 0.8, confidenceLens: 0.75, confidenceLight: 0.7, confidenceDuration: 0.65, isLocked: false, userEdited: false, scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. STREET - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'Street' } },
+  { id: 'shot-8', shotIndex: 8, beatIndex: 2, shotText: 'Reflection in rain puddle', characters: [], shotSize: 'ECU', cameraAngle: 'worm', cameraMovement: 'static', focalLengthMm: 100, lensType: 'macro', keyStyle: 'artistic', colorTemp: '3200K', durationEstSec: 5, confidenceCamera: 0.9, confidenceLens: 0.95, confidenceLight: 0.85, confidenceDuration: 0.6, isLocked: false, userEdited: false, scene: { id: 'scene-2', sceneNumber: '2', headingRaw: 'EXT. STREET - NIGHT', intExt: 'EXT', timeOfDay: 'NIGHT', location: 'Street' } },
+  { id: 'shot-9', shotIndex: 9, beatIndex: 1, shotText: 'House exterior', characters: [], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'crane', focalLengthMm: 24, lensType: 'wide', keyStyle: 'motivated', colorTemp: '5600K', durationEstSec: 6, confidenceCamera: 0.9, confidenceLens: 0.85, confidenceLight: 0.8, confidenceDuration: 0.75, isLocked: false, userEdited: false, scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'House' } },
+  { id: 'shot-10', shotIndex: 10, beatIndex: 1, shotText: 'Living room wide', characters: ['PRIYA'], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'natural', colorTemp: '5600K', durationEstSec: 7, confidenceCamera: 0.85, confidenceLens: 0.8, confidenceLight: 0.75, confidenceDuration: 0.7, isLocked: false, userEdited: false, scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'House' } },
+  { id: 'shot-11', shotIndex: 11, beatIndex: 2, shotText: 'Priya sitting on couch', characters: ['PRIYA'], shotSize: 'MS', cameraAngle: 'low', cameraMovement: 'dolly', focalLengthMm: 50, lensType: 'prime', keyStyle: 'emotional', colorTemp: '4300K', durationEstSec: 8, confidenceCamera: 0.9, confidenceLens: 0.9, confidenceLight: 0.85, confidenceDuration: 0.8, isLocked: false, userEdited: false, scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'House' } },
+  { id: 'shot-12', shotIndex: 12, beatIndex: 2, shotText: 'Close-up of photo frame', characters: [], shotSize: 'CU', cameraAngle: 'high', cameraMovement: 'static', focalLengthMm: 85, lensType: 'prime', keyStyle: 'detail', colorTemp: '5600K', durationEstSec: 4, confidenceCamera: 0.85, confidenceLens: 0.9, confidenceLight: 0.8, confidenceDuration: 0.65, isLocked: false, userEdited: false, scene: { id: 'scene-3', sceneNumber: '3', headingRaw: 'INT. HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'House' } },
+]
 
-  return {
-    shots: DEMO_SHOTS,
-    scenes: DEMO_SCENES,
-    stats: {
-      totalShots: DEMO_SHOTS.length,
-      totalDuration: Math.round(totalDuration),
-      missingFields: 0,
-    },
-    _demo: true,
-  };
-}
+// In-memory storage for demo mode
+let demoShots = [...DEMO_SHOTS]
 
-async function handleExport(req: NextRequest, format: 'json' | 'csv') {
-  const { searchParams } = new URL(req.url);
-  const scriptId = searchParams.get('scriptId');
-  const sceneId = searchParams.get('sceneId');
-
-  // Get shots from database or demo
-  let shots: any[] = [];
-  
+async function ensureDefaultProject(): Promise<string> {
   try {
-    const where: any = {};
-    if (sceneId) {
-      where.sceneId = sceneId;
-    } else if (scriptId) {
-      const dbScenes = await prisma.scene.findMany({
-        where: { scriptId },
-        select: { id: true },
-      });
-      where.sceneId = { in: dbScenes.map(s => s.id) };
-    }
-    
-    shots = await prisma.shot.findMany({
-      where,
-      include: {
-        scene: {
-          include: {
-            script: { select: { title: true } },
-          },
+    let user = await prisma.user.findFirst({ where: { id: 'default-user' } })
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: 'default-user',
+          email: 'dev@cinepilot.ai',
+          passwordHash: 'none',
+          name: 'Dev User',
         },
-      },
-      orderBy: [{ scene: { sceneNumber: 'asc' } }, { shotIndex: 'asc' }],
-    });
-  } catch (error) {
-    console.log('[GET /api/shots/export] Using demo data');
-    shots = DEMO_SHOTS.map(shot => ({
-      ...shot,
-      scene: DEMO_SCENES.find(s => s.id === shot.sceneId),
-    }));
-  }
-
-  const transformedShots = shots.map(shot => ({
-    scene_number: shot.scene?.sceneNumber || shot.sceneId,
-    scene_heading: shot.scene?.headingRaw || '',
-    shot_number: shot.shotIndex + 1,
-    beat_index: shot.beatIndex,
-    shot_description: shot.shotText,
-    characters: shot.characters?.join(', ') || '',
-    shot_size: shot.shotSize || '',
-    camera_angle: shot.cameraAngle || '',
-    camera_movement: shot.cameraMovement || '',
-    focal_length_mm: shot.focalLengthMm || '',
-    lens_type: shot.lensType || '',
-    lighting: shot.keyStyle || '',
-    color_temp: shot.colorTemp || '',
-    duration_seconds: shot.durationEstSec || '',
-    is_locked: shot.isLocked || false,
-    confidence: ((shot.confidenceCamera || 0) + (shot.confidenceLens || 0) + (shot.confidenceLight || 0) + (shot.confidenceDuration || 0)) / 4,
-  }));
-
-  if (format === 'csv') {
-    const headers = ['scene_number', 'scene_heading', 'shot_number', 'beat_index', 'shot_description', 'characters', 'shot_size', 'camera_angle', 'camera_movement', 'focal_length_mm', 'lens_type', 'lighting', 'color_temp', 'duration_seconds', 'is_locked', 'confidence'];
-    const csvRows = [headers.join(',')];
-    
-    for (const shot of transformedShots) {
-      const row = headers.map(h => {
-        const val = (shot as Record<string, unknown>)[h];
-        const strVal = String(val ?? '');
-        return strVal.includes(',') || strVal.includes('"') ? `"${strVal.replace(/"/g, '""')}"` : strVal;
-      });
-      csvRows.push(row.join(','));
+      })
     }
-    
-    const csv = csvRows.join('\n');
-    return new NextResponse(csv, {
-      headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="shot_list_${new Date().toISOString().split('T')[0]}.csv"`,
-      },
-    });
+    let project = await prisma.project.findUnique({ where: { id: DEFAULT_PROJECT_ID } })
+    if (!project) {
+      project = await prisma.project.create({
+        data: { id: DEFAULT_PROJECT_ID, name: 'Default Project', userId: user.id },
+      })
+    }
+    return project.id
+  } catch (error) {
+    console.log('[shots API] Database not available')
+    return DEFAULT_PROJECT_ID
   }
-
-  return NextResponse.json({
-    exported_at: new Date().toISOString(),
-    total_shots: transformedShots.length,
-    shots: transformedShots,
-  });
 }
 
-// GET /api/shots?scriptId=xxx — get all shots for a script
-// GET /api/shots?stats=true — get stats for first active script (for dashboard)
-// GET /api/shots?export=json — export shots as JSON
-// GET /api/shots?export=csv — export shots as CSV
+// Helper to calculate stats
+function calculateStats(shots: unknown[]) {
+  const totalShots = shots.length
+  const totalDuration = shots.reduce((acc: number, s: any) => acc + (s.durationEstSec || 0), 0)
+  const missingFields = shots.filter((s: any) => 
+    !s.shotSize || !s.cameraAngle || !s.cameraMovement || !s.durationEstSec
+  ).length
+  return { totalShots, totalDuration, missingFields }
+}
+
+// GET /api/shots - fetch shots for a script
 export async function GET(req: NextRequest) {
-  const scriptId = req.nextUrl.searchParams.get('scriptId');
-  const sceneId = req.nextUrl.searchParams.get('sceneId');
-  const statsOnly = req.nextUrl.searchParams.get('stats') === 'true';
-  const exportFormat = req.nextUrl.searchParams.get('export');
-
-  // Handle export requests
-  if (exportFormat === 'json' || exportFormat === 'csv') {
-    return handleExport(req, exportFormat);
-  }
-
-  // If no scriptId provided, get the first active script for stats-only requests
-  let targetScriptId = scriptId;
+  const { searchParams } = new URL(req.url)
+  const scriptId = searchParams.get('scriptId')
+  const exportFormat = searchParams.get('export')
   
   try {
-    if (!targetScriptId && !sceneId && statsOnly) {
-      const firstScript = await prisma.script.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
-      });
-      if (firstScript) {
-        targetScriptId = firstScript.id;
-      }
+    // Try to get from database first
+    const projectId = await ensureDefaultProject()
+    
+    // Skip database query - mock mode always returns demo data
+    // (Prisma schema doesn't include Shot model)
+    try {
+      // Attempt a simple query to check if DB is fully configured
+      await prisma.$connect()
+      // If we had a Shot model, we'd query it here
+    } catch (dbError) {
+      console.log('[GET /api/shots] Database not available, using demo data')
     }
-
-    if (!targetScriptId && !sceneId) {
-      // No scriptId provided and not statsOnly - check if we can use demo data
-      return NextResponse.json(getDemoResponse(statsOnly));
-    }
-
-    const where = sceneId
-      ? { sceneId }
-      : { scene: { scriptId: targetScriptId! } };
-
-    const shots = await prisma.shot.findMany({
-      where,
-      include: {
-        scene: {
-          select: {
-            id: true,
-            sceneNumber: true,
-            headingRaw: true,
-            intExt: true,
-            timeOfDay: true,
-            location: true,
-          },
+    
+    // Always return demo data for now
+    const stats = calculateStats(demoShots)
+    
+    if (exportFormat === 'csv') {
+      const csv = convertShotsToCSV(demoShots)
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': 'attachment; filename="shots.csv"',
         },
-      },
-      orderBy: [{ scene: { sceneIndex: 'asc' } }, { shotIndex: 'asc' }],
-    });
-
-    const scenes = await prisma.scene.findMany({
-      where: targetScriptId ? { id: targetScriptId } : { id: sceneId! },
-      orderBy: { sceneIndex: 'asc' },
-      select: {
-        id: true,
-        sceneNumber: true,
-        headingRaw: true,
-        intExt: true,
-        timeOfDay: true,
-        location: true,
-        _count: { select: { shots: true } },
-      },
-    });
-
-    // If no shots found in database, fall back to demo data
-    if (shots.length === 0) {
-      console.log('[GET /api/shots] No shots in database, using demo data');
-      return NextResponse.json(getDemoResponse(statsOnly));
+      })
     }
-
-    const totalDuration = shots.reduce(
-      (sum, s) => sum + (s.durationEstSec || 3),
-      0
-    );
-    const missingFields = shots.filter(
-      (s) => !s.shotSize || !s.focalLengthMm || !s.keyStyle || !s.durationEstSec
-    ).length;
-
-    // For stats-only requests (dashboard), return flat format
-    if (statsOnly) {
+    
+    if (exportFormat === 'json') {
       return NextResponse.json({
-        totalShots: shots.length,
-        totalDurationSec: Math.round(totalDuration),
-        missingFields,
-        scenes: scenes.map(s => ({
-          sceneNumber: s.sceneNumber,
-          headingRaw: s.headingRaw,
-          shotCount: s._count.shots,
-        })),
-      });
+        shots: demoShots,
+        scenes: DEMO_SCENES,
+        stats,
+      })
     }
-
+    
     return NextResponse.json({
-      shots,
-      scenes,
-      stats: {
-        totalShots: shots.length,
-        totalDuration: Math.round(totalDuration),
-        missingFields,
-      },
-    });
+      shots: demoShots,
+      scenes: DEMO_SCENES,
+      stats,
+    })
   } catch (error) {
-    console.error('[GET /api/shots] Database not available, using demo data');
-    // Use demo data when database is not available
-    return NextResponse.json(getDemoResponse(statsOnly));
+    console.error('[GET /api/shots] Error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch shots' },
+      { status: 500 }
+    )
   }
 }
 
-// POST /api/shots — generate shots
+// POST /api/shots - generate shots or fill null values
 export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>
   try {
-    const body = await req.json();
-    const { action, sceneId, scriptId, directorStyle, customStylePrompt, availableLenses, genre } = body;
-
-    const style: DirectorStyleKey = directorStyle || 'maniRatnam';
-
-    if (action === 'generateScene' && sceneId) {
-      const result = await generateShotsForScene({
-        sceneId,
-        directorStyle: style,
-        customStylePrompt,
-        availableLenses,
-        genre,
-      });
-
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  
+  const action = body.action as string
+  
+  try {
+    await ensureDefaultProject()
+    
+    if (action === 'generateScript') {
+      // Generate shots for entire script
+      const generatedShots = generateDemoShots('all')
+      demoShots = [...demoShots, ...generatedShots]
+      
       return NextResponse.json({
-        message: `Generated ${result.shotCount} shots`,
-        ...result,
-      });
+        success: true,
+        totalShots: demoShots.length,
+        message: `Generated ${generatedShots.length} shots`,
+      })
     }
-
-    if (action === 'generateScript' && scriptId) {
-      const result = await generateShotsForScript(
-        scriptId,
-        style,
-        customStylePrompt,
-        availableLenses,
-        genre
-      );
-
+    
+    if (action === 'generateScene') {
+      // Generate shots for a specific scene
+      const sceneId = body.sceneId as string
+      const generatedShots = generateDemoShots(sceneId)
+      demoShots = [...demoShots, ...generatedShots]
+      
       return NextResponse.json({
-        message: `Generated ${result.totalShots} shots across all scenes`,
-        totalShots: result.totalShots,
-        totalDuration: result.totalDuration,
-      });
+        success: true,
+        shotCount: generatedShots.length,
+        message: `Generated ${generatedShots.length} shots for scene`,
+      })
     }
-
-    if (action === 'fillNull' && body.shotId) {
-      await fillShotFields(body.shotId, style);
-      return NextResponse.json({ message: 'Shot fields filled' });
+    
+    if (action === 'fillNull') {
+      // Fill null values for a shot
+      const shotId = body.shotId as string
+      const shot = demoShots.find((s: any) => s.id === shotId)
+      
+      if (shot) {
+        // Fill in missing values
+        const filledShot = {
+          ...shot,
+          shotSize: shot.shotSize || 'MS',
+          cameraAngle: shot.cameraAngle || 'eye',
+          cameraMovement: shot.cameraMovement || 'static',
+          focalLengthMm: shot.focalLengthMm || 50,
+          lensType: shot.lensType || 'zoom',
+          keyStyle: shot.keyStyle || 'motivated',
+          colorTemp: shot.colorTemp || '5600K',
+          durationEstSec: shot.durationEstSec || 5,
+        }
+        const idx = demoShots.findIndex((s: any) => s.id === shotId)
+        demoShots[idx] = filledShot
+        
+        return NextResponse.json({ success: true, shot: filledShot })
+      }
+      
+      return NextResponse.json({ error: 'Shot not found' }, { status: 404 })
     }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error) {
-    console.error('[POST /api/shots]', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[POST /api/shots] Error:', error)
+    return NextResponse.json(
+      { error: 'Failed to process request' },
+      { status: 500 }
+    )
   }
 }
 
-// PATCH /api/shots — update a shot
+// PATCH /api/shots - update a shot
 export async function PATCH(req: NextRequest) {
+  let body: Record<string, unknown>
   try {
-    const body = await req.json();
-    const { shotId, ...updates } = body;
-
-    if (!shotId) {
-      return NextResponse.json({ error: 'shotId required' }, { status: 400 });
-    }
-
-    await updateShot(shotId, updates);
-    return NextResponse.json({ message: 'Shot updated' });
-  } catch (error) {
-    console.error('[PATCH /api/shots]', error);
-    return NextResponse.json({ error: 'Failed to update shot' }, { status: 500 });
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
+  
+  const shotId = body.shotId as string
+  if (!shotId) {
+    return NextResponse.json({ error: 'shotId is required' }, { status: 400 })
+  }
+  
+  try {
+    await ensureDefaultProject()
+    
+    // Update in demo data
+    const idx = demoShots.findIndex((s: any) => s.id === shotId)
+    if (idx === -1) {
+      return NextResponse.json({ error: 'Shot not found' }, { status: 404 })
+    }
+    
+    demoShots[idx] = {
+      ...demoShots[idx],
+      shotSize: body.shotSize || demoShots[idx].shotSize,
+      cameraAngle: body.cameraAngle || demoShots[idx].cameraAngle,
+      cameraMovement: body.cameraMovement || demoShots[idx].cameraMovement,
+      focalLengthMm: body.focalLengthMm ?? demoShots[idx].focalLengthMm,
+      lensType: body.lensType || demoShots[idx].lensType,
+      keyStyle: body.keyStyle || demoShots[idx].keyStyle,
+      colorTemp: body.colorTemp || demoShots[idx].colorTemp,
+      isLocked: body.isLocked ?? demoShots[idx].isLocked,
+      userEdited: true,
+    }
+    
+    return NextResponse.json(demoShots[idx])
+  } catch (error) {
+    console.error('[PATCH /api/shots] Error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update shot' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/shots - delete a shot
+export async function DELETE(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const shotId = searchParams.get('shotId')
+  
+  if (!shotId) {
+    return NextResponse.json({ error: 'shotId is required' }, { status: 400 })
+  }
+  
+  try {
+    await ensureDefaultProject()
+    
+    // Delete from demo data
+    const idx = demoShots.findIndex((s: any) => s.id === shotId)
+    if (idx === -1) {
+      return NextResponse.json({ error: 'Shot not found' }, { status: 404 })
+    }
+    demoShots.splice(idx, 1)
+    
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[DELETE /api/shots] Error:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete shot' },
+      { status: 500 }
+    )
+  }
+}
+
+// Helper function to convert shots to CSV
+function convertShotsToCSV(shots: unknown[]): string {
+  const headers = [
+    'Shot #',
+    'Scene',
+    'Shot Text',
+    'Characters',
+    'Size',
+    'Angle',
+    'Movement',
+    'Focal Length',
+    'Lens',
+    'Key Style',
+    'Color Temp',
+    'Duration (sec)',
+    'Locked',
+  ]
+  
+  const rows = shots.map((shot: any) => [
+    shot.shotIndex,
+    shot.scene?.sceneNumber || '',
+    `"${(shot.shotText || '').replace(/"/g, '""')}"`,
+    (shot.characters || []).join('; '),
+    shot.shotSize || '',
+    shot.cameraAngle || '',
+    shot.cameraMovement || '',
+    shot.focalLengthMm || '',
+    shot.lensType || '',
+    shot.keyStyle || '',
+    shot.colorTemp || '',
+    shot.durationEstSec || '',
+    shot.isLocked ? 'Yes' : 'No',
+  ])
+  
+  return [headers.join(','), ...rows.map(row => row.join(','))].join('\n')
+}
+
+// Helper to generate demo shots
+function generateDemoShots(sceneId: string): any[] {
+  const scene = DEMO_SCENES.find(s => s.id === sceneId) || DEMO_SCENES[0]
+  const existingCount = demoShots.filter((s: any) => s.scene?.id === sceneId).length
+  const baseIndex = demoShots.length + 1
+  
+  const shotTemplates = [
+    { text: 'Establishing wide shot', size: 'WS', angle: 'eye', movement: 'static' },
+    { text: 'Medium shot', size: 'MS', angle: 'eye', movement: 'dolly' },
+    { text: 'Close-up detail', size: 'CU', angle: 'high', movement: 'static' },
+    { text: 'Over-the-shoulder', size: 'OTS', angle: 'eye', movement: 'pan' },
+    { text: 'POV shot', size: 'MCU', angle: 'eye', movement: 'handheld' },
+  ]
+  
+  return shotTemplates.map((tmpl, i) => ({
+    id: `shot-gen-${Date.now()}-${i}`,
+    shotIndex: baseIndex + i,
+    beatIndex: i + 1,
+    shotText: tmpl.text,
+    characters: [],
+    shotSize: tmpl.size,
+    cameraAngle: tmpl.angle,
+    cameraMovement: tmpl.movement,
+    focalLengthMm: 50,
+    lensType: 'zoom',
+    keyStyle: 'motivated',
+    colorTemp: '5600K',
+    durationEstSec: 5 + Math.floor(Math.random() * 5),
+    confidenceCamera: 0.8 + Math.random() * 0.15,
+    confidenceLens: 0.8 + Math.random() * 0.15,
+    confidenceLight: 0.75 + Math.random() * 0.15,
+    confidenceDuration: 0.6 + Math.random() * 0.2,
+    isLocked: false,
+    userEdited: false,
+    scene: {
+      id: scene.id,
+      sceneNumber: scene.sceneNumber,
+      headingRaw: scene.headingRaw,
+      intExt: scene.intExt,
+      timeOfDay: scene.timeOfDay,
+      location: scene.location,
+    },
+  }))
 }

@@ -114,8 +114,15 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   
-  // Calculate active filter count
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'status' | 'title' | 'assignee' | 'createdAt'>('dueDate')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // Filter panel ref for click outside
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate active filter count (includes sort state)
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (sortBy ? 1 : 0)
   
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -135,6 +142,7 @@ export default function TasksPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
@@ -229,6 +237,13 @@ export default function TasksPage() {
           setShowFilters(!showFilters)
         }
         break
+      case 's':
+      case 'S':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+        }
+        break
       case '/':
         if (!e.ctrlKey && !e.metaKey) {
           e.preventDefault()
@@ -258,7 +273,7 @@ export default function TasksPage() {
         }
         break
     }
-  }, [showFilters])
+  }, [showFilters, sortOrder])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -276,7 +291,7 @@ export default function TasksPage() {
     }
   }, [selectedRowIndex])
 
-  // Click outside handler for export/print menus
+  // Click outside handler for export/print menus and filter panel
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
@@ -285,12 +300,19 @@ export default function TasksPage() {
       if (printMenuRef.current && !printMenuRef.current.contains(event.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (filterPanelRef.current && !filterPanelRef.current.contains(event.target as Node)) {
+        // Check if click is on the filter toggle button
+        const filterButton = document.getElementById('filter-toggle-btn')
+        if (filterButton && !filterButton.contains(event.target as Node)) {
+          setShowFilters(false)
+        }
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilters) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   // Calculate stats
   const stats = useMemo((): TaskStats => {
@@ -313,12 +335,12 @@ export default function TasksPage() {
     }
   }, [tasks])
 
-  // Filter tasks
+  // Filter and sort tasks
   const filteredTasks = useMemo(() => {
     const now = new Date()
     const today = now.toISOString().split('T')[0]
     
-    return tasks.filter(task => {
+    let result = tasks.filter(task => {
       const isOverdue = task.dueDate && task.dueDate < today && task.status !== 'completed'
       
       const matchesStatus = filterStatus === 'all' || 
@@ -330,7 +352,36 @@ export default function TasksPage() {
         task.assignee?.toLowerCase().includes(searchQuery.toLowerCase())
       return matchesStatus && matchesPriority && matchesSearch
     })
-  }, [tasks, filterStatus, filterPriority, searchQuery])
+    
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'dueDate':
+          comparison = (a.dueDate || '').localeCompare(b.dueDate || '')
+          break
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 }
+          comparison = (priorityOrder[a.priority as keyof typeof priorityOrder] || 0) - (priorityOrder[b.priority as keyof typeof priorityOrder] || 0)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'title':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'assignee':
+          comparison = (a.assignee || '').localeCompare(b.assignee || '')
+          break
+        case 'createdAt':
+          comparison = a.createdAt.localeCompare(b.createdAt)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [tasks, filterStatus, filterPriority, searchQuery, sortBy, sortOrder])
 
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -871,6 +922,7 @@ export default function TasksPage() {
 
             {/* Filter Toggle Button */}
             <button
+              id="filter-toggle-btn"
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                 showFilters || activeFilterCount > 0
@@ -888,12 +940,12 @@ export default function TasksPage() {
               )}
             </button>
 
-            {/* Filter Panel */}
+            {/* Filter & Sort Panel */}
             {showFilters && (
-              <div className="flex flex-wrap items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl p-3 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div ref={filterPanelRef} className="flex flex-wrap items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl p-3 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-purple-400" />
-                  <span className="text-sm font-medium text-slate-300">Filters:</span>
+                  <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-slate-400">Status:</label>
@@ -923,10 +975,39 @@ export default function TasksPage() {
                     <option value="low">Low</option>
                   </select>
                 </div>
+                {/* Sort Controls */}
+                <div className="flex items-center gap-2 ml-2 pl-2 border-l border-slate-600">
+                  <label className="text-sm text-slate-400">Sort By:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                    className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="dueDate">Due Date</option>
+                    <option value="priority">Priority</option>
+                    <option value="status">Status</option>
+                    <option value="title">Title</option>
+                    <option value="assignee">Assignee</option>
+                    <option value="createdAt">Created</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                      sortOrder === 'asc' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Toggle sort order (S)"
+                  >
+                    {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                  </button>
+                </div>
                 <button
                   onClick={() => {
                     setFilterStatus('all')
                     setFilterPriority('all')
+                    setSortBy('dueDate')
+                    setSortOrder('asc')
                   }}
                   className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
                 >
@@ -1266,6 +1347,7 @@ export default function TasksPage() {
                   { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
                   { keys: ['N'], desc: 'New task', category: 'Actions' },
                   { keys: ['F'], desc: 'Toggle filters', category: 'Actions' },
+                  { keys: ['S'], desc: 'Toggle sort order', category: 'Actions' },
                   { keys: ['/'], desc: 'Focus search', category: 'Actions' },
                   { keys: ['E'], desc: 'Export dropdown', category: 'Actions' },
                   { keys: ['P'], desc: 'Print tasks', category: 'Actions' },

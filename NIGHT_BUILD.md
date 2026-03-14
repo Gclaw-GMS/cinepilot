@@ -1,5 +1,43 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (5:30 AM) - Tasks & Weather Page Lint Fixes Complete
+
+## Night Build (5:30 AM) - Tasks & Weather Page Lint Fixes (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Tasks Page - Unnecessary Dependency Fix**: Fixed unnecessary dependency warning for tasks.length in keyboard handler
+  - **Removed tasks.length**: Removed from useCallback dependency array since count is derived from DOM
+  - **Lint Warning Resolved**: No more warning for app/tasks/page.tsx
+
+- **Weather Page - Missing Dependencies Fix**: Fixed missing dependencies warning for selectedHourlyDate and weatherData.forecast
+  - **Updated dependency array**: Changed from weatherData?.forecast?.length to weatherData?.forecast
+  - **Lint Warning Resolved**: No more warning for app/weather/page.tsx
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 2 page files fixed ✅
+- **Tests:** Passing ✅
+
+### Tasks Page Lint Fix Checklist
+- [x] Feature works 100% (keyboard shortcuts work correctly)
+- [x] React hooks patterns correct (proper dependencies)
+- [x] Code follows existing patterns
+- [x] Build passes
+- [x] Tests pass
+- [x] Error handling complete
+
+### Weather Page Lint Fix Checklist
+- [x] Feature works 100% (hourly weather fetches correctly)
+- [x] React hooks patterns correct (proper dependencies)
+- [x] Code follows existing patterns
+- [x] Build passes
+- [x] Tests pass
+- [x] Error handling complete
+
+---
+
 ## Build Status: ✅ PASSING (5:04 AM) - Schedule Page Lint Fix Complete
 
 ---

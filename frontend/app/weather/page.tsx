@@ -741,7 +741,7 @@ export default function WeatherPage() {
         fetchHourlyWeather(selectedLocation, weatherData.forecast[0].date);
       }
     }
-  }, [viewMode, selectedLocation, weatherData?.forecast?.length, fetchHourlyWeather]);
+  }, [viewMode, selectedLocation, selectedHourlyDate, weatherData?.forecast, fetchHourlyWeather]);
 
   // Fetch hourly data when date changes
   useEffect(() => {

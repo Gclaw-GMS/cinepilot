@@ -900,6 +900,7 @@ export default function StoryboardPage() {
                           ) : frame.status === 'failed' ? (
                             <div className="text-red-500 text-sm">Generation failed</div>
                           ) : frame.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={frame.imageUrl}
                               alt={`Shot ${frame.shot.shotIndex + 1}`}

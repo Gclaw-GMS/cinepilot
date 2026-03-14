@@ -35,6 +35,7 @@ export const LocationScoutCard: React.FC<LocationScoutCardProps> = ({ location, 
     >
       <div className="relative h-40 bg-gray-700">
         {location.photos?.[0] ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={location.photos[0]} alt={location.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-500">

@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import Sidebar from './sidebar'
 import ChatWidget from './components/ChatWidget'
+import KeyboardShortcuts from './components/KeyboardShortcuts'
 
 // Force dynamic rendering for all pages to ensure fresh data
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,7 @@ export default function RootLayout({
           </main>
         </div>
         <ChatWidget />
+        <KeyboardShortcuts />
       </body>
     </html>
   )

@@ -215,9 +215,32 @@ export default function Sidebar() {
         ))}
       </nav>
 
+      {/* Keyboard Shortcuts Footer */}
+      <div className="p-3 border-t border-slate-800 bg-slate-800/30">
+        <div className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider">Quick Shortcuts</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="flex items-center justify-between text-[10px] text-slate-500">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-indigo-400 font-mono">1-9</kbd>
+            <span>Quick Nav</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-slate-500">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-indigo-400 font-mono">G</kbd>
+            <span>Go to</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-slate-500">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-indigo-400 font-mono">/</kbd>
+            <span>Search</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-slate-500">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-indigo-400 font-mono">?</kbd>
+            <span>Help</span>
+          </div>
+        </div>
+      </div>
+
       {/* Footer */}
       <div className="p-4 border-t border-slate-800">
-        <div className="text-xs text-slate-600 text-center">CinePilot v1.0</div>
+        <div className="text-xs text-slate-600 text-center">CinePilot v1.0 • Night Build</div>
       </div>
     </aside>
   )

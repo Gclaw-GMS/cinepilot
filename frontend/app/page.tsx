@@ -154,6 +154,12 @@ export default function Dashboard() {
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchStatsRef = useRef<() => void>(() => {})
+  const dbStatusRef = useRef(dbStatus)
+
+  // Update dbStatusRef when dbStatus changes
+  useEffect(() => {
+    dbStatusRef.current = dbStatus;
+  }, [dbStatus]);
 
   // Check database connection status
   const checkDbStatus = useCallback(async () => {
@@ -216,7 +222,7 @@ export default function Dashboard() {
       )
 
       // Check database status - if disconnected, always use demo mode
-      if (dbStatus === 'disconnected') {
+      if (dbStatusRef.current === 'disconnected') {
         console.log('[Dashboard] Database disconnected, using demo stats')
         setStats(DEMO_STATS)
         setIsDemoMode(true)

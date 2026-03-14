@@ -103,6 +103,8 @@ export default function ContinuityPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
+  const selectedScriptRef = useRef(selectedScript);
+  const printContinuityReportRef = useRef<() => void>();
   
   // Historical and breakdown data
   const [historicalData] = useState(DEMO_HISTORICAL_DATA);
@@ -186,13 +188,17 @@ export default function ContinuityPage() {
   }, [stats]);
 
   useEffect(() => {
+    selectedScriptRef.current = selectedScript;
+  }, [selectedScript]);
+
+  useEffect(() => {
     fetch('/api/scripts')
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : data.scripts || [];
         setScripts(list);
         // Auto-select first script and load demo data
-        if (list.length > 0 && !selectedScript) {
+        if (list.length > 0 && !selectedScriptRef.current) {
           setSelectedScript(list[0].id);
         }
       })
@@ -277,7 +283,7 @@ export default function ContinuityPage() {
         case 'p':
           e.preventDefault();
           if (warnings.length > 0) {
-            printContinuityReport();
+            printContinuityReportRef.current?.();
           }
           break;
         case 'f':
@@ -580,6 +586,12 @@ export default function ContinuityPage() {
       printWindow.document.close()
     }
   }
+
+  // Update refs for keyboard shortcuts
+  useEffect(() => {
+    printContinuityReportRef.current = printContinuityReport;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">

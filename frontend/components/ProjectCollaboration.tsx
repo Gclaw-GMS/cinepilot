@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { collaboration, type Activity, type ProjectTask, type ProjectExpenses } from '@/lib/api'
 
 interface ProjectCollaborationProps {
@@ -15,9 +15,10 @@ export default function ProjectCollaboration({ projectId }: ProjectCollaboration
   const [expenses, setExpenses] = useState<ProjectExpenses | null>(null)
   const [loading, setLoading] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', assigned_to: '', due_date: '' })
+  const loadDataRef = useRef<() => void | Promise<void>>()
 
   useEffect(() => {
-    loadData()
+    loadDataRef.current?.()
   }, [projectId, activeTab])
 
   const loadData = useCallback(async () => {
@@ -35,6 +36,11 @@ export default function ProjectCollaboration({ projectId }: ProjectCollaboration
     }
     setLoading(false)
   }, [projectId, activeTab])
+
+  // Update ref for useEffect
+  useEffect(() => {
+    loadDataRef.current = loadData;
+  }, [loadData]);
 
   const handleCreateTask = async () => {
     if (!newTask.title) return

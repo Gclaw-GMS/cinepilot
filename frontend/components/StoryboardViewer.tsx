@@ -74,6 +74,7 @@ export const StoryboardViewer: React.FC<StoryboardViewerProps> = ({
                 >
                   <div className="aspect-video bg-gray-700 relative">
                     {frame.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={frame.image_url} alt={`Shot ${frame.shot_number}`} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-500">
@@ -107,6 +108,7 @@ export const StoryboardViewer: React.FC<StoryboardViewerProps> = ({
                 >
                   <div className="aspect-video bg-gray-700">
                     {frame.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={frame.image_url} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">

@@ -151,7 +151,7 @@ export default function CollaborationPage() {
         case 'r':
           e.preventDefault()
           setRefreshing(true)
-          fetchData().finally(() => setRefreshing(false))
+          fetchDataRef.current?.().finally(() => setRefreshing(false))
           break
         case '/':
           e.preventDefault()
@@ -193,7 +193,7 @@ export default function CollaborationPage() {
         case 'p':
           e.preventDefault()
           if (filteredMembersRef.current.length > 0) {
-            handlePrint()
+            handlePrintRef.current?.()
           }
           break
       }
@@ -361,8 +361,8 @@ export default function CollaborationPage() {
   }
 
   // Print function
-  const handlePrint = () => {
-    const membersToPrint = filteredMembers
+  const handlePrint = useCallback(() => {
+    const membersToPrint = filteredMembersRef.current
     const activeCount = membersToPrint.filter(m => m.status === 'active').length
     const busyCount = membersToPrint.filter(m => m.status === 'busy').length
     const offlineCount = membersToPrint.filter(m => m.status === 'offline').length
@@ -473,7 +473,19 @@ export default function CollaborationPage() {
       }
     }
     setShowPrintMenu(false)
-  }
+  }, [])
+
+  // Refs for keyboard shortcuts
+  const handlePrintRef = useRef(handlePrint)
+  const fetchDataRef = useRef(fetchData)
+  
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
+  
+  useEffect(() => {
+    fetchDataRef.current = fetchData
+  }, [fetchData])
 
   // Click outside handler for export menu, print menu and filter panel
   useEffect(() => {

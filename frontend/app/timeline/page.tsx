@@ -46,6 +46,7 @@ export default function TimelinePage() {
   
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -60,6 +61,21 @@ export default function TimelinePage() {
   const exportingRef = useRef(exporting);
   const printingRef = useRef(printing);
   const showExportMenuRef = useRef(showExportMenu);
+  const showFiltersRef = useRef(showFilters);
+  const showPrintMenuRef = useRef(showPrintMenu);
+  
+  // Update refs when state changes
+  useEffect(() => {
+    showExportMenuRef.current = showExportMenu;
+  }, [showExportMenu]);
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters;
+  }, [showFilters]);
+  
+  useEffect(() => {
+    showPrintMenuRef.current = showPrintMenu;
+  }, [showPrintMenu]);
   
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
@@ -362,7 +378,7 @@ export default function TimelinePage() {
   
   useEffect(() => {
     showExportMenuRef.current = showExportMenu;
-  }, [showExportMenu]);
+  }, [showExportMenu, showFilters]);
 
   // Keyboard shortcuts handler
   useEffect(() => {
@@ -389,15 +405,19 @@ export default function TimelinePage() {
         case '3':
           setViewMode('calendar');
           break;
+        case 'f':
+          e.preventDefault();
+          setShowFilters(s => !s);
+          break;
         case '?':
           setShowKeyboardHelp(true);
           break;
         case 'escape':
           setShowKeyboardHelp(false);
           setSearchQuery('');
-          setShowFilters(false);
-          setShowExportMenu(false);
-          setShowPrintMenu(false);
+          setShowFilters(() => false);
+          setShowExportMenu(() => false);
+          setShowPrintMenu(() => false);
           break;
         case 'e':
           if (!exportingRef.current) {
@@ -416,19 +436,27 @@ export default function TimelinePage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Click outside to close export menu
+  // Click outside to close menus and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+      if (showExportMenuRef.current && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setShowExportMenu(false)
       }
-      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+      if (showPrintMenuRef.current && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
+      }
+      if (showFiltersRef.current && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button itself
+        const filterButton = document.getElementById('timeline-filter-toggle');
+        if (filterButton && filterButton.contains(e.target as Node)) {
+          return;
+        }
+        setShowFilters(() => false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [])
 
   const projectOptions = DEMO_PROJECTS;
 
@@ -639,6 +667,7 @@ export default function TimelinePage() {
 
               {/* Filters */}
               <button
+                id="timeline-filter-toggle"
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   showFilters || activeFilterCount > 0 ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -741,6 +770,7 @@ export default function TimelinePage() {
           <AnimatePresence>
             {showFilters && (
               <motion.div
+                ref={filterPanelRef}
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}

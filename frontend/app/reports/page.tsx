@@ -95,6 +95,8 @@ export default function ReportsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [tabFilter, setTabFilter] = useState<string>('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const fetchReportRef = useRef<() => void | Promise<void>>()
+  const handlePrintRef = useRef<() => void>()
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -123,6 +125,11 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchReport() }, [fetchReport])
 
+  // Update refs for keyboard shortcuts
+  useEffect(() => {
+    fetchReportRef.current = fetchReport;
+  }, [fetchReport]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -134,7 +141,7 @@ export default function ReportsPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          fetchReport()
+          fetchReportRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -170,7 +177,7 @@ export default function ReportsPage() {
           break
         case 'p':
           e.preventDefault()
-          if (reportData) handlePrint()
+          if (reportData) handlePrintRef.current?.()
           break
         case 'g':
           e.preventDefault()
@@ -300,7 +307,7 @@ export default function ReportsPage() {
     setExporting(false)
   }
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     if (!reportData) return
     setPrinting(true)
     setShowPrintMenu(false)
@@ -412,7 +419,12 @@ export default function ReportsPage() {
       printWindow.print()
     }
     setPrinting(false)
-  }
+  }, [reportData, setPrinting, setShowPrintMenu])
+
+  // Update ref for keyboard shortcuts
+  useEffect(() => {
+    handlePrintRef.current = handlePrint;
+  }, [handlePrint]);
 
   const budgetData = reportData ? [
     { name: 'Budget', value: reportData.production.budget },

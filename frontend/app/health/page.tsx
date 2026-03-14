@@ -326,7 +326,7 @@ export default function HealthPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -385,6 +385,12 @@ export default function HealthPage() {
     setRefreshing(true)
     fetchHealth()
   }, [fetchHealth])
+
+  // Ref for keyboard shortcut access
+  const handleRefreshRef = useRef(handleRefresh)
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
 
   useEffect(() => { 
     fetchHealth()

@@ -178,6 +178,12 @@ export default function CensorPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  
+  // Refs for keyboard shortcut state access
+  const analysisRef = useRef(analysis)
+  const showFiltersRef = useRef(showFilters)
+  const showExportDropdownRef = useRef(showExportDropdown)
+  const handlePrintRef = useRef<() => void>(() => {})
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -198,16 +204,16 @@ export default function CensorPage() {
           break
         case 'f':
           e.preventDefault()
-          setShowFilters(!showFilters)
+          setShowFilters(!showFiltersRef.current)
           break
         case 'e':
           e.preventDefault()
-          setShowExportDropdown(!showExportDropdown)
+          setShowExportDropdown(!showExportDropdownRef.current)
           break
         case 'p':
           e.preventDefault()
-          if (analysis) {
-            handlePrint()
+          if (analysisRef.current) {
+            handlePrintRef.current?.()
           }
           break
         case '?':
@@ -229,6 +235,19 @@ export default function CensorPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Update refs when state changes
+  useEffect(() => {
+    analysisRef.current = analysis
+  }, [analysis])
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+  
+  useEffect(() => {
+    showExportDropdownRef.current = showExportDropdown
+  }, [showExportDropdown])
 
   // Click outside handlers
   useEffect(() => {
@@ -364,14 +383,15 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
   }
 
   // Print functionality
-  const handlePrint = () => {
-    if (!analysis) return
+  const handlePrint = useCallback(() => {
+    if (!analysisRef.current) return
 
     const timestamp = new Date().toLocaleString('en-GB', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     })
 
+    const analysis = analysisRef.current
     const certInfo = CERTIFICATE_INFO[analysis.predictedCertificate.replace(/\d+/g, '').trim()] || CERTIFICATE_INFO['UA']
 
     const html = `<!DOCTYPE html>
@@ -483,7 +503,12 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
     printWindow.document.close()
     printWindow.focus()
     setShowPrintMenu(false)
-  }
+  }, [])
+
+  // Update ref after handlePrint is defined
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
 
   const certInfo = analysis?.predictedCertificate 
     ? CERTIFICATE_INFO[analysis.predictedCertificate.replace(/\d+/g, '').trim()] || CERTIFICATE_INFO['UA']

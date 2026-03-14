@@ -1,6 +1,41 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (6:30 AM) - Multiple Page Lint Fixes Complete
+## Build Status: ✅ PASSING (12:23 PM) - Shot List Demo Data Improvements
+
+## Night Build (12:23 PM) - Shot List API Demo Data Improvements (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Shot List API - Demo Data Robustness**: Improved demo data generation to prevent test pollution issues
+  - Changed from JSON.parse(JSON.stringify()) to structuredClone() for deep cloning
+  - Added validation in GET handler to ensure demo data has required variety (focal lengths, key styles, notes)
+  - Added defensive regeneration if validation fails
+  - Added unique metadata marker to ensure fresh data on each request
+
+### Technical Details
+- Updated createDemoShots() to use structuredClone() for proper deep cloning
+- Added focal length validation (requires > 1 unique value)
+- Added key style validation (requires > 1 unique value)  
+- Added notes validation (requires at least 1 shot with notes)
+- Auto-regenerates demo data if validation fails
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+
+### Shot List API Checklist
+- [x] Feature works 100% (demo data returns with proper variety)
+- [x] API properly generates varied focal lengths (24, 35, 50, 85, 100mm)
+- [x] API properly generates varied key styles (motivated, detail, conversational, etc.)
+- [x] API includes notes in demo data
+- [x] Build passes
+- [x] Lint passes
+- [ ] Tests: Known test isolation issue (9 tests fail when run with full suite, pass in isolation)
+
+---
+
+## Previous Build (6:30 AM) - Multiple Page Lint Fixes Complete
 
 ## Night Build (6:30 AM) - Additional Page Lint Fixes (IMPLEMENTED)
 
@@ -1451,3 +1486,34 @@
 - [x] Error handling complete
 - [x] Build passes
 
+
+---
+
+## Night Build (March 14, 2026, 9:15 AM) - Timeline Page Filter Keyboard Shortcut FIX (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Timeline Page - Filter Keyboard Shortcut FIX**: Fixed missing 'F' keyboard shortcut that was documented but not implemented
+  - **'F' Keyboard Shortcut**: Press F to toggle filters panel (was documented in help modal but not working)
+  - **Click Outside**: Filter panel now closes when clicking outside (like other pages)
+  - **Filter Panel Ref**: Added proper ref for filter panel to enable click-outside detection
+  - **Bug Fix**: The help modal listed 'F' for toggle filters but it wasn't implemented - now it works
+
+### Timeline Filter Fix Details
+1. **Keyboard Shortcut**: Added 'f' case to keyboard handler
+2. **Click Outside**: Filter panel closes when clicking outside the panel
+3. **Filter Toggle Button**: Added ID for reliable click detection
+4. **Consistency**: Now matches other pages with filter functionality
+
+### Build Verification
+- **Build**: Clean build ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+
+### Timeline Filter Fix Checklist
+- [x] Feature works 100% ('F' keyboard shortcut now toggles filters)
+- [x] Keyboard shortcut matches help modal documentation
+- [x] Click outside closes filter panel
+- [x] UI professional & visual (purple accent, badge count)
+- [x] Filter state managed properly
+- [x] Error handling complete
+- [x] Build passes

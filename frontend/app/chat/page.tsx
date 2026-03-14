@@ -253,7 +253,7 @@ What would you like to know about your production?`,
     setExporting(false)
   }
 
-  const handlePrintChat = () => {
+  const handlePrintChat = useCallback(() => {
     const formatTime = (timestamp?: string) => {
       if (!timestamp) return ''
       return new Date(timestamp).toLocaleString('en-US', {
@@ -365,7 +365,19 @@ What would you like to know about your production?`,
       }
     }
     setShowPrintMenu(false)
-  }
+  }, [messages, context])
+
+  // Refs for keyboard shortcuts
+  const handlePrintChatRef = useRef(handlePrintChat)
+  const messagesLengthRef = useRef(messages.length)
+  
+  useEffect(() => {
+    handlePrintChatRef.current = handlePrintChat
+  }, [handlePrintChat])
+  
+  useEffect(() => {
+    messagesLengthRef.current = messages.length
+  }, [messages.length])
 
   const handlePrompt = (prompt: string) => {
     setInput(prompt)
@@ -428,8 +440,8 @@ What would you like to know about your production?`,
           break
         case 'p':
           e.preventDefault()
-          if (messages.length > 0) {
-            handlePrintChat()
+          if (messagesLengthRef.current > 0) {
+            handlePrintChatRef.current?.()
           }
           break
         case 'escape':

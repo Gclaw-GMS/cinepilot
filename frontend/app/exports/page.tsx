@@ -141,7 +141,7 @@ export default function ExportsPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -176,6 +176,12 @@ export default function ExportsPage() {
     setSelectedExports([])
     setTimeout(() => setRefreshing(false), 500)
   }, [])
+
+  // Ref for keyboard shortcut access
+  const handleRefreshRef = useRef(handleRefresh)
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
 
   // Count active filters
   const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length

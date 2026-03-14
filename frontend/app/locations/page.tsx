@@ -523,7 +523,7 @@ export default function LocationsPage() {
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilters])
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId)
   const filteredScenes = useMemo(() => {

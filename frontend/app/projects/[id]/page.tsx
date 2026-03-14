@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as api from '@/lib/api'
@@ -63,11 +63,13 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState('scenes')
   const [loading, setLoading] = useState(true)
 
+  const loadProjectDataRef = useRef<() => void | Promise<void>>()
+
   useEffect(() => {
-    loadProjectData()
+    loadProjectDataRef.current?.()
   }, [projectId])
 
-  const loadProjectData = async () => {
+  const loadProjectData = useCallback(async () => {
     setLoading(true)
     const projectIdStr = String(projectId)
     try {
@@ -93,7 +95,12 @@ export default function ProjectDetailPage() {
       setCrew(DEMO_CREW)
     }
     setLoading(false)
-  }
+  }, [projectId])
+
+  // Update ref for useEffect
+  useEffect(() => {
+    loadProjectDataRef.current = loadProjectData;
+  }, [loadProjectData]);
 
   const statusColors: Record<string, string> = {
     'planning': 'bg-blue-900 text-blue-400',

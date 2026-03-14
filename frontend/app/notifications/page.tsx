@@ -242,11 +242,17 @@ export default function NotificationsPage() {
   }, [fetchNotifications]);
 
   // Handle refresh with loading state
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     await fetchNotifications()
     setTimeout(() => setIsRefreshing(false), 500)
-  }
+  }, [fetchNotifications])
+
+  // Ref for keyboard shortcut access
+  const handleRefreshRef = useRef(handleRefresh)
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
 
   // Export functions
   const handleExportCSV = () => {
@@ -457,7 +463,7 @@ export default function NotificationsPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case '/':
           e.preventDefault()

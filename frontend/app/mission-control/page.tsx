@@ -83,7 +83,7 @@ function LiveTicker({ data }: { data: MissionControlData | null }) {
   const [tick, setTick] = useState(0)
   
   // Generate dynamic ticker messages based on data
-  const getMessages = () => {
+  const getMessages = useCallback(() => {
     if (!data) return []
     const msgs = []
     if (data.production.scenes.completed > 0) {
@@ -99,12 +99,12 @@ function LiveTicker({ data }: { data: MissionControlData | null }) {
       msgs.push({ time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), msg: data.risks[0].title, type: 'warning' as const })
     }
     return msgs
-  }
+  }, [data])
   
   useEffect(() => { 
     const i = setInterval(() => setTick(t => (t + 1) % Math.max(1, getMessages().length)), 4000)
     return () => clearInterval(i)
-  }, [data])
+  }, [getMessages])
   
   const messages = getMessages()
   const m = messages[tick % messages.length] || { time: '--:--', msg: 'Loading...', type: 'info' as const }
@@ -173,7 +173,7 @@ export default function MissionControl() {
       console.error('Mission control fetch error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load')
       // Use fallback data on error
-      if (!data) setData(FALLBACK_DATA)
+      setData(prev => prev || FALLBACK_DATA)
     } finally {
       setLoading(false)
       setRefreshing(false)

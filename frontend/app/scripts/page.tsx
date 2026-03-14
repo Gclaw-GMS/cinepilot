@@ -205,6 +205,12 @@ export default function ScriptsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => Promise<void>>()
+  const handlePrintRef = useRef<() => void>()
+
+  // Derived values (computed before use to avoid hook order issues)
+  const activeScript = scripts[0]
+  const scenes = activeScript?.scenes || []
+  const allVfx = scenes.flatMap(s => s.vfxNotes.map(v => ({ ...v, sceneNumber: s.sceneNumber })))
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -225,7 +231,7 @@ export default function ScriptsPage() {
           break
         case 'p':
           e.preventDefault()
-          handlePrint()
+          handlePrintRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -429,7 +435,7 @@ export default function ScriptsPage() {
   }
 
   // Print functionality
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     if (!activeScript || scenes.length === 0) return
 
     const printWindow = window.open('', '_blank')
@@ -530,7 +536,13 @@ export default function ScriptsPage() {
     setTimeout(() => {
       printWindow.print()
     }, 250)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Update ref for keyboard shortcuts
+  useEffect(() => {
+    handlePrintRef.current = handlePrint;
+  }, [handlePrint]);
 
   // Copy scene to clipboard
   const handleCopyScene = async (scene: SceneData) => {
@@ -576,12 +588,9 @@ Warnings: ${allWarnings.length}`
     }
   }
 
-  const activeScript = scripts[0]
-  const scenes = activeScript?.scenes || []
   const qualityAnalysis = analyses.find(a => a.analysisType === 'quality_score')
   const summaryAnalysis = analyses.find(a => a.analysisType === 'breakdown_summary')
   const allWarnings = scenes.flatMap(s => s.warnings.map(w => ({ ...w, sceneNumber: s.sceneNumber })))
-  const allVfx = scenes.flatMap(s => s.vfxNotes.map(v => ({ ...v, sceneNumber: s.sceneNumber })))
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()

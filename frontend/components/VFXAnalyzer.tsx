@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, CheckCircle, Film, DollarSign, Clock, Sparkles, RefreshCw, BarChart3 } from 'lucide-react';
 
@@ -73,6 +73,12 @@ export default function VFXAnalyzer({ scenes = [], scriptId }: VFXAnalyzerProps)
   const [scripts, setScripts] = useState<Script[]>([]);
   const [selectedScriptId, setSelectedScriptId] = useState<string>(scriptId || '');
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const selectedScriptIdRef = useRef(selectedScriptId);
+
+  // Update ref when selectedScriptId changes
+  useEffect(() => {
+    selectedScriptIdRef.current = selectedScriptId;
+  }, [selectedScriptId]);
 
   // Fetch available scripts on mount
   useEffect(() => {
@@ -82,7 +88,7 @@ export default function VFXAnalyzer({ scenes = [], scriptId }: VFXAnalyzerProps)
         const data = await res.json();
         if (data.scripts && data.scripts.length > 0) {
           setScripts(data.scripts);
-          if (!selectedScriptId) {
+          if (!selectedScriptIdRef.current) {
             setSelectedScriptId(data.scripts[0].id);
           }
         } else {

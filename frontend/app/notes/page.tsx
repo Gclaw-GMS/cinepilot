@@ -297,7 +297,7 @@ export default function NotesPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu, showFilterPanel])
+  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu, showFilterPanel, showPrintMenu])
 
   // Click outside to close export, print menus, and filter panel
   useEffect(() => {

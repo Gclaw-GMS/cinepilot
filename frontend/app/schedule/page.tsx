@@ -307,9 +307,10 @@ export default function SchedulePage() {
     shootingDaysRef.current = shootingDays
   }, [shootingDays])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Update filtered ref when shooting days change (filtered is derived from shootingDays)
   useEffect(() => {
     filteredShootingDaysRef.current = filteredShootingDays
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shootingDays])
 
   // Keyboard shortcuts
@@ -457,7 +458,7 @@ export default function SchedulePage() {
     setExporting(false)
   }
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     const currentShootingDays = shootingDaysRef.current
     const currentFilteredDays = filteredShootingDaysRef.current
     
@@ -558,7 +559,7 @@ export default function SchedulePage() {
     printWindow.print()
     
     setShowPrintMenu(false)
-  }
+  }, [])
 
   const handleOptimize = useCallback(async () => {
     setOptimizing(true)

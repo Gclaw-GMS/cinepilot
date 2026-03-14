@@ -70,6 +70,8 @@ export default function TravelExpensesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'category' | 'status' | 'vendor'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('dashboard')
 
   // Calculate active filter count using useMemo for efficiency
@@ -78,14 +80,17 @@ export default function TravelExpensesPage() {
     if (categoryFilter !== 'all') count++
     if (statusFilter !== 'all') count++
     if (searchQuery) count++
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++
     return count
-  }, [categoryFilter, statusFilter, searchQuery])
+  }, [categoryFilter, statusFilter, searchQuery, sortBy, sortOrder])
 
   // Clear all filters function
   const clearFilters = useCallback(() => {
     setCategoryFilter('all')
     setStatusFilter('all')
     setSearchQuery('')
+    setSortBy('date')
+    setSortOrder('desc')
   }, [])
 
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -168,12 +173,37 @@ export default function TravelExpensesPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showFilters])
 
-  const filteredExpenses = expenses.filter(e => {
-    const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter
-    const matchesStatus = statusFilter === 'all' || e.status === statusFilter
-    const matchesSearch = !searchQuery || e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.vendor?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesStatus && matchesSearch
-  })
+  const filteredExpenses = useMemo(() => {
+    const filtered = expenses.filter(e => {
+      const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter
+      const matchesStatus = statusFilter === 'all' || e.status === statusFilter
+      const matchesSearch = !searchQuery || e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.vendor?.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchesCategory && matchesStatus && matchesSearch
+    })
+    
+    // Apply sorting
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+          break
+        case 'amount':
+          comparison = a.amount - b.amount
+          break
+        case 'category':
+          comparison = a.category.localeCompare(b.category)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'vendor':
+          comparison = (a.vendor || '').localeCompare(b.vendor || '')
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [expenses, categoryFilter, statusFilter, searchQuery, sortBy, sortOrder])
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
   const pendingExpenses = expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + e.amount, 0)
@@ -347,7 +377,7 @@ export default function TravelExpensesPage() {
           total: expenses.filter(e => e.status === s.key).reduce((sum, e) => sum + e.amount, 0)
         }))
       },
-      filters: { search: searchQuery, category: categoryFilter, status: statusFilter },
+      filters: { search: searchQuery, category: categoryFilter, status: statusFilter, sortBy, sortOrder },
       expenses: filteredExpenses
     }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -434,6 +464,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); setShowExportMenu(!showExportMenu) }
       if (e.key === '?' || (e.shiftKey && e.key === '/')) { setShowHelp(true) }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
+      if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); searchInputRef.current?.focus() }
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         handleRefreshRef.current?.()
@@ -441,7 +472,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters])
+  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters, sortOrder])
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
   const getCategoryInfo = (category: string) => EXPENSE_CATEGORIES.find(c => c.key === category) || { key: category, label: category, icon: DollarSign, color: '#6b7280' }
@@ -616,7 +647,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
           )}
         </div>
 
-        {/* Collapsible Filter Panel */}
+        {/* Collapsible Filter & Sort Panel */}
         {showFilters && (
           <div 
             ref={filterPanelRef}
@@ -643,6 +674,28 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
                 <option value="all">All Status</option>
                 {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
               </select>
+              <div className="h-6 w-px bg-slate-600" />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-300">Sort by:</span>
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)} 
+                  className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="category">Category</option>
+                  <option value="status">Status</option>
+                  <option value="vendor">Vendor</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg flex items-center gap-1 transition-colors"
+                  title="Toggle sort order"
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -700,12 +753,20 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <table className="w-full">
                 <thead className="bg-slate-700/50">
                   <tr>
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm">Category</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm cursor-pointer hover:text-white transition-colors" onClick={() => { setSortBy('category'); setSortOrder(sortBy === 'category' && sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                      Category {sortBy === 'category' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                    </th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm">Description</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm">Person</th>
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm">Date</th>
-                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-sm">Amount</th>
-                    <th className="text-center px-4 py-3 text-slate-400 font-medium text-sm">Status</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm cursor-pointer hover:text-white transition-colors" onClick={() => { setSortBy('date'); setSortOrder(sortBy === 'date' && sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                      Date {sortBy === 'date' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                    </th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-sm cursor-pointer hover:text-white transition-colors" onClick={() => { setSortBy('amount'); setSortOrder(sortBy === 'amount' && sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                      Amount {sortBy === 'amount' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                    </th>
+                    <th className="text-center px-4 py-3 text-slate-400 font-medium text-sm cursor-pointer hover:text-white transition-colors" onClick={() => { setSortBy('status'); setSortOrder(sortBy === 'status' && sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                      Status {sortBy === 'status' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                    </th>
                     <th className="text-right px-4 py-3 text-slate-400 font-medium text-sm">Actions</th>
                   </tr>
                 </thead>
@@ -758,6 +819,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
             </div>
             <div className="p-4 space-y-3">
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Toggle sort order</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">S</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Refresh data</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">R</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Add new expense</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+N</kbd></div>

@@ -102,6 +102,12 @@ export default function ProgressPage() {
   const [filterPriority, setFilterPriority] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const progressRef = useRef(progress)
+
+  // Update progress ref when progress changes
+  useEffect(() => {
+    progressRef.current = progress
+  }, [progress])
 
   // Calculate active filter count
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)
@@ -477,7 +483,7 @@ export default function ProgressPage() {
           break
         case 'p':
           e.preventDefault()
-          if (progress) setShowPrintMenu(prev => !prev)
+          if (progressRef.current) setShowPrintMenu(prev => !prev)
           break
         case '?':
           e.preventDefault()

@@ -124,6 +124,7 @@ export default function CrewPage() {
   const printMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
+  const handlePrintRef = useRef<() => void>();
 
   const [form, setForm] = useState({
     name: '',
@@ -224,7 +225,7 @@ export default function CrewPage() {
           break
         case 'p':
           e.preventDefault()
-          handlePrint()
+          handlePrintRef.current?.()
           break
       }
     }
@@ -512,7 +513,7 @@ export default function CrewPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     const totalDailyRate = crew.reduce((sum, c) => {
       const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
       return sum + (isNaN(rate) ? 0 : rate)
@@ -603,7 +604,12 @@ export default function CrewPage() {
     printWindow.print()
     
     setShowPrintMenu(false)
-  }
+  }, [crew, filtered])
+
+  // Update handlePrint ref
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
 
   if (loading) {
     return (

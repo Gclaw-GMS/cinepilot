@@ -85,6 +85,7 @@ export default function DubbingPage() {
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  const printDubbingReportRef = useRef<() => void>()
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -114,7 +115,7 @@ export default function DubbingPage() {
         case 'p':
           e.preventDefault()
           if (dubbedVersions.length > 0) {
-            printDubbingReport()
+            printDubbingReportRef.current?.()
           }
           break
         case '?':
@@ -268,7 +269,7 @@ export default function DubbingPage() {
   }
 
   // Print function
-  const printDubbingReport = () => {
+  const printDubbingReport = useCallback(() => {
     if (dubbedVersions.length === 0) return
     
     const languageLabels: Record<string, string> = {
@@ -389,7 +390,12 @@ export default function DubbingPage() {
     printWindow.document.close()
     printWindow.print()
     setShowPrintMenu(false)
-  }
+  }, [dubbedVersions, preview])
+
+  // Update refs when functions change
+  useEffect(() => {
+    printDubbingReportRef.current = printDubbingReport
+  }, [printDubbingReport])
 
   useEffect(() => {
     if (selectedScriptId) {

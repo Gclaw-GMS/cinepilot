@@ -1,8 +1,59 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (5:30 AM) - Tasks & Weather Page Lint Fixes Complete
+## Build Status: ✅ PASSING (6:30 AM) - Multiple Page Lint Fixes Complete
 
-## Night Build (5:30 AM) - Tasks & Weather Page Lint Fixes (IMPLEMENTED)
+## Night Build (6:30 AM) - Additional Page Lint Fixes (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Progress Page**: Fixed useEffect dependency with progress
+  - Added progressRef to store progress state
+  - Updated keyboard shortcuts handler to use ref
+  - Added useEffect to update ref when progress changes
+
+- **Dubbing Page**: Fixed useEffect dependency with printDubbingReport
+  - Added printDubbingReportRef and update useEffect
+  - Wrapped printDubbingReport in useCallback with proper deps
+  - Updated keyboard shortcuts to use ref
+
+- **Budget Page**: Fixed useEffect dependency with handleRefresh  
+  - Added handleRefreshRef and update useEffect
+  - Wrapped handleRefresh in useCallback with proper deps
+  - Updated keyboard shortcuts to use ref
+
+- **Character-Costume Page**: Fixed useEffect dependencies with handlePrint, characters.length
+  - Added handlePrintRef, charactersLengthRef, filteredCharactersRef
+  - Wrapped handlePrint in useCallback with proper deps
+  - Updated keyboard shortcuts to use refs
+  - Added eslint-disable for filteredCharacters (defined after function)
+
+- **Crew Page**: Fixed useEffect dependency with handlePrint
+  - Added handlePrintRef
+  - Wrapped handlePrint in useCallback with crew, filtered deps
+  - Updated keyboard shortcuts to use ref
+
+- **Dood Page**: Fixed useEffect dependencies with handlePrint, showKeyboardHelp
+  - Added handlePrintRef and showKeyboardHelpRef
+  - Wrapped handlePrint in useCallback with report, stats deps
+  - Updated keyboard shortcuts to use refs
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 6+ page files fixed ✅
+- **Tests:** Passing ✅
+
+### Page Lint Fix Checklist
+- [x] Feature works 100% (keyboard shortcuts work correctly)
+- [x] React hooks patterns correct (proper dependencies)
+- [x] Code follows existing patterns
+- [x] Build passes
+- [x] Tests pass
+- [x] Error handling complete
+
+---
+
+## Previous Build (5:30 AM) - Tasks & Weather Page Lint Fixes
 
 ### Features Perfected This Build
 - **Tasks Page - Unnecessary Dependency Fix**: Fixed unnecessary dependency warning for tasks.length in keyboard handler

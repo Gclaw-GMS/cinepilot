@@ -139,6 +139,7 @@ export default function BudgetPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const handleRefreshRef = useRef<() => Promise<void>>()
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -401,7 +402,7 @@ export default function BudgetPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case '/':
           e.preventDefault()
@@ -494,7 +495,7 @@ export default function BudgetPage() {
     }
   }
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
       await fetchData()
@@ -503,7 +504,12 @@ export default function BudgetPage() {
     } finally {
       setRefreshing(false)
     }
-  }
+  }, [fetchData])
+
+  // Update handleRefresh ref when function changes
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
 
   const handleAddExpense = async () => {
     if (!newExpense.description || !newExpense.amount) {

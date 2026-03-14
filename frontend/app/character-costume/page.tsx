@@ -129,6 +129,9 @@ export default function CharacterCostumePage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  const handlePrintRef = useRef<() => void>()
+  const charactersLengthRef = useRef(characters.length)
+  const filteredCharactersRef = useRef<typeof characters>([])
 
   const fetchCharacters = useCallback(async () => {
     setLoading(true)
@@ -215,8 +218,8 @@ export default function CharacterCostumePage() {
         case 'p':
           if (!e.ctrlKey && !e.metaKey) {
             e.preventDefault()
-            if (characters.length > 0) {
-              handlePrint()
+            if (charactersLengthRef.current > 0) {
+              handlePrintRef.current?.()
             }
           }
           break
@@ -354,7 +357,7 @@ export default function CharacterCostumePage() {
   }
 
   // Print functionality
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     if (characters.length === 0) return
 
     const timestamp = new Date().toLocaleString('en-GB', {
@@ -493,7 +496,17 @@ export default function CharacterCostumePage() {
     printWindow.document.close()
     printWindow.focus()
     setShowPrintMenu(false)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characters, summary?.byRole, summary?.totalBudget])
+
+  // Update refs when values/functions change
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
+
+  useEffect(() => {
+    charactersLengthRef.current = characters.length
+  }, [characters.length])
 
   const handleEdit = (char: Character) => {
     setFormData({

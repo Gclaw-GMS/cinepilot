@@ -69,8 +69,19 @@ export default function StoryboardPage() {
   const [printing, setPrinting] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   
-  // Refs for keyboard shortcuts
+  // Refs for keyboard shortcuts and data
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const selectedScriptRef = useRef(selectedScript)
+  const scenesLengthRef = useRef(scenes.length)
+  const handleRefreshRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    selectedScriptRef.current = selectedScript
+  }, [selectedScript])
+
+  useEffect(() => {
+    scenesLengthRef.current = scenes.length
+  }, [scenes.length])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -81,7 +92,7 @@ export default function StoryboardPage() {
           title: sc.title,
         }))
         setScripts(s)
-        if (s.length > 0 && !selectedScript) setSelectedScript(s[0].id)
+        if (s.length > 0 && !selectedScriptRef.current) setSelectedScript(s[0].id)
       })
       .catch(console.error)
   }, [])
@@ -100,6 +111,18 @@ export default function StoryboardPage() {
       setLoading(false)
     }
   }, [selectedScript])
+
+  // Handle refresh with animation - MUST be before the useEffect that refs it
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    await fetchFrames()
+    setIsRefreshing(false)
+  }, [fetchFrames])
+
+  // Update ref after handleRefresh is defined
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh
+  }, [handleRefresh])
 
   // Export functions
   const handleExportCSV = () => {
@@ -345,13 +368,6 @@ export default function StoryboardPage() {
     fetchFrames()
   }, [fetchFrames])
 
-  // Handle refresh with animation
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    await fetchFrames()
-    setIsRefreshing(false)
-  }
-
   // Keyboard shortcuts handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -364,7 +380,7 @@ export default function StoryboardPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          handleRefreshRef.current?.()
           break
         case 'f':
           e.preventDefault()
@@ -396,7 +412,7 @@ export default function StoryboardPage() {
           break
         case 'p':
           e.preventDefault()
-          if (scenes.length > 0) {
+          if (scenesLengthRef.current > 0) {
             setShowPrintMenu(prev => !prev)
           }
           break

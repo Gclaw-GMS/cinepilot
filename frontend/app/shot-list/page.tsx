@@ -115,6 +115,10 @@ export default function ShotHubPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  const handleGenerateAllRef = useRef<() => Promise<void>>()
+  const handleSaveShotsRef = useRef<() => Promise<void>>()
+  const handlePrintRef = useRef<() => void>()
+  const printingRef = useRef(printing)
 
   const fetchScriptId = useCallback(async () => {
     try {
@@ -182,13 +186,13 @@ export default function ShotHubPage() {
         case 'g':
           e.preventDefault()
           if (scriptId && !generating) {
-            handleGenerateAll()
+            handleGenerateAllRef.current?.()
           }
           break
         case 's':
           e.preventDefault()
           if (!saving && shots.length > 0) {
-            handleSaveShots()
+            handleSaveShotsRef.current?.()
           }
           break
         case 'e':
@@ -216,8 +220,8 @@ export default function ShotHubPage() {
           break
         case 'p':
           e.preventDefault()
-          if (shots.length > 0 && !printing) {
-            handlePrint()
+          if (shots.length > 0 && !printingRef.current) {
+            handlePrintRef.current?.()
           }
           break
       }
@@ -248,7 +252,7 @@ export default function ShotHubPage() {
     }
   }, [showExportMenu, showPrintMenu, showFilterPanel])
 
-  const handleGenerateAll = async () => {
+  const handleGenerateAll = useCallback(async () => {
     if (!scriptId) return
     setGenerating(true)
     setError(null)
@@ -269,7 +273,7 @@ export default function ShotHubPage() {
     } finally {
       setGenerating(false)
     }
-  }
+  }, [scriptId, directorStyle, fetchShots])
 
   const handleGenerateScene = async (sceneId: string) => {
     setGenerating(true)
@@ -319,7 +323,7 @@ export default function ShotHubPage() {
     }
   }
 
-  const handleSaveShots = async () => {
+  const handleSaveShots = useCallback(async () => {
     setSaving(true)
     setSaveMessage(null)
     try {
@@ -351,7 +355,7 @@ export default function ShotHubPage() {
     setSaving(false)
     // Clear message after 3 seconds
     setTimeout(() => setSaveMessage(null), 3000)
-  }
+  }, [shots, scriptId, fetchShots])
 
   const handleExportShots = async (format: 'json' | 'csv' = 'json') => {
     setExporting(true)
@@ -504,6 +508,23 @@ export default function ShotHubPage() {
     
     setTimeout(() => setPrinting(false), 500);
   }, [shots, selectedSceneId, scenes]);
+
+  // Update refs for keyboard shortcuts (after functions are defined)
+  useEffect(() => {
+    handleGenerateAllRef.current = handleGenerateAll
+  }, [handleGenerateAll])
+
+  useEffect(() => {
+    handleSaveShotsRef.current = handleSaveShots
+  }, [handleSaveShots])
+
+  useEffect(() => {
+    handlePrintRef.current = handlePrint
+  }, [handlePrint])
+
+  useEffect(() => {
+    printingRef.current = printing
+  }, [printing])
 
   const filteredScenes = scenes.filter(s => {
     if (!sceneFilter) return true

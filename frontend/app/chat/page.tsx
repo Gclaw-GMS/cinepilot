@@ -26,7 +26,8 @@ import {
   Download,
   ChevronDown,
   X,
-  Printer
+  Printer,
+  Search
 } from 'lucide-react'
 
 type Message = {
@@ -67,10 +68,14 @@ export default function ChatPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const initialLoadDone = useRef(false)
 
   const scrollToBottom = useCallback(() => {
@@ -412,8 +417,14 @@ What would you like to know about your production?`,
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input/textarea
+      // Ignore if typing in input/textarea (but allow search input shortcuts)
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        // Allow Escape to close search when focused on search
+        if (e.key === 'Escape' && e.target === searchInputRef.current) {
+          e.preventDefault()
+          setShowSearch(false)
+          setSearchQuery('')
+        }
         return
       }
       
@@ -424,7 +435,8 @@ What would you like to know about your production?`,
           break
         case '/':
           e.preventDefault()
-          inputRef.current?.focus()
+          setShowSearch(true)
+          setTimeout(() => searchInputRef.current?.focus(), 50)
           break
         case '?':
           e.preventDefault()
@@ -444,18 +456,27 @@ What would you like to know about your production?`,
             handlePrintChatRef.current?.()
           }
           break
+        case 'f':
+          e.preventDefault()
+          setShowSearch(prev => !prev)
+          if (!showSearch) {
+            setTimeout(() => searchInputRef.current?.focus(), 50)
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowExportMenu(false)
           setShowPrintMenu(false)
+          setShowSearch(false)
+          setSearchQuery('')
           break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [showSearch])
 
   // Click outside to close export menu
   useEffect(() => {
@@ -497,6 +518,48 @@ What would you like to know about your production?`,
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Search */}
+              <div className="relative">
+                {showSearch ? (
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search messages..."
+                        className="w-64 pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        autoFocus
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setShowSearch(false); setSearchQuery('') }}
+                      className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 50) }}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                    title="Search messages (F)"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search
+                  </button>
+                )}
+              </div>
               <button 
                 onClick={fetchContext}
                 disabled={isRefreshing}
@@ -658,7 +721,16 @@ What would you like to know about your production?`,
         <div className="flex-1 flex flex-col">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.map((msg, idx) => (
+            {/* Search results info */}
+            {searchQuery && (
+              <div className="mb-4 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-sm text-indigo-300 flex items-center justify-between">
+                <span>Found {messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase())).length} results for "{searchQuery}"</span>
+                <button onClick={() => { setSearchQuery(''); setShowSearch(false) }} className="hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            {(searchQuery ? messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase())) : messages).map((msg, idx) => (
               <div
                 key={idx}
                 className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
@@ -798,6 +870,10 @@ What would you like to know about your production?`,
               </button>
             </div>
             <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                <span className="text-slate-300">Search messages</span>
+                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">F</kbd>
+              </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Refresh context</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">R</kbd>

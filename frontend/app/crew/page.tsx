@@ -136,6 +136,18 @@ export default function CrewPage() {
     notes: '',
   });
 
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'dailyRate'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Sort options for UI
+  const sortOptions = [
+    { key: 'name', label: 'Name' },
+    { key: 'role', label: 'Role' },
+    { key: 'department', label: 'Department' },
+    { key: 'dailyRate', label: 'Daily Rate' },
+  ];
+
   const fetchCrew = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -235,7 +247,7 @@ export default function CrewPage() {
   }, [modalOpen])
 
   const filtered = useMemo(() => {
-    return crew.filter((c) => {
+    const filteredCrew = crew.filter((c) => {
       const matchSearch =
         !search.trim() ||
         c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -244,7 +256,29 @@ export default function CrewPage() {
       const matchDept = deptFilter === 'all' || c.department === deptFilter;
       return matchSearch && matchDept;
     });
-  }, [crew, search, deptFilter]);
+    
+    // Apply sorting
+    return filteredCrew.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'name':
+          comparison = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'role':
+          comparison = (a.role || '').localeCompare(b.role || '');
+          break;
+        case 'department':
+          comparison = (a.department || '').localeCompare(b.department || '');
+          break;
+        case 'dailyRate':
+          const aRate = a.dailyRate ? (typeof a.dailyRate === 'string' ? parseFloat(a.dailyRate) : Number(a.dailyRate)) : 0;
+          const bRate = b.dailyRate ? (typeof b.dailyRate === 'string' ? parseFloat(b.dailyRate) : Number(b.dailyRate)) : 0;
+          comparison = aRate - bRate;
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [crew, search, deptFilter, sortBy, sortOrder]);
 
   const formatINR = (amount: number | string | null | undefined) => {
     if (amount === null || amount === undefined) return '₹0';
@@ -904,6 +938,41 @@ export default function CrewPage() {
               >
                 Clear Filters
               </button>
+              
+              {/* Sort Controls */}
+              <div className="flex items-center gap-2 ml-auto border-l border-slate-700 pl-4">
+                <span className="text-sm text-slate-400">Sort:</span>
+                <div className="flex gap-1">
+                  {sortOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => setSortBy(option.key as typeof sortBy)}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                        sortBy === option.key 
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition-colors"
+                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  {sortOrder === 'asc' ? (
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -913,12 +982,32 @@ export default function CrewPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-800">
-                <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
-                <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Department</th>
+                <th 
+                  className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
+                  onClick={() => { setSortBy('name'); setSortOrder(sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
+                >
+                  Name {sortBy === 'name' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                </th>
+                <th 
+                  className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
+                  onClick={() => { setSortBy('role'); setSortOrder(sortBy === 'role' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
+                >
+                  Role {sortBy === 'role' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                </th>
+                <th 
+                  className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
+                  onClick={() => { setSortBy('department'); setSortOrder(sortBy === 'department' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
+                >
+                  Department {sortBy === 'department' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                </th>
                 <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Skills</th>
                 <th className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Contact</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Daily Rate</th>
+                <th 
+                  className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
+                  onClick={() => { setSortBy('dailyRate'); setSortOrder(sortBy === 'dailyRate' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
+                >
+                  Daily Rate {sortBy === 'dailyRate' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                </th>
                 <th className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>

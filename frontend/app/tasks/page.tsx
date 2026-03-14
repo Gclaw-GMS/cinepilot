@@ -258,7 +258,7 @@ export default function TasksPage() {
         }
         break
     }
-  }, [tasks.length])
+  }, [tasks.length, showFilters])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)

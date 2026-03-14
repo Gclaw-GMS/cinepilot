@@ -283,6 +283,8 @@ export default function WeatherPage() {
   const exportToCSVRef = useRef<() => void>(() => {});
   const exportToJSONRef = useRef<() => void>(() => {});
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const handlePrintRef = useRef<() => void>(() => {});
+  const printingRef = useRef(false);
 
   // Fetch schedule data for integration
   const fetchScheduleData = useCallback(async () => {
@@ -439,8 +441,8 @@ export default function WeatherPage() {
           break
         case 'p':
           e.preventDefault()
-          if (weatherData?.forecast?.length && !printing) {
-            handlePrint()
+          if (weatherData?.forecast?.length && !printingRef.current) {
+            handlePrintRef.current()
           }
           break
       }
@@ -703,6 +705,12 @@ export default function WeatherPage() {
     setTimeout(() => setPrinting(false), 500);
   }, [weatherData]);
 
+  // Set up print ref for keyboard shortcuts (after handlePrint is defined)
+  useEffect(() => {
+    handlePrintRef.current = handlePrint;
+    printingRef.current = printing;
+  }, [handlePrint, printing]);
+
   // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -733,7 +741,7 @@ export default function WeatherPage() {
         fetchHourlyWeather(selectedLocation, weatherData.forecast[0].date);
       }
     }
-  }, [viewMode, selectedLocation, weatherData?.forecast?.length]);
+  }, [viewMode, selectedLocation, weatherData?.forecast?.length, fetchHourlyWeather]);
 
   // Fetch hourly data when date changes
   useEffect(() => {

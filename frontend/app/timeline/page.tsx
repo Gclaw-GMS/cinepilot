@@ -65,14 +65,14 @@ export default function TimelinePage() {
   });
 
   // Demo stats for when there's no data
-  const DEMO_STATS: Stats = {
+  const DEMO_STATS = useMemo(() => ({
     total: 8,
     completed: 2,
     inProgress: 3,
     pending: 3,
     shootDays: 20,
     scenes: 145,
-  };
+  }), []);
 
   // Fetch real stats from API
   const fetchStats = useCallback(async (isInitial = false) => {
@@ -117,7 +117,7 @@ export default function TimelinePage() {
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [selectedProject]);
+  }, [selectedProject, DEMO_STATS]);
 
   // Fetch stats on mount and when project changes
   useEffect(() => {

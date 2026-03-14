@@ -522,7 +522,7 @@ export default function VfxPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [calculateSummaryCost]);
 
   // Assign to ref for keyboard shortcuts
   fetchDataRef.current = () => {

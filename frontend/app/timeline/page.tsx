@@ -54,6 +54,13 @@ export default function TimelinePage() {
   const [printing, setPrinting] = useState(false)
   const printMenuRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts to avoid dependency warnings
+  const handleRefreshRef = useRef<() => Promise<void>>(async () => {});
+  const handlePrintRef = useRef<() => void>(() => {});
+  const exportingRef = useRef(exporting);
+  const printingRef = useRef(printing);
+  const showExportMenuRef = useRef(showExportMenu);
+  
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -124,11 +131,16 @@ export default function TimelinePage() {
     fetchStats(true);
   }, [fetchStats]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchStats();
     setRefreshing(false);
-  };
+  }, [fetchStats]);
+  
+  // Update handleRefreshRef when handleRefresh changes
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  }, [handleRefresh]);
 
   // Export handlers
   const handleExport = async (format: 'csv' | 'json') => {
@@ -187,7 +199,7 @@ export default function TimelinePage() {
   };
 
   // Print function
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     setPrinting(true);
     setShowPrintMenu(false);
     
@@ -332,7 +344,25 @@ export default function TimelinePage() {
     }
     
     setTimeout(() => setPrinting(false), 500);
-  };
+  }, [stats]);
+  
+  // Update handlePrintRef when handlePrint changes
+  useEffect(() => {
+    handlePrintRef.current = handlePrint;
+  }, [handlePrint]);
+
+  // Update refs for keyboard shortcut checks
+  useEffect(() => {
+    exportingRef.current = exporting;
+  }, [exporting]);
+  
+  useEffect(() => {
+    printingRef.current = printing;
+  }, [printing]);
+  
+  useEffect(() => {
+    showExportMenuRef.current = showExportMenu;
+  }, [showExportMenu]);
 
   // Keyboard shortcuts handler
   useEffect(() => {
@@ -344,7 +374,7 @@ export default function TimelinePage() {
 
       switch (e.key.toLowerCase()) {
         case 'r':
-          handleRefresh();
+          handleRefreshRef.current?.();
           break;
         case '/':
           e.preventDefault();
@@ -370,13 +400,13 @@ export default function TimelinePage() {
           setShowPrintMenu(false);
           break;
         case 'e':
-          if (!exporting) {
-            setShowExportMenu(!showExportMenu);
+          if (!exportingRef.current) {
+            setShowExportMenu(!showExportMenuRef.current);
           }
           break;
         case 'p':
-          if (!printing) {
-            handlePrint();
+          if (!printingRef.current) {
+            handlePrintRef.current?.();
           }
           break;
       }

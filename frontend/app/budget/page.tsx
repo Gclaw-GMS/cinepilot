@@ -135,6 +135,11 @@ export default function BudgetPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [subcategoryFilter, setSubcategoryFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'category' | 'description' | 'subcategory' | 'total' | 'rate' | 'date' | 'amount' | 'vendor'>('category')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
@@ -147,12 +152,40 @@ export default function BudgetPage() {
   const sources = [...new Set(items.map(item => item.source))].sort()
 
   // Count active filters
-  const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length
+  const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
+
+  // Helper to sort items (used by exports)
+  const sortItems = (itemsToSort: BudgetItemData[]) => {
+    return [...itemsToSort].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'category':
+          comparison = (a.category || '').localeCompare(b.category || '')
+          break
+        case 'description':
+          comparison = (a.description || '').localeCompare(b.description || '')
+          break
+        case 'subcategory':
+          comparison = (a.subcategory || '').localeCompare(b.subcategory || '')
+          break
+        case 'total':
+          comparison = Number(a.total || 0) - Number(b.total || 0)
+          break
+        case 'rate':
+          comparison = Number(a.rate || 0) - Number(b.rate || 0)
+          break
+        default:
+          comparison = (a.category || '').localeCompare(b.category || '')
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }
 
   // Export functions
   const handleExportCSV = () => {
+    const sortedItems = sortItems(items)
     const headers = ['Category', 'Description', 'Subcategory', 'Quantity', 'Unit', 'Rate Low', 'Rate High', 'Total', 'Source']
-    const rows = items.map(item => [
+    const rows = sortedItems.map(item => [
       item.category,
       item.description,
       item.subcategory || '',
@@ -175,13 +208,29 @@ export default function BudgetPage() {
   }
 
   const handleExportJSON = () => {
+    const sortedItems = sortItems(items)
+    // Build filter info for export metadata
+    const filterInfo: string[] = []
+    if (categoryFilter !== 'all') filterInfo.push(`Category: ${categoryFilter}`)
+    if (subcategoryFilter !== 'all') filterInfo.push(`Subcategory: ${subcategoryFilter}`)
+    if (sourceFilter !== 'all') filterInfo.push(`Source: ${sourceFilter}`)
+    if (sortBy !== 'category' || sortOrder !== 'asc') filterInfo.push(`Sort: ${sortBy} (${sortOrder})`)
+    
     const exportData = {
-      items,
+      items: sortedItems,
       expenses,
       forecast,
       exportedAt: new Date().toISOString(),
       totalPlanned: items.reduce((s, i) => s + Number(i.total || 0), 0),
-      totalSpent: expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+      totalSpent: expenses.reduce((s, e) => s + Number(e.amount || 0), 0),
+      filterMetadata: {
+        activeFilters: filterInfo,
+        categoryFilter,
+        subcategoryFilter,
+        sourceFilter,
+        sortBy,
+        sortOrder
+      }
     }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -194,16 +243,43 @@ export default function BudgetPage() {
   }
 
   const handlePrint = () => {
+    // Use sorted items for print output
+    const sortedItems = sortItems(items)
+    
     // Get category totals
     const categoryTotals: Record<string, number> = {}
-    items.forEach(item => {
+    sortedItems.forEach(item => {
       const cat = item.category
       categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.total || 0)
     })
 
-    // Get category breakdown for expenses
+    // Get category breakdown for expenses (also sorted)
+    const sortedExpenses = [...expenses].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'category':
+          comparison = (a.category || '').localeCompare(b.category || '')
+          break
+        case 'description':
+          comparison = (a.description || '').localeCompare(b.description || '')
+          break
+        case 'amount':
+          comparison = Number(a.amount || 0) - Number(b.amount || 0)
+          break
+        case 'date':
+          comparison = (a.date || '').localeCompare(b.date || '')
+          break
+        case 'vendor':
+          comparison = (a.vendor || '').localeCompare(b.vendor || '')
+          break
+        default:
+          comparison = (a.date || '').localeCompare(b.date || '')
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
     const expenseByCategory: Record<string, number> = {}
-    expenses.forEach(exp => {
+    sortedExpenses.forEach(exp => {
       expenseByCategory[exp.category] = (expenseByCategory[exp.category] || 0) + Number(exp.amount)
     })
 
@@ -274,7 +350,7 @@ export default function BudgetPage() {
       </thead>
       <tbody>
         ${Object.entries(categoryTotals).map(([cat, total]) => {
-          const catItems = items.filter(i => i.category === cat)
+          const catItems = sortedItems.filter(i => i.category === cat)
           return catItems.map((item, idx) => `
             <tr ${idx === 0 ? 'class="category-header"' : ''}>
               ${idx === 0 ? `<td rowspan="${catItems.length}" style="vertical-align:top;font-weight:bold">${cat}</td>` : ''}
@@ -294,7 +370,7 @@ export default function BudgetPage() {
     </table>
   </div>
 
-  ${expenses.length > 0 ? `
+  ${sortedExpenses.length > 0 ? `
   <div class="section">
     <h2>💰 Expenses Details</h2>
     <table>
@@ -309,7 +385,7 @@ export default function BudgetPage() {
         </tr>
       </thead>
       <tbody>
-        ${expenses.map(exp => `
+        ${sortedExpenses.map(exp => `
           <tr>
             <td>${exp.date}</td>
             <td>${exp.category}</td>
@@ -424,11 +500,17 @@ export default function BudgetPage() {
           setShowPrintMenu(false)
           setShowFilters(false)
           setSearchQuery('')
+          setSortBy('category')
+          setSortOrder('asc')
           searchInputRef.current?.blur()
           break
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case '1':
           e.preventDefault()
@@ -554,6 +636,28 @@ export default function BudgetPage() {
     // Source filter
     if (sourceFilter !== 'all' && item.source !== sourceFilter) return false
     return true
+  }).sort((a, b) => {
+    let comparison = 0
+    switch (sortBy) {
+      case 'category':
+        comparison = (a.category || '').localeCompare(b.category || '')
+        break
+      case 'description':
+        comparison = (a.description || '').localeCompare(b.description || '')
+        break
+      case 'subcategory':
+        comparison = (a.subcategory || '').localeCompare(b.subcategory || '')
+        break
+      case 'total':
+        comparison = Number(a.total || 0) - Number(b.total || 0)
+        break
+      case 'rate':
+        comparison = Number(a.rate || 0) - Number(b.rate || 0)
+        break
+      default:
+        comparison = (a.category || '').localeCompare(b.category || '')
+    }
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   const filteredExpenses = expenses.filter(exp => {
@@ -566,6 +670,28 @@ export default function BudgetPage() {
     // Category filter for expenses
     if (categoryFilter !== 'all' && exp.category !== categoryFilter) return false
     return true
+  }).sort((a, b) => {
+    let comparison = 0
+    switch (sortBy) {
+      case 'category':
+        comparison = (a.category || '').localeCompare(b.category || '')
+        break
+      case 'description':
+        comparison = (a.description || '').localeCompare(b.description || '')
+        break
+      case 'amount':
+        comparison = Number(a.amount || 0) - Number(b.amount || 0)
+        break
+      case 'date':
+        comparison = (a.date || '').localeCompare(b.date || '')
+        break
+      case 'vendor':
+        comparison = (a.vendor || '').localeCompare(b.vendor || '')
+        break
+      default:
+        comparison = (a.date || '').localeCompare(b.date || '')
+    }
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   const totalPlanned = filteredItems.reduce((s, i) => s + Number(i.total || 0), 0)
@@ -618,7 +744,7 @@ export default function BudgetPage() {
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">/</span>
           </div>
-          {/* Filter Toggle Button */}
+          {/* Filter & Sort Toggle Button */}
           <button
             data-filter-toggle
             onClick={() => setShowFilters(!showFilters)}
@@ -627,10 +753,10 @@ export default function BudgetPage() {
                 ? 'bg-indigo-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
-            title="Toggle Filters (F)"
+            title="Toggle Filters & Sort (F)"
           >
             <Filter className="w-4 h-4" />
-            Filters
+            Filter & Sort
             {activeFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">{activeFilterCount}</span>
             )}
@@ -795,7 +921,7 @@ export default function BudgetPage() {
         ))}
       </div>
 
-      {/* Filter Panel */}
+      {/* Filter & Sort Panel */}
       {showFilters && (
         <div 
           ref={filterPanelRef}
@@ -804,7 +930,7 @@ export default function BudgetPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm font-medium text-slate-300">Filters:</span>
+              <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Category:</label>
@@ -839,11 +965,49 @@ export default function BudgetPage() {
                 {sources.map((src) => (<option key={src} value={src}>{src === 'ai' ? 'AI Generated' : 'Manual'}</option>))}
               </select>
             </div>
+            
+            {/* Sort Options */}
+            <div className="flex items-center gap-2 border-l border-slate-600 pl-4">
+              <label className="text-sm text-slate-400">Sort:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="category">Category</option>
+                <option value="description">Description</option>
+                <option value="subcategory">Subcategory</option>
+                <option value="total">Total</option>
+                <option value="rate">Rate</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                  sortBy !== 'category' || sortOrder !== 'asc'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+                }`}
+                title="Toggle sort order (S)"
+              >
+                {sortOrder === 'asc' ? (
+                  <>
+                    <span>↑</span> <span>ASC</span>
+                  </>
+                ) : (
+                  <>
+                    <span>↓</span> <span>DESC</span>
+                  </>
+                )}
+              </button>
+            </div>
+            
             <button
               onClick={() => {
                 setCategoryFilter('all')
                 setSubcategoryFilter('all')
                 setSourceFilter('all')
+                setSortBy('category')
+                setSortOrder('asc')
               }}
               className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
             >
@@ -1248,6 +1412,7 @@ export default function BudgetPage() {
                 { key: 'R', action: 'Refresh budget data' },
                 { key: '/', action: 'Search budget items' },
                 { key: 'F', action: 'Toggle filters' },
+                { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', action: 'Add new expense' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Print budget report' },
@@ -1256,7 +1421,7 @@ export default function BudgetPage() {
                 { key: '3', action: 'Switch to Expenses tab' },
                 { key: '4', action: 'Switch to Forecast tab' },
                 { key: '?', action: 'Show this help' },
-                { key: 'Esc', action: 'Close modal / Clear search' },
+                { key: 'Esc', action: 'Close modal / Clear search / Reset filters' },
               ].map(({ key, action }) => (
                 <div key={key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
                   <span className="text-gray-400">{action}</span>

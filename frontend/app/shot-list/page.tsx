@@ -90,15 +90,31 @@ export default function ShotHubPage() {
   })
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
-  // Calculate active filter count
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'shotIndex' | 'scene' | 'shotSize' | 'cameraAngle' | 'cameraMovement' | 'duration' | 'confidence'>('shotIndex')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  // Sort options
+  const sortOptions = [
+    { key: 'shotIndex', label: 'Shot #' },
+    { key: 'scene', label: 'Scene' },
+    { key: 'shotSize', label: 'Shot Size' },
+    { key: 'cameraAngle', label: 'Angle' },
+    { key: 'cameraMovement', label: 'Movement' },
+    { key: 'duration', label: 'Duration' },
+    { key: 'confidence', label: 'Confidence' },
+  ]
+
+  // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.sceneId !== 'all') count++
     if (filters.shotSize !== 'all') count++
     if (filters.cameraAngle !== 'all') count++
     if (filters.cameraMovement !== 'all') count++
+    if (sortBy !== 'shotIndex' || sortOrder !== 'asc') count++
     return count
-  }, [filters])
+  }, [filters, sortBy, sortOrder])
 
   // Clear all filters
   const clearFilters = useCallback(() => {
@@ -108,6 +124,8 @@ export default function ShotHubPage() {
       cameraAngle: 'all',
       cameraMovement: 'all',
     })
+    setSortBy('shotIndex')
+    setSortOrder('asc')
   }, [])
 
   // Refs for keyboard shortcuts
@@ -192,7 +210,14 @@ export default function ShotHubPage() {
         case 's':
           e.preventDefault()
           if (!saving && shots.length > 0) {
-            handleSaveShotsRef.current?.()
+            // Toggle sort order when filter panel is open or there are active filters
+            if (showFilterPanel || activeFilterCount > 0) {
+              setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+            } else {
+              handleSaveShotsRef.current?.()
+            }
+          } else if (showFilterPanel || activeFilterCount > 0) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
           }
           break
         case 'e':
@@ -217,6 +242,8 @@ export default function ShotHubPage() {
           setShowFilterPanel(false)
           setSceneFilter('')
           setSelectedSceneId(null)
+          setSortBy('shotIndex')
+          setSortOrder('asc')
           break
         case 'p':
           e.preventDefault()
@@ -229,7 +256,7 @@ export default function ShotHubPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [scriptId, generating, saving, exporting, shots.length, showFilterPanel])
+  }, [scriptId, generating, saving, exporting, shots.length, showFilterPanel, activeFilterCount, sortOrder, sortBy])
 
   // Click outside to close menus
   useEffect(() => {
@@ -537,16 +564,47 @@ export default function ShotHubPage() {
     ? shots.filter(s => s.scene.id === selectedSceneId)
     : shots
 
-  // Apply filters to shots
+  // Apply filters and sorting to shots
   const filteredShots = useMemo(() => {
-    return activeSceneShots.filter(shot => {
+    const filtered = activeSceneShots.filter(shot => {
       if (filters.sceneId !== 'all' && shot.scene.id !== filters.sceneId) return false
       if (filters.shotSize !== 'all' && shot.shotSize !== filters.shotSize) return false
       if (filters.cameraAngle !== 'all' && shot.cameraAngle !== filters.cameraAngle) return false
       if (filters.cameraMovement !== 'all' && shot.cameraMovement !== filters.cameraMovement) return false
       return true
     })
-  }, [activeSceneShots, filters])
+    
+    // Apply sorting
+    return filtered.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'shotIndex':
+          comparison = a.shotIndex - b.shotIndex
+          break
+        case 'scene':
+          comparison = (a.scene.sceneNumber || '').localeCompare(b.scene.sceneNumber || '')
+          break
+        case 'shotSize':
+          comparison = (a.shotSize || '').localeCompare(b.shotSize || '')
+          break
+        case 'cameraAngle':
+          comparison = (a.cameraAngle || '').localeCompare(b.cameraAngle || '')
+          break
+        case 'cameraMovement':
+          comparison = (a.cameraMovement || '').localeCompare(b.cameraMovement || '')
+          break
+        case 'duration':
+          comparison = (a.durationEstSec || 0) - (b.durationEstSec || 0)
+          break
+        case 'confidence':
+          const aConf = ((a.confidenceCamera || 0) + (a.confidenceLens || 0) + (a.confidenceLight || 0) + (a.confidenceDuration || 0)) / 4
+          const bConf = ((b.confidenceCamera || 0) + (b.confidenceLens || 0) + (b.confidenceLight || 0) + (b.confidenceDuration || 0)) / 4
+          comparison = aConf - bConf
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [activeSceneShots, filters, sortBy, sortOrder])
 
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60)
@@ -756,7 +814,7 @@ export default function ShotHubPage() {
               title="Toggle filters (F)"
             >
               <Filter className="w-4 h-4" />
-              Filters
+              Filter & Sort
               {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-white text-violet-600 text-xs rounded-full font-bold">
                   {activeFilterCount}
@@ -764,9 +822,9 @@ export default function ShotHubPage() {
               )}
             </button>
             {showFilterPanel && (
-              <div className="absolute right-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20 p-4">
+              <div className="absolute right-0 mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">Filter Shots</h3>
+                  <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
@@ -777,6 +835,35 @@ export default function ShotHubPage() {
                   )}
                 </div>
                 
+                {/* Sort Options */}
+                <div className="mb-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-violet-300">Sort By</label>
+                    <button
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      className="px-2 py-1 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded flex items-center gap-1"
+                      title="Toggle sort order (S)"
+                    >
+                      {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {sortOptions.map(option => (
+                      <button
+                        key={option.key}
+                        onClick={() => setSortBy(option.key as typeof sortBy)}
+                        className={`px-2 py-1.5 text-xs rounded transition-colors ${
+                          sortBy === option.key
+                            ? 'bg-violet-600 text-white'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {option.label} {sortBy === option.key && (sortOrder === 'asc' ? '↑' : '↓')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Scene Filter */}
                 <div className="mb-3">
                   <label className="block text-xs text-gray-400 mb-1">Scene</label>
@@ -1144,6 +1231,10 @@ export default function ShotHubPage() {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">F</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">S</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Generate all shots</span>

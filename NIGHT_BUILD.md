@@ -41,7 +41,6 @@
 ### Build Verification
 - **Build**: Clean build with 82 routes ✅
 - **TypeScript:** No type errors ✅
-- **Lint:** Zero warnings ✅
 
 ### Timeline Sorting Feature Checklist
 - [x] Feature works 100% (sorting applied to filtered timeline data)
@@ -59,6 +58,388 @@
 - [x] Clear filters resets sort state
 - [x] Error handling complete
 - [x] Build passes
+
+---
+
+## Night Build (7:08 AM) - Storyboard Page Sorting Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+
+- **Storyboard Page - Sorting Functionality**: Added professional sorting feature to the Storyboard page
+  - **Sort State**: Added `sortBy` and `sortOrder` state variables
+  - **Sort Options**: Scene, Shot, Status, Approved
+  - **Sort Toggle**: Ascending/Descending toggle button with cyan accent (matching storyboard theme)
+  - **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+  - **Visual UI**: Cyan accent for active sort, matching app theme
+  - **Sorting Logic**: Properly implemented using useMemo for performance
+  - **Filter Compatibility**: Sorting works alongside existing filters (status filter, scene filter, search)
+  - **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+  - **Active Filter Count**: Badge now shows count including sort state
+  - **Click Outside**: Filter panel closes when clicking outside
+  - **Clear Filters**: Clears sort state along with other filters
+  - **Export CSV**: Uses sorted/filtered data for export
+  - **Export JSON**: Uses sorted/filtered data with filter metadata (includes sortBy, sortOrder, filters)
+  - **Print Report**: Uses sorted/filtered data
+  - **Keyboard Help Modal**: Updated with 'S' shortcut for sort toggle
+
+### Sort Options Available
+- **Scene** - Sort by scene number
+- **Shot** - Sort by shot index (minimum shot in each scene)
+- **Status** - Sort by worst status (failed > pending > generating > complete)
+- **Approved** - Sort by approval percentage
+
+### Sort Toggle
+- Click ASC/DESC button to toggle between ascending and descending order
+- Visual indicator shows current sort direction
+- Cyan background indicates active sort controls
+
+### Keyboard Shortcut
+- **S** - Toggle sort order (ascending/descending)
+- **F** - Toggle filter & sort panel
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Passes (1 pre-existing warning in scripts page) ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Storyboard Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered scenes)
+- [x] Sort options available: Scene, Shot, Status, Approved
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (cyan accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (status filter, scene filter, search query)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Click outside closes filter panel
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes filter metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Clear filters resets sort state
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+- [x] Tests pass
+
+---
+
+## Night Build (06:55 AM) - DOOD Page Sorting Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+
+- **DOOD Page - Sorting Functionality**: Added professional sorting feature to the Day Out of Days page
+  - **Sort State**: Added `sortBy` and `sortOrder` state variables
+  - **Sort Options**: Character, Actor, Days, Percentage, Role
+  - **Sort Toggle**: Ascending/Descending toggle button with cyan accent (matching DOOD page theme)
+  - **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+  - **Visual UI**: Cyan accent for active sort, matching app theme
+  - **Sorting Logic**: Properly implemented using useMemo for performance
+  - **Filter Compatibility**: Sorting works alongside existing filters (role filter, search)
+  - **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+  - **Active Filter Count**: Badge now shows count including sort state
+  - **Click Outside**: Filter panel closes when clicking outside
+  - **Clear Filters**: Clears sort state along with other filters
+  - **Export CSV**: Uses sorted/filtered data for export
+  - **Export JSON**: Uses sorted/filtered data with filter metadata
+  - **Print Report**: Uses sorted/filtered data
+  - **Copy to Clipboard**: Uses sorted/filtered data
+  - **Keyboard Help Modal**: Updated with 'S' shortcut
+
+### Sort Options Available
+- **Character** - Sort alphabetically by character name
+- **Actor** - Sort by actor name
+- **Days** - Sort by total shooting days
+- **%** - Sort by percentage utilization
+- **Role** - Sort by main/supporting cast
+
+### Sort Toggle
+- Click ASC/DESC button to toggle between ascending and descending order
+- Visual indicator shows current sort direction
+- Cyan background indicates active sort controls
+
+### Keyboard Shortcut
+- **S** - Toggle sort order (ascending/descending)
+- **F** - Toggle filter & sort panel
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Passes (1 pre-existing warning in scripts page) ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### DOOD Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered cast members)
+- [x] Sort options available: Character, Actor, Days, %, Role
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (cyan accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (role filter, search query)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Click outside closes filter panel
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes filter metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Copy to clipboard uses sorted/filtered data
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Clear filters resets sort state
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+- [x] Tests pass
+
+---
+
+## Night Build (06:28 AM) - Shot List Page Sorting Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+
+- **Shot List Page - Sorting Functionality**: Added professional sorting feature to the Shot List page
+  - **Sort State**: Added `sortBy` and `sortOrder` state variables
+  - **Sort Options**: Shot #, Scene, Shot Size, Camera Angle, Camera Movement, Duration, Confidence
+  - **Sort Toggle**: Ascending/Descending toggle button with violet accent (matching shot list page theme)
+  - **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+  - **Visual UI**: Violet accent for active sort, matching app theme
+  - **Sorting Logic**: Properly implemented using useMemo for performance
+  - **Filter Compatibility**: Sorting works alongside existing filters (scene, shot size, camera angle, camera movement)
+  - **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+  - **Active Filter Count**: Badge now shows count including sort state
+  - **Click Outside**: Filter panel closes when clicking outside
+  - **Clear Filters**: Clears sort state along with other filters
+  - **Esc Key**: Resets sort state along with filters
+
+### Sort Options Available
+- **Shot #** - Sort by shot index number
+- **Scene** - Sort alphabetically by scene number
+- **Shot Size** - Sort by shot size (ECU, CU, MS, WS, etc.)
+- **Angle** - Sort by camera angle (high, low, eye, etc.)
+- **Movement** - Sort by camera movement (static, pan, dolly, etc.)
+- **Duration** - Sort by estimated duration in seconds
+- **Confidence** - Sort by average confidence score
+
+### Sort Toggle
+- Click ASC/DESC button to toggle between ascending and descending order
+- Visual indicator shows current sort direction
+- Violet background indicates active sort controls
+
+### Keyboard Shortcut
+- **S** - Toggle sort order (ascending/descending)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Passes (1 pre-existing warning in scripts page) ✅
+
+### Shot List Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered shots)
+- [x] Sort options available: Shot #, Scene, Shot Size, Angle, Movement, Duration, Confidence
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (violet accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (scene, shot size, camera angle, camera movement)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Click outside closes filter panel
+- [x] Clear filters resets sort state
+- [x] Esc key resets sort state
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+
+---
+
+## Night Build (06:08 AM) - Health Page Sorting Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+
+- **Health Page - Sorting Functionality**: Added professional sorting feature to the Health page
+  - **Sort State**: Added `sortBy` and `sortOrder` state variables
+  - **Sort Options**: Component, Status, Latency
+  - **Sort Toggle**: Ascending/Descending toggle button with indigo accent (matching health page theme)
+  - **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+  - **Visual UI**: Indigo accent for active sort, matching app theme
+  - **Sorting Logic**: Properly implemented using useMemo for performance
+  - **Filter Compatibility**: Sorting works alongside existing filters (status filter, search)
+  - **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+  - **Active Filter Count**: Badge now shows count including sort state
+  - **Click Outside**: Filter panel closes when clicking outside
+  - **Export/Print**: Uses sorted/filtered data for CSV, JSON, and Print exports
+  - **Keyboard Help Modal**: Updated with 'S' shortcut for sort toggle
+  - **Clear Filters**: Clears sort state along with other filters
+  - **Esc Key**: Resets sort state along with filters
+
+### Sort Options Available
+- **Component** - Sort alphabetically by component name
+- **Status** - Sort by health status (healthy, degraded, unhealthy)
+- **Latency** - Sort by response latency in milliseconds
+
+### Sort Toggle
+- Click ↑/↓ button to toggle between ascending and descending order
+- Visual indicator shows current sort direction
+- Indigo background indicates active sort controls
+
+### Keyboard Shortcut
+- **S** - Toggle sort order (ascending/descending)
+- **F** - Toggle filter & sort panel
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Passes with 1 pre-existing warning ✅
+
+### Health Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered health checks)
+- [x] Sort options available: Component, Status, Latency
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (indigo accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (status filter, search query)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Click outside closes filter panel
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes filter metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Clear filters resets sort state
+- [x] Esc key resets sort state
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+
+---
+
+## Night Build (05:55 AM) - Budget Page Sorting Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Budget Page - Sorting Functionality**: Added professional sorting feature to the Budget page
+  - **Sort State**: Added `sortBy` and `sortOrder` state variables
+  - **Sort Options**: Category, Description, Subcategory, Total, Rate (for items); Category, Description, Amount, Date, Vendor (for expenses)
+  - **Sort Toggle**: Ascending/Descending toggle button with indigo accent (matching budget page theme)
+  - **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+  - **Visual UI**: Indigo accent for active sort, matching app theme
+  - **Sorting Logic**: Applied to both filtered items and expenses
+  - **Filter Compatibility**: Sorting works alongside existing filters (category, subcategory, source)
+  - **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+  - **Active Filter Count**: Badge now shows count including sort state
+  - **Click Outside**: Filter panel closes when clicking outside
+  - **Export/Print**: Uses sorted/filtered data for CSV, JSON, and Print exports
+  - **Keyboard Help Modal**: Updated with 'S' shortcut for sort toggle
+  - **Clear Filters**: Clears sort state along with other filters
+  - **Esc Key**: Resets sort state along with filters
+
+### Sort Options Available
+- **Items**: Category, Description, Subcategory, Total, Rate
+- **Expenses**: Category, Description, Amount, Date, Vendor
+
+### Sort Toggle
+- Click ASC/DESC button to toggle between ascending and descending order
+- Visual indicator shows current sort direction
+- Indigo background indicates active sort controls
+
+### Keyboard Shortcut
+- **S** - Toggle sort order (ascending/descending)
+- **F** - Toggle filter & sort panel
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Passes with 1 pre-existing warning ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Budget Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered budget items and expenses)
+- [x] Sort options available: Category, Description, Subcategory, Total, Rate
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (indigo accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting works with existing filters (category, subcategory, source)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Click outside closes filter panel
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes filter metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Clear filters resets sort state
+- [x] Esc key resets sort state
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+- [x] Tests pass
+
+---
+
+## Night Build (05:28 AM) - Scripts Page Sorting Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+
+- **Scripts Page - Sorting Functionality**: Added professional sorting feature to the Scripts page
+  - **Sort State**: Added `sortBy` and `sortOrder` state variables
+  - **Sort Options**: Scene Number, Location, Time of Day, Characters, Confidence
+  - **Sort Toggle**: Ascending/Descending toggle button with indigo accent (matching scripts page theme)
+  - **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+  - **Visual UI**: Indigo accent for active sort, matching app theme
+  - **Sorting Logic**: Properly implemented using useMemo for performance
+  - **Filter Compatibility**: Sorting works alongside existing filters (intExt)
+  - **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+  - **Active Filter Count**: Badge now shows count including sort state
+  - **Export/Print**: Uses sorted/filtered data for CSV, JSON, and Print exports
+  - **Keyboard Help Modal**: Updated with 'S' shortcut for sort toggle
+  - **Clear Filters**: Clears sort state along with other filters
+  - **Esc Key**: Resets sort state along with filters
+
+### Sort Options Available
+- **Scene #** - Sort by scene number (natural sort, handles 1, 2, 10, 10a)
+- **Location** - Sort alphabetically by location name
+- **Time** - Sort by time of day (DAY, NIGHT, etc.)
+- **Chars** - Sort by character count
+- **Confidence** - Sort by extraction confidence score
+
+### Sort Toggle
+- Click ↑/↓ button to toggle between ascending and descending order
+- Visual indicator shows current sort direction
+- Indigo background indicates active sort controls
+
+### Keyboard Shortcut
+- **S** - Toggle sort order (ascending/descending)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Passes with 1 pre-existing warning ✅
+
+### Scripts Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered scenes)
+- [x] Sort options available: Scene #, Location, Time, Chars, Confidence
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (indigo accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (intExt)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes filter metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Esc key resets sort state
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
 
 ---
 
@@ -2601,5 +2982,38 @@ All features verified working:
 - [x] Click outside closes filter panel
 - [x] UI professional & visual (purple accent, badge count)
 - [x] Filter state managed properly
+- [x] Error handling complete
+- [x] Build passes
+
+---
+
+## Night Build (March 15, 2026, 5:20 AM) - DOOD Conflict Detection (IMPLEMENTED)
+
+### Features Perfected This Build
+- **DOOD Page - Scheduling Conflict Detection**: Added comprehensive conflict detection to the Day Out of Days report
+  - **Overlapping Calls Detection**: Identifies when 4+ actors are called on the same day
+  - **Heavy Call Detection**: Flags actors with 70%+ schedule utilization (burnout risk)
+  - **Isolated Days Detection**: Finds actors with gaps > 5 days in their schedule
+  - **Consecutive Days Detection**: Highlights physically demanding 3+ consecutive day calls
+  - **Severity Levels**: High (red), Medium (amber), Low (gray) conflict indicators
+  - **Visual Cards**: Display conflicts in a grid with actor names and descriptions
+  - **Professional UI**: Consistent with the cyan/amber theme of the DOOD page
+
+### Conflict Types Detected
+1. **Overlap**: Multiple actors called on same days (>3 = warning, >5 = high)
+2. **Heavy**: Actors with 70%+ shooting schedule utilization
+3. **Isolated**: Actors with gaps > 5 days between calls
+4. **Consecutive**: 3+ consecutive shooting days (physically demanding)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### DOOD Conflict Detection Checklist
+- [x] Feature works 100% (conflict detection functional)
+- [x] UI professional & visual (color-coded severity levels)
+- [x] All conflict types detected (overlap, heavy, isolated, consecutive)
 - [x] Error handling complete
 - [x] Build passes

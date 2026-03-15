@@ -182,17 +182,24 @@ export default function ScriptsPage() {
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [selectedScene, setSelectedScene] = useState<SceneData | null>(null)
+  
+  // Sort state
+  const [sortBy, setSortBy] = useState<'sceneNumber' | 'location' | 'timeOfDay' | 'characters' | 'confidence'>('sceneNumber')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
-  // Compute active filter count
+  // Compute active filter count (includes sort as active filter)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (intExtFilter !== 'all') count++
+    if (sortBy !== 'sceneNumber' || sortOrder !== 'asc') count++
     return count
-  }, [intExtFilter])
+  }, [intExtFilter, sortBy, sortOrder])
 
-  // Clear all filters
+  // Clear all filters (including sort)
   const clearFilters = useCallback(() => {
     setIntExtFilter('all')
+    setSortBy('sceneNumber')
+    setSortOrder('asc')
   }, [])
   const [runningAnalysis, setRunningAnalysis] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState('')
@@ -245,6 +252,10 @@ export default function ScriptsPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -252,6 +263,8 @@ export default function ScriptsPage() {
           setShowFilters(false)
           setSceneFilter('')
           setIntExtFilter('all')
+          setSortBy('sceneNumber')
+          setSortOrder('asc')
           break
         case '1':
           e.preventDefault()
@@ -352,7 +365,7 @@ export default function ScriptsPage() {
     setExporting(true)
     
     const rows = [['Scene', 'Type', 'Time', 'Location', 'Characters', 'Props', 'VFX Notes', 'Warnings']]
-    scenes.forEach(scene => {
+    filteredScenes.forEach(scene => {
       rows.push([
         scene.sceneNumber,
         scene.intExt || '',
@@ -389,8 +402,15 @@ export default function ScriptsPage() {
         version: activeScript.version,
         createdAt: activeScript.createdAt,
       },
+      filters: {
+        intExt: intExtFilter,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+        searchQuery: sceneFilter,
+      },
       summary: {
         totalScenes: scenes.length,
+        filteredScenes: filteredScenes.length,
         intScenes: scenes.filter(s => s.intExt === 'INT').length,
         extScenes: scenes.filter(s => s.intExt === 'EXT').length,
         dayScenes: scenes.filter(s => s.timeOfDay === 'DAY').length,
@@ -399,7 +419,7 @@ export default function ScriptsPage() {
         totalWarnings: allWarnings.length,
         totalVfxNotes: allVfx.length,
       },
-      scenes: scenes.map(scene => ({
+      scenes: filteredScenes.map(scene => ({
         sceneNumber: scene.sceneNumber,
         heading: scene.headingRaw,
         intExt: scene.intExt,
@@ -448,11 +468,18 @@ export default function ScriptsPage() {
     const nightScenes = scenes.filter(s => s.timeOfDay === 'NIGHT').length
     const totalCharacters = new Set(scenes.flatMap(s => s.sceneCharacters.map(c => c.character.name))).size
 
+    // Build filter info for print header
+    const filterInfo = []
+    if (intExtFilter !== 'all') filterInfo.push(`Filter: ${intExtFilter}`)
+    if (sortBy !== 'sceneNumber' || sortOrder !== 'asc') filterInfo.push(`Sort: ${sortBy} (${sortOrder})`)
+    if (sceneFilter) filterInfo.push(`Search: "${sceneFilter}"`)
+
     const statsHtml = `
       <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
         <h3 style="margin: 0 0 10px 0; color: #1a1a2e;">Script Summary</h3>
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
           <div><strong>Total Scenes:</strong> ${scenes.length}</div>
+          <div><strong>Filtered:</strong> ${filteredScenes.length}</div>
           <div><strong>INT:</strong> ${intScenes}</div>
           <div><strong>EXT:</strong> ${extScenes}</div>
           <div><strong>Characters:</strong> ${totalCharacters}</div>
@@ -461,11 +488,16 @@ export default function ScriptsPage() {
           <div><strong>Locations:</strong> ${new Set(scenes.map(s => s.location)).size}</div>
           <div><strong>VFX Shots:</strong> ${allVfx.length}</div>
         </div>
+        ${filterInfo.length > 0 ? `
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+          ${filterInfo.join(' | ')}
+        </div>
+        ` : ''}
       </div>
     `
 
-    // Generate scenes table
-    const scenesHtml = scenes.map(scene => {
+    // Generate scenes table using filtered scenes
+    const scenesHtml = filteredScenes.map(scene => {
       const characters = scene.sceneCharacters.map(c => c.character.name).join(', ')
       const props = scene.sceneProps.map(p => p.prop.name).join(', ')
       const vfx = scene.vfxNotes.map(v => v.description).join(', ')
@@ -668,14 +700,46 @@ Warnings: ${allWarnings.length}`
     }
   }
 
-  const filteredScenes = scenes.filter(s => {
-    const matchesSearch = !sceneFilter ||
-      s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
-      (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
-      (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
-    const matchesIntExt = intExtFilter === 'all' || s.intExt === intExtFilter
-    return matchesSearch && matchesIntExt
-  })
+  const filteredScenes = useMemo(() => {
+    let result = scenes.filter(s => {
+      const matchesSearch = !sceneFilter ||
+        s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
+        (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
+        (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
+      const matchesIntExt = intExtFilter === 'all' || s.intExt === intExtFilter
+      return matchesSearch && matchesIntExt
+    })
+    
+    // Apply sorting
+    const sorted = [...result].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'sceneNumber':
+          // Natural sort for scene numbers (handles 1, 2, 10, 10a, etc.)
+          const numA = parseInt(a.sceneNumber.replace(/\D/g, '')) || 0
+          const numB = parseInt(b.sceneNumber.replace(/\D/g, '')) || 0
+          comparison = numA - numB
+          break
+        case 'location':
+          comparison = (a.location || '').localeCompare(b.location || '')
+          break
+        case 'timeOfDay':
+          comparison = (a.timeOfDay || '').localeCompare(b.timeOfDay || '')
+          break
+        case 'characters':
+          comparison = a.sceneCharacters.length - b.sceneCharacters.length
+          break
+        case 'confidence':
+          comparison = a.confidence - b.confidence
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return sorted
+  }, [scenes, sceneFilter, intExtFilter, sortBy, sortOrder])
 
   const tabs: { key: ActiveTab; label: string; count?: number }[] = [
     { key: 'upload', label: 'Upload' },
@@ -799,9 +863,9 @@ Warnings: ${allWarnings.length}`
               )}
             </button>
             {showFilters && (
-              <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                  <span className="text-sm font-medium">Filters</span>
+                  <span className="text-sm font-medium">Filter & Sort</span>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
@@ -812,6 +876,53 @@ Warnings: ${allWarnings.length}`
                   )}
                 </div>
                 <div className="p-4 space-y-4">
+                  {/* Sort Options */}
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Sort By</label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {[
+                        { key: 'sceneNumber', label: 'Scene #' },
+                        { key: 'location', label: 'Location' },
+                        { key: 'timeOfDay', label: 'Time' },
+                        { key: 'characters', label: 'Chars' },
+                        { key: 'confidence', label: 'Confidence' },
+                      ].map(opt => (
+                        <button
+                          key={opt.key}
+                          onClick={() => setSortBy(opt.key as typeof sortBy)}
+                          className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                            sortBy === opt.key
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                        sortBy !== 'sceneNumber' || sortOrder !== 'asc'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
+                      }`}
+                    >
+                      {sortOrder === 'asc' ? (
+                        <>
+                          <span>↑</span> <span>Ascending</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>↓</span> <span>Descending</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* Divider */}
+                  <div className="border-t border-gray-700" />
+                  
                   {/* Interior/Exterior Filter */}
                   <div>
                     <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Interior/Exterior</label>
@@ -1323,6 +1434,7 @@ Warnings: ${allWarnings.length}`
                 { key: 'E', action: 'Export menu' },
                 { key: 'P', action: 'Print script' },
                 { key: 'F', action: 'Toggle filters' },
+                { key: 'S', action: 'Toggle sort order' },
                 { key: '/', action: 'Focus search' },
                 { key: '1', action: 'Upload tab' },
                 { key: '2', action: 'Scenes tab' },

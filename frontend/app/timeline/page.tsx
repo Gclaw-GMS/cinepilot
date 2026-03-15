@@ -36,12 +36,14 @@ export default function TimelinePage() {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [filterType, setFilterType] = useState('all');
+  const [sortBy, setSortBy] = useState<'phase' | 'type' | 'status' | 'date' | 'scenes' | 'duration'>('phase');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Calculate active filter count
+  // Calculate active filter count (includes sort state)
   const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)
   
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -168,7 +170,50 @@ export default function TimelinePage() {
       const res = await fetch(`/api/schedule?projectId=${projectId}`);
       const data = await res.json();
       
-      const shootingDays = data.shootingDays || [];
+      let shootingDays = data.shootingDays || [];
+      
+      // Apply filters
+      if (filterType !== 'all') {
+        shootingDays = shootingDays.filter((d: any) => d.type === filterType);
+      }
+      
+      // Apply search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        shootingDays = shootingDays.filter((d: any) => 
+          d.location?.name?.toLowerCase().includes(query) ||
+          d.notes?.toLowerCase().includes(query) ||
+          d.dayNumber?.toString().includes(query)
+        );
+      }
+      
+      // Apply sorting
+      shootingDays = [...shootingDays].sort((a: any, b: any) => {
+        let comparison = 0;
+        switch (sortBy) {
+          case 'phase':
+            comparison = (a.dayNumber || 0) - (b.dayNumber || 0);
+            break;
+          case 'type':
+            comparison = (a.type || '').localeCompare(b.type || '');
+            break;
+          case 'status':
+            comparison = (a.status || '').localeCompare(b.status || '');
+            break;
+          case 'date':
+            comparison = new Date(a.scheduledDate || 0).getTime() - new Date(b.scheduledDate || 0).getTime();
+            break;
+          case 'scenes':
+            comparison = (a.dayScenes?.length || 0) - (b.dayScenes?.length || 0);
+            break;
+          case 'duration':
+            comparison = (a.estimatedHours || 0) - (b.estimatedHours || 0);
+            break;
+          default:
+            comparison = 0;
+        }
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
       
       if (format === 'csv') {
         // Create CSV content
@@ -192,10 +237,16 @@ export default function TimelinePage() {
         a.click();
         URL.revokeObjectURL(url);
       } else {
-        // Create JSON content
+        // Create JSON content with filter metadata
         const jsonContent = {
           exportDate: new Date().toISOString(),
           projectId,
+          filters: {
+            type: filterType,
+            search: searchQuery,
+            sortBy,
+            sortOrder
+          },
           totalDays: shootingDays.length,
           shootingDays
         };
@@ -415,9 +466,15 @@ export default function TimelinePage() {
         case 'escape':
           setShowKeyboardHelp(false);
           setSearchQuery('');
+          setFilterType('all');
+          setSortBy('phase');
+          setSortOrder('asc');
           setShowFilters(() => false);
           setShowExportMenu(() => false);
           setShowPrintMenu(() => false);
+          break;
+        case 's':
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
           break;
         case 'e':
           if (!exportingRef.current) {
@@ -670,15 +727,15 @@ export default function TimelinePage() {
                 id="timeline-filter-toggle"
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  showFilters || activeFilterCount > 0 ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                  showFilters || filterType !== 'all' || sortOrder !== 'asc' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
                 }`}
-                title="Toggle Filters (F)"
+                title="Toggle Filters & Sort (F)"
               >
                 <Filter className="w-4 h-4" />
-                Filters
-                {activeFilterCount > 0 && (
+                Filter & Sort
+                {(filterType !== 'all' || sortOrder !== 'asc') && (
                   <span className="ml-1 px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded-full">
-                    {activeFilterCount}
+                    {(filterType !== 'all' ? 1 : 0) + (sortOrder !== 'asc' ? 1 : 0)}
                   </span>
                 )}
               </button>
@@ -790,8 +847,47 @@ export default function TimelinePage() {
                       <option value="post-production">Post-Production</option>
                     </select>
                   </div>
+                  
+                  {/* Sort Options */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-400">Sort by:</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"
+                    >
+                      <option value="phase">Phase Name</option>
+                      <option value="type">Type</option>
+                      <option value="status">Status</option>
+                      <option value="date">Date</option>
+                      <option value="scenes">Scenes</option>
+                      <option value="duration">Duration</option>
+                    </select>
+                  </div>
+                  
+                  {/* Sort Order Toggle */}
                   <button
-                    onClick={() => { setFilterType('all'); setSearchQuery('') }}
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      sortOrder === 'desc' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                    title="Toggle Sort Order (S)"
+                  >
+                    {sortOrder === 'asc' ? (
+                      <>
+                        <span>ASC</span>
+                        <span className="text-xs">↑</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>DESC</span>
+                        <span className="text-xs">↓</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={() => { setFilterType('all'); setSearchQuery(''); setSortBy('phase'); setSortOrder('asc'); }}
                     className="text-sm text-purple-400 hover:text-purple-300"
                   >
                     Clear Filters
@@ -941,6 +1037,10 @@ export default function TimelinePage() {
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Toggle filters</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">F</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Toggle sort order (asc/desc)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">S</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Export timeline</span>

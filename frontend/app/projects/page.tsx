@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { 
   Folder, 
@@ -130,6 +130,8 @@ export default function ProjectsPage() {
     language: [] as string[],
     genre: [] as string[],
   })
+  const [sortBy, setSortBy] = useState<'name' | 'status' | 'startDate' | 'budget' | 'createdAt'>('createdAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -219,6 +221,11 @@ export default function ProjectsPage() {
     else if (e.key.toLowerCase() === 'f') {
       e.preventDefault()
       setShowFilters(prev => !prev)
+    }
+    // S: Toggle sort order
+    else if (e.key.toLowerCase() === 's') {
+      e.preventDefault()
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
     }
     // Escape: Close modal / Clear search / Close export / Close filters
     else if (e.key === 'Escape') {
@@ -336,15 +343,15 @@ export default function ProjectsPage() {
     </div>
     <div class="stat">
       <div class="stat-label">In Production</div>
-      <div class="stat-value">${filtered.filter(p => p.status === 'production').length}</div>
+      <div class="stat-value">${filtered.filter((p: Project) => p.status === 'production').length}</div>
     </div>
     <div class="stat">
       <div class="stat-label">Planning</div>
-      <div class="stat-value">${filtered.filter(p => p.status === 'planning').length}</div>
+      <div class="stat-value">${filtered.filter((p: Project) => p.status === 'planning').length}</div>
     </div>
     <div class="stat">
       <div class="stat-label">Total Budget</div>
-      <div class="stat-value">₹${(filtered.reduce((sum, p) => sum + (parseInt(p.budget || '0')), 0) / 10000000).toFixed(1)}Cr</div>
+      <div class="stat-value">₹${(filtered.reduce((sum: number, p: Project) => sum + (parseInt(p.budget || '0')), 0) / 10000000).toFixed(1)}Cr</div>
     </div>
   </div>
   <table>
@@ -360,7 +367,7 @@ export default function ProjectsPage() {
       </tr>
     </thead>
     <tbody>
-      ${filtered.map(p => `
+      ${filtered.map((p: Project) => `
         <tr>
           <td><strong>${p.name}</strong>${p.description ? `<br><small style="color:#64748b">${p.description}</small>` : ''}</td>
           <td><span class="status" style="background:${statusColors[p.status] || '#64748b'}20;color:${statusColors[p.status] || '#64748b'}">${p.status.replace('_', ' ')}</span></td>
@@ -391,7 +398,7 @@ export default function ProjectsPage() {
     
     if (format === 'csv') {
       const headers = ['Name', 'Description', 'Status', 'Language', 'Genre', 'Budget', 'Start Date', 'End Date', 'Scripts', 'Crew']
-      const rows = exportData.map(p => [
+      const rows = exportData.map((p: Project) => [
         p.name,
         p.description || '',
         p.status,
@@ -416,17 +423,17 @@ export default function ProjectsPage() {
         exportDate: new Date().toISOString(),
         totalProjects: exportData.length,
         summary: {
-          byStatus: exportData.reduce((acc, p) => {
+          byStatus: exportData.reduce((acc: Record<string, number>, p: Project) => {
             acc[p.status] = (acc[p.status] || 0) + 1
             return acc
           }, {} as Record<string, number>),
-          byLanguage: exportData.reduce((acc, p) => {
+          byLanguage: exportData.reduce((acc: Record<string, number>, p: Project) => {
             if (p.language) {
               acc[p.language] = (acc[p.language] || 0) + 1
             }
             return acc
           }, {} as Record<string, number>),
-          totalBudget: exportData.reduce((sum, p) => sum + (parseFloat(p.budget || '0') || 0), 0),
+          totalBudget: exportData.reduce((sum: number, p: Project) => sum + (parseFloat(p.budget || '0') || 0), 0),
         },
         projects: exportData
       }
@@ -537,26 +544,59 @@ export default function ProjectsPage() {
   }
 
   // Count active filters
-  const activeFilterCount = filters.status.length + filters.language.length + filters.genre.length
+  const activeFilterCount = useMemo(() => {
+    let count = filters.status.length + filters.language.length + filters.genre.length
+    if (sortBy !== 'createdAt' || sortOrder !== 'desc') count++
+    return count
+  }, [filters, sortBy, sortOrder])
 
-  const filtered = projects.filter(p => {
-    // Search filter
-    const matchesSearch = !search || 
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.description?.toLowerCase().includes(search.toLowerCase()) ||
-      p.genre?.toLowerCase().includes(search.toLowerCase())
-    
-    // Status filter
-    const matchesStatus = filters.status.length === 0 || filters.status.includes(p.status)
-    
-    // Language filter
-    const matchesLanguage = filters.language.length === 0 || (p.language && filters.language.includes(p.language))
-    
-    // Genre filter (partial match)
-    const matchesGenre = filters.genre.length === 0 || filters.genre.some(g => p.genre?.toLowerCase().includes(g.toLowerCase()))
-    
-    return matchesSearch && matchesStatus && matchesLanguage && matchesGenre
-  })
+  // Filter and sort projects
+  const filtered = useMemo(() => {
+    let result = projects.filter(p => {
+      // Search filter
+      const matchesSearch = !search || 
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.description?.toLowerCase().includes(search.toLowerCase()) ||
+        p.genre?.toLowerCase().includes(search.toLowerCase())
+      
+      // Status filter
+      const matchesStatus = filters.status.length === 0 || filters.status.includes(p.status)
+      
+      // Language filter
+      const matchesLanguage = filters.language.length === 0 || (p.language && filters.language.includes(p.language))
+      
+      // Genre filter (partial match)
+      const matchesGenre = filters.genre.length === 0 || filters.genre.some(g => p.genre?.toLowerCase().includes(g.toLowerCase()))
+      
+      return matchesSearch && matchesStatus && matchesLanguage && matchesGenre
+    })
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'startDate':
+          comparison = (new Date(a.startDate || '1970-01-01').getTime()) - (new Date(b.startDate || '1970-01-01').getTime())
+          break
+        case 'budget':
+          comparison = (parseInt(a.budget || '0')) - (parseInt(b.budget || '0'))
+          break
+        case 'createdAt':
+        default:
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+    return result
+  }, [projects, search, filters, sortBy, sortOrder])
 
   const toggleFilter = (type: 'status' | 'language' | 'genre', value: string) => {
     setFilters(prev => {
@@ -704,10 +744,14 @@ export default function ProjectsPage() {
       {showFilters && (
         <div ref={filterPanelRef} className="mb-6 bg-slate-900/50 border border-slate-800 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-slate-300">Filter Projects</h3>
+            <h3 className="text-sm font-medium text-slate-300">Filter & Sort Projects</h3>
             {activeFilterCount > 0 && (
               <button
-                onClick={clearFilters}
+                onClick={() => {
+                  clearFilters()
+                  setSortBy('createdAt')
+                  setSortOrder('desc')
+                }}
                 className="text-xs text-purple-400 hover:text-purple-300"
               >
                 Clear all ({activeFilterCount})
@@ -715,7 +759,7 @@ export default function ProjectsPage() {
             )}
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Status Filter */}
             <div>
               <label className="block text-xs text-slate-500 mb-2">Status</label>
@@ -774,6 +818,50 @@ export default function ProjectsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Sort Options */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Sort By</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {[
+                  { value: 'createdAt', label: 'Created' },
+                  { value: 'name', label: 'Name' },
+                  { value: 'status', label: 'Status' },
+                  { value: 'startDate', label: 'Start Date' },
+                  { value: 'budget', label: 'Budget' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setSortBy(opt.value as typeof sortBy)}
+                    className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                      sortBy === opt.value
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  sortBy !== 'createdAt' || sortOrder !== 'desc'
+                    ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                {sortOrder === 'asc' ? (
+                  <>
+                    <span>↑</span> Ascending
+                  </>
+                ) : (
+                  <>
+                    <span>↓</span> Descending
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -1129,6 +1217,7 @@ export default function ProjectsPage() {
                 { key: 'R', description: 'Refresh projects' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters' },
+                { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'P', description: 'Print projects report' },
                 { key: 'N', description: 'Create new project' },
                 { key: 'E', description: 'Export projects' },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Bell,
   Mail,
@@ -188,6 +188,10 @@ export default function NotificationsPage() {
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   
+  // Sort state
+  const [sortBy, setSortBy] = useState<'date' | 'priority' | 'channel' | 'status'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -201,13 +205,22 @@ export default function NotificationsPage() {
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
   
   // Calculate active filter count
-  const activeFilterCount = (channelFilter !== 'all' ? 1 : 0) + (filterTab !== 'all' ? 1 : 0);
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (channelFilter !== 'all') count++;
+    if (filterTab !== 'all') count++;
+    if (searchQuery) count++;
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++;
+    return count;
+  }, [channelFilter, filterTab, searchQuery, sortBy, sortOrder]);
   
   // Clear all filters
   const clearFilters = useCallback(() => {
     setChannelFilter('all');
     setFilterTab('all');
     setSearchQuery('');
+    setSortBy('date');
+    setSortOrder('desc');
   }, []);
   const [form, setForm] = useState({
     channel: 'app' as 'app' | 'email' | 'whatsapp' | 'sms',
@@ -256,12 +269,12 @@ export default function NotificationsPage() {
 
   // Export functions
   const handleExportCSV = () => {
-    if (notifications.length === 0) return
+    if (sortedNotifications.length === 0) return
     setExporting(true)
     setShowExportMenu(false)
 
     const headers = ['ID', 'Channel', 'Recipient', 'Title', 'Body', 'Status', 'Priority', 'Created At', 'Sent At']
-    const rows = notifications.map(n => [
+    const rows = sortedNotifications.map(n => [
       n.id,
       n.channel,
       n.recipient || '',
@@ -283,36 +296,38 @@ export default function NotificationsPage() {
   }
 
   const handleExportJSON = () => {
-    if (notifications.length === 0) return
+    if (sortedNotifications.length === 0) return
     setExporting(true)
     setShowExportMenu(false)
 
     const exportData = {
       exportDate: new Date().toISOString(),
-      total: notifications.length,
-      stats: {
-        total: notifications.length,
-        unread: notifications.filter(n => n.status === 'unread').length,
-        sent: notifications.filter(n => n.status === 'sent').length,
-        failed: notifications.filter(n => n.status === 'failed').length,
-        byChannel: {
-          app: notifications.filter(n => n.channel === 'app').length,
-          email: notifications.filter(n => n.channel === 'email').length,
-          whatsapp: notifications.filter(n => n.channel === 'whatsapp').length,
-          sms: notifications.filter(n => n.channel === 'sms').length,
-        },
-        byPriority: {
-          high: notifications.filter(n => n.priority === 'high').length,
-          medium: notifications.filter(n => n.priority === 'medium').length,
-          low: notifications.filter(n => n.priority === 'low').length,
-        },
-      },
+      total: sortedNotifications.length,
+      sortBy,
+      sortOrder,
       filters: {
-        searchQuery,
         channelFilter,
         filterTab,
+        searchQuery: searchQuery || undefined,
       },
-      notifications: notifications,
+      stats: {
+        total: sortedNotifications.length,
+        unread: sortedNotifications.filter(n => n.status === 'unread').length,
+        sent: sortedNotifications.filter(n => n.status === 'sent').length,
+        failed: sortedNotifications.filter(n => n.status === 'failed').length,
+        byChannel: {
+          app: sortedNotifications.filter(n => n.channel === 'app').length,
+          email: sortedNotifications.filter(n => n.channel === 'email').length,
+          whatsapp: sortedNotifications.filter(n => n.channel === 'whatsapp').length,
+          sms: sortedNotifications.filter(n => n.channel === 'sms').length,
+        },
+        byPriority: {
+          high: sortedNotifications.filter(n => n.priority === 'high').length,
+          medium: sortedNotifications.filter(n => n.priority === 'medium').length,
+          low: sortedNotifications.filter(n => n.priority === 'low').length,
+        },
+      },
+      notifications: sortedNotifications,
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -324,20 +339,20 @@ export default function NotificationsPage() {
   }
 
   const handlePrint = () => {
-    if (notifications.length === 0) return
+    if (sortedNotifications.length === 0) return
     setPrinting(true)
     setShowPrintMenu(false)
 
     const stats = {
-      total: notifications.length,
-      unread: notifications.filter(n => n.status === 'unread').length,
-      sent: notifications.filter(n => n.status === 'sent').length,
-      failed: notifications.filter(n => n.status === 'failed').length,
+      total: sortedNotifications.length,
+      unread: sortedNotifications.filter(n => n.status === 'unread').length,
+      sent: sortedNotifications.filter(n => n.status === 'sent').length,
+      failed: sortedNotifications.filter(n => n.status === 'failed').length,
       byChannel: {
-        app: notifications.filter(n => n.channel === 'app').length,
-        email: notifications.filter(n => n.channel === 'email').length,
-        whatsapp: notifications.filter(n => n.channel === 'whatsapp').length,
-        sms: notifications.filter(n => n.channel === 'sms').length,
+        app: sortedNotifications.filter(n => n.channel === 'app').length,
+        email: sortedNotifications.filter(n => n.channel === 'email').length,
+        whatsapp: sortedNotifications.filter(n => n.channel === 'whatsapp').length,
+        sms: sortedNotifications.filter(n => n.channel === 'sms').length,
       },
     }
 
@@ -417,7 +432,7 @@ export default function NotificationsPage() {
       </tr>
     </thead>
     <tbody>
-      ${notifications.map((n, i) => `
+      ${sortedNotifications.map((n, i) => `
         <tr>
           <td>${i + 1}</td>
           <td><span class="badge ${n.channel}">${n.channel.toUpperCase()}</span></td>
@@ -511,6 +526,12 @@ export default function NotificationsPage() {
             setShowFilters(!showFilters)
           }
           break
+        case 's':
+          if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault()
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          }
+          break
         case 'e':
           if (!showExportMenu) {
             e.preventDefault()
@@ -528,7 +549,7 @@ export default function NotificationsPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showFilters, notifications.length, showExportMenu, showPrintMenu])
+  }, [showFilters, notifications.length, showExportMenu, showPrintMenu, sortOrder])
 
   // Click outside to close export/print menus and filter panel
   useEffect(() => {
@@ -576,10 +597,33 @@ export default function NotificationsPage() {
     return matchesTab && matchesChannel && matchesSearch;
   });
 
-  // Sort by date (newest first)
-  const sortedNotifications = [...filteredNotifications].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  // Sort notifications based on sortBy and sortOrder
+  const sortedNotifications = useMemo(() => {
+    return [...filteredNotifications].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          break;
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          comparison = priorityOrder[b.priority] - priorityOrder[a.priority];
+          break;
+        case 'channel':
+          comparison = a.channel.localeCompare(b.channel);
+          break;
+        case 'status':
+          const statusOrder = { unread: 3, sent: 2, read: 1, failed: 0 };
+          const aStatus = a.status === 'read' ? 'read' : a.status;
+          const bStatus = b.status === 'read' ? 'read' : b.status;
+          comparison = (statusOrder[bStatus as keyof typeof statusOrder] || 0) - (statusOrder[aStatus as keyof typeof statusOrder] || 0);
+          break;
+      }
+      
+      return sortOrder === 'asc' ? -comparison : comparison;
+    });
+  }, [filteredNotifications, sortBy, sortOrder]);
 
   const toggleStatus = async (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'read' ? 'unread' : 'read';
@@ -1031,7 +1075,7 @@ export default function NotificationsPage() {
               </button>
             </div>
 
-            {/* Filter Panel */}
+            {/* Filter & Sort Panel */}
             {showFilters && (
               <div ref={filterPanelRef} className="flex flex-wrap items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl p-3 animate-in fade-in slide-in-from-top-2 duration-200 mb-4">
                 <div className="flex items-center gap-2">
@@ -1065,11 +1109,38 @@ export default function NotificationsPage() {
                     <option value="failed">Failed</option>
                   </select>
                 </div>
+                
+                {/* Sort Controls */}
+                <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
+                  <span className="text-sm text-slate-400">Sort:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                    className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="date">Date</option>
+                    <option value="priority">Priority</option>
+                    <option value="channel">Channel</option>
+                    <option value="status">Status</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      sortBy !== 'date' || sortOrder !== 'desc'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Toggle sort order (S)"
+                  >
+                    {sortOrder === 'asc' ? 'ASC' : 'DESC'}
+                  </button>
+                </div>
+                
                 <button
                   onClick={clearFilters}
                   className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
                 >
-                  Clear Filters
+                  Clear All
                 </button>
               </div>
             )}
@@ -1258,6 +1329,10 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">F</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">S</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Focus search</span>

@@ -230,18 +230,29 @@ export default function WeatherPage() {
     condition: 'all',
     dateRange: 'all',
   });
+  const [sortBy, setSortBy] = useState<'date' | 'temp' | 'score' | 'humidity' | 'wind'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const printMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
 
-  // Calculate active filter count
-  const activeFilterCount = (filters.condition !== 'all' ? 1 : 0) + (filters.dateRange !== 'all' ? 1 : 0);
+  // Calculate active filter count (includes sort)
+  const activeFilterCount = (filters.condition !== 'all' ? 1 : 0) + 
+    (filters.dateRange !== 'all' ? 1 : 0) + 
+    (sortBy !== 'date' || sortOrder !== 'asc' ? 1 : 0);
 
-  // Clear filters
-  const clearFilters = () => {
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  }, []);
+
+  // Clear filters and sort
+  const clearFilters = useCallback(() => {
     setFilters({ condition: 'all', dateRange: 'all' });
-  };
+    setSortBy('date');
+    setSortOrder('asc');
+  }, []);
 
-  // Filtered weather forecast
+  // Filtered and sorted weather forecast
   const filteredForecast = useMemo(() => {
     if (!weatherData?.forecast) return [];
     
@@ -274,8 +285,33 @@ export default function WeatherPage() {
       }
     }
     
+    // Apply sorting
+    if (sortBy !== 'date' || sortOrder !== 'asc') {
+      result.sort((a, b) => {
+        let comparison = 0;
+        switch (sortBy) {
+          case 'date':
+            comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+            break;
+          case 'temp':
+            comparison = a.tempHigh - b.tempHigh;
+            break;
+          case 'score':
+            comparison = a.productionScore - b.productionScore;
+            break;
+          case 'humidity':
+            comparison = a.humidity - b.humidity;
+            break;
+          case 'wind':
+            comparison = a.windSpeed - b.windSpeed;
+            break;
+        }
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    }
+    
     return result;
-  }, [weatherData?.forecast, filters]);
+  }, [weatherData?.forecast, filters, sortBy, sortOrder]);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -439,6 +475,10 @@ export default function WeatherPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
         case 'p':
           e.preventDefault()
           if (weatherData?.forecast?.length && !printingRef.current) {
@@ -450,7 +490,7 @@ export default function WeatherPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [weatherData]);
+  }, [weatherData, toggleSortOrder]);
 
   // Geocode custom location using Nominatim (free API)
   const handleCustomLocationSearch = useCallback(async () => {
@@ -494,12 +534,12 @@ export default function WeatherPage() {
     }
   }, [customLocationInput, fetchWeather]);
 
-  // Export forecast to CSV
+  // Export forecast to CSV (uses filtered/sorted data)
   const exportToCSV = useCallback(() => {
-    if (!weatherData?.forecast?.length) return;
+    if (!filteredForecast.length) return;
     
     const headers = ['Date', 'Condition', 'Temp High (°C)', 'Temp Low (°C)', 'Humidity (%)', 'Wind Speed (km/h)', 'Precipitation (mm)', 'Production Score', 'Recommendation'];
-    const rows = weatherData.forecast.map(day => [
+    const rows = filteredForecast.map(day => [
       day.date,
       day.condition,
       day.tempHigh.toString(),
@@ -516,28 +556,34 @@ export default function WeatherPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `weather-forecast-${weatherData.location}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `weather-forecast-${weatherData?.location || 'forecast'}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [weatherData]);
+  }, [filteredForecast, weatherData]);
 
-  // Export forecast to JSON
+  // Export forecast to JSON (uses filtered/sorted data)
   const exportToJSON = useCallback(() => {
-    if (!weatherData?.forecast?.length) return;
+    if (!filteredForecast.length) return;
     
     const exportData = {
       exportDate: new Date().toISOString(),
-      location: weatherData.location,
-      coordinates: { lat: weatherData.lat, lng: weatherData.lng },
-      isDemo: weatherData.isDemo,
-      summary: {
-        totalDays: weatherData.forecast.length,
-        avgProductionScore: Math.round(weatherData.forecast.reduce((sum, d) => sum + d.productionScore, 0) / weatherData.forecast.length),
-        bestDay: weatherData.forecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, weatherData.forecast[0]),
-        worstDay: weatherData.forecast.reduce((worst, d) => d.productionScore < worst.productionScore ? d : worst, weatherData.forecast[0]),
-        totalPrecipitation: weatherData.forecast.reduce((sum, d) => sum + d.precipitation, 0),
+      location: weatherData?.location || 'Unknown',
+      coordinates: { lat: weatherData?.lat || 0, lng: weatherData?.lng || 0 },
+      isDemo: weatherData?.isDemo,
+      filters: {
+        condition: filters.condition,
+        dateRange: filters.dateRange,
+        sortBy,
+        sortOrder,
       },
-      forecast: weatherData.forecast.map(day => ({
+      summary: {
+        totalDays: filteredForecast.length,
+        avgProductionScore: Math.round(filteredForecast.reduce((sum, d) => sum + d.productionScore, 0) / filteredForecast.length),
+        bestDay: filteredForecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, filteredForecast[0]),
+        worstDay: filteredForecast.reduce((worst, d) => d.productionScore < worst.productionScore ? d : worst, filteredForecast[0]),
+        totalPrecipitation: filteredForecast.reduce((sum, d) => sum + d.precipitation, 0),
+      },
+      forecast: filteredForecast.map(day => ({
         date: day.date,
         condition: day.condition,
         temperature: { high: day.tempHigh, low: day.tempLow },
@@ -554,10 +600,10 @@ export default function WeatherPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `weather-forecast-${weatherData.location}-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `weather-forecast-${weatherData?.location || 'forecast'}-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [weatherData]);
+  }, [filteredForecast, weatherData, filters, sortBy, sortOrder]);
 
   // Set up export ref for keyboard shortcuts
   useEffect(() => {
@@ -567,11 +613,11 @@ export default function WeatherPage() {
 
   // Print forecast report
   const handlePrint = useCallback(() => {
-    if (!weatherData?.forecast?.length) return;
+    if (!filteredForecast.length) return;
     setPrinting(true);
     setShowPrintMenu(false);
     
-    const forecast = weatherData.forecast;
+    const forecast = filteredForecast;
     const avgScore = Math.round(forecast.reduce((sum, d) => sum + d.productionScore, 0) / forecast.length);
     const bestDay = forecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, forecast[0]);
     const totalPrecip = forecast.reduce((sum, d) => sum + d.precipitation, 0);
@@ -627,7 +673,7 @@ export default function WeatherPage() {
 <body>
   <div class="header">
     <h1>Weather Forecast Report</h1>
-    <div class="location">📍 ${weatherData.location}</div>
+    <div class="location">📍 ${weatherData?.location || 'Unknown Location'}</div>
     <div class="date">Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
   </div>
   
@@ -703,7 +749,7 @@ export default function WeatherPage() {
     }
     
     setTimeout(() => setPrinting(false), 500);
-  }, [weatherData]);
+  }, [filteredForecast, weatherData]);
 
   // Set up print ref for keyboard shortcuts (after handlePrint is defined)
   useEffect(() => {
@@ -857,6 +903,7 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['3']} description="Switch to Analytics view" />
                 <ShortcutRow keys={['4']} description="Switch to Schedule view" />
                 <ShortcutRow keys={['F']} description="Toggle filters" />
+                <ShortcutRow keys={['S']} description="Toggle sort order" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
                 <ShortcutRow keys={['P']} description="Print forecast report" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
@@ -1062,13 +1109,14 @@ export default function WeatherPage() {
           </div>
         </div>
 
-        {/* Filter Panel */}
+        {/* Filter & Sort Panel */}
         {showFilters && weatherData?.forecast && (
           <div 
             ref={filterPanelRef}
             className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200"
           >
-            <div className="flex flex-wrap items-center gap-4">
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center gap-4 mb-3">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-400" />
                 <span className="text-sm font-medium text-slate-300">Filters:</span>
@@ -1101,16 +1149,45 @@ export default function WeatherPage() {
                   <option value="weekend">This Weekend</option>
                 </select>
               </div>
+            </div>
+            {/* Sort Row */}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-blue-300">Sort:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="date">📅 Date</option>
+                  <option value="temp">🌡️ Temperature</option>
+                  <option value="score">🎯 Production Score</option>
+                  <option value="humidity">💧 Humidity</option>
+                  <option value="wind">💨 Wind Speed</option>
+                </select>
+              </div>
+              <button
+                onClick={toggleSortOrder}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  sortOrder === 'asc' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-500' 
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+              </button>
               {activeFilterCount > 0 && (
                 <button
-                  onClick={() => setFilters({ condition: 'all', dateRange: 'all' })}
+                  onClick={clearFilters}
                   className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
                 >
-                  Clear Filters
+                  Clear All
                 </button>
               )}
               <span className="text-sm text-slate-500 ml-auto">
-                {weatherData.forecast.length} days available
+                {filteredForecast.length} of {weatherData.forecast.length} days
               </span>
             </div>
           </div>

@@ -68,12 +68,17 @@ export default function StoryboardPage() {
   const [sceneFilter, setSceneFilter] = useState<string>('all')
   const [printing, setPrinting] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [sortBy, setSortBy] = useState<'scene' | 'shot' | 'status' | 'approved'>('scene')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
   // Refs for keyboard shortcuts and data
   const searchInputRef = useRef<HTMLInputElement>(null)
   const selectedScriptRef = useRef(selectedScript)
   const scenesLengthRef = useRef(scenes.length)
   const handleRefreshRef = useRef<() => void>(() => {})
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     selectedScriptRef.current = selectedScript
@@ -124,12 +129,12 @@ export default function StoryboardPage() {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
 
-  // Export functions
+  // Export functions using filtered/sorted data
   const handleExportCSV = () => {
-    if (scenes.length === 0) return
+    if (filteredScenes.length === 0) return
     const headers = ['Scene', 'Shot', 'Frame ID', 'Status', 'Approved', 'Style', 'Prompt']
     const rows: string[][] = []
-    scenes.forEach(scene => {
+    filteredScenes.forEach(scene => {
       scene.frames.forEach(frame => {
         rows.push([
           scene.sceneNumber.toString(),
@@ -154,17 +159,24 @@ export default function StoryboardPage() {
   }
 
   const handleExportJSON = () => {
-    if (scenes.length === 0) return
+    if (filteredScenes.length === 0) return
     const data = {
       exportDate: new Date().toISOString(),
-      totalScenes: scenes.length,
-      totalFrames: scenes.reduce((sum, s) => sum + s.frames.length, 0),
-      summary: {
-        approved: scenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0),
-        pending: scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending').length, 0),
-        failed: scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0),
+      filters: {
+        searchQuery,
+        statusFilter,
+        sceneFilter,
+        sortBy,
+        sortOrder,
       },
-      scenes: scenes.map(scene => ({
+      totalScenes: filteredScenes.length,
+      totalFrames: filteredScenes.reduce((sum, s) => sum + s.frames.length, 0),
+      summary: {
+        approved: filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0),
+        pending: filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending').length, 0),
+        failed: filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0),
+      },
+      scenes: filteredScenes.map(scene => ({
         sceneNumber: scene.sceneNumber,
         heading: scene.heading,
         frames: scene.frames.map(frame => ({
@@ -188,19 +200,19 @@ export default function StoryboardPage() {
     setShowExportMenu(false)
   }
 
-  // Print functionality
+  // Print functionality using filtered/sorted data
   const handlePrint = () => {
-    if (scenes.length === 0) return
+    if (filteredScenes.length === 0) return
     setPrinting(true)
 
-    // Calculate stats
-    const totalFrames = scenes.reduce((sum, s) => sum + s.frames.length, 0)
-    const approvedCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0)
-    const pendingCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending' || f.status === 'generating').length, 0)
-    const failedCount = scenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0)
+    // Calculate stats from filtered data
+    const totalFrames = filteredScenes.reduce((sum, s) => sum + s.frames.length, 0)
+    const approvedCount = filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0)
+    const pendingCount = filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending' || f.status === 'generating').length, 0)
+    const failedCount = filteredScenes.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0)
 
-    // Build scenes HTML
-    const scenesHtml = scenes.map(scene => {
+    // Build scenes HTML from filtered data
+    const scenesHtml = filteredScenes.map(scene => {
       const framesHtml = scene.frames.map(frame => `
         <div style="page-break-inside: avoid; margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
@@ -386,6 +398,10 @@ export default function StoryboardPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -435,7 +451,7 @@ export default function StoryboardPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Filter scenes based on search query and filters
+  // Filter and sort scenes based on search query and filters
   const filteredScenes = useMemo(() => {
     let result = scenes
     
@@ -474,17 +490,59 @@ export default function StoryboardPage() {
       )
     }
     
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'scene':
+          comparison = a.sceneNumber - b.sceneNumber
+          break
+        case 'shot':
+          // Sort by the first shot's index in each scene
+          const aMinShot = a.frames.length > 0 ? Math.min(...a.frames.map(f => f.shot.shotIndex)) : 0
+          const bMinShot = b.frames.length > 0 ? Math.min(...b.frames.map(f => f.shot.shotIndex)) : 0
+          comparison = aMinShot - bMinShot
+          break
+        case 'status':
+          // Sort by worst status (failed > pending > generating > complete)
+          const getWorstStatus = (frames: FrameData[]) => {
+            if (frames.some(f => f.status === 'failed')) return 3
+            if (frames.some(f => f.status === 'pending')) return 2
+            if (frames.some(f => f.status === 'generating')) return 1
+            return 0
+          }
+          comparison = getWorstStatus(a.frames) - getWorstStatus(b.frames)
+          break
+        case 'approved':
+          // Sort by approval percentage
+          const aApproval = a.frames.length > 0 ? a.frames.filter(f => f.isApproved).length / a.frames.length : 0
+          const bApproval = b.frames.length > 0 ? b.frames.filter(f => f.isApproved).length / b.frames.length : 0
+          comparison = aApproval - bApproval
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
     return result
-  }, [scenes, searchQuery, statusFilter, sceneFilter])
+  }, [scenes, searchQuery, statusFilter, sceneFilter, sortBy, sortOrder])
   
-  // Calculate active filter count
-  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (sceneFilter !== 'all' ? 1 : 0)
+  // Calculate active filter count (includes sort state)
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (sceneFilter !== 'all' ? 1 : 0) + (sortBy !== 'scene' || sortOrder !== 'asc' ? 1 : 0)
   
-  // Clear all filters
+  // Clear all filters and sort
   const clearFilters = () => {
     setStatusFilter('all')
     setSceneFilter('all')
     setSearchQuery('')
+    setSortBy('scene')
+    setSortOrder('asc')
+  }
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
   const handleGenerateScene = async (sceneId: string) => {
@@ -629,7 +687,7 @@ export default function StoryboardPage() {
                     ? 'bg-violet-600 border-violet-500 text-white'
                     : 'bg-[#1a1a1a] border-gray-700 hover:bg-[#222] text-gray-400'
                 }`}
-                title="Filter (F)"
+                title="Filter & Sort (F)"
               >
                 <Filter className="w-5 h-5" />
                 {activeFilterCount > 0 && (
@@ -639,9 +697,9 @@ export default function StoryboardPage() {
                 )}
               </button>
               {showFilters && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-72 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                    <span className="text-sm font-medium">Filters</span>
+                    <span className="text-sm font-medium">Filter & Sort</span>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -652,6 +710,43 @@ export default function StoryboardPage() {
                     )}
                   </div>
                   <div className="p-4 space-y-4">
+                    {/* Sort Options */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs text-gray-500 uppercase tracking-wider">Sort By</label>
+                        <button
+                          onClick={toggleSortOrder}
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
+                            sortOrder === 'asc' 
+                              ? 'bg-cyan-600 text-white' 
+                              : 'bg-cyan-600 text-white'
+                          }`}
+                          title="Toggle sort order (S)"
+                        >
+                          {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { key: 'scene', label: 'Scene' },
+                          { key: 'shot', label: 'Shot' },
+                          { key: 'status', label: 'Status' },
+                          { key: 'approved', label: 'Approved' },
+                        ].map(sort => (
+                          <button
+                            key={sort.key}
+                            onClick={() => setSortBy(sort.key as typeof sortBy)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
+                              sortBy === sort.key
+                                ? 'bg-cyan-600 text-white'
+                                : 'bg-[#222] text-gray-400 hover:bg-[#333] hover:text-white'
+                            }`}
+                          >
+                            {sort.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     {/* Status Filter */}
                     <div>
                       <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Status</label>
@@ -1039,7 +1134,8 @@ export default function StoryboardPage() {
               <div className="space-y-3">
                 {[
                   { key: 'R', action: 'Refresh storyboard data' },
-                  { key: 'F', action: 'Toggle filters' },
+                  { key: 'F', action: 'Toggle filters & sort' },
+                  { key: 'S', action: 'Toggle sort order (asc/desc)' },
                   { key: 'P', action: 'Print storyboard report' },
                   { key: '/', action: 'Focus search input' },
                   { key: '1', action: 'Switch to Clean Line Art style' },

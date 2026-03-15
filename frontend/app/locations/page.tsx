@@ -580,7 +580,7 @@ export default function LocationsPage() {
       return result.sort((a, b) => (b.scoreTotal - a.scoreTotal) * multiplier)
     }
     return result.sort((a, b) => (a.name || '').localeCompare(b.name || '') * multiplier)
-  }, [candidates, filterScore, sortBy, filters, favorites])
+  }, [candidates, filterScore, sortBy, sortOrder, filters, favorites])
 
   // Statistics
   const stats = useMemo(() => {

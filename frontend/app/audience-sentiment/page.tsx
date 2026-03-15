@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   MessageCircle,
   ThumbsUp,
@@ -81,11 +81,21 @@ export default function AudienceSentimentPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'analyzing' | 'failed'>('all')
+  
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'sentiment' | 'comments' | 'positive' | 'negative' | 'neutral'>('createdAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
   // Calculate active filter count
-  const activeFilterCount = (platformFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)
+  const activeFilterCount = (platformFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0) + (sortBy !== 'createdAt' || sortOrder !== 'desc' ? 1 : 0)
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
   const [formData, setFormData] = useState({
     title: '',
     platform: 'youtube',
@@ -97,17 +107,50 @@ export default function AudienceSentimentPage() {
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const printSentimentReportRef = useRef<() => void>(() => {})
 
-  // Filter analyses by platform, status, and search query
-  const filteredAnalyses = analyses.filter(a => {
-    const matchesPlatform = platformFilter === 'all' || a.platform === platformFilter
-    const matchesStatus = statusFilter === 'all' || a.status === statusFilter
-    const matchesSearch = !searchQuery || 
-      a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (a.topPositive?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-      (a.topNegative?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-      (a.takeaways?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())))
-    return matchesPlatform && matchesStatus && matchesSearch
-  })
+  // Filter and sort analyses by platform, status, search query, and sort options
+  const filteredAnalyses = useMemo(() => {
+    const filtered = analyses.filter(a => {
+      const matchesPlatform = platformFilter === 'all' || a.platform === platformFilter
+      const matchesStatus = statusFilter === 'all' || a.status === statusFilter
+      const matchesSearch = !searchQuery || 
+        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (a.topPositive?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+        (a.topNegative?.some(c => c.text.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+        (a.takeaways?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())))
+      return matchesPlatform && matchesStatus && matchesSearch
+    })
+    
+    // Sort the filtered results
+    return filtered.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+        case 'sentiment':
+          comparison = a.avgSentiment - b.avgSentiment
+          break
+        case 'comments':
+          comparison = a.totalComments - b.totalComments
+          break
+        case 'positive':
+          comparison = a.positiveCount - b.positiveCount
+          break
+        case 'negative':
+          comparison = a.negativeCount - b.negativeCount
+          break
+        case 'neutral':
+          comparison = a.neutralCount - b.neutralCount
+          break
+        default:
+          comparison = 0
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [analyses, platformFilter, statusFilter, searchQuery, sortBy, sortOrder])
 
   const fetchAnalyses = useCallback(async () => {
     setError(null)
@@ -185,6 +228,10 @@ export default function AudienceSentimentPage() {
           e.preventDefault()
           setShowKeyboardHelp(false)
           setShowFilters(false)
+          break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
           break
         case 'f':
           e.preventDefault()
@@ -671,13 +718,42 @@ export default function AudienceSentimentPage() {
                 </select>
               </div>
               
+              {/* Sort By */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400">Sort:</span>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="createdAt">Date</option>
+                    <option value="title">Title</option>
+                    <option value="sentiment">Sentiment</option>
+                    <option value="comments">Comments</option>
+                    <option value="positive">Positive</option>
+                    <option value="negative">Negative</option>
+                    <option value="neutral">Neutral</option>
+                  </select>
+                  <button
+                    onClick={toggleSortOrder}
+                    className="flex items-center gap-1 px-2 py-1.5 bg-orange-600 hover:bg-orange-500 rounded-lg text-xs text-white transition-colors"
+                    title="Toggle sort order (S)"
+                  >
+                    {sortOrder === 'asc' ? '↑' : '↓'}
+                  </button>
+                </div>
+              </div>
+              
               {/* Clear Filters */}
-              {(platformFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+              {(platformFilter !== 'all' || statusFilter !== 'all' || searchQuery || sortBy !== 'createdAt' || sortOrder !== 'desc') && (
                 <button
                   onClick={() => {
                     setPlatformFilter('all')
                     setStatusFilter('all')
                     setSearchQuery('')
+                    setSortBy('createdAt')
+                    setSortOrder('desc')
                   }}
                   className="text-sm text-rose-400 hover:text-rose-300 transition-colors"
                 >
@@ -1134,6 +1210,10 @@ export default function AudienceSentimentPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

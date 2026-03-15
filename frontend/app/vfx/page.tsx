@@ -167,6 +167,23 @@ export default function VfxPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'scene' | 'type' | 'confidence' | 'complexity'>('scene');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Sort options
+  const sortOptions = [
+    { key: 'scene', label: 'Scene Number' },
+    { key: 'type', label: 'VFX Type' },
+    { key: 'confidence', label: 'Confidence' },
+    { key: 'complexity', label: 'Complexity' },
+  ];
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
@@ -183,8 +200,9 @@ export default function VfxPage() {
     let count = 0;
     if (typeFilter !== 'all') count++;
     if (complexityFilter !== 'all') count++;
+    if (sortBy !== 'scene' || sortOrder !== 'asc') count++;
     return count;
-  }, [typeFilter, complexityFilter]);
+  }, [typeFilter, complexityFilter, sortBy, sortOrder]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -224,10 +242,16 @@ export default function VfxPage() {
           setSearchQuery('')
           setTypeFilter('all')
           setComplexityFilter('all')
+          setSortBy('scene')
+          setSortOrder('asc')
           break
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
           break
         case 'e':
           if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
@@ -332,8 +356,31 @@ export default function VfxPage() {
       notes = notes.filter(n => getComplexity(n.confidence) === complexityFilter);
     }
     
+    // Apply sorting
+    notes.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'scene':
+          comparison = a.scene.sceneIndex - b.scene.sceneIndex;
+          break;
+        case 'type':
+          comparison = a.vfxType.localeCompare(b.vfxType);
+          break;
+        case 'confidence':
+          comparison = a.confidence - b.confidence;
+          break;
+        case 'complexity':
+          const aComplexity = getComplexity(a.confidence);
+          const bComplexity = getComplexity(b.confidence);
+          const complexityOrder: Record<string, number> = { simple: 1, moderate: 2, complex: 3 };
+          comparison = (complexityOrder[aComplexity] || 0) - (complexityOrder[bComplexity] || 0);
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
     return notes;
-  }, [vfxNotes, searchQuery, typeFilter, complexityFilter]);
+  }, [vfxNotes, searchQuery, typeFilter, complexityFilter, sortBy, sortOrder]);
 
   // Group filtered notes by scene
   const filteredSceneGroups = useMemo(() => {
@@ -565,7 +612,12 @@ export default function VfxPage() {
   // Export VFX data to CSV
   function exportToCSV() {
     const headers = ['Scene', 'Heading', 'Type', 'Description', 'Confidence', 'Severity', 'Warning'];
-    const rows = displayScenes.map(([sceneNum, group]) => {
+    const scenesToExport = isFilterOrSortActive ? displayScenes : [...sceneGroups.entries()].sort((a, b) => {
+      const aIdx = vfxNotes.find((n) => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
+      const bIdx = vfxNotes.find((n) => n.scene.sceneNumber === b[0])?.scene.sceneIndex ?? 0;
+      return aIdx - bIdx;
+    });
+    const rows = scenesToExport.map(([sceneNum, group]) => {
       const notes = group.notes.map(n => ({
         scene: sceneNum,
         heading: group.heading || '',
@@ -600,10 +652,18 @@ export default function VfxPage() {
 
   // Export VFX data to JSON
   function exportToJSON() {
+    const notesToExport = isFilterOrSortActive ? filteredNotes : vfxNotes;
     const exportData = {
       exportedAt: new Date().toISOString(),
       scriptId: selectedScript,
       scriptTitle: scripts.find(s => s.id === selectedScript)?.title || 'Unknown',
+      filters: isFilterOrSortActive ? {
+        searchQuery,
+        typeFilter,
+        complexityFilter,
+        sortBy,
+        sortOrder,
+      } : null,
       summary: summary ? {
         totalScenes: summary.totalScenes,
         totalNotes: summary.totalNotes,
@@ -612,7 +672,7 @@ export default function VfxPage() {
         estimatedTotalCost: summary.estimatedTotalCost,
         estimatedTotalDuration: summary.estimatedTotalDuration,
       } : null,
-      notes: vfxNotes.map(n => ({
+      notes: notesToExport.map(n => ({
         scene: n.scene.sceneNumber,
         heading: n.scene.headingRaw,
         type: n.vfxType,
@@ -809,8 +869,9 @@ export default function VfxPage() {
     sceneGroups.get(key)!.props.push(prop);
   }
 
-  // Use filtered scenes for display when filters are active, otherwise use all scenes
-  const displayScenes = searchQuery || typeFilter !== 'all' || complexityFilter !== 'all' 
+  // Use filtered scenes for display when filters or sort are active, otherwise use all scenes
+  const isFilterOrSortActive = searchQuery || typeFilter !== 'all' || complexityFilter !== 'all' || sortBy !== 'scene' || sortOrder !== 'asc';
+  const displayScenes = isFilterOrSortActive 
     ? filteredSceneGroups 
     : [...sceneGroups.entries()].sort((a, b) => {
         const aIdx = vfxNotes.find((n) => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
@@ -1021,10 +1082,44 @@ export default function VfxPage() {
                   <option value="complex">Complex</option>
                 </select>
               </div>
+              <div className="h-6 w-px bg-slate-700" />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-300">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                >
+                  {sortOptions.map(opt => (
+                    <option key={opt.key} value={opt.key}>{opt.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={toggleSortOrder}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    sortOrder === 'asc' 
+                      ? 'bg-purple-500/20 text-purple-400' 
+                      : 'bg-purple-600/20 text-purple-300'
+                  }`}
+                  title={`Sort ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
+                >
+                  {sortOrder === 'asc' ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               <button
                 onClick={() => {
                   setTypeFilter('all')
                   setComplexityFilter('all')
+                  setSortBy('scene')
+                  setSortOrder('asc')
                 }}
                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
               >
@@ -1566,6 +1661,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Toggle sort order</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Add new VFX shot</span>

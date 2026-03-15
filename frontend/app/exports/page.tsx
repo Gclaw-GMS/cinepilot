@@ -130,6 +130,15 @@ export default function ExportsPage() {
   const [formatFilter, setFormatFilter] = useState('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'format' | 'category'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+  
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,6 +160,10 @@ export default function ExportsPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -160,6 +173,9 @@ export default function ExportsPage() {
           setShowKeyboardHelp(false)
           setSearchQuery('')
           setShowFilters(false)
+          // Reset sort to default
+          setSortBy('name')
+          setSortOrder('asc')
           break
       }
     }
@@ -183,8 +199,8 @@ export default function ExportsPage() {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
 
-  // Count active filters
-  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length
+  // Count active filters (including sort state)
+  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
   
   // Filter categories by search query and filters
   const filteredCategories = useMemo(() => {
@@ -217,8 +233,34 @@ export default function ExportsPage() {
       })).filter(category => category.exports.length > 0)
     }
     
+    // Apply sorting
+    categories = categories.map(category => ({
+      ...category,
+      exports: [...category.exports].sort((a, b) => {
+        let comparison = 0
+        switch (sortBy) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name)
+            break
+          case 'format':
+            comparison = a.format.localeCompare(b.format)
+            break
+          case 'category':
+            comparison = category.id.localeCompare(category.id)
+            break
+        }
+        return sortOrder === 'asc' ? comparison : -comparison
+      })
+    }))
+    
+    // Sort categories themselves
+    categories = [...categories].sort((a, b) => {
+      const comparison = a.label.localeCompare(b.label)
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
     return categories
-  }, [searchQuery, categoryFilter, formatFilter])
+  }, [searchQuery, categoryFilter, formatFilter, sortBy, sortOrder])
   
   // Get total export count
   const totalExports = filteredCategories.reduce((sum, cat) => sum + cat.exports.length, 0)
@@ -500,12 +542,41 @@ export default function ExportsPage() {
                 </select>
               </div>
               
+              {/* Sort By */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'format' | 'category')}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  <option value="name">Name</option>
+                  <option value="format">Format</option>
+                  <option value="category">Category</option>
+                </select>
+              </div>
+              
+              {/* Sort Order Toggle */}
+              <button
+                onClick={toggleSortOrder}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  sortOrder === 'asc' 
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' 
+                    : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                }`}
+                title="Toggle sort order (S)"
+              >
+                {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+              </button>
+              
               {/* Clear Filters */}
               {activeFilterCount > 0 && (
                 <button
                   onClick={() => {
                     setCategoryFilter('all')
                     setFormatFilter('all')
+                    setSortBy('name')
+                    setSortOrder('asc')
                   }}
                   className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors"
                 >
@@ -750,6 +821,10 @@ export default function ExportsPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Show shortcuts</span>

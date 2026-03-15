@@ -27,7 +27,8 @@ import {
   ChevronDown,
   X,
   Printer,
-  Search
+  Search,
+  Filter
 } from 'lucide-react'
 
 type Message = {
@@ -71,6 +72,13 @@ export default function ChatPage() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  // Message role filter state
+  const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'assistant'>('all')
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate active filter count
+  const activeFilterCount = (roleFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -469,7 +477,12 @@ What would you like to know about your production?`,
           setShowExportMenu(false)
           setShowPrintMenu(false)
           setShowSearch(false)
+          setShowFilterPanel(false)
           setSearchQuery('')
+          break
+        case 'g':
+          e.preventDefault()
+          setShowFilterPanel(prev => !prev)
           break
       }
     }
@@ -487,12 +500,18 @@ What would you like to know about your production?`,
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false)
       }
+      if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on the filter toggle button
+        const filterButton = document.querySelector('[data-filter-toggle]')
+        if (filterButton && filterButton.contains(e.target as Node)) return
+        setShowFilterPanel(false)
+      }
     }
-    if (showExportMenu || showPrintMenu) {
+    if (showExportMenu || showPrintMenu || showFilterPanel) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu])
+  }, [showExportMenu, showPrintMenu, showFilterPanel])
 
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return ''
@@ -569,6 +588,74 @@ What would you like to know about your production?`,
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
+              {/* Filter Toggle Button */}
+              <div className="relative" ref={filterPanelRef}>
+                <button 
+                  data-filter-toggle
+                  onClick={() => setShowFilterPanel(prev => !prev)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+                    activeFilterCount > 0 
+                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
+                      : 'bg-slate-800 hover:bg-slate-700'
+                  }`}
+                  title="Filter messages (G)"
+                >
+                  <Filter className="w-4 h-4" />
+                  Filter
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                {showFilterPanel && (
+                  <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                    <div className="px-4 py-3 border-b border-slate-700">
+                      <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Message Filter</h4>
+                    </div>
+                    <div className="p-3">
+                      <label className="text-xs text-slate-500 mb-2 block">Show messages from:</label>
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => setRoleFilter('all')}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            roleFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          All Messages
+                        </button>
+                        <button
+                          onClick={() => setRoleFilter('user')}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            roleFilter === 'user' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <User className="w-4 h-4" />
+                          Your Messages
+                        </button>
+                        <button
+                          onClick={() => setRoleFilter('assistant')}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            roleFilter === 'assistant' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <Bot className="w-4 h-4" />
+                          AI Responses
+                        </button>
+                      </div>
+                      {roleFilter !== 'all' && (
+                        <button
+                          onClick={() => setRoleFilter('all')}
+                          className="w-full mt-3 px-3 py-2 text-xs text-slate-400 hover:text-white transition-colors"
+                        >
+                          Clear Filter
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="relative" ref={exportMenuRef}>
                 <button 
                   onClick={() => setShowExportMenu(prev => !prev)}
@@ -722,15 +809,23 @@ What would you like to know about your production?`,
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* Search results info */}
-            {searchQuery && (
+            {(searchQuery || roleFilter !== 'all') && (
               <div className="mb-4 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-sm text-indigo-300 flex items-center justify-between">
-                <span>Found {messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase())).length} results for "{searchQuery}"</span>
-                <button onClick={() => { setSearchQuery(''); setShowSearch(false) }} className="hover:text-white">
+                <span>
+                  {searchQuery && `Found ${messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase())).length} results for "${searchQuery}"`}
+                  {searchQuery && roleFilter !== 'all' && ' | '}
+                  {roleFilter !== 'all' && `Showing ${roleFilter} messages`}
+                </span>
+                <button onClick={() => { setSearchQuery(''); setShowSearch(false); setRoleFilter('all') }} className="hover:text-white">
                   <X className="w-4 h-4" />
                 </button>
               </div>
             )}
-            {(searchQuery ? messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase())) : messages).map((msg, idx) => (
+            {(searchQuery || roleFilter !== 'all' ? messages.filter(m => {
+              const matchesSearch = !searchQuery || m.content.toLowerCase().includes(searchQuery.toLowerCase())
+              const matchesRole = roleFilter === 'all' || m.role === roleFilter
+              return matchesSearch && matchesRole
+            }) : messages).map((msg, idx) => (
               <div
                 key={idx}
                 className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
@@ -873,6 +968,10 @@ What would you like to know about your production?`,
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Search messages</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">F</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                <span className="text-slate-300">Filter messages</span>
+                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">G</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Refresh context</span>

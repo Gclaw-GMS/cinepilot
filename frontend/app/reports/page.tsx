@@ -94,17 +94,26 @@ export default function ReportsPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [tabFilter, setTabFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'date' | 'name' | 'budget' | 'status'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const sortOrderRef = useRef(sortOrder)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const fetchReportRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+
+  // Update sortOrderRef when sortOrder changes
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (tabFilter !== 'all') count++
     if (searchQuery) count++
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++
     return count
-  }, [tabFilter, searchQuery])
+  }, [tabFilter, searchQuery, sortBy, sortOrder])
 
   const fetchReport = useCallback(async () => {
     try {
@@ -187,6 +196,10 @@ export default function ReportsPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -195,6 +208,8 @@ export default function ReportsPage() {
           setShowFilters(false)
           setSearchQuery('')
           setTabFilter('all')
+          setSortBy('date')
+          setSortOrder('desc')
           break
       }
     }
@@ -517,10 +532,10 @@ export default function ReportsPage() {
                 ? 'bg-indigo-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
-            title="Toggle Filters (F)"
+            title="Toggle Filters & Sort (F)"
           >
             <Filter className="w-4 h-4" />
-            Filters
+            Filters & Sort
             {activeFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
                 {activeFilterCount}
@@ -595,7 +610,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Filter Panel */}
+      {/* Filter & Sort Panel */}
       {showFilters && (
         <div 
           ref={filterPanelRef}
@@ -604,7 +619,7 @@ export default function ReportsPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm font-medium text-slate-300">Filters:</span>
+              <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Report Tab:</label>
@@ -621,8 +636,28 @@ export default function ReportsPage() {
                 <option value="censor">Censor</option>
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Sort:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="date">Date</option>
+                <option value="name">Name</option>
+                <option value="budget">Budget</option>
+                <option value="status">Status</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg flex items-center gap-1 transition-colors"
+                title="Toggle sort order (S)"
+              >
+                {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+              </button>
+            </div>
             <button
-              onClick={() => { setTabFilter('all'); setSearchQuery('') }}
+              onClick={() => { setTabFilter('all'); setSearchQuery(''); setSortBy('date'); setSortOrder('desc') }}
               className={`px-3 py-1.5 text-sm transition-colors ${
                 activeFilterCount > 0 
                   ? 'text-red-400 hover:text-red-300' 
@@ -956,6 +991,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle filters</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">F</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Toggle sort order</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">S</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle export menu</span>

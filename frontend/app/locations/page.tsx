@@ -120,6 +120,7 @@ export default function LocationsPage() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [filterScore, setFilterScore] = useState<number>(0)
   const [sortBy, setSortBy] = useState<'score' | 'name'>('score')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<'cards' | 'chart'>('cards')
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -145,8 +146,9 @@ export default function LocationsPage() {
     if (filters.intExt !== 'all') count++
     if (filters.timeOfDay !== 'all') count++
     if (filters.favoritesOnly) count++
+    if (sortBy !== 'score' || sortOrder !== 'desc') count++
     return count
-  }, [filters])
+  }, [filters, sortBy, sortOrder])
 
   const fetchScenes = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -199,6 +201,10 @@ export default function LocationsPage() {
         case '2':
           setViewMode('chart')
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'f':
           setShowFilters(prev => !prev)
           break
@@ -217,6 +223,8 @@ export default function LocationsPage() {
           setShowPrintMenu(false)
           setShowFilters(false)
           setSearchQuery('')
+          setSortBy('score')
+          setSortOrder('desc')
           break
       }
     }
@@ -567,10 +575,11 @@ export default function LocationsPage() {
       result = result.filter(c => c.id && favorites.has(c.id))
     }
     
+    const multiplier = sortOrder === 'asc' ? 1 : -1
     if (sortBy === 'score') {
-      return result.sort((a, b) => b.scoreTotal - a.scoreTotal)
+      return result.sort((a, b) => (b.scoreTotal - a.scoreTotal) * multiplier)
     }
-    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || '') * multiplier)
   }, [candidates, filterScore, sortBy, filters, favorites])
 
   // Statistics
@@ -756,7 +765,7 @@ export default function LocationsPage() {
         </div>
       </div>
 
-      {/* Filter Panel */}
+      {/* Filter & Sort Panel */}
       {showFilters && (
         <div 
           ref={filterPanelRef}
@@ -765,7 +774,7 @@ export default function LocationsPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium text-slate-300">Filters:</span>
+              <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Place Type:</label>
@@ -828,9 +837,35 @@ export default function LocationsPage() {
                 <span className="text-sm text-slate-300">Favorites Only</span>
               </label>
             </div>
+            <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
+              <label className="text-sm text-slate-400">Sort:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'score' | 'name')}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="score">Score</option>
+                <option value="name">Name</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
+                  sortBy !== 'score' || sortOrder !== 'desc'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
+                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
             {activeFilterCount > 0 && (
               <button
-                onClick={() => setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })}
+                onClick={() => {
+                  setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })
+                  setSortBy('score')
+                  setSortOrder('desc')
+                }}
                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
               >
                 Clear Filters
@@ -873,13 +908,14 @@ export default function LocationsPage() {
               {[
                 { key: 'R', action: 'Refresh location data' },
                 { key: '/', action: 'Focus search input' },
-                { key: 'F', action: 'Toggle filters' },
+                { key: 'S', action: 'Toggle sort order (asc/desc)' },
+                { key: 'F', action: 'Toggle filter & sort panel' },
                 { key: '1', action: 'Switch to Cards view' },
                 { key: '2', action: 'Switch to Analysis view' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Toggle print menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },
-                { key: 'Esc', action: 'Close modal / Clear search' },
+                { key: 'Esc', action: 'Close modal / Clear filters & sort' },
               ].map(({ key, action }) => (
                 <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50">
                   <span className="text-slate-400">{action}</span>
@@ -1087,6 +1123,17 @@ export default function LocationsPage() {
                         <option value="score">By Score</option>
                         <option value="name">By Name</option>
                       </select>
+                      <button
+                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
+                          sortBy !== 'score' || sortOrder !== 'desc'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                        }`}
+                        title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                      >
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </button>
                     </div>
                     <div className="ml-auto text-sm text-slate-500">
                       Showing {filteredCandidates.length} of {candidates.length} locations

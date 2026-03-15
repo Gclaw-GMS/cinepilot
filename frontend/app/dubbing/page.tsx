@@ -73,14 +73,43 @@ export default function DubbingPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [languageFilter, setLanguageFilter] = useState('all')
   
-  // Computed filtered versions
-  const filteredVersions = useMemo(() => {
-    if (languageFilter === 'all') return dubbedVersions
-    return dubbedVersions.filter(d => d.language === languageFilter)
-  }, [dubbedVersions, languageFilter])
+  // Sort state
+  const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   
-  // Active filter count
-  const activeFilterCount = languageFilter !== 'all' ? 1 : 0
+  // Computed filtered and sorted versions
+  const filteredVersions = useMemo(() => {
+    let result = dubbedVersions
+    
+    // Apply language filter
+    if (languageFilter !== 'all') {
+      result = result.filter(d => d.language === languageFilter)
+    }
+    
+    // Apply sorting
+    const sorted = [...result].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'language':
+          comparison = a.language.localeCompare(b.language)
+          break
+        case 'date':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return sorted
+  }, [dubbedVersions, languageFilter, sortBy, sortOrder])
+  
+  // Active filter count (includes sort as active filter)
+  const activeFilterCount = (languageFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -107,6 +136,10 @@ export default function DubbingPage() {
         case 'f':
           e.preventDefault()
           setShowFilterPanel(!showFilterPanel)
+          break
+        case 's':
+          e.preventDefault()
+          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
           break
         case 'e':
           e.preventDefault()
@@ -135,7 +168,7 @@ export default function DubbingPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length])
+  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length, sortOrder])
 
   // Click outside handler for export menu
   useEffect(() => {
@@ -223,8 +256,9 @@ export default function DubbingPage() {
 
   // Export functions
   const handleExportCSV = () => {
+    const dataToExport = filteredVersions.length > 0 ? filteredVersions : dubbedVersions
     const headers = ['Title', 'Language', 'Created At']
-    const rows = dubbedVersions.map(d => [
+    const rows = dataToExport.map(d => [
       d.title,
       d.language,
       new Date(d.createdAt).toLocaleDateString()
@@ -242,11 +276,16 @@ export default function DubbingPage() {
   }
 
   const handleExportJSON = () => {
+    const dataToExport = filteredVersions.length > 0 ? filteredVersions : dubbedVersions
     const data = {
       exportDate: new Date().toISOString(),
-      totalDubbedVersions: dubbedVersions.length,
+      totalDubbedVersions: dataToExport.length,
       totalPreviewScenes: preview.length,
-      dubbedVersions: dubbedVersions.map(d => ({
+      filterApplied: languageFilter !== 'all' || sortBy !== 'date',
+      languageFilter: languageFilter !== 'all' ? languageFilter : null,
+      sortBy: sortBy !== 'date' ? sortBy : null,
+      sortOrder: sortOrder,
+      dubbedVersions: dataToExport.map(d => ({
         title: d.title,
         language: d.language,
         createdAt: d.createdAt
@@ -272,6 +311,8 @@ export default function DubbingPage() {
   const printDubbingReport = useCallback(() => {
     if (dubbedVersions.length === 0) return
     
+    const dataToPrint = filteredVersions.length > 0 ? filteredVersions : dubbedVersions
+    
     const languageLabels: Record<string, string> = {
       telugu: 'Telugu',
       hindi: 'Hindi',
@@ -290,6 +331,10 @@ export default function DubbingPage() {
       }
       return colors[lang] || '#6b7280'
     }
+    
+    const filterNote = languageFilter !== 'all' || sortBy !== 'date' 
+      ? `<p style="font-size: 12px; color: #64748b; margin-bottom: 16px;">* Showing filtered/sorted data</p>` 
+      : ''
     
     const html = `
 <!DOCTYPE html>
@@ -333,7 +378,7 @@ export default function DubbingPage() {
   <div class="stats">
     <div class="stat-card">
       <div class="stat-label">Total Versions</div>
-      <div class="stat-value">${dubbedVersions.length}</div>
+      <div class="stat-value">${dataToPrint.length}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Preview Scenes</div>
@@ -341,9 +386,11 @@ export default function DubbingPage() {
     </div>
     <div class="stat-card">
       <div class="stat-label">Languages</div>
-      <div class="stat-value">${new Set(dubbedVersions.map(d => d.language)).size}</div>
+      <div class="stat-value">${new Set(dataToPrint.map(d => d.language)).size}</div>
     </div>
   </div>
+  
+  ${filterNote}
   
   <h3 style="margin-bottom: 12px;">Dubbed Versions</h3>
   <table>
@@ -356,7 +403,7 @@ export default function DubbingPage() {
       </tr>
     </thead>
     <tbody>
-      ${dubbedVersions.map((dub, i) => `
+      ${dataToPrint.map((dub, i) => `
         <tr>
           <td>${i + 1}</td>
           <td>${dub.title}</td>
@@ -390,7 +437,7 @@ export default function DubbingPage() {
     printWindow.document.close()
     printWindow.print()
     setShowPrintMenu(false)
-  }, [dubbedVersions, preview])
+  }, [dubbedVersions, preview, filteredVersions, languageFilter, sortBy])
 
   // Update refs when functions change
   useEffect(() => {
@@ -527,30 +574,60 @@ export default function DubbingPage() {
                 )}
               </button>
               {showFilterPanel && (
-                <div className="absolute left-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700">
-                    <h3 className="text-sm font-medium text-white">Filter Dubbed Versions</h3>
+                    <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
                   </div>
-                  <div className="p-4">
-                    <label className="block text-xs text-slate-400 mb-2">Language</label>
-                    <select
-                      value={languageFilter}
-                      onChange={(e) => setLanguageFilter(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="all">All Languages</option>
-                      {TARGET_LANGUAGES.map(lang => (
-                        <option key={lang.value} value={lang.value}>{lang.label}</option>
-                      ))}
-                    </select>
+                  <div className="p-4 space-y-4">
+                    {/* Language Filter */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-2">Language</label>
+                      <select
+                        value={languageFilter}
+                        onChange={(e) => setLanguageFilter(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="all">All Languages</option>
+                        {TARGET_LANGUAGES.map(lang => (
+                          <option key={lang.value} value={lang.value}>{lang.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Sort Options */}
+                    <div className="border-t border-slate-700 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs text-slate-400">Sort By</label>
+                        <button
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className="flex items-center gap-1 px-2 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 rounded text-xs text-indigo-400 transition-colors"
+                          title="Toggle sort order"
+                        >
+                          {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                        </button>
+                      </div>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="date">Date Created</option>
+                        <option value="title">Title</option>
+                        <option value="language">Language</option>
+                      </select>
+                    </div>
                   </div>
                   {activeFilterCount > 0 && (
                     <div className="px-4 py-3 border-t border-slate-700 bg-slate-800/50">
                       <button
-                        onClick={() => setLanguageFilter('all')}
+                        onClick={() => {
+                          setLanguageFilter('all')
+                          setSortBy('date')
+                          setSortOrder('desc')
+                        }}
                         className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                       >
-                        Clear Filters
+                        Clear Filters & Sort
                       </button>
                     </div>
                   )}
@@ -639,6 +716,15 @@ export default function DubbingPage() {
             <div className="flex items-center gap-2 mb-2">
               <Languages className="w-4 h-4 text-green-400" />
               <span className="text-sm text-slate-400">Dubbed Versions</span>
+              {activeFilterCount > 0 && (
+                <span className="ml-auto text-xs text-indigo-400">
+                  {sortBy !== 'date' && (
+                    <span className="bg-indigo-500/20 px-1.5 py-0.5 rounded">
+                      {sortBy === 'title' ? 'Title' : sortBy === 'language' ? 'Lang' : 'Date'} {sortOrder === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
             <p className="text-2xl font-semibold text-white">
               {activeFilterCount > 0 ? filteredVersions.length : dubbedVersions.length}
@@ -787,6 +873,11 @@ export default function DubbingPage() {
                   ({filteredVersions.length} of {dubbedVersions.length})
                 </span>
               )}
+              {sortBy !== 'date' && (
+                <span className="ml-auto text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full">
+                  {sortBy === 'title' ? 'Title' : sortBy === 'language' ? 'Language' : 'Date'}: {sortOrder === 'asc' ? '↑' : '↓'}
+                </span>
+              )}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredVersions.map((dub) => (
@@ -890,6 +981,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Toggle sort order</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>

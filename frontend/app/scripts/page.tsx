@@ -214,10 +214,12 @@ export default function ScriptsPage() {
   const fetchDataRef = useRef<() => Promise<void>>()
   const handlePrintRef = useRef<() => void>()
 
-  // Derived values (computed before use to avoid hook order issues)
+  // Active script
   const activeScript = scripts[0]
-  const scenes = activeScript?.scenes || []
-  const allVfx = scenes.flatMap(s => s.vfxNotes.map(v => ({ ...v, sceneNumber: s.sceneNumber })))
+  
+  // Derived values (computed with useMemo to avoid hook dependency issues)
+  const scenes = useMemo(() => activeScript?.scenes || [], [activeScript])
+  const allVfx = useMemo(() => scenes.flatMap(s => s.vfxNotes.map(v => ({ ...v, sceneNumber: s.sceneNumber }))), [scenes])
 
   // Keyboard shortcuts
   useEffect(() => {

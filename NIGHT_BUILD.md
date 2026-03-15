@@ -1,10 +1,44 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (08:28 AM) - Continuity Page Sorting Feature Complete
+## Build Status: ✅ PASSING (09:48 AM) - Scripts Page Lint Fix Complete
 
 ---
 
-## Night Build (08:28 AM) - Continuity Page Sorting Feature (IMPLEMENTED)
+## Night Build (09:48 AM) - Scripts Page Lint Fix (IMPLEMENTED)
+
+### Features Perfected This Build
+
+- **Scripts Page - React Hook Dependency Fix**: Fixed lint warning for useMemo dependency with scenes variable
+  - **Wrapped scenes in useMemo**: Added useMemo to compute scenes from activeScript
+  - **Wrapped allVfx in useMemo**: Added useMemo to compute allVfx from scenes
+  - **Proper Dependencies**: Both useMemo hooks now have proper dependency arrays
+  - **Lint Warning Resolved**: No more warning for app/scripts/page.tsx
+  - **Build Verification**: Clean build with 82 routes
+
+### Scripts Lint Fix Details
+1. **Added useMemo for scenes**: `const scenes = useMemo(() => activeScript?.scenes || [], [activeScript])`
+2. **Added useMemo for allVfx**: `const allVfx = useMemo(() => scenes.flatMap(...), [scenes])`
+3. **Proper Dependencies**: scenes depends on activeScript, allVfx depends on scenes
+4. **Consistent Pattern**: Matches the pattern used in other pages in the codebase
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Scripts Page Lint Fix Checklist
+- [x] Feature works 100% (scenes computed correctly via useMemo)
+- [x] React hooks patterns correct (useMemo with proper deps)
+- [x] Code follows existing patterns
+- [x] Build passes
+- [x] Lint passes
+- [x] Tests pass (803 passing)
+
+---
+
+## Night Build (08:28 AM) - Continuity Page Sorting Feature Complete
 
 ### Features Perfected This Build
 

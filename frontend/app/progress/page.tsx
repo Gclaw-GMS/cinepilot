@@ -100,6 +100,9 @@ export default function ProgressPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in_progress' | 'pending' | 'delayed' | 'blocked'>('all')
   const [filterPriority, setFilterPriority] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'dueDate' | 'name' | 'status' | 'priority' | 'progress' | 'date'>('dueDate')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(progress)
@@ -110,13 +113,15 @@ export default function ProgressPage() {
   }, [progress])
 
   // Calculate active filter count
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (sortBy !== 'dueDate' || sortOrder !== 'asc' ? 1 : 0)
 
-  // Clear all filters
+  // Clear all filters and sort
   const clearFilters = useCallback(() => {
     setFilterStatus('all')
     setFilterPriority('all')
     setSearchQuery('')
+    setSortBy('dueDate')
+    setSortOrder('asc')
   }, [])
 
   const fetchProgress = useCallback(async () => {
@@ -481,6 +486,10 @@ export default function ProgressPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'p':
           e.preventDefault()
           if (progressRef.current) setShowPrintMenu(prev => !prev)
@@ -496,6 +505,8 @@ export default function ProgressPage() {
           setShowPrintMenu(false)
           setShowFilters(false)
           setSearchQuery('')
+          setSortBy('dueDate')
+          setSortOrder('asc')
           searchInputRef.current?.blur()
           break
       }
@@ -545,7 +556,7 @@ export default function ProgressPage() {
   // Filter tasks based on search, status, and priority filters
   const filteredTasks = useMemo(() => {
     if (!progress?.tasks) return []
-    return progress.tasks.filter(task => {
+    let tasks = progress.tasks.filter(task => {
       // Apply status filter
       if (filterStatus !== 'all' && task.status !== filterStatus) {
         return false
@@ -566,12 +577,42 @@ export default function ProgressPage() {
       }
       return true
     })
-  }, [progress?.tasks, filterStatus, filterPriority, searchQuery])
+    
+    // Apply sorting
+    const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+    const statusOrder: Record<string, number> = { completed: 4, in_progress: 3, pending: 2, blocked: 1, delayed: 1 }
+    
+    tasks.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'dueDate':
+          const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
+          const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
+          comparison = dateA - dateB
+          break
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'status':
+          comparison = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0)
+          break
+        case 'priority':
+          comparison = (priorityOrder[a.priority] || 0) - (priorityOrder[b.priority] || 0)
+          break
+        case 'progress':
+          comparison = a.progress - b.progress
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return tasks
+  }, [progress?.tasks, filterStatus, filterPriority, searchQuery, sortBy, sortOrder])
 
   // Filter milestones based on search and status filters
   const filteredMilestones = useMemo(() => {
     if (!progress?.milestones) return []
-    return progress.milestones.filter(milestone => {
+    let milestones = progress.milestones.filter(milestone => {
       // Apply status filter
       if (filterStatus !== 'all' && milestone.status !== filterStatus) {
         return false
@@ -586,7 +627,35 @@ export default function ProgressPage() {
       }
       return true
     })
-  }, [progress?.milestones, filterStatus, searchQuery])
+    
+    // Apply sorting
+    const statusOrder: Record<string, number> = { completed: 4, in_progress: 3, pending: 2, delayed: 1 }
+    
+    milestones.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'dueDate':
+        case 'date':
+          const dateA = new Date(a.date).getTime()
+          const dateB = new Date(b.date).getTime()
+          comparison = dateA - dateB
+          break
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'status':
+          comparison = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0)
+          break
+        case 'priority':
+        case 'progress':
+          comparison = a.tasks - b.tasks
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return milestones
+  }, [progress?.milestones, filterStatus, searchQuery, sortBy, sortOrder])
 
   const handleInitialize = async () => {
     setInitializing(true)
@@ -712,7 +781,7 @@ export default function ProgressPage() {
                   ? 'bg-cyan-500 text-black'
                   : 'bg-slate-800 hover:bg-slate-700'
               }`}
-              title="Toggle Filters (F)"
+              title="Toggle Filter & Sort (F)"
             >
               <Filter className="w-5 h-5" />
               {activeFilterCount > 0 && (
@@ -782,13 +851,13 @@ export default function ProgressPage() {
         </div>
       </div>
 
-      {/* Filter Panel */}
+      {/* Filter & Sort Panel */}
       {showFilters && (
         <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl p-4 filter-panel">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
               <Filter className="w-4 h-4 text-cyan-400" />
-              Filters
+              Filter & Sort
             </h3>
             <button
               onClick={clearFilters}
@@ -797,7 +866,7 @@ export default function ProgressPage() {
               Clear All
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Status Filter */}
             <div>
               <label className="block text-xs text-slate-500 mb-2">Status</label>
@@ -829,31 +898,41 @@ export default function ProgressPage() {
                 <option value="low">Low</option>
               </select>
             </div>
-            {/* View Mode Filter (for reference) */}
+            {/* Sort By */}
             <div>
-              <label className="block text-xs text-slate-500 mb-2">View</label>
-              <div className="flex bg-slate-800 rounded-lg p-1">
-                {(['timeline', 'tasks', 'kanban'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      viewMode === mode
-                        ? 'bg-cyan-400 text-black'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </button>
-                ))}
-              </div>
+              <label className="block text-xs text-slate-500 mb-2">Sort By</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+              >
+                <option value="dueDate">Due Date</option>
+                <option value="name">Name</option>
+                <option value="status">Status</option>
+                <option value="priority">Priority</option>
+                <option value="progress">Progress</option>
+              </select>
+            </div>
+            {/* Sort Order Toggle */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-2">Order</label>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  sortOrder === 'asc' 
+                    ? 'bg-cyan-400/20 text-cyan-400 border border-cyan-400/50' 
+                    : 'bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Filtered Item Count */}
-      {hasData && (filterStatus !== 'all' || filterPriority !== 'all' || searchQuery) && (
+      {hasData && (filterStatus !== 'all' || filterPriority !== 'all' || searchQuery || sortBy !== 'dueDate' || sortOrder !== 'asc') && (
         <div className="mb-4 text-sm text-slate-400 flex items-center gap-2">
           <Filter className="w-4 h-4" />
           Showing <span className="text-cyan-400 font-semibold">{filteredTasks.length}</span> tasks
@@ -884,14 +963,15 @@ export default function ProgressPage() {
               {[
                 { key: 'R', action: 'Refresh data' },
                 { key: '/', action: 'Focus search' },
-                { key: 'F', action: 'Toggle filters' },
+                { key: 'F', action: 'Toggle filter & sort' },
+                { key: 'S', action: 'Toggle sort order' },
                 { key: '1', action: 'Timeline view' },
                 { key: '2', action: 'Tasks view' },
                 { key: '3', action: 'Kanban view' },
                 { key: 'E', action: 'Export menu' },
                 { key: 'P', action: 'Print report' },
                 { key: '?', action: 'Show shortcuts' },
-                { key: 'Esc', action: 'Close modal / Clear search' },
+                { key: 'Esc', action: 'Close modal / Clear filters & sort' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">
                   <span className="text-slate-300">{shortcut.action}</span>

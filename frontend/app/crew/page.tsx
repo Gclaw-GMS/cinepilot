@@ -140,6 +140,14 @@ export default function CrewPage() {
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'dailyRate'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Bulk selection state
+  const [selectedCrew, setSelectedCrew] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showBulkDepartmentMenu, setShowBulkDepartmentMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const selectedCrewRef = useRef(selectedCrew);
+  const showBulkActionsRef = useRef(showBulkActions);
+
   // Sort options for UI
   const sortOptions = [
     { key: 'name', label: 'Name' },
@@ -185,12 +193,50 @@ export default function CrewPage() {
     }
   }, [fetchCrew])
 
+  // Update refs when values change
+  useEffect(() => {
+    selectedCrewRef.current = selectedCrew
+    showBulkActionsRef.current = showBulkActions
+  }, [selectedCrew, showBulkActions])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea/select
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
         return
+      }
+      
+      // Bulk selection shortcuts - using inline to avoid dependency issues
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'a') {
+          e.preventDefault()
+          // Select all - will use filtered from closure via state
+          const checkboxes = document.querySelectorAll('input[type="checkbox"]')
+          checkboxes.forEach((cb) => {
+            if (cb instanceof HTMLInputElement) {
+              cb.checked = true
+            }
+          })
+          return
+        }
+        if (e.key === 'd' && selectedCrewRef.current.size > 0) {
+          e.preventDefault()
+          setShowDeleteConfirm(true)
+          return
+        }
+      }
+      
+      // Escape to clear selection
+      if (e.key === 'Escape') {
+        if (showBulkActionsRef.current) {
+          e.preventDefault()
+          setSelectedCrew(new Set())
+          setShowBulkActions(false)
+          setShowBulkDepartmentMenu(false)
+          setShowDeleteConfirm(false)
+          return
+        }
       }
       
       switch (e.key.toLowerCase()) {
@@ -224,6 +270,8 @@ export default function CrewPage() {
           setShowExportMenu(false)
           setShowPrintMenu(false)
           setShowFilters(false)
+          setShowBulkDepartmentMenu(false)
+          setShowDeleteConfirm(false)
           setSearch('')
           setDeptFilter('all')
           break
@@ -307,6 +355,88 @@ export default function CrewPage() {
     
     return { total, deptCounts, totalDailyRate, avgDailyRate, projected30Day, departments: Object.keys(deptCounts).length };
   }, [crew]);
+
+  // Bulk selection handlers
+  const handleSelectAll = useCallback(() => {
+    const allIds = new Set(filtered.map(c => c.id))
+    setSelectedCrew(allIds)
+    setShowBulkActions(allIds.size > 0)
+  }, [filtered])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedCrew(new Set())
+    setShowBulkActions(false)
+    setShowBulkDepartmentMenu(false)
+    setShowDeleteConfirm(false)
+  }, [])
+
+  const handleToggleSelect = useCallback((id: string) => {
+    const newSelected = new Set(selectedCrew)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedCrew(newSelected)
+    setShowBulkActions(newSelected.size > 0)
+  }, [selectedCrew])
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedCrew.size === 0) return
+    setShowDeleteConfirm(false)
+    
+    setError(null)
+    try {
+      const idsToDelete = Array.from(selectedCrew)
+      for (const id of idsToDelete) {
+        const res = await fetch('/api/crew', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+        if (!res.ok) {
+          throw new Error(`Failed to delete ${id}`)
+        }
+      }
+      setSuccess(`${idsToDelete.length} crew member(s) removed`)
+      setTimeout(() => setSuccess(null), 3000)
+      handleClearSelection()
+      await fetchCrew()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Bulk delete failed'
+      setError(message)
+    }
+  }, [selectedCrew, fetchCrew, handleClearSelection])
+
+  const handleBulkChangeDepartment = useCallback(async (newDepartment: string) => {
+    if (selectedCrew.size === 0) return
+    setShowBulkDepartmentMenu(false)
+    
+    setError(null)
+    try {
+      const idsToUpdate = Array.from(selectedCrew)
+      for (const id of idsToUpdate) {
+        const crewMember = crew.find(c => c.id === id)
+        if (crewMember) {
+          const res = await fetch('/api/crew', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, department: newDepartment }),
+          })
+          if (!res.ok) {
+            throw new Error(`Failed to update ${id}`)
+          }
+        }
+      }
+      setSuccess(`${idsToUpdate.length} crew member(s) moved to ${newDepartment}`)
+      setTimeout(() => setSuccess(null), 3000)
+      handleClearSelection()
+      await fetchCrew()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Bulk update failed'
+      setError(message)
+    }
+  }, [selectedCrew, crew, fetchCrew, handleClearSelection])
 
   const deptData = useMemo(() => {
     return DEPARTMENTS.map(dept => ({
@@ -982,11 +1112,21 @@ export default function CrewPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-800">
-                <th 
-                  className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
-                  onClick={() => { setSortBy('name'); setSortOrder(sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
-                >
-                  Name {sortBy === 'name' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                <th className="text-left px-4 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <button
+                    onClick={handleSelectAll}
+                    className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
+                    title="Select all (Ctrl+A)"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCrew.size === filtered.length && filtered.length > 0}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span>Name</span>
+                  </button>
                 </th>
                 <th 
                   className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
@@ -1014,15 +1154,24 @@ export default function CrewPage() {
             <tbody className="divide-y divide-slate-800">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                     No crew members found. Add your first crew member!
                   </td>
                 </tr>
               ) : (
                 filtered.map((member) => (
-                  <tr key={member.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4">
+                  <tr 
+                    key={member.id} 
+                    className={`hover:bg-slate-800/50 transition-colors ${selectedCrew.has(member.id) ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : ''}`}
+                  >
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedCrew.has(member.id)}
+                          onChange={() => handleToggleSelect(member.id)}
+                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                        />
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-medium text-sm">
                           {getInitials(member.name)}
                         </div>
@@ -1078,6 +1227,97 @@ export default function CrewPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Bulk Actions Floating Toolbar */}
+        {showBulkActions && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 flex items-center gap-4 px-6 py-3 animate-in slide-in-from-bottom-4">
+              <div className="flex items-center gap-2">
+                <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-medium">
+                  {selectedCrew.size} selected
+                </span>
+              </div>
+              
+              <div className="h-6 w-px bg-slate-700" />
+              
+              {/* Change Department Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowBulkDepartmentMenu(!showBulkDepartmentMenu)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Change Department
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showBulkDepartmentMenu ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showBulkDepartmentMenu && (
+                  <div className="absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[180px]">
+                    {DEPARTMENTS.map((dept) => (
+                      <button
+                        key={dept}
+                        onClick={() => handleBulkChangeDepartment(dept)}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                      >
+                        <span 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ backgroundColor: DEPT_COLORS[dept] || '#64748b' }}
+                        />
+                        {dept}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Delete Button */}
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+              
+              {/* Clear Selection */}
+              <button
+                onClick={handleClearSelection}
+                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-800 rounded-lg text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm">
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <Trash2 className="w-8 h-8 text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Delete {selectedCrew.size} Crew Member{selectedCrew.size !== 1 ? 's' : ''}?</h3>
+                <p className="text-slate-400 text-sm mb-6">This action cannot be undone. All selected crew members will be permanently removed.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm text-white transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Modal */}
@@ -1212,8 +1452,19 @@ export default function CrewPage() {
                 <span className="text-slate-300">Show shortcuts</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
               </div>
+              <div className="py-2 border-b border-slate-800">
+                <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Bulk Selection</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Select all visible</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Ctrl+A</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Delete selected</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Ctrl+D</kbd>
+              </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-slate-300">Close / Clear filters</span>
+                <span className="text-slate-300">Clear selection</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
               </div>
             </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -127,6 +127,16 @@ export default function EquipmentPage() {
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'status' | 'dailyRate' | 'dateEnd'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
+  // Bulk selection state
+  const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(new Set())
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
+  // Refs for bulk selection
+  const selectedEquipmentRef = useRef(selectedEquipment)
+  const showBulkActionsRef = useRef(showBulkActions)
+  
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -223,11 +233,39 @@ export default function EquipmentPage() {
     fetchEquipment()
   }
 
+  // Update ref when selection changes
+  useEffect(() => {
+    selectedEquipmentRef.current = selectedEquipment
+  }, [selectedEquipment])
+
+  useEffect(() => {
+    showBulkActionsRef.current = showBulkActions
+  }, [showBulkActions])
+
+  // Bulk selection handlers - placeholder (will be defined after filtered)
+  const [bulkHandlersReady, setBulkHandlersReady] = useState(false)
+  
+  const handleSelectEquipment = useCallback((id: string) => {
+    const newSelected = new Set(selectedEquipment)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedEquipment(newSelected)
+    setShowBulkActions(newSelected.size > 0)
+  }, [selectedEquipment])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedEquipment(new Set())
+    setShowBulkActions(false)
+  }, [])
+
   useEffect(() => {
     fetchEquipment()
   }, [fetchEquipment])
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea/select
@@ -243,6 +281,35 @@ export default function EquipmentPage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        // Bulk selection shortcuts
+        case 'a':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (selectedEquipmentRef.current.size === filtered.length) {
+              setSelectedEquipment(new Set())
+              setShowBulkActions(false)
+            } else {
+              setSelectedEquipment(new Set(filtered.map(eq => eq.id)))
+              setShowBulkActions(filtered.length > 0)
+            }
+          }
+          break
+        case 'd':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (selectedEquipmentRef.current.size > 0) {
+              setShowDeleteConfirm(true)
+            }
+          }
+          break
+        case 'escape':
+          if (showBulkActionsRef.current) {
+            e.preventDefault()
+            setSelectedEquipment(new Set())
+            setShowBulkActions(false)
+            setShowBulkStatusMenu(false)
+          }
           break
         case '/':
           e.preventDefault()
@@ -322,6 +389,7 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalOpen, editModalOpen, showExportMenu, equipment.length])
 
   // Click outside to close export menu
@@ -398,6 +466,67 @@ export default function EquipmentPage() {
     }
     return sortOrder === 'asc' ? comparison : -comparison
   })
+
+  // Bulk selection handlers (after filtered is defined)
+  const handleSelectAllEquipment = useCallback(() => {
+    if (selectedEquipment.size === filtered.length) {
+      setSelectedEquipment(new Set())
+      setShowBulkActions(false)
+    } else {
+      setSelectedEquipment(new Set(filtered.map(eq => eq.id)))
+      setShowBulkActions(filtered.length > 0)
+    }
+  }, [selectedEquipment, filtered])
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedEquipment.size === 0) return
+    
+    const idsToDelete = Array.from(selectedEquipment)
+    try {
+      const results = await Promise.all(
+        idsToDelete.map(id => 
+          fetch(`/api/equipment?id=${id}`, { method: 'DELETE' })
+        )
+      )
+      const allOk = results.every(res => res.ok)
+      if (allOk) {
+        await fetchEquipment()
+        setSuccess(`Deleted ${idsToDelete.length} equipment item${idsToDelete.length > 1 ? 's' : ''} successfully!`)
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setError('Failed to delete equipment')
+    }
+    handleClearSelection()
+    setShowDeleteConfirm(false)
+  }, [selectedEquipment, fetchEquipment, handleClearSelection])
+
+  const handleBulkStatusChange = useCallback(async (newStatus: string) => {
+    if (selectedEquipment.size === 0) return
+    
+    const idsToUpdate = Array.from(selectedEquipment)
+    try {
+      const results = await Promise.all(
+        idsToUpdate.map(id => 
+          fetch(`/api/equipment?id=${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus }),
+          })
+        )
+      )
+      const allOk = results.every(res => res.ok)
+      if (allOk) {
+        await fetchEquipment()
+        setSuccess(`Updated ${idsToUpdate.length} equipment item${idsToUpdate.length > 1 ? 's' : ''} to ${newStatus}!`)
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setError('Failed to update equipment status')
+    }
+    handleClearSelection()
+    setShowBulkStatusMenu(false)
+  }, [selectedEquipment, fetchEquipment, handleClearSelection])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1043,13 +1172,53 @@ export default function EquipmentPage() {
 
         {/* Equipment Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Select All Header */}
+          {filtered.length > 0 && (
+            <div className="col-span-full bg-slate-900/50 border border-slate-800 rounded-xl p-3 mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedEquipment.size === filtered.length && filtered.length > 0}
+                  onChange={handleSelectAllEquipment}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                />
+                <span className="text-sm text-slate-400">
+                  {selectedEquipment.size > 0 ? `${selectedEquipment.size} of ${filtered.length} selected` : 'Select all'}
+                </span>
+              </div>
+              {selectedEquipment.size > 0 && (
+                <button
+                  onClick={handleClearSelection}
+                  className="text-xs text-slate-500 hover:text-slate-300"
+                >
+                  Clear selection
+                </button>
+              )}
+            </div>
+          )}
           {filtered.map((eq) => (
-            <div key={eq.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
-                  <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
-                </div>
+            <div 
+              key={eq.id} 
+              className={`bg-slate-900 border rounded-xl p-5 transition-all group ${
+                selectedEquipment.has(eq.id) 
+                  ? 'border-indigo-500 ring-1 ring-indigo-500/30' 
+                  : 'border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-start gap-3 mb-3">
+                {/* Checkbox */}
+                <input
+                  type="checkbox"
+                  checked={selectedEquipment.has(eq.id)}
+                  onChange={() => handleSelectEquipment(eq.id)}
+                  className="w-4 h-4 mt-1 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
+                      <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
+                    </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                   <button
                     onClick={() => handleEdit(eq)}
@@ -1086,6 +1255,8 @@ export default function EquipmentPage() {
                   </p>
                 </div>
               </div>
+                </div>
+              </div>
             </div>
           ))}
           
@@ -1102,6 +1273,98 @@ export default function EquipmentPage() {
             </div>
           )}
         </div>
+
+        {/* Bulk Actions Floating Toolbar */}
+        {showBulkActions && selectedEquipment.size > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-indigo-500/50 rounded-xl shadow-xl shadow-indigo-500/10 px-4 py-3 flex items-center gap-4 z-40">
+            <div className="flex items-center gap-2">
+              <span className="bg-indigo-500 text-white text-xs font-medium px-2 py-1 rounded-full">
+                {selectedEquipment.size}
+              </span>
+              <span className="text-sm text-slate-300">selected</span>
+            </div>
+            
+            <div className="h-6 w-px bg-slate-700" />
+            
+            {/* Bulk Status Change */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm transition-colors"
+              >
+                Change Status
+                <ChevronRight className={`w-4 h-4 transition-transform ${showBulkStatusMenu ? 'rotate-90' : ''}`} />
+              </button>
+              
+              {showBulkStatusMenu && (
+                <div className="absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[140px]">
+                  {[
+                    { key: 'available', label: 'Available' },
+                    { key: 'in-use', label: 'In Use' },
+                    { key: 'maintenance', label: 'Maintenance' },
+                    { key: 'returned', label: 'Returned' },
+                  ].map(status => (
+                    <button
+                      key={status.key}
+                      onClick={() => handleBulkStatusChange(status.key)}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Bulk Delete */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+            
+            {/* Clear Selection */}
+            <button
+              onClick={handleClearSelection}
+              className="flex items-center gap-2 px-3 py-1.5 text-slate-400 hover:text-white transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Delete {selectedEquipment.size} Equipment Item{selectedEquipment.size !== 1 ? 's' : ''}?</h3>
+                  <p className="text-sm text-slate-400">This action cannot be undone.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Modal */}
         {modalOpen && (
@@ -1354,6 +1617,25 @@ export default function EquipmentPage() {
                 </button>
               </div>
               <div className="p-4 space-y-3">
+                {/* Bulk Selection */}
+                <div className="border-b border-slate-700 pb-2 mb-2">
+                  <span className="text-indigo-400 text-sm font-medium">Selection</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Select all</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Ctrl+A</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Delete selected</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Ctrl+D</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Clear selection</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
+                </div>
+                <div className="border-b border-slate-700 pb-2 mb-2 mt-3">
+                  <span className="text-slate-400 text-sm">General</span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh equipment data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>

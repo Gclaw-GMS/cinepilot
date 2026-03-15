@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   Heart, Activity, Database, HardDrive, Cpu, AlertTriangle, 
   CheckCircle, XCircle, RefreshCw, Clock, Server, 
@@ -63,42 +63,70 @@ export default function HealthPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'healthy' | 'degraded' | 'unhealthy'>('all')
+  const [sortBy, setSortBy] = useState<'component' | 'status' | 'latency'>('component')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Calculate active filter count
-  const activeFilterCount = filterStatus !== 'all' ? 1 : 0
+  // Calculate active filter count (includes sort state)
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (sortBy !== 'component' || sortOrder !== 'asc' ? 1 : 0)
   
-  // Clear all filters
+  // Clear all filters and sort
   const clearFilters = useCallback(() => {
     setFilterStatus('all')
     setSearchQuery('')
+    setSortBy('component')
+    setSortOrder('asc')
   }, [])
   
-  // Filtered checks based on search and status filter
-  const filteredChecks = healthData?.checks.filter(check => {
-    // Apply status filter
-    if (filterStatus !== 'all' && check.status !== filterStatus) {
-      return false
-    }
-    // Apply search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return (
-        check.component.toLowerCase().includes(query) ||
-        check.status.toLowerCase().includes(query) ||
-        (check.message?.toLowerCase().includes(query) ?? false)
-      )
-    }
-    return true
-  }) || []
+  // Filtered and sorted checks
+  const filteredChecks = useMemo(() => {
+    if (!healthData?.checks) return []
+    
+    let result = healthData.checks.filter(check => {
+      // Apply status filter
+      if (filterStatus !== 'all' && check.status !== filterStatus) {
+        return false
+      }
+      // Apply search query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return (
+          check.component.toLowerCase().includes(query) ||
+          check.status.toLowerCase().includes(query) ||
+          (check.message?.toLowerCase().includes(query) ?? false)
+        )
+      }
+      return true
+    })
+    
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'component':
+          comparison = a.component.localeCompare(b.component)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'latency':
+          comparison = (a.latencyMs || 0) - (b.latencyMs || 0)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [healthData?.checks, filterStatus, searchQuery, sortBy, sortOrder])
 
   // Export functions
   const exportToCSV = () => {
     if (!healthData) return
     const headers = ['Component', 'Status', 'Message', 'Latency (ms)']
-    const rows = healthData.checks.map(c => [
+    // Use sorted/filtered data for export
+    const rows = filteredChecks.map(c => [
       c.component,
       c.status,
       c.message || '',
@@ -123,7 +151,15 @@ export default function HealthPage() {
       timestamp: healthData.timestamp,
       uptime: healthData.uptime,
       version: healthData.version,
-      checks: healthData.checks,
+      checks: filteredChecks,
+      filterMetadata: {
+        filterStatus,
+        searchQuery,
+        sortBy,
+        sortOrder,
+        totalFiltered: filteredChecks.length,
+        totalRecords: healthData.checks.length
+      },
       history: healthHistory
     }
     const json = JSON.stringify(data, null, 2)
@@ -141,9 +177,10 @@ export default function HealthPage() {
   const handlePrint = () => {
     if (!healthData) return
     
-    const healthyCount = healthData.checks.filter(c => c.status === 'healthy').length
-    const degradedCount = healthData.checks.filter(c => c.status === 'degraded').length
-    const unhealthyCount = healthData.checks.filter(c => c.status === 'unhealthy').length
+    // Use sorted/filtered data for print
+    const healthyCount = filteredChecks.filter(c => c.status === 'healthy').length
+    const degradedCount = filteredChecks.filter(c => c.status === 'degraded').length
+    const unhealthyCount = filteredChecks.filter(c => c.status === 'unhealthy').length
     
     const printWindow = window.open('', '_blank', 'width=800,height=600')
     if (!printWindow) return
@@ -215,7 +252,7 @@ export default function HealthPage() {
         </tr>
       </thead>
       <tbody>
-        ${healthData.checks.map(check => `
+        ${filteredChecks.map(check => `
           <tr>
             <td style="text-transform: capitalize; font-weight: 500;">${check.component}</td>
             <td><span class="status-badge ${check.status}">${check.status}</span></td>
@@ -336,6 +373,10 @@ export default function HealthPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -355,6 +396,8 @@ export default function HealthPage() {
           setShowPrintMenu(false)
           setShowFilters(false)
           setSearchQuery('')
+          setSortBy('component')
+          setSortOrder('asc')
           break
       }
     }
@@ -509,13 +552,13 @@ export default function HealthPage() {
                 )}
               </button>
               
-              {/* Filter Panel */}
+              {/* Filter & Sort Panel */}
               {showFilters && (
-                <div className="filter-menu absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                <div className="filter-menu absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
                   <div className="p-3 border-b border-slate-700">
-                    <h3 className="text-sm font-medium text-white">Filter Components</h3>
+                    <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
                   </div>
-                  <div className="p-3">
+                  <div className="p-3 border-b border-slate-700">
                     <label className="block text-xs text-slate-400 mb-2">Status</label>
                     <select
                       value={filterStatus}
@@ -527,6 +570,31 @@ export default function HealthPage() {
                       <option value="degraded">Degraded</option>
                       <option value="unhealthy">Unhealthy</option>
                     </select>
+                  </div>
+                  <div className="p-3 border-b border-slate-700">
+                    <label className="block text-xs text-slate-400 mb-2">Sort By</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="component">Component</option>
+                        <option value="status">Status</option>
+                        <option value="latency">Latency</option>
+                      </select>
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          sortOrder === 'asc' 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Toggle sort order (S)"
+                      >
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </button>
+                    </div>
                   </div>
                   {activeFilterCount > 0 && (
                     <div className="p-3 border-t border-slate-700">
@@ -944,6 +1012,10 @@ export default function HealthPage() {
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">F</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">S</kbd>
               </div>
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Export data</span>

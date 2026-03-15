@@ -368,6 +368,8 @@ export default function AIToolsPage() {
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'name' | 'category' | 'desc'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -637,6 +639,9 @@ export default function AIToolsPage() {
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
         setShowFilterPanel(!showFilterPanel)
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault()
+        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         handleRefresh()
@@ -658,6 +663,8 @@ export default function AIToolsPage() {
         setShowPrintMenu(false)
         setShowFilterPanel(false)
         setSearchQuery('')
+        setSortBy('name')
+        setSortOrder('asc')
       }
     }
     
@@ -665,15 +672,31 @@ export default function AIToolsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleRefresh, showFilterPanel])
 
-  // Convert tools to renderable format with search and category filtering
-  const filteredTools = tools.filter(t => {
-    const matchesSearch = !searchQuery.trim() || 
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.category.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter
-    return matchesSearch && matchesCategory
-  })
+  // Convert tools to renderable format with search, category filtering, and sorting
+  const filteredTools = useMemo(() => {
+    const filtered = tools.filter(t => {
+      const matchesSearch = !searchQuery.trim() || 
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter
+      return matchesSearch && matchesCategory
+    })
+    
+    // Apply sorting
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'name') {
+        comparison = a.name.localeCompare(b.name)
+      } else if (sortBy === 'category') {
+        comparison = a.category.localeCompare(b.category)
+      } else if (sortBy === 'desc') {
+        comparison = a.desc.length - b.desc.length
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [tools, searchQuery, categoryFilter, sortBy, sortOrder])
+  
   const aiFeatures = filteredTools.map(apiToolToFeature)
 
   const runAnalysis = async (featureId: string) => {
@@ -746,7 +769,7 @@ export default function AIToolsPage() {
                 <button 
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
-                    categoryFilter !== 'all' 
+                    categoryFilter !== 'all' || sortBy !== 'name' || sortOrder !== 'asc'
                       ? 'bg-indigo-500 text-white' 
                       : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
                   }`}
@@ -754,21 +777,23 @@ export default function AIToolsPage() {
                 >
                   <Search className="w-4 h-4" />
                   <span className="text-sm">Filters</span>
-                  {categoryFilter !== 'all' && (
-                    <span className="ml-1 px-1.5 py-0.5 bg-white text-indigo-500 text-xs rounded-full">1</span>
+                  {(categoryFilter !== 'all' || sortBy !== 'name' || sortOrder !== 'asc') && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white text-indigo-500 text-xs rounded-full">
+                      {(categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)}
+                    </span>
                   )}
                 </button>
                 {showFilterPanel && (
                   <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                     <div className="p-4 border-b border-slate-700">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold">Filter Tools</h3>
-                        {categoryFilter !== 'all' && (
+                        <h3 className="font-semibold">Filter & Sort</h3>
+                        {(categoryFilter !== 'all' || sortBy !== 'name' || sortOrder !== 'asc') && (
                           <button 
-                            onClick={() => setCategoryFilter('all')}
+                            onClick={() => { setCategoryFilter('all'); setSortBy('name'); setSortOrder('asc'); }}
                             className="text-xs text-indigo-400 hover:text-indigo-300"
                           >
-                            Clear
+                            Clear All
                           </button>
                         )}
                       </div>
@@ -792,6 +817,31 @@ export default function AIToolsPage() {
                             </>
                           )}
                         </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Sort By</label>
+                        <select 
+                          value={sortBy} 
+                          onChange={(e) => setSortBy(e.target.value as 'name' | 'category' | 'desc')}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                        >
+                          <option value="name">Name</option>
+                          <option value="category">Category</option>
+                          <option value="desc">Description Length</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Sort Order</span>
+                        <button
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
+                            sortBy !== 'name' || sortOrder !== 'asc'
+                              ? 'bg-indigo-500 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1185,6 +1235,10 @@ export default function AIToolsPage() {
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">F</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Toggle sort order</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">S</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Refresh tools</span>

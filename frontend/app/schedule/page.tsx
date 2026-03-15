@@ -240,8 +240,17 @@ export default function SchedulePage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterLocation, setFilterLocation] = useState<string>('all')
   
-  // Calculate active filter count
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'dayNumber' | 'date' | 'callTime' | 'hours' | 'location' | 'status'>('dayNumber')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+  
+  // Calculate active filter count (includes sort)
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'dayNumber' || sortOrder !== 'asc' ? 1 : 0)
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -353,6 +362,10 @@ export default function SchedulePage() {
           setShowPrintMenu(false)
           setSearchQuery('')
           setShowFilters(false)
+          setFilterStatus('all')
+          setFilterLocation('all')
+          setSortBy('dayNumber')
+          setSortOrder('asc')
           break
         case 'e':
           e.preventDefault()
@@ -365,6 +378,10 @@ export default function SchedulePage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
           break
       }
     }
@@ -400,7 +417,7 @@ export default function SchedulePage() {
     setShowExportMenu(false)
     
     const headers = ['Day', 'Date', 'Location', 'Status', 'Scenes', 'Call Time', 'Hours']
-    const rows = shootingDays.map(day => [
+    const rows = filteredShootingDays.map(day => [
       day.dayNumber,
       day.scheduledDate || '',
       day.location?.name || 'TBD',
@@ -427,9 +444,16 @@ export default function SchedulePage() {
     
     const exportData = {
       exportDate: new Date().toISOString(),
-      totalDays: shootingDays.length,
+      filters: {
+        searchQuery,
+        filterStatus,
+        filterLocation,
+        sortBy,
+        sortOrder
+      },
+      totalDays: filteredShootingDays.length,
       stats,
-      shootingDays: shootingDays.map(day => ({
+      shootingDays: filteredShootingDays.map(day => ({
         dayNumber: day.dayNumber,
         date: day.scheduledDate,
         callTime: day.callTime,
@@ -671,9 +695,9 @@ export default function SchedulePage() {
     return Array.from(locations).sort()
   }, [shootingDays])
 
-  // Filter shooting days by search query and filters
+  // Filter and sort shooting days
   const filteredShootingDays = useMemo(() => {
-    let days = shootingDays
+    let days = [...shootingDays]
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -698,8 +722,34 @@ export default function SchedulePage() {
       days = days.filter(day => day.location?.name === filterLocation)
     }
     
+    // Apply sorting
+    days.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'dayNumber':
+          comparison = a.dayNumber - b.dayNumber
+          break
+        case 'date':
+          comparison = (a.scheduledDate || '').localeCompare(b.scheduledDate || '')
+          break
+        case 'callTime':
+          comparison = (a.callTime || '').localeCompare(b.callTime || '')
+          break
+        case 'hours':
+          comparison = (parseInt(a.estimatedHours || '0') - parseInt(b.estimatedHours || '0'))
+          break
+        case 'location':
+          comparison = (a.location?.name || '').localeCompare(b.location?.name || '')
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
     return days
-  }, [shootingDays, searchQuery, filterStatus, filterLocation])
+  }, [shootingDays, searchQuery, filterStatus, filterLocation, sortBy, sortOrder])
 
   // Night vs Day breakdown
   const dayNightData = useMemo(() => {
@@ -921,16 +971,16 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* Filter Panel */}
+      {/* Filter & Sort Panel */}
       {showFilters && (
         <div 
           ref={filterPanelRef}
           className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200"
         >
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm font-medium text-gray-300">Filters:</span>
+              <span className="text-sm font-medium text-gray-300">Filter & Sort:</span>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-400">Status:</label>
@@ -959,11 +1009,45 @@ export default function SchedulePage() {
                 ))}
               </select>
             </div>
+          </div>
+          
+          {/* Sort Controls */}
+          <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-400">Sort by:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="dayNumber">Day Number</option>
+                <option value="date">Date</option>
+                <option value="callTime">Call Time</option>
+                <option value="hours">Hours</option>
+                <option value="location">Location</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
             <button
-              onClick={() => { setFilterStatus('all'); setFilterLocation('all') }}
+              onClick={toggleSortOrder}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                sortOrder === 'asc' 
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              {sortOrder === 'asc' ? 'ASC ↑' : 'DESC ↓'}
+            </button>
+            <button
+              onClick={() => { 
+                setFilterStatus('all'); 
+                setFilterLocation('all');
+                setSortBy('dayNumber');
+                setSortOrder('asc');
+              }}
               className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
             >
-              Clear Filters
+              Clear All
             </button>
           </div>
         </div>
@@ -1424,13 +1508,14 @@ export default function SchedulePage() {
                 { key: 'R', desc: 'Refresh schedule data' },
                 { key: '/', desc: 'Focus search input' },
                 { key: 'F', desc: 'Toggle filters panel' },
+                { key: 'S', desc: 'Toggle sort order (ASC/DESC)' },
                 { key: '1', desc: 'Switch to Timeline view' },
                 { key: '2', desc: 'Switch to Analytics view' },
                 { key: 'O', desc: 'Open optimize schedule' },
                 { key: 'E', desc: 'Export schedule (CSV/JSON)' },
                 { key: 'P', desc: 'Print schedule report' },
                 { key: '?', desc: 'Show this help modal' },
-                { key: 'Esc', desc: 'Close modal / Clear search / Close filters' },
+                { key: 'Esc', desc: 'Close modal / Clear search & filters / Reset sort' },
               ].map(({ key, desc }) => (
                 <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-700/50 transition-colors">
                   <span className="text-gray-300">{desc}</span>

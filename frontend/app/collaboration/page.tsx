@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   Users, Mail, Phone, MessageSquare, Calendar, Plus, Search,
   Film, Star, Clock, CheckCircle, MoreHorizontal, Loader2,
@@ -90,7 +90,9 @@ export default function CollaborationPage() {
     department: 'all',
     status: 'all',
   })
-  
+  const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'status' | 'dailyRate'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -98,7 +100,7 @@ export default function CollaborationPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   // Calculate active filter count
-  const activeFilterCount = (filters.department !== 'all' ? 1 : 0) + (filters.status !== 'all' ? 1 : 0)
+  const activeFilterCount = (filters.department !== 'all' ? 1 : 0) + (filters.status !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
   const filteredMembersRef = useRef<TeamMember[]>([])
 
   const [formData, setFormData] = useState({
@@ -181,6 +183,10 @@ export default function CollaborationPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -189,6 +195,8 @@ export default function CollaborationPage() {
           setShowFilters(false)
           setSearch('')
           setFilters({ department: 'all', status: 'all' })
+          setSortBy('name')
+          setSortOrder('asc')
           break
         case 'p':
           e.preventDefault()
@@ -201,16 +209,43 @@ export default function CollaborationPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, showFilters, search])
+  }, [showForm, showExportMenu, showPrintMenu, showFilters, search, sortBy, sortOrder])
 
-  const filteredMembers = members.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.role.toLowerCase().includes(search.toLowerCase()) ||
-      m.email?.toLowerCase().includes(search.toLowerCase())
-    const matchesDept = filters.department === 'all' || m.department === filters.department
-    const matchesStatus = filters.status === 'all' || m.status === filters.status
-    return matchesSearch && matchesDept && matchesStatus
-  })
+  const filteredMembers = useMemo(() => {
+    let result = members.filter(m => {
+      const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
+        m.role.toLowerCase().includes(search.toLowerCase()) ||
+        m.email?.toLowerCase().includes(search.toLowerCase())
+      const matchesDept = filters.department === 'all' || m.department === filters.department
+      const matchesStatus = filters.status === 'all' || m.status === filters.status
+      return matchesSearch && matchesDept && matchesStatus
+    })
+
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'role':
+          comparison = a.role.localeCompare(b.role)
+          break
+        case 'department':
+          comparison = (a.department || '').localeCompare(b.department || '')
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'dailyRate':
+          comparison = (a.dailyRate || 0) - (b.dailyRate || 0)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+    return result
+  }, [members, search, filters, sortBy, sortOrder])
   
   // Update ref for keyboard shortcuts
   filteredMembersRef.current = filteredMembers
@@ -337,6 +372,15 @@ export default function CollaborationPage() {
     const data = {
       exportDate: new Date().toISOString(),
       totalMembers: filteredMembers.length,
+      filters: {
+        search,
+        department: filters.department,
+        status: filters.status,
+      },
+      sort: {
+        sortBy,
+        sortOrder,
+      },
       members: filteredMembers.map(m => ({
         name: m.name,
         role: m.role,
@@ -622,9 +666,34 @@ export default function CollaborationPage() {
               )}
             </button>
             {showFilters && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-700">
-                  <h3 className="text-white font-medium mb-3">Filter Team</h3>
+                  <h3 className="text-white font-medium mb-3">Filter & Sort</h3>
+                  
+                  {/* Sort Options */}
+                  <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                    <label className="block text-sm text-indigo-300 mb-2">Sort By</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="name">Name</option>
+                        <option value="role">Role</option>
+                        <option value="department">Department</option>
+                        <option value="status">Status</option>
+                        <option value="dailyRate">Daily Rate</option>
+                      </select>
+                      <button
+                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+                        title="Toggle sort order"
+                      >
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </button>
+                    </div>
+                  </div>
                   
                   {/* Department Filter */}
                   <div className="mb-4">
@@ -659,7 +728,11 @@ export default function CollaborationPage() {
                   {/* Clear Filters */}
                   {activeFilterCount > 0 && (
                     <button
-                      onClick={() => setFilters({ department: 'all', status: 'all' })}
+                      onClick={() => {
+                        setFilters({ department: 'all', status: 'all' })
+                        setSortBy('name')
+                        setSortOrder('asc')
+                      }}
                       className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
                     >
                       Clear Filters ({activeFilterCount})
@@ -1037,6 +1110,10 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">F</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">S</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export team data</span>

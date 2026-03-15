@@ -5,7 +5,7 @@ import {
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
   Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2,
-  Keyboard, Search, Filter
+  Keyboard, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -73,6 +73,8 @@ export default function CallSheetsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterLocation, setFilterLocation] = useState('all')
   const [filterMonth, setFilterMonth] = useState('all')
+  const [sortBy, setSortBy] = useState<'date' | 'title' | 'location' | 'callTime'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
@@ -81,6 +83,7 @@ export default function CallSheetsPage() {
   const deleteSheetRef = useRef<(id: string) => Promise<void>>()
   const startEditingRef = useRef<() => void>()
   const cancelEditingRef = useRef<() => void>()
+  const toggleSortOrderRef = useRef<() => void>()
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -168,6 +171,12 @@ export default function CallSheetsPage() {
             setShowFilters(prev => !prev)
           }
           break
+        case 's':
+          e.preventDefault()
+          if (!creating && !isEditing) {
+            toggleSortOrderRef.current?.()
+          }
+          break
         case 'x':
           e.preventDefault()
           if (selected && !isEditing) {
@@ -200,6 +209,10 @@ export default function CallSheetsPage() {
             setShowFilters(false)
           } else if (isEditing) {
             cancelEditingRef.current?.()
+          } else {
+            // Reset sort to default when no modal/panel is open
+            setSortBy('date')
+            setSortOrder('desc')
           }
           break
       }
@@ -255,8 +268,40 @@ export default function CallSheetsPage() {
       })
     }
     
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+          break
+        case 'title':
+          comparison = (a.title || '').localeCompare(b.title || '')
+          break
+        case 'location':
+          comparison = (a.content?.location || '').localeCompare(b.content?.location || '')
+          break
+        case 'callTime':
+          comparison = (a.content?.callTime || '').localeCompare(b.content?.callTime || '')
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
     return result
-  }, [callSheets, searchQuery, filterLocation, filterMonth])
+  }, [callSheets, searchQuery, filterLocation, filterMonth, sortBy, sortOrder])
+
+  // Active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (searchQuery) count++
+    if (filterLocation !== 'all') count++
+    if (filterMonth !== 'all') count++
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++
+    return count
+  }, [searchQuery, filterLocation, filterMonth, sortBy, sortOrder])
 
   // Get unique locations for filter
   const uniqueLocations = useMemo(() => {
@@ -281,19 +326,18 @@ export default function CallSheetsPage() {
     return Array.from(months).sort().reverse()
   }, [callSheets])
 
-  // Active filter count
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (filterLocation !== 'all') count++
-    if (filterMonth !== 'all') count++
-    return count
-  }, [filterLocation, filterMonth])
-
   // Clear all filters
   const clearFilters = () => {
     setFilterLocation('all')
     setFilterMonth('all')
+    setSortBy('date')
+    setSortOrder('desc')
   }
+
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }, [])
 
   const createNew = async () => {
     try {
@@ -413,6 +457,10 @@ export default function CallSheetsPage() {
   useEffect(() => {
     cancelEditingRef.current = cancelEditing
   }, [cancelEditing])
+
+  useEffect(() => {
+    toggleSortOrderRef.current = toggleSortOrder
+  }, [toggleSortOrder])
 
   const saveChanges = async () => {
     if (!selected) return
@@ -706,9 +754,9 @@ export default function CallSheetsPage() {
               )}
             </button>
             {showFilters && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                  <span className="text-sm font-medium">Filters</span>
+                  <span className="text-sm font-medium">Filter & Sort</span>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
@@ -719,6 +767,29 @@ export default function CallSheetsPage() {
                   )}
                 </div>
                 <div className="p-4 space-y-4">
+                  {/* Sort Options */}
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Sort By</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as 'date' | 'title' | 'location' | 'callTime')}
+                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="date">Date</option>
+                        <option value="title">Title</option>
+                        <option value="location">Location</option>
+                        <option value="callTime">Call Time</option>
+                      </select>
+                      <button
+                        onClick={toggleSortOrder}
+                        className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white flex items-center gap-1 transition-colors"
+                        title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                      >
+                        {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
                   {/* Location Filter */}
                   <div>
                     <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Location</label>
@@ -1426,7 +1497,8 @@ export default function CallSheetsPage() {
               {[
                 { key: 'R', description: 'Refresh call sheets' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'F', description: 'Toggle filters' },
+                { key: 'F', description: 'Toggle filters & sort' },
+                { key: 'S', description: 'Toggle sort order' },
                 { key: 'N', description: 'New call sheet' },
                 { key: 'E', description: 'Edit selected sheet' },
                 { key: 'X', description: 'Export dropdown menu' },

@@ -97,6 +97,27 @@ export default function ContinuityPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'scene' | 'severity' | 'type' | 'description'>('scene');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Compute active filter count (includes sort as active filter)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (typeFilter !== 'all') count++;
+    if (severityFilter !== 'all') count++;
+    if (sortBy !== 'scene' || sortOrder !== 'asc') count++;
+    return count;
+  }, [typeFilter, severityFilter, sortBy, sortOrder]);
+  
+  // Clear all filters (including sort)
+  const clearAllFilters = useCallback(() => {
+    setTypeFilter('all');
+    setSeverityFilter('all');
+    setSortBy('scene');
+    setSortOrder('asc');
+  }, []);
+  
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -290,6 +311,10 @@ export default function ContinuityPage() {
           e.preventDefault();
           setShowFilters(!showFilters);
           break;
+        case 's':
+          e.preventDefault();
+          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+          break;
         case '?':
           e.preventDefault();
           setShowKeyboardHelp(true);
@@ -301,13 +326,14 @@ export default function ContinuityPage() {
           setShowFilters(false);
           setShowPrintMenu(false);
           setFilter('');
+          clearAllFilters();
           break;
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportMenu, showFilters, showPrintMenu, warnings.length]);
+  }, [showExportMenu, showFilters, showPrintMenu, warnings.length, sortOrder, clearAllFilters]);
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -404,8 +430,33 @@ export default function ContinuityPage() {
           (w.scene.headingRaw || '').toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
+    
+    // Apply sorting
+    const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'scene':
+          // Sort by scene number (extract numeric part)
+          const aNum = parseInt(a.scene.sceneNumber.replace(/\D/g, '')) || 0;
+          const bNum = parseInt(b.scene.sceneNumber.replace(/\D/g, '')) || 0;
+          comparison = aNum - bNum;
+          break;
+        case 'severity':
+          comparison = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+          break;
+        case 'type':
+          comparison = a.warningType.localeCompare(b.warningType);
+          break;
+        case 'description':
+          comparison = a.description.localeCompare(b.description);
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
     return filtered;
-  }, [warnings, typeFilter, severityFilter, searchQuery, filter]);
+  }, [warnings, typeFilter, severityFilter, searchQuery, filter, sortBy, sortOrder]);
 
   // Export handlers
   const handleExport = (format: 'csv' | 'json' | 'pdf') => {
@@ -658,10 +709,10 @@ export default function ContinuityPage() {
                 }`}
               >
                 <Filter className="w-4 h-4" />
-                Filters
-                {(severityFilter !== 'all' || typeFilter !== 'all') && (
+                Filter & Sort
+                {activeFilterCount > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs font-medium rounded">
-                    {([severityFilter !== 'all', typeFilter !== 'all'].filter(Boolean)).length}
+                    {activeFilterCount}
                   </span>
                 )}
               </button>
@@ -695,11 +746,38 @@ export default function ContinuityPage() {
                         <option value="low">Low</option>
                       </select>
                     </div>
+                    {/* Sort Options */}
+                    <div className="border-t border-slate-700 pt-4">
+                      <label className="text-xs text-slate-400 mb-2 block">Sort By</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
+                        >
+                          <option value="scene">Scene</option>
+                          <option value="severity">Severity</option>
+                          <option value="type">Type</option>
+                          <option value="description">Description</option>
+                        </select>
+                        <button
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                            sortBy !== 'scene' || sortOrder !== 'asc'
+                              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                              : 'bg-slate-900 border border-slate-700 text-slate-400 hover:bg-slate-700'
+                          }`}
+                          title="Toggle Sort Order"
+                        >
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </button>
+                      </div>
+                    </div>
                     <button
-                      onClick={() => { setTypeFilter('all'); setSeverityFilter('all') }}
+                      onClick={clearAllFilters}
                       className="w-full py-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                     >
-                      Clear Filters
+                      Clear Filters & Sort
                     </button>
                   </div>
                 </div>
@@ -1332,13 +1410,14 @@ export default function ContinuityPage() {
                 { key: 'R', description: 'Refresh continuity data' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters panel' },
+                { key: 'S', description: 'Toggle sort order' },
                 { key: 'E', description: 'Toggle export dropdown' },
                 { key: 'P', description: 'Print continuity report' },
                 { key: '1', description: 'Switch to Overview tab' },
                 { key: '2', description: 'Switch to Breakdown tab' },
                 { key: '3', description: 'Switch to Trends tab' },
                 { key: '?', description: 'Show keyboard shortcuts' },
-                { key: 'Esc', description: 'Close modal / Clear filters' },
+                { key: 'Esc', description: 'Close modal / Clear filters & sort' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

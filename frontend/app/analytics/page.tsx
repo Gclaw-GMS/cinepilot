@@ -181,13 +181,15 @@ export default function AnalyticsPage() {
     timePeriod: 'all',
     department: 'all',
   })
+  const [sortBy, setSortBy] = useState<'name' | 'efficiency' | 'utilization'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   // Calculate active filter count
-  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0)
+  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -255,6 +257,10 @@ export default function AnalyticsPage() {
         case 'f':
           e.preventDefault()
           setShowFilterPanel(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case 'e':
           e.preventDefault()
@@ -340,13 +346,22 @@ export default function AnalyticsPage() {
 
     const exportData = {
       exportDate: new Date().toISOString(),
+      filters: {
+        timePeriod: filters.timePeriod,
+        department: filters.department,
+        searchQuery,
+      },
+      sort: {
+        sortBy,
+        sortOrder,
+      },
       overview: dashboard.overview,
       timeline: metrics.timeline,
       performance: metrics.performance,
       predictions: metrics.predictions,
       budgetBreakdown: dashboard.budget_breakdown,
       scheduleProgress: dashboard.schedule_progress,
-      departmentStats: metrics.department_stats,
+      departmentStats: sortedDeptStats,
       recentActivities: dashboard.recent_activities,
       upcomingShoots: dashboard.upcoming_shoots,
     }
@@ -373,6 +388,8 @@ export default function AnalyticsPage() {
 
   const clearFilters = () => {
     setFilters({ timePeriod: 'all', department: 'all' })
+    setSortBy('name')
+    setSortOrder('asc')
   }
 
   const formatCurrency = (amount: number): string => {
@@ -627,6 +644,23 @@ export default function AnalyticsPage() {
     return dept.name.toLowerCase().includes(query)
   }) || []
 
+  // Sort department stats
+  const sortedDeptStats = [...filteredDeptStats].sort((a, b) => {
+    let comparison = 0
+    switch (sortBy) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name)
+        break
+      case 'efficiency':
+        comparison = a.efficiency - b.efficiency
+        break
+      case 'utilization':
+        comparison = a.utilization - b.utilization
+        break
+    }
+    return sortOrder === 'asc' ? comparison : -comparison
+  })
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
@@ -701,7 +735,7 @@ export default function AnalyticsPage() {
             {showFilterPanel && (
               <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-700">
-                  <h3 className="text-white font-medium mb-3">Filter Analytics</h3>
+                  <h3 className="text-white font-medium mb-3">Filter & Sort</h3>
                   
                   {/* Time Period Filter */}
                   <div className="mb-4">
@@ -734,6 +768,29 @@ export default function AnalyticsPage() {
                       <option value="art">Art</option>
                       <option value="vfx">VFX</option>
                     </select>
+                  </div>
+                  
+                  {/* Sort Options */}
+                  <div className="mb-4">
+                    <label className="block text-sm text-slate-400 mb-2">Sort By (Dept Stats)</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="name">Name</option>
+                        <option value="efficiency">Efficiency</option>
+                        <option value="utilization">Utilization</option>
+                      </select>
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+                        title="Toggle sort order"
+                      >
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Clear Filters */}
@@ -1110,15 +1167,15 @@ export default function AnalyticsPage() {
               Department Performance
               {searchQuery && (
                 <span className="ml-2 text-sm text-slate-400">
-                  ({filteredDeptStats.length} of {deptData.length})
+                  ({sortedDeptStats.length} of {deptData.length})
                 </span>
               )}
             </h3>
-            {filteredDeptStats.length === 0 && searchQuery ? (
+            {sortedDeptStats.length === 0 && searchQuery ? (
               <p className="text-slate-500 text-center py-8">No departments match "{searchQuery}"</p>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={filteredDeptStats}>
+                <BarChart data={sortedDeptStats}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="name" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" domain={[0, 100]} />
@@ -1285,6 +1342,7 @@ export default function AnalyticsPage() {
               {[
                 { key: 'R', description: 'Refresh analytics data' },
                 { key: 'F', description: 'Toggle filters panel' },
+                { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'E', description: 'Toggle export dropdown' },
                 { key: 'P', description: 'Print analytics report' },
                 { key: '/', description: 'Focus search input' },

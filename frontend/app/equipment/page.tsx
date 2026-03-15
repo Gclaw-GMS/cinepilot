@@ -279,6 +279,44 @@ export default function EquipmentPage() {
           setFilterCat('all')
           setFilterStatus('all')
           break
+        // Number keys for category filter (1-5)
+        case '1':
+          e.preventDefault()
+          setFilterCat('camera')
+          break
+        case '2':
+          e.preventDefault()
+          setFilterCat('lighting')
+          break
+        case '3':
+          e.preventDefault()
+          setFilterCat('sound')
+          break
+        case '4':
+          e.preventDefault()
+          setFilterCat('grip')
+          break
+        case '5':
+          e.preventDefault()
+          setFilterCat('art')
+          break
+        case '0':
+          e.preventDefault()
+          setFilterCat('all')
+          break
+        // Status filter with Shift+number
+        case '!':
+          e.preventDefault()
+          setFilterStatus('available')
+          break
+        case '@':
+          e.preventDefault()
+          setFilterStatus('in-use')
+          break
+        case '#':
+          e.preventDefault()
+          setFilterStatus('maintenance')
+          break
       }
     }
     
@@ -1347,6 +1385,48 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Close modal / Clear</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
+                </div>
+                <div className="border-t border-slate-700 pt-3 mt-3">
+                  <span className="text-slate-400 text-sm">Category Filters</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Camera</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Lighting</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Sound</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Grip</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">4</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Art</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">5</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">All Categories</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">0</kbd>
+                </div>
+                <div className="border-t border-slate-700 pt-3 mt-3">
+                  <span className="text-slate-400 text-sm">Status Filters</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Available</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">!</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">In Use</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">@</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Maintenance</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">#</kbd>
                 </div>
               </div>
             </div>

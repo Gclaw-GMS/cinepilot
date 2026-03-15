@@ -2545,3 +2545,36 @@ All features verified working:
 - [x] Filter state managed properly
 - [x] Error handling complete
 - [x] Build passes
+
+---
+
+## Night Build (March 15, 2026, 5:20 AM) - DOOD Conflict Detection (IMPLEMENTED)
+
+### Features Perfected This Build
+- **DOOD Page - Scheduling Conflict Detection**: Added comprehensive conflict detection to the Day Out of Days report
+  - **Overlapping Calls Detection**: Identifies when 4+ actors are called on the same day
+  - **Heavy Call Detection**: Flags actors with 70%+ schedule utilization (burnout risk)
+  - **Isolated Days Detection**: Finds actors with gaps > 5 days in their schedule
+  - **Consecutive Days Detection**: Highlights physically demanding 3+ consecutive day calls
+  - **Severity Levels**: High (red), Medium (amber), Low (gray) conflict indicators
+  - **Visual Cards**: Display conflicts in a grid with actor names and descriptions
+  - **Professional UI**: Consistent with the cyan/amber theme of the DOOD page
+
+### Conflict Types Detected
+1. **Overlap**: Multiple actors called on same days (>3 = warning, >5 = high)
+2. **Heavy**: Actors with 70%+ shooting schedule utilization
+3. **Isolated**: Actors with gaps > 5 days between calls
+4. **Consecutive**: 3+ consecutive shooting days (physically demanding)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### DOOD Conflict Detection Checklist
+- [x] Feature works 100% (conflict detection functional)
+- [x] UI professional & visual (color-coded severity levels)
+- [x] All conflict types detected (overlap, heavy, isolated, consecutive)
+- [x] Error handling complete
+- [x] Build passes

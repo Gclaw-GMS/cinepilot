@@ -145,7 +145,10 @@ export default function CrewPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'skills'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'skills' | 'analytics' | 'conflicts'>('list');
+  
+  // Budget limit for conflict detection
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000); // ₹5L default
 
   // Bulk selection state
   const [selectedCrew, setSelectedCrew] = useState<Set<string>>(new Set());
@@ -166,6 +169,8 @@ export default function CrewPage() {
   const viewModeOptions = [
     { key: 'list', label: 'List View', icon: Users },
     { key: 'skills', label: 'Skills Matrix', icon: Briefcase },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { key: 'conflicts', label: 'Conflicts', icon: AlertTriangle },
   ];
 
   // Bulk selection handlers
@@ -285,6 +290,14 @@ export default function CrewPage() {
           e.preventDefault()
           setViewMode('skills')
           break
+        case '3':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '4':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case 'a':
           // Ctrl+A or Cmd+A for select all
           if (e.ctrlKey || e.metaKey) {
@@ -339,6 +352,206 @@ export default function CrewPage() {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [crew, search, deptFilter, sortBy, sortOrder]);
+
+  // Analytics data computation
+  const analyticsData = useMemo(() => {
+    // Department distribution
+    const deptDistribution = crew.reduce((acc, c) => {
+      const dept = c.department || 'Unassigned';
+      acc[dept] = (acc[dept] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const deptData = Object.entries(deptDistribution).map(([name, count]) => ({
+      name,
+      count,
+      color: DEPT_COLORS[name] || '#64748b',
+    })).sort((a, b) => b.count - a.count);
+
+    // Cost analysis by department
+    const deptCosts = crew.reduce((acc, c) => {
+      const dept = c.department || 'Unassigned';
+      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
+      acc[dept] = (acc[dept] || 0) + rate;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const costData = Object.entries(deptCosts).map(([name, total]) => ({
+      name,
+      total,
+      color: DEPT_COLORS[name] || '#64748b',
+    })).sort((a, b) => b.total - a.total);
+
+    // Daily rate distribution
+    const rateRanges = [
+      { range: '₹0-5K', min: 0, max: 5000, count: 0 },
+      { range: '₹5K-10K', min: 5000, max: 10000, count: 0 },
+      { range: '₹10K-20K', min: 10000, max: 20000, count: 0 },
+      { range: '₹20K-30K', min: 20000, max: 30000, count: 0 },
+      { range: '₹30K+', min: 30000, max: Infinity, count: 0 },
+    ];
+    
+    crew.forEach(c => {
+      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
+      const range = rateRanges.find(r => rate >= r.min && rate < r.max);
+      if (range) range.count++;
+    });
+
+    const rateDistribution = rateRanges.map(r => ({
+      name: r.range,
+      count: r.count,
+    }));
+
+    // Summary stats
+    const totalCrew = crew.length;
+    const totalDailyRate = crew.reduce((sum, c) => sum + (c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0), 0);
+    const avgDailyRate = totalCrew > 0 ? totalDailyRate / totalCrew : 0;
+    const highestRate = Math.max(...crew.map(c => c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0));
+    const departments = Object.keys(deptDistribution).length;
+
+    return {
+      deptData,
+      costData,
+      rateDistribution,
+      stats: {
+        totalCrew,
+        totalDailyRate,
+        avgDailyRate,
+        highestRate,
+        departments,
+      },
+    };
+  }, [crew]);
+
+  // Crew conflict detection
+  const crewConflicts = useMemo(() => {
+    const conflicts: Array<{
+      id: string;
+      type: 'high-cost' | 'missing-contact' | 'skill-gap' | 'department-imbalance' | 'unassigned';
+      severity: 'high' | 'medium' | 'low';
+      crewId: string;
+      title: string;
+      description: string;
+      recommendation: string;
+    }> = [];
+
+    // Check for high daily rates (potential budget issues)
+    crew.forEach(c => {
+      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
+      if (rate > 40000) { // > ₹40K/day
+        conflicts.push({
+          id: `high-cost-${c.id}`,
+          type: 'high-cost',
+          severity: 'high',
+          crewId: c.id,
+          title: `High Daily Rate: ${c.name}`,
+          description: `Daily rate is ₹${rate.toLocaleString()}, which exceeds ₹40K threshold`,
+          recommendation: 'Verify this rate is justified and within budget'
+        });
+      } else if (rate > 25000) {
+        conflicts.push({
+          id: `high-cost-${c.id}`,
+          type: 'high-cost',
+          severity: 'medium',
+          crewId: c.id,
+          title: `Elevated Daily Rate: ${c.name}`,
+          description: `Daily rate is ₹${rate.toLocaleString()}, which exceeds ₹25K threshold`,
+          recommendation: 'Review rate against industry standards'
+        });
+      }
+    });
+
+    // Check for missing contact information
+    crew.forEach(c => {
+      if (!c.phone && !c.email) {
+        conflicts.push({
+          id: `missing-contact-${c.id}`,
+          type: 'missing-contact',
+          severity: 'medium',
+          crewId: c.id,
+          title: `Missing Contact Info: ${c.name}`,
+          description: 'No phone or email contact information available',
+          recommendation: 'Add contact details for communication'
+        });
+      }
+    });
+
+    // Check for unassigned department
+    crew.forEach(c => {
+      if (!c.department) {
+        conflicts.push({
+          id: `unassigned-${c.id}`,
+          type: 'unassigned',
+          severity: 'low',
+          crewId: c.id,
+          title: `Unassigned Department: ${c.name}`,
+          description: 'Crew member has no department assigned',
+          recommendation: 'Assign to appropriate department'
+        });
+      }
+    });
+
+    // Check for department imbalance (too many or too few in a department)
+    const deptCount = crew.reduce((acc, c) => {
+      const dept = c.department || 'Unassigned';
+      acc[dept] = (acc[dept] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    Object.entries(deptCount).forEach(([dept, count]) => {
+      if (count > 5) { // Too many in one department
+        conflicts.push({
+          id: `dept-imbalance-${dept}`,
+          type: 'department-imbalance',
+          severity: count > 8 ? 'high' : 'medium',
+          crewId: '',
+          title: `Department Overstaffed: ${dept}`,
+          description: `${count} crew members in ${dept} department (potential resource imbalance)`,
+          recommendation: 'Review if additional crew in this department is necessary'
+        });
+      }
+    });
+
+    // Check for missing key departments
+    const requiredDepts = ['Camera', 'Direction', 'Sound', 'Lighting'];
+    requiredDepts.forEach(dept => {
+      if (!deptCount[dept] || deptCount[dept] === 0) {
+        conflicts.push({
+          id: `skill-gap-${dept}`,
+          type: 'skill-gap',
+          severity: 'high',
+          crewId: '',
+          title: `Missing Department: ${dept}`,
+          description: `No crew members assigned to ${dept} department`,
+          recommendation: `Recruit or assign crew for ${dept} role`
+        });
+      }
+    });
+
+    // Check total daily rate against budget
+    const totalDailyRate = crew.reduce((sum, c) => sum + (c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0), 0);
+    if (totalDailyRate > budgetLimit) {
+      conflicts.push({
+        id: 'budget-overrun',
+        type: 'high-cost',
+        severity: 'high',
+        crewId: '',
+        title: 'Crew Budget Exceeded',
+        description: `Total daily rate (₹${(totalDailyRate / 100000).toFixed(2)}L) exceeds budget limit (₹${(budgetLimit / 100000).toFixed(2)}L)`,
+        recommendation: 'Review crew rates and consider reducing team size or negotiating rates'
+      });
+    }
+
+    return conflicts;
+  }, [crew, budgetLimit]);
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: crewConflicts.length,
+    high: crewConflicts.filter(c => c.severity === 'high').length,
+    medium: crewConflicts.filter(c => c.severity === 'medium').length,
+    low: crewConflicts.filter(c => c.severity === 'low').length,
+  }), [crewConflicts]);
 
   // Bulk selection handlers (defined after filtered to avoid reference errors)
   const selectAllCrew = useCallback(() => {
@@ -1234,6 +1447,261 @@ export default function CrewPage() {
             {skillsMatrix.skills.length === 0 && (
               <div className="p-8 text-center text-slate-500">
                 No skills data available. Add skills to crew members to see the matrix.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Analytics View */}
+        {viewMode === 'analytics' && (
+          <div className="space-y-6">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <Users className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Total Crew</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{analyticsData.stats.totalCrew}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <DollarSign className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Total Daily Rate</span>
+                </div>
+                <p className="text-2xl font-bold text-white">₹{(analyticsData.stats.totalDailyRate / 1000).toFixed(0)}K</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Avg Daily Rate</span>
+                </div>
+                <p className="text-2xl font-bold text-white">₹{(analyticsData.stats.avgDailyRate / 1000).toFixed(1)}K</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Highest Rate</span>
+                </div>
+                <p className="text-2xl font-bold text-white">₹{(analyticsData.stats.highestRate / 1000).toFixed(0)}K</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <Briefcase className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Departments</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{analyticsData.stats.departments}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Total Cost/Day</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-400">₹{(analyticsData.stats.totalDailyRate / 100000).toFixed(2)}L</p>
+              </div>
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Department Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <PieChart className="w-5 h-5 text-emerald-400" />
+                  Department Distribution
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analyticsData.deptData}
+                        dataKey="count"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        labelLine={false}
+                      >
+                        {analyticsData.deptData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#f1f5f9' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Cost by Department */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-emerald-400" />
+                  Cost by Department
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.costData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis type="number" stroke="#94a3b8" tickFormatter={(v) => `₹${(v/1000).toFixed(0)}K`} />
+                      <YAxis dataKey="name" type="category" stroke="#94a3b8" width={80} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#f1f5f9' }}
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Total Rate']}
+                      />
+                      <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                        {analyticsData.costData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Daily Rate Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 md:col-span-2">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  Daily Rate Distribution
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.rateDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" stroke="#94a3b8" />
+                      <YAxis stroke="#94a3b8" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#f1f5f9' }}
+                      />
+                      <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Crew Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Total Conflicts</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{conflictStats.total}</p>
+              </div>
+              <div className="bg-slate-900 border border-red-500/30 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-red-400 mb-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">High Priority</span>
+                </div>
+                <p className="text-2xl font-bold text-red-400">{conflictStats.high}</p>
+              </div>
+              <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-amber-400 mb-1">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Medium Priority</span>
+                </div>
+                <p className="text-2xl font-bold text-amber-400">{conflictStats.medium}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-slate-400 mb-1">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-wider">Low Priority</span>
+                </div>
+                <p className="text-2xl font-bold text-slate-400">{conflictStats.low}</p>
+              </div>
+            </div>
+
+            {/* Budget Limit Input */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
+                  <span className="text-sm font-medium text-white">Daily Rate Budget Limit:</span>
+                </div>
+                <input
+                  type="number"
+                  value={budgetLimit}
+                  onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm w-40"
+                  placeholder="₹5,00,000"
+                />
+                <span className="text-xs text-slate-500">(Default: ₹5,00,000)</span>
+              </div>
+            </div>
+
+            {/* Conflict Cards */}
+            {crewConflicts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {crewConflicts.map((conflict) => (
+                  <div
+                    key={conflict.id}
+                    className={`bg-slate-900 border rounded-xl p-4 ${
+                      conflict.severity === 'high'
+                        ? 'border-red-500/30'
+                        : conflict.severity === 'medium'
+                        ? 'border-amber-500/30'
+                        : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div
+                        className={`p-2 rounded-lg ${
+                          conflict.severity === 'high'
+                            ? 'bg-red-500/20'
+                            : conflict.severity === 'medium'
+                            ? 'bg-amber-500/20'
+                            : 'bg-slate-800'
+                        }`}
+                      >
+                        <AlertTriangle
+                          className={`w-5 h-5 ${
+                            conflict.severity === 'high'
+                              ? 'text-red-400'
+                              : conflict.severity === 'medium'
+                              ? 'text-amber-400'
+                              : 'text-slate-400'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-white text-sm">{conflict.title}</h4>
+                        <span
+                          className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${
+                            conflict.severity === 'high'
+                              ? 'bg-red-500/20 text-red-400'
+                              : conflict.severity === 'medium'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {conflict.severity.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-400 mb-3">{conflict.description}</p>
+                    <div className="pt-3 border-t border-slate-800">
+                      <p className="text-xs text-slate-500 mb-1">Recommendation:</p>
+                      <p className="text-sm text-slate-300">{conflict.recommendation}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">Crew Looks Good!</h3>
+                <p className="text-slate-400">No conflicts detected in your crew data.</p>
               </div>
             )}
           </div>

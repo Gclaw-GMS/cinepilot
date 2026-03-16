@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, CheckCircle } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, CheckCircle, BarChart3 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -131,6 +131,7 @@ export default function EquipmentPage() {
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -212,6 +213,134 @@ export default function EquipmentPage() {
       budgetStatus,
     }
   }, [equipment, budgetLimit])
+
+  // Equipment conflict detection
+  const equipmentConflicts = useMemo(() => {
+    const conflicts: Array<{
+      id: string
+      type: 'double-booking' | 'maintenance-scheduled' | 'budget-overrun' | 'high-value' | 'date-overlap'
+      severity: 'high' | 'medium' | 'low'
+      equipmentId: string
+      title: string
+      description: string
+      recommendation: string
+    }> = []
+
+    // Check for double bookings (same equipment, overlapping dates)
+    for (let i = 0; i < equipment.length; i++) {
+      for (let j = i + 1; j < equipment.length; j++) {
+        const eq1 = equipment[i]
+        const eq2 = equipment[j]
+        
+        // Only check same equipment name
+        if (eq1.name.toLowerCase() !== eq2.name.toLowerCase()) continue
+        
+        const start1 = new Date(eq1.dateStart)
+        const end1 = new Date(eq1.dateEnd)
+        const start2 = new Date(eq2.dateStart)
+        const end2 = new Date(eq2.dateEnd)
+        
+        // Check for overlap
+        if (start1 <= end2 && start2 <= end1) {
+          conflicts.push({
+            id: `double-${eq1.id}-${eq2.id}`,
+            type: 'double-booking',
+            severity: 'high',
+            equipmentId: eq1.id,
+            title: `Double Booking: ${eq1.name}`,
+            description: `This equipment is booked for overlapping periods: ${eq1.dateStart} to ${eq1.dateEnd} and ${eq2.dateStart} to ${eq2.dateEnd}`,
+            recommendation: 'Review rental dates and coordinate with vendors to resolve overlap'
+          })
+        }
+      }
+    }
+
+    // Check for maintenance equipment scheduled for use
+    equipment.forEach(eq => {
+      if (eq.status === 'maintenance') {
+        const startDate = new Date(eq.dateStart)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        if (startDate <= today) {
+          conflicts.push({
+            id: `maintenance-${eq.id}`,
+            type: 'maintenance-scheduled',
+            severity: 'high',
+            equipmentId: eq.id,
+            title: `Maintenance Equipment in Use: ${eq.name}`,
+            description: `This equipment is marked as under maintenance but has past start date: ${eq.dateStart}`,
+            recommendation: 'Update equipment status or rental dates to reflect current state'
+          })
+        }
+      }
+    })
+
+    // Check for budget overrun (individual item high cost)
+    equipment.forEach(eq => {
+      const startDate = new Date(eq.dateStart)
+      const endDate = new Date(eq.dateEnd)
+      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+      const totalCost = eq.dailyRate * days * eq.quantity
+      
+      if (totalCost > 100000) { // > ₹1L
+        conflicts.push({
+          id: `high-value-${eq.id}`,
+          type: 'high-value',
+          severity: totalCost > 500000 ? 'high' : 'medium',
+          equipmentId: eq.id,
+          title: `High Value Rental: ${eq.name}`,
+          description: `This equipment rental costs ₹${(totalCost / 100000).toFixed(2)}L (₹${eq.dailyRate.toLocaleString()}/day × ${days} days)`,
+          recommendation: 'Verify this high-cost rental is essential for production'
+        })
+      }
+    })
+
+    // Check for budget overrun (total)
+    if (budgetData.isOverBudget) {
+      conflicts.push({
+        id: 'budget-overrun-total',
+        type: 'budget-overrun',
+        severity: 'high',
+        equipmentId: '',
+        title: 'Equipment Budget Exceeded',
+        description: `Total equipment costs (₹${(budgetData.estimatedTotal / 100000).toFixed(2)}L) exceed budget limit (₹${(budgetLimit / 100000).toFixed(2)}L)`,
+        recommendation: 'Review equipment rentals and consider alternatives or reduce rental periods'
+      })
+    }
+
+    // Check for date overlaps (different equipment on same dates - resource contention)
+    const dateGroups: Record<string, EquipmentRental[]> = {}
+    equipment.forEach(eq => {
+      const startKey = eq.dateStart
+      if (!dateGroups[startKey]) dateGroups[startKey] = []
+      dateGroups[startKey].push(eq)
+    })
+    
+    Object.entries(dateGroups).forEach(([date, items]) => {
+      if (items.length > 3) {
+        conflicts.push({
+          id: `date-overlap-${date}`,
+          type: 'date-overlap',
+          severity: items.length > 5 ? 'high' : 'medium',
+          equipmentId: items[0].id,
+          title: `Resource Contention: ${date}`,
+          description: `${items.length} equipment items scheduled for the same start date (${date}), potential coordination issues`,
+          recommendation: 'Stagger rental start dates or coordinate with multiple vendors'
+        })
+      }
+    })
+
+    return conflicts
+  }, [equipment, budgetData.isOverBudget, budgetData.estimatedTotal, budgetLimit])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: equipmentConflicts.length,
+    high: equipmentConflicts.filter(c => c.severity === 'high').length,
+    medium: equipmentConflicts.filter(c => c.severity === 'medium').length,
+    low: equipmentConflicts.filter(c => c.severity === 'low').length,
+  }), [equipmentConflicts])
 
   const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
   const STATUS_COLORS: Record<string, string> = {
@@ -502,6 +631,18 @@ export default function EquipmentPage() {
             handlePrintRef.current?.()
           }
           break
+        case '1':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -538,7 +679,7 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalOpen, editModalOpen, showExportMenu, equipment.length])
+  }, [modalOpen, editModalOpen, showExportMenu, equipment.length, viewMode])
 
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedEquipment)
@@ -1043,6 +1184,54 @@ export default function EquipmentPage() {
           </div>
         </div>
 
+        {/* View Mode Tabs */}
+        <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'list' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              List
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'analytics' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </span>
+          </button>
+          <button
+            onClick={() => setViewMode('conflicts')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
+              viewMode === 'conflicts' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Conflicts
+            </span>
+            {conflictStats.high > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                {conflictStats.high}
+              </span>
+            )}
+          </button>
+        </div>
+
         {error && (
           <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1146,8 +1335,8 @@ export default function EquipmentPage() {
           <StatCard title="Returned" value={stats.returned} color="slate" icon={<Package className="w-5 h-5 text-slate-400" />} />
         </div>
 
-        {/* Charts */}
-        {categoryData.length > 0 && (
+        {/* Charts - Only show in analytics mode */}
+        {viewMode === 'analytics' && categoryData.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Category Breakdown */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -1205,6 +1394,116 @@ export default function EquipmentPage() {
           </div>
         )}
 
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className={`p-4 rounded-xl border ${conflictStats.total > 0 ? 'bg-indigo-500/10 border-indigo-500/30' : 'bg-slate-900 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Total Conflicts</p>
+                    <p className="text-2xl font-semibold mt-1">{conflictStats.total}</p>
+                  </div>
+                  <AlertTriangle className="w-8 h-8 text-indigo-400" />
+                </div>
+              </div>
+              <div className={`p-4 rounded-xl border ${conflictStats.high > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">High Priority</p>
+                    <p className="text-2xl font-semibold mt-1 text-red-400">{conflictStats.high}</p>
+                  </div>
+                  <AlertCircle className="w-8 h-8 text-red-400" />
+                </div>
+              </div>
+              <div className={`p-4 rounded-xl border ${conflictStats.medium > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Medium Priority</p>
+                    <p className="text-2xl font-semibold mt-1 text-amber-400">{conflictStats.medium}</p>
+                  </div>
+                  <AlertTriangle className="w-8 h-8 text-amber-400" />
+                </div>
+              </div>
+              <div className={`p-4 rounded-xl border ${conflictStats.low > 0 ? 'bg-slate-500/10 border-slate-500/30' : 'bg-slate-900 border-slate-800'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">Low Priority</p>
+                    <p className="text-2xl font-semibold mt-1 text-slate-400">{conflictStats.low}</p>
+                  </div>
+                  <AlertTriangle className="w-8 h-8 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* Conflicts List */}
+            {equipmentConflicts.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                <CheckCircle className="w-16 h-16 mx-auto mb-4 text-emerald-400" />
+                <h3 className="text-xl font-semibold mb-2">Equipment Schedule Looks Good!</h3>
+                <p className="text-slate-400">No conflicts detected in your equipment rentals.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {equipmentConflicts.map(conflict => (
+                  <div 
+                    key={conflict.id}
+                    className={`p-4 rounded-xl border ${
+                      conflict.severity === 'high' 
+                        ? 'bg-red-500/5 border-red-500/20' 
+                        : conflict.severity === 'medium'
+                        ? 'bg-amber-500/5 border-amber-500/20'
+                        : 'bg-slate-800/50 border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {conflict.severity === 'high' ? (
+                        <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      ) : conflict.severity === 'medium' ? (
+                        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            conflict.severity === 'high' 
+                              ? 'bg-red-500/20 text-red-400' 
+                              : conflict.severity === 'medium'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-slate-700 text-slate-400'
+                          }`}>
+                            {conflict.severity.charAt(0).toUpperCase() + conflict.severity.slice(1)}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            conflict.type === 'double-booking' ? 'bg-red-500/20 text-red-400' :
+                            conflict.type === 'budget-overrun' ? 'bg-red-500/20 text-red-400' :
+                            conflict.type === 'maintenance-scheduled' ? 'bg-red-500/20 text-red-400' :
+                            conflict.type === 'high-value' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>
+                            {conflict.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                          </span>
+                        </div>
+                        <h4 className="font-semibold mb-1">{conflict.title}</h4>
+                        <p className="text-sm text-slate-400 mb-2">{conflict.description}</p>
+                        <div className="text-xs text-indigo-400">
+                          <span className="text-slate-500">Recommendation: </span>
+                          {conflict.recommendation}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* List/Analytics View */}
+        {(viewMode === 'list' || viewMode === 'analytics') && (
+          <>
         {/* Filters */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex flex-wrap items-center gap-4">
@@ -1350,6 +1649,8 @@ export default function EquipmentPage() {
             </div>
           )}
         </div>
+          </>
+        )}
 
         {/* Floating Bulk Actions Toolbar */}
         {showBulkActions && selectedEquipment.size > 0 && (
@@ -1690,6 +1991,19 @@ export default function EquipmentPage() {
                 </button>
               </div>
               <div className="p-4 space-y-3">
+                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">View Modes</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Switch to List view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Switch to Analytics view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Switch to Conflicts view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
+                </div>
                 <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Selection</div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Select all equipment</span>

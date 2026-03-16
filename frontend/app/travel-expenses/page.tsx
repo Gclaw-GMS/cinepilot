@@ -5,7 +5,8 @@ import {
   Plane, Train, Bus, Car, Building, Wallet, Plus, Edit2, Trash2,
   DollarSign, Calendar, MapPin, Search, X, HelpCircle,
   Clock, CreditCard, Receipt, Filter, BarChart3, PieChart as PieChartIcon,
-  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet
+  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet,
+  AlertTriangle, CheckCircle, TrendingUp, TrendingDown, AlertCircle
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -57,6 +58,16 @@ interface CategorySummary {
   approved: number
 }
 
+interface TravelConflict {
+  id: string
+  type: 'budget' | 'duplicate' | 'missing-receipt' | 'pending-too-long' | 'high-value'
+  severity: 'high' | 'medium' | 'low'
+  expenseId?: string
+  title: string
+  description: string
+  recommendation: string
+}
+
 export default function TravelExpensesPage() {
   const [expenses, setExpenses] = useState<TravelExpense[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,7 +83,8 @@ export default function TravelExpensesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'category' | 'status' | 'vendor'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('dashboard')
+  const [viewMode, setViewMode] = useState<'list' | 'dashboard' | 'budget' | 'conflicts'>('dashboard')
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default ₹5L
 
   // Calculate active filter count using useMemo for efficiency
   const activeFilterCount = useMemo(() => {
@@ -232,6 +244,123 @@ export default function TravelExpensesPage() {
     value: expenses.filter(e => e.status === s.key).reduce((sum, e) => sum + e.amount, 0),
     color: s.color
   })).filter(d => d.value > 0)
+
+  // Budget calculations
+  const budgetUsedPercent = useMemo(() => (totalExpenses / budgetLimit) * 100, [totalExpenses, budgetLimit])
+  const budgetRemaining = useMemo(() => budgetLimit - totalExpenses, [budgetLimit, totalExpenses])
+  const isOverBudget = useMemo(() => totalExpenses > budgetLimit, [totalExpenses, budgetLimit])
+  const isWarning = useMemo(() => budgetUsedPercent >= 80 && !isOverBudget, [budgetUsedPercent, isOverBudget])
+  const budgetStatus = useMemo(() => isOverBudget ? 'over' : isWarning ? 'warning' : 'ok', [isOverBudget, isWarning])
+
+  // Conflict detection
+  const travelConflicts = useMemo(() => {
+    const conflicts: TravelConflict[] = []
+    const today = new Date()
+    
+    // Budget Overrun
+    if (isOverBudget) {
+      conflicts.push({
+        id: 'conflict-budget',
+        type: 'budget',
+        severity: 'high',
+        title: 'Budget Overrun',
+        description: `Total expenses (₹${(totalExpenses/100000).toFixed(1)}L) exceed budget limit (₹${(budgetLimit/100000).toFixed(1)}L)`,
+        recommendation: 'Review and reduce planned travel expenses or request budget increase'
+      })
+    } else if (isWarning) {
+      conflicts.push({
+        id: 'conflict-budget-warning',
+        type: 'budget',
+        severity: 'medium',
+        title: 'Approaching Budget Limit',
+        description: `Budget usage at ${budgetUsedPercent.toFixed(0)}% (₹${(totalExpenses/100000).toFixed(1)}L of ₹${(budgetLimit/100000).toFixed(1)}L)`,
+        recommendation: 'Monitor expenses closely to stay within budget'
+      })
+    }
+
+    // Duplicate detection (same amount, date, category)
+    const duplicates = expenses.reduce((acc, exp, idx) => {
+      const matches = expenses.filter(e => 
+        e.id !== exp.id && 
+        e.amount === exp.amount && 
+        e.date === exp.date && 
+        e.category === exp.category
+      )
+      if (matches.length > 0) {
+        acc.push({ expense: exp, duplicates: matches })
+      }
+      return acc
+    }, [] as { expense: TravelExpense; duplicates: TravelExpense[] }[])
+    
+    duplicates.forEach((dup, i) => {
+      conflicts.push({
+        id: `conflict-dup-${i}`,
+        type: 'duplicate',
+        severity: 'medium',
+        expenseId: dup.expense.id,
+        title: 'Possible Duplicate Expense',
+        description: `Multiple expenses of ₹${dup.expense.amount.toLocaleString()} on ${dup.expense.date} for ${dup.expense.category}`,
+        recommendation: 'Verify these are separate expenses or merge them'
+      })
+    })
+
+    // Missing receipts (>₹10,000 without notes)
+    expenses.forEach(exp => {
+      if (exp.amount > 10000 && !exp.notes) {
+        conflicts.push({
+          id: `conflict-receipt-${exp.id}`,
+          type: 'missing-receipt',
+          severity: exp.amount > 50000 ? 'high' : 'medium',
+          expenseId: exp.id,
+          title: 'Missing Receipt Documentation',
+          description: `Expense of ₹${exp.amount.toLocaleString()} (${exp.description}) has no notes/receipt reference`,
+          recommendation: 'Add receipt documentation or notes for this expense'
+        })
+      }
+    })
+
+    // Pending too long (>30 days)
+    expenses.forEach(exp => {
+      if (exp.status === 'pending') {
+        const daysPending = Math.floor((today.getTime() - new Date(exp.date).getTime()) / (1000 * 60 * 60 * 24))
+        if (daysPending > 30) {
+          conflicts.push({
+            id: `conflict-pending-${exp.id}`,
+            type: 'pending-too-long',
+            severity: daysPending > 60 ? 'high' : 'medium',
+            expenseId: exp.id,
+            title: 'Expense Pending Too Long',
+            description: `Pending expense for ${daysPending} days: ₹${exp.amount.toLocaleString()} (${exp.description})`,
+            recommendation: 'Follow up on approval or rejection of this expense'
+          })
+        }
+      }
+    })
+
+    // High value items (>₹50,000)
+    expenses.forEach(exp => {
+      if (exp.amount > 50000) {
+        conflicts.push({
+          id: `conflict-high-${exp.id}`,
+          type: 'high-value',
+          severity: exp.amount > 100000 ? 'high' : 'medium',
+          expenseId: exp.id,
+          title: 'High Value Expense',
+          description: `Large expense of ₹${exp.amount.toLocaleString()} (${exp.description})`,
+          recommendation: 'Ensure proper approval and documentation for this expense'
+        })
+      }
+    })
+
+    return conflicts
+  }, [expenses, isOverBudget, isWarning, budgetUsedPercent, budgetLimit, totalExpenses])
+
+  const conflictStats = useMemo(() => ({
+    total: travelConflicts.length,
+    high: travelConflicts.filter(c => c.severity === 'high').length,
+    medium: travelConflicts.filter(c => c.severity === 'medium').length,
+    low: travelConflicts.filter(c => c.severity === 'low').length
+  }), [travelConflicts])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -469,10 +598,15 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         handleRefreshRef.current?.()
       }
+      // View mode shortcuts
+      if (e.key === '1' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('dashboard') }
+      if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('list') }
+      if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('budget') }
+      if (e.key === '4' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('conflicts') }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters, sortOrder])
+  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters, sortOrder, viewMode])
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
   const getCategoryInfo = (category: string) => EXPENSE_CATEGORIES.find(c => c.key === category) || { key: category, label: category, icon: DollarSign, color: '#6b7280' }
@@ -570,6 +704,11 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <div className="flex bg-slate-700 rounded-lg p-1">
                 <button onClick={() => setViewMode('dashboard')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'dashboard' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><BarChart3 className="w-4 h-4 inline mr-1" />Dashboard</button>
                 <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'list' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><Receipt className="w-4 h-4 inline mr-1" />List</button>
+                <button onClick={() => setViewMode('budget')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'budget' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><Wallet className="w-4 h-4 inline mr-1" />Budget</button>
+                <button onClick={() => setViewMode('conflicts')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'conflicts' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}>
+                  <AlertTriangle className="w-4 h-4 inline mr-1" />Conflicts
+                  {conflictStats.high > 0 && <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-xs">{conflictStats.high}</span>}
+                </button>
               </div>
 
               {/* Add Button */}
@@ -747,6 +886,210 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               </div>
             </div>
           </div>
+        ) : viewMode === 'budget' ? (
+          /* Budget View */
+          <div className="space-y-6">
+            {/* Budget Overview Card */}
+            <div className={`bg-slate-800/50 border-2 rounded-xl p-6 ${
+              budgetStatus === 'over' ? 'border-red-500' : 
+              budgetStatus === 'warning' ? 'border-amber-500' : 
+              'border-emerald-500'
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold flex items-center gap-2">
+                  <Wallet className={`w-6 h-6 ${
+                    budgetStatus === 'over' ? 'text-red-500' : 
+                    budgetStatus === 'warning' ? 'text-amber-500' : 
+                    'text-emerald-500'
+                  }`} />
+                  Budget Tracking
+                </h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-sm">Budget Limit:</span>
+                  <input 
+                    type="number" 
+                    value={budgetLimit}
+                    onChange={(e) => setBudgetLimit(parseInt(e.target.value) || 0)}
+                    className="w-32 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-right"
+                  />
+                </div>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-slate-400">Budget Used</span>
+                  <span className={`font-semibold ${
+                    budgetStatus === 'over' ? 'text-red-500' : 
+                    budgetStatus === 'warning' ? 'text-amber-500' : 
+                    'text-emerald-500'
+                  }`}>{budgetUsedPercent.toFixed(1)}%</span>
+                </div>
+                <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-500 ${
+                      budgetStatus === 'over' ? 'bg-red-500' : 
+                      budgetStatus === 'warning' ? 'bg-amber-500' : 
+                      'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(budgetUsedPercent, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <p className="text-slate-400 text-sm mb-1">Total Spent</p>
+                  <p className="text-2xl font-bold">{formatCurrency(totalExpenses)}</p>
+                </div>
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <p className="text-slate-400 text-sm mb-1">Budget Limit</p>
+                  <p className="text-2xl font-bold">{formatCurrency(budgetLimit)}</p>
+                </div>
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <p className="text-slate-400 text-sm mb-1">{isOverBudget ? 'Over Budget' : 'Remaining'}</p>
+                  <p className={`text-2xl font-bold ${isOverBudget ? 'text-red-500' : budgetRemaining < budgetLimit * 0.2 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    {formatCurrency(Math.abs(budgetRemaining))}
+                    {isOverBudget && <span className="text-sm ml-1">(Over)</span>}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Message */}
+              <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${
+                budgetStatus === 'over' ? 'bg-red-500/20 text-red-400' : 
+                budgetStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' : 
+                'bg-emerald-500/20 text-emerald-400'
+              }`}>
+                {budgetStatus === 'over' ? <AlertTriangle className="w-5 h-5" /> : budgetStatus === 'warning' ? <AlertCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                <span className="font-medium">
+                  {budgetStatus === 'over' 
+                    ? `Over budget by ${formatCurrency(Math.abs(budgetRemaining))}! Immediate action required.`
+                    : budgetStatus === 'warning' 
+                    ? `Approaching budget limit (${budgetUsedPercent.toFixed(0)}% used). Monitor spending closely.`
+                    : `Within budget. ${formatCurrency(budgetRemaining)} remaining.`
+                  }
+                </span>
+              </div>
+            </div>
+
+            {/* Budget by Category */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4">Spending by Category</h3>
+              <div className="space-y-3">
+                {categorySummary.sort((a, b) => b.total - a.total).map(cat => {
+                  const catInfo = getCategoryInfo(cat.category)
+                  const percent = (cat.total / totalExpenses) * 100
+                  return (
+                    <div key={cat.category} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="flex items-center gap-2">
+                          <catInfo.icon className="w-4 h-4" style={{ color: catInfo.color }} />
+                          {catInfo.label}
+                        </span>
+                        <span className="text-slate-400">{formatCurrency(cat.total)} ({percent.toFixed(1)}%)</span>
+                      </div>
+                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full"
+                          style={{ width: `${percent}%`, backgroundColor: catInfo.color }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        ) : viewMode === 'conflicts' ? (
+          /* Conflicts View */
+          <div className="space-y-6">
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Total Issues</span>
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <p className="text-3xl font-bold">{conflictStats.total}</p>
+              </div>
+              <div className="bg-slate-800/50 border border-red-500/30 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">High Priority</span>
+                  <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs">High</span>
+                </div>
+                <p className="text-3xl font-bold text-red-500">{conflictStats.high}</p>
+              </div>
+              <div className="bg-slate-800/50 border border-amber-500/30 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Medium Priority</span>
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">Medium</span>
+                </div>
+                <p className="text-3xl font-bold text-amber-500">{conflictStats.medium}</p>
+              </div>
+              <div className="bg-slate-800/50 border border-slate-600 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Low Priority</span>
+                  <span className="px-2 py-0.5 bg-slate-500/20 text-slate-400 rounded text-xs">Low</span>
+                </div>
+                <p className="text-3xl font-bold text-slate-500">{conflictStats.low}</p>
+              </div>
+            </div>
+
+            {/* Conflicts List */}
+            {conflictStats.total === 0 ? (
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-12 text-center">
+                <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">All Clear!</h3>
+                <p className="text-slate-400">No conflicts detected in travel expenses.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {travelConflicts.map(conflict => (
+                  <div 
+                    key={conflict.id} 
+                    className={`bg-slate-800/50 border rounded-xl p-5 ${
+                      conflict.severity === 'high' ? 'border-red-500/30' :
+                      conflict.severity === 'medium' ? 'border-amber-500/30' :
+                      'border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={`p-2 rounded-lg ${
+                        conflict.severity === 'high' ? 'bg-red-500/20' :
+                        conflict.severity === 'medium' ? 'bg-amber-500/20' :
+                        'bg-slate-700'
+                      }`}>
+                        {conflict.type === 'budget' && <AlertTriangle className={`w-5 h-5 ${conflict.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`} />}
+                        {conflict.type === 'duplicate' && <Receipt className={`w-5 h-5 ${conflict.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`} />}
+                        {conflict.type === 'missing-receipt' && <Receipt className={`w-5 h-5 ${conflict.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`} />}
+                        {conflict.type === 'pending-too-long' && <Clock className={`w-5 h-5 ${conflict.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`} />}
+                        {conflict.type === 'high-value' && <DollarSign className={`w-5 h-5 ${conflict.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`} />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold">{conflict.title}</h4>
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                            conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>
+                            {conflict.severity}
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-sm">{conflict.description}</p>
+                      </div>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-lg p-3">
+                      <p className="text-xs text-slate-400 mb-1">Recommendation</p>
+                      <p className="text-sm">{conflict.recommendation}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
@@ -818,6 +1161,10 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between"><span className="text-slate-300">Dashboard view</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">List view</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Budget view</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">3</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Conflicts view</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">4</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle sort order</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">S</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>

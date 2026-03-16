@@ -28,6 +28,12 @@ interface HealthResponse {
   checks: HealthCheck[]
   version: string
   isDemo?: boolean
+  system?: {
+    platform: string
+    nodeVersion: string
+    cpuCores: number
+    totalMemoryGB?: number
+  }
 }
 
 interface HealthHistory {
@@ -35,6 +41,7 @@ interface HealthHistory {
   database: number
   disk: number
   memory: number
+  cpu: number
 }
 
 const STATUS_COLORS = {
@@ -48,6 +55,11 @@ const COMPONENT_ICONS: Record<string, typeof Database> = {
   disk: HardDrive,
   memory: Cpu,
   environment: Zap,
+  cpu: Gauge,
+  eventloop: Activity,
+  external_apis: Server,
+  process: Heart,
+  file_descriptors: HardDrive,
 }
 
 export default function HealthPage() {
@@ -317,6 +329,7 @@ export default function HealthPage() {
       
       // Add to history for charts
       setHealthHistory(prev => {
+        const cpuCheck = data.checks.find(c => c.component === 'cpu')
         const newEntry: HealthHistory = {
           timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
           database: data.checks.find(c => c.component === 'database')?.status === 'healthy' ? 100 : 
@@ -325,6 +338,8 @@ export default function HealthPage() {
                 data.checks.find(c => c.component === 'disk')?.status === 'degraded' ? 50 : 0,
           memory: data.checks.find(c => c.component === 'memory')?.status === 'healthy' ? 100 : 
                   data.checks.find(c => c.component === 'memory')?.status === 'degraded' ? 50 : 0,
+          cpu: cpuCheck?.status === 'healthy' ? 100 : 
+               cpuCheck?.status === 'degraded' ? 50 : 0,
         }
         const updated = [...prev, newEntry].slice(-20)
         return updated
@@ -736,6 +751,12 @@ export default function HealthPage() {
             {healthData?.version || '1.0.0'}
           </div>
           <div className="text-sm text-slate-500 mt-1">CinePilot API</div>
+          {healthData?.system && (
+            <div className="mt-2 pt-2 border-t border-slate-800 text-xs text-slate-500">
+              <div>Node: {healthData.system.nodeVersion}</div>
+              <div>{healthData.system.cpuCores} cores • {healthData.system.totalMemoryGB}GB</div>
+            </div>
+          )}
         </div>
 
         {/* Last Refresh */}
@@ -826,6 +847,72 @@ export default function HealthPage() {
                     </div>
                   </div>
                 )}
+                
+                {/* CPU details */}
+                {check.component === 'cpu' && check.details && (
+                  <div className="mt-3 pt-3 border-t border-slate-800">
+                    <div className="flex justify-between text-xs text-slate-400 mb-2">
+                      <span>CPU Load</span>
+                      <span>{(check.details as { loadPercent?: number }).loadPercent}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all"
+                        style={{ 
+                          width: `${Math.min((check.details as { loadPercent?: number }).loadPercent || 0, 100)}%`,
+                          backgroundColor: getStatusColor(check.status)
+                        }}
+                      />
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">
+                      {(check.details as { cores?: number }).cores} cores • 1m: {(check.details as { load1m?: number }).load1m?.toFixed(2)}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Event Loop details */}
+                {check.component === 'eventloop' && check.details && (
+                  <div className="mt-3 pt-3 border-t border-slate-800">
+                    <div className="text-xs text-slate-400">
+                      Event Loop Lag: <span className="text-white font-mono">{(check.details as { lagMs?: number }).lagMs}ms</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* File Descriptors details */}
+                {check.component === 'file_descriptors' && check.details && (
+                  <div className="mt-3 pt-3 border-t border-slate-800">
+                    <div className="text-xs text-slate-400">
+                      Open FDs: <span className="text-white font-mono">{(check.details as { count?: number }).count}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Process details */}
+                {check.component === 'process' && check.details && (
+                  <div className="mt-3 pt-3 border-t border-slate-800">
+                    <div className="text-xs text-slate-400">
+                      PID: <span className="text-white font-mono">{(check.details as { pid?: number }).pid}</span>
+                      <span className="mx-2">•</span>
+                      Arch: <span className="text-white">{(check.details as { arch?: string }).arch}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* External APIs details */}
+                {check.component === 'external_apis' && check.details && (
+                  <div className="mt-3 pt-3 border-t border-slate-800">
+                    {(check.details as { apis?: Array<{ name: string; status: string }> }).apis?.map((api, i) => (
+                      <div key={i} className="text-xs text-slate-400 flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${api.status === 'healthy' ? 'bg-emerald-500' : api.status === 'degraded' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                        {api.name}: {api.status}
+                      </div>
+                    ))}
+                    {!(check.details as { apis?: [] }).apis?.length && (
+                      <div className="text-xs text-slate-500">No external APIs configured</div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           }) : (
@@ -857,6 +944,10 @@ export default function HealthPage() {
                     <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -890,6 +981,14 @@ export default function HealthPage() {
                     fillOpacity={1} 
                     fill="url(#colorMem)" 
                     name="Memory"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="cpu" 
+                    stroke="#ec4899" 
+                    fillOpacity={1} 
+                    fill="url(#colorCpu)" 
+                    name="CPU"
                   />
                 </AreaChart>
               </ResponsiveContainer>

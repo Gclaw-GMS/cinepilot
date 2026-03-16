@@ -82,6 +82,28 @@ export default function CateringPage() {
   })
   const [sortBy, setSortBy] = useState<'date' | 'budget' | 'mealType' | 'people'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default budget limit: ₹5,00,000
+  
+  // Budget tracking calculations
+  const budgetData = useMemo(() => {
+    if (!plan) return { usedPercent: 0, remaining: 0, isOverBudget: false, isWarning: false, status: 'ok' }
+    
+    const estimatedTotal = plan.totalSpent || plan.totalBudget
+    const budgetUsedPercent = budgetLimit > 0 ? (estimatedTotal / budgetLimit) * 100 : 0
+    const budgetRemaining = budgetLimit - estimatedTotal
+    const isOverBudget = budgetRemaining < 0
+    const isWarning = !isOverBudget && budgetUsedPercent >= 80
+    const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
+    
+    return {
+      usedPercent: budgetUsedPercent,
+      remaining: budgetRemaining,
+      isOverBudget,
+      isWarning,
+      status: budgetStatus,
+      estimatedTotal
+    }
+  }, [plan, budgetLimit])
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -872,6 +894,74 @@ export default function CateringPage() {
                 </div>
                 <p className="text-2xl font-semibold text-white">{plan.shootDays.length > 0 ? plan.shootDays[0].totalCast + plan.shootDays[0].totalCrew : 0}</p>
                 <p className="text-xs text-slate-500 mt-1">Cast + Crew per day</p>
+              </div>
+            </div>
+
+            {/* Budget Tracking Card */}
+            <div className={`bg-slate-900 border rounded-xl p-5 ${budgetData.status === 'over' ? 'border-red-500/30' : budgetData.status === 'warning' ? 'border-amber-500/30' : 'border-emerald-500/30'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${budgetData.status === 'over' ? 'bg-red-500/20' : budgetData.status === 'warning' ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}>
+                    {budgetData.status === 'over' ? <AlertCircle className="w-5 h-5 text-red-400" /> : budgetData.status === 'warning' ? <AlertCircle className="w-5 h-5 text-amber-400" /> : <DollarSign className="w-5 h-5 text-emerald-400" />}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">Catering Budget Tracker</h3>
+                    <p className={`text-xs ${budgetData.status === 'over' ? 'text-red-400' : budgetData.status === 'warning' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {budgetData.status === 'over' ? 'Over Budget!' : budgetData.status === 'warning' ? 'Approaching budget limit' : 'Within budget'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400">Budget Limit:</span>
+                  <input
+                    type="number"
+                    value={budgetLimit}
+                    onChange={(e) => setBudgetLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-32 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
+                    placeholder="Enter limit"
+                  />
+                </div>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-slate-400">Budget Used: ₹{(budgetData.estimatedTotal || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-slate-400">Limit: ₹{budgetLimit.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${budgetData.status === 'over' ? 'bg-red-500' : budgetData.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${Math.min(budgetData.usedPercent, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className="text-slate-500">{budgetData.usedPercent.toFixed(1)}% used</span>
+                  <span className={budgetData.isOverBudget ? 'text-red-400' : 'text-slate-500'}>
+                    {budgetData.isOverBudget 
+                      ? `Over by ₹${Math.abs(budgetData.remaining).toLocaleString('en-IN')}` 
+                      : `₹${budgetData.remaining.toLocaleString('en-IN')} remaining`}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Status Messages */}
+              <div className="flex flex-wrap gap-2">
+                {budgetData.isOverBudget && (
+                  <span className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Over budget by ₹{Math.abs(budgetData.remaining).toLocaleString('en-IN')}
+                  </span>
+                )}
+                {budgetData.isWarning && !budgetData.isOverBudget && (
+                  <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Approaching budget limit ({budgetData.usedPercent.toFixed(0)}%)
+                  </span>
+                )}
+                {!budgetData.isOverBudget && !budgetData.isWarning && (
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full flex items-center gap-1">
+                    <DollarSign className="w-3 h-3" /> {(100 - budgetData.usedPercent).toFixed(0)}% budget remaining
+                  </span>
+                )}
               </div>
             </div>
 

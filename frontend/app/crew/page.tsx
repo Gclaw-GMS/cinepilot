@@ -127,6 +127,8 @@ export default function CrewPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
   const handlePrintRef = useRef<() => void>();
+  const selectAllCrewRef = useRef<() => void>(() => {});
+  const clearSelectionRef = useRef<() => void>(() => {});
 
   const [form, setForm] = useState({
     name: '',
@@ -256,7 +258,7 @@ export default function CrewPage() {
           setDeptFilter('all')
           // Clear bulk selection when pressing Esc
           if (selectedCrewRef.current.size > 0) {
-            clearSelection()
+            clearSelectionRef.current()
           }
           break
         case 'f':
@@ -287,7 +289,7 @@ export default function CrewPage() {
           // Ctrl+A or Cmd+A for select all
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault()
-            selectAllCrew()
+            selectAllCrewRef.current()
           }
           break
         case 'd':
@@ -347,6 +349,15 @@ export default function CrewPage() {
     setSelectedCrew(new Set());
     setShowBulkActions(false);
   }, []);
+
+  // Update refs for keyboard shortcuts
+  useEffect(() => {
+    selectAllCrewRef.current = selectAllCrew;
+  }, [selectAllCrew]);
+
+  useEffect(() => {
+    clearSelectionRef.current = clearSelection;
+  }, [clearSelection]);
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedCrew.size === 0) return;

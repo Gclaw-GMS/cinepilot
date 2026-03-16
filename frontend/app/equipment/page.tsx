@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, QrCode, Zap, CheckCircle } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -126,6 +126,15 @@ export default function EquipmentPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'status' | 'dailyRate' | 'dateEnd'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [showScanner, setShowScanner] = useState(false)
+  const [scannerMode, setScannerMode] = useState<'lookup' | 'checkin' | 'checkout'>('lookup')
+  const [scannedCode, setScannedCode] = useState('')
+  const [scanResult, setScanResult] = useState<EquipmentRental | null>(null)
+  const [scanError, setScanError] = useState('')
+  const [processingScan, setProcessingScan] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   
   // Bulk selection state
   const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(new Set())
@@ -158,6 +167,79 @@ export default function EquipmentPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+
+  // Scanner functions
+  const startScanner = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+    } catch (err) {
+      setScanError('Could not access camera. Please ensure camera permissions are granted.')
+    }
+  }, [])
+
+  const stopScanner = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+  }, [])
+
+  const processScannedCode = useCallback((code: string) => {
+    setProcessingScan(true)
+    setScanError('')
+    
+    // Find equipment by ID or name
+    const found = equipment.find(eq => 
+      eq.id.toLowerCase() === code.toLowerCase() ||
+      eq.name.toLowerCase().includes(code.toLowerCase()) ||
+      code.toLowerCase().includes(eq.id.toLowerCase())
+    )
+    
+    if (found) {
+      setScanResult(found)
+      if (scannerMode === 'checkin' && found.status !== 'available') {
+        // Update status to available
+        const updated = equipment.map(eq => 
+          eq.id === found.id ? { ...eq, status: 'available' as const } : eq
+        )
+        setEquipment(updated)
+      } else if (scannerMode === 'checkout' && found.status === 'available') {
+        // Update status to in-use
+        const updated = equipment.map(eq => 
+          eq.id === found.id ? { ...eq, status: 'in-use' as const } : eq
+        )
+        setEquipment(updated)
+      }
+    } else {
+      setScanResult(null)
+      setScanError(`Equipment not found: "${code}"`)
+    }
+    
+    setProcessingScan(false)
+  }, [equipment, scannerMode])
+
+  const handleManualCodeSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    if (scannedCode.trim()) {
+      processScannedCode(scannedCode.trim())
+    }
+  }, [scannedCode, processScannedCode])
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [])
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -320,6 +402,15 @@ export default function EquipmentPage() {
           if (!modalOpen && !editModalOpen) {
             setModalOpen(true)
             setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+          }
+          break
+        case 's':
+          e.preventDefault()
+          if (!modalOpen && !editModalOpen) {
+            setShowScanner(true)
+            setScanResult(null)
+            setScanError('')
+            setScannedCode('')
           }
           break
         case '?':
@@ -1028,6 +1119,13 @@ export default function EquipmentPage() {
               )}
             </div>
             <button
+              onClick={() => { setShowScanner(true); setScanResult(null); setScanError(''); setScannedCode(''); }}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
+            >
+              <QrCode className="w-4 h-4" />
+              Scan
+            </button>
+            <button
               onClick={() => { setModalOpen(true); setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' }) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
             >
@@ -1600,6 +1698,174 @@ export default function EquipmentPage() {
           </div>
         )}
 
+        {/* QR/Barcode Scanner Modal */}
+        {showScanner && (
+          <div 
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            onClick={() => { setShowScanner(false); stopScanner(); }}
+          >
+            <div 
+              className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-5 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+                    <QrCode className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold">Equipment Scanner</h2>
+                    <p className="text-sm text-slate-400">Scan barcode or QR code</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setShowScanner(false); stopScanner(); }}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* Scanner Mode Selection */}
+                <div className="flex gap-2">
+                  {[
+                    { key: 'lookup', label: 'Lookup', icon: Search },
+                    { key: 'checkin', label: 'Check In', icon: Download },
+                    { key: 'checkout', label: 'Check Out', icon: Zap },
+                  ].map(mode => (
+                    <button
+                      key={mode.key}
+                      onClick={() => setScannerMode(mode.key as typeof scannerMode)}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        scannerMode === mode.key 
+                          ? 'bg-indigo-600 text-white' 
+                          : 'bg-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <mode.icon className="w-4 h-4" />
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Camera View */}
+                <div className="relative aspect-video bg-slate-800 rounded-xl overflow-hidden">
+                  <video 
+                    ref={videoRef}
+                    className="w-full h-full object-cover"
+                    playsInline
+                    muted
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Scanner overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-48 h-48 border-2 border-indigo-500/50 rounded-lg relative">
+                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg" />
+                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg" />
+                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg" />
+                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-indigo-500 rounded-br-lg" />
+                      <div className="absolute inset-x-0 top-1/2 h-0.5 bg-indigo-500/50 animate-pulse" />
+                    </div>
+                  </div>
+                  
+                  {/* Start camera button if not started */}
+                  {!streamRef.current && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
+                      <button
+                        onClick={startScanner}
+                        className="flex flex-col items-center gap-2 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-colors"
+                      >
+                        <Camera className="w-8 h-8" />
+                        <span className="font-medium">Start Camera</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Entry */}
+                <form onSubmit={handleManualCodeSubmit} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={scannedCode}
+                    onChange={(e) => setScannedCode(e.target.value)}
+                    placeholder="Enter equipment ID or scan barcode..."
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!scannedCode.trim() || processingScan}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+                  >
+                    {processingScan ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
+                  </button>
+                </form>
+
+                {/* Scan Result */}
+                {scanResult && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-400" />
+                      <span className="font-medium text-emerald-400">Equipment Found!</span>
+                      {scannerMode !== 'lookup' && (
+                        <span className="ml-auto text-xs px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded">
+                          Status updated to {scannerMode === 'checkin' ? 'Available' : 'In Use'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Name:</span>
+                        <span className="text-white font-medium">{scanResult.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Category:</span>
+                        <span className="text-white">{scanResult.category}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Status:</span>
+                        <span className={`font-medium ${
+                          scanResult.status === 'available' ? 'text-emerald-400' :
+                          scanResult.status === 'in-use' ? 'text-amber-400' :
+                          scanResult.status === 'maintenance' ? 'text-red-400' : 'text-slate-400'
+                        }`}>
+                          {scanResult.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Daily Rate:</span>
+                        <span className="text-white">₹{scanResult.dailyRate.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedEquipment(new Set([scanResult.id]))
+                        setShowBulkActions(true)
+                        setShowScanner(false)
+                        stopScanner()
+                      }}
+                      className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Select This Equipment
+                    </button>
+                  </div>
+                )}
+
+                {/* Scan Error */}
+                {scanError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-400" />
+                      <span className="text-red-400">{scanError}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Keyboard Shortcuts Help Modal */}
         {showKeyboardHelp && (
           <div 
@@ -1651,6 +1917,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Add new equipment</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">N</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Open scanner</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">S</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Export dropdown</span>

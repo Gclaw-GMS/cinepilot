@@ -151,6 +151,9 @@ export default function TravelExpensesPage() {
     expensesLengthRef.current = expenses.length
   }, [expenses.length])
 
+  // Store filtered expenses length in ref for keyboard shortcuts
+  const filteredExpensesLengthRef = useRef(0)
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -178,7 +181,7 @@ export default function TravelExpensesPage() {
           break
         case 'm':
           e.preventDefault()
-          if (filteredExpenses.length > 0) {
+          if (filteredExpensesLengthRef.current > 0) {
             exportToMarkdownRef.current?.()
           }
           break
@@ -655,6 +658,11 @@ ${filteredExpenses.map(exp => {
     
     return result
   }, [expenses, searchQuery, sortBy, sortOrder])
+
+  // Update filtered expenses length ref when filtered expenses change
+  useEffect(() => {
+    filteredExpensesLengthRef.current = filteredExpenses.length
+  }, [filteredExpenses.length])
 
   // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {

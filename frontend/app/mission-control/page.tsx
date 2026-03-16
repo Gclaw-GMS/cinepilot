@@ -5,7 +5,8 @@ import {
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw, HelpCircle, X, Search, Printer, Filter
+  Loader2, RefreshCw, HelpCircle, X, Search, Printer, Filter,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -153,11 +154,11 @@ export default function MissionControl() {
   const [filterDepartment, setFilterDepartment] = useState('all')
   const [filterRiskLevel, setFilterRiskLevel] = useState('all')
   const [filterLocation, setFilterLocation] = useState('all')
-
+  
   // Sort states
   const [sortBy, setSortBy] = useState<'name' | 'health' | 'members' | 'dailyRate' | 'level' | 'daysLeft' | 'scenes' | 'progress' | 'title'>('health')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [activeSortTab, setActiveSortTab] = useState<'departments' | 'risks' | 'locations'>('departments')
+  const [sortCategory, setSortCategory] = useState<'departments' | 'risks' | 'locations'>('departments')
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
@@ -202,17 +203,6 @@ export default function MissionControl() {
     setRefreshing(true)
     fetchData()
   }
-
-  // Sort toggle function
-  const handleSortToggle = useCallback(() => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }, [])
-
-  // Reset sort to default
-  const handleResetSort = useCallback(() => {
-    setSortBy('health')
-    setSortOrder('desc')
-  }, [])
 
   // Export functions
   const handleExportCSV = () => {
@@ -268,10 +258,16 @@ export default function MissionControl() {
       risks: sortedRisks,
       locations: sortedLocations,
       summary: data.summary,
-      sortMetadata: {
+      sortInfo: {
         sortBy,
         sortOrder,
-        activeSortTab,
+        sortCategory,
+      },
+      filterInfo: {
+        searchQuery,
+        filterDepartment,
+        filterRiskLevel,
+        filterLocation,
       },
       stats: {
         totalDepartments: sortedDepartments.length,
@@ -555,7 +551,7 @@ export default function MissionControl() {
   }, [showFilterPanel])
 
   // Active filter count
-  const activeFilterCount = (filterDepartment !== 'all' ? 1 : 0) + (filterRiskLevel !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)
+  const activeFilterCount = (filterDepartment !== 'all' ? 1 : 0) + (filterRiskLevel !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'health' || sortOrder !== 'desc' ? 1 : 0)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -592,7 +588,7 @@ export default function MissionControl() {
           break
         case 's':
           e.preventDefault()
-          handleSortToggle()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case 'escape':
           e.preventDefault()
@@ -601,14 +597,13 @@ export default function MissionControl() {
           setShowPrintMenu(false)
           setShowFilterPanel(false)
           setSearchQuery('')
-          handleResetSort()
           break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSortToggle, handleResetSort, showFilterPanel, searchQuery])
+  }, [])
 
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`
@@ -625,92 +620,80 @@ export default function MissionControl() {
 
   const productionHealth = data?.production.overall ?? 0
 
-  // Filter departments, risks, and locations based on search
-  const filteredDepartments = useMemo(() => 
-    data?.departments.filter(d => 
+  // Sorting functions using useMemo for performance
+  const sortedDepartments = useMemo(() => {
+    const filtered = data?.departments.filter(d => 
       d.name.toLowerCase().includes(searchQuery.toLowerCase())
     ) ?? []
-  , [data?.departments, searchQuery])
-  
-  const filteredRisks = useMemo(() => 
-    data?.risks.filter(r => 
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'health':
+          comparison = a.health - b.health
+          break
+        case 'members':
+          comparison = a.members - b.members
+          break
+        case 'dailyRate':
+          comparison = a.dailyRate - b.dailyRate
+          break
+        default:
+          comparison = a.health - b.health
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [data?.departments, searchQuery, sortBy, sortOrder])
+
+  const sortedRisks = useMemo(() => {
+    const filtered = data?.risks.filter(r => 
       r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.level.toLowerCase().includes(searchQuery.toLowerCase())
     ) ?? []
-  , [data?.risks, searchQuery])
-  
-  const filteredLocations = useMemo(() => 
-    data?.locations.filter(l => 
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      const levelOrder = { high: 3, medium: 2, low: 1 }
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'level':
+          comparison = (levelOrder[a.level as keyof typeof levelOrder] || 0) - (levelOrder[b.level as keyof typeof levelOrder] || 0)
+          break
+        case 'daysLeft':
+          comparison = a.daysLeft - b.daysLeft
+          break
+        default:
+          comparison = (levelOrder[a.level as keyof typeof levelOrder] || 0) - (levelOrder[b.level as keyof typeof levelOrder] || 0)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [data?.risks, searchQuery, sortBy, sortOrder])
+
+  const sortedLocations = useMemo(() => {
+    const filtered = data?.locations.filter(l => 
       l.name.toLowerCase().includes(searchQuery.toLowerCase())
     ) ?? []
-  , [data?.locations, searchQuery])
-
-  // Sort departments based on sortBy and sortOrder
-  const sortedDepartments = useMemo(() => [...filteredDepartments].sort((a, b) => {
-    let comparison = 0
-    switch (sortBy) {
-      case 'name':
-        comparison = a.name.localeCompare(b.name)
-        break
-      case 'health':
-        comparison = a.health - b.health
-        break
-      case 'members':
-        comparison = a.members - b.members
-        break
-      case 'dailyRate':
-        comparison = a.dailyRate - b.dailyRate
-        break
-      default:
-        comparison = 0
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  }), [filteredDepartments, sortBy, sortOrder])
-
-  // Sort risks based on sortBy and sortOrder
-  const sortedRisks = useMemo(() => [...filteredRisks].sort((a, b) => {
-    let comparison = 0
-    const levelOrder = { high: 3, medium: 2, low: 1 }
-    switch (sortBy) {
-      case 'level':
-        comparison = (levelOrder[a.level as keyof typeof levelOrder] || 0) - (levelOrder[b.level as keyof typeof levelOrder] || 0)
-        break
-      case 'daysLeft':
-        comparison = a.daysLeft - b.daysLeft
-        break
-      case 'title':
-        comparison = a.title.localeCompare(b.title)
-        break
-      default:
-        comparison = 0
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  }), [filteredRisks, sortBy, sortOrder])
-
-  // Sort locations based on sortBy and sortOrder
-  const sortedLocations = useMemo(() => [...filteredLocations].sort((a, b) => {
-    let comparison = 0
-    switch (sortBy) {
-      case 'name':
-        comparison = a.name.localeCompare(b.name)
-        break
-      case 'scenes':
-        comparison = a.scenes - b.scenes
-        break
-      case 'progress':
-        comparison = a.progress - b.progress
-        break
-      case 'scenes':
-        comparison = a.scenes - b.scenes
-        break
-      case 'progress':
-        comparison = a.progress - b.progress
-        break
-      default:
-        comparison = 0
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  }), [filteredLocations, sortBy, sortOrder])
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'scenes':
+          comparison = a.scenes - b.scenes
+          break
+        case 'progress':
+          comparison = a.progress - b.progress
+          break
+        default:
+          comparison = a.name.localeCompare(b.name)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [data?.locations, searchQuery, sortBy, sortOrder])
 
   const hasActiveFilters = searchQuery.trim().length > 0 || sortBy !== 'health' || sortOrder !== 'desc'
   const totalFiltered = sortedDepartments.length + sortedRisks.length + sortedLocations.length
@@ -819,59 +802,64 @@ export default function MissionControl() {
               </button>
               {showFilterPanel && (
                 <div className="absolute left-0 mt-2 w-72 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                  <div className="px-4 py-3 border-b border-white/10">
                     <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
-                    <button
-                      onClick={handleSortToggle}
-                      className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 rounded-lg transition-colors"
-                      title="Toggle sort order (S)"
-                    >
-                      <span className="text-xs text-cyan-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                    </button>
-                  </div>
-                  {/* Sort Tabs */}
-                  <div className="flex border-b border-white/10">
-                    <button
-                      onClick={() => setActiveSortTab('departments')}
-                      className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                        activeSortTab === 'departments' 
-                          ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-400' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Departments
-                    </button>
-                    <button
-                      onClick={() => setActiveSortTab('risks')}
-                      className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                        activeSortTab === 'risks' 
-                          ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-400' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Risks
-                    </button>
-                    <button
-                      onClick={() => setActiveSortTab('locations')}
-                      className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                        activeSortTab === 'locations' 
-                          ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-400' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Locations
-                    </button>
                   </div>
                   <div className="p-4 space-y-4">
-                    {/* Sort By */}
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-2">Sort By</label>
+                    {/* Sort Section */}
+                    <div className="pb-4 border-b border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-xs text-slate-400 flex items-center gap-1">
+                          <ArrowUpDown className="w-3 h-3" />
+                          Sort By
+                        </label>
+                        <button
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 rounded-lg text-xs text-cyan-400 transition-colors"
+                          title="Toggle sort order (S)"
+                        >
+                          {sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                          {sortOrder.toUpperCase()}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <button
+                          onClick={() => { setSortCategory('departments'); setSortBy('health'); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            sortCategory === 'departments' 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          Depts
+                        </button>
+                        <button
+                          onClick={() => { setSortCategory('risks'); setSortBy('level'); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            sortCategory === 'risks' 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          Risks
+                        </button>
+                        <button
+                          onClick={() => { setSortCategory('locations'); setSortBy('name'); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            sortCategory === 'locations' 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          Locs
+                        </button>
+                      </div>
                       <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                         className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
                       >
-                        {activeSortTab === 'departments' && (
+                        {sortCategory === 'departments' && (
                           <>
                             <option value="health">Health %</option>
                             <option value="name">Name</option>
@@ -879,18 +867,18 @@ export default function MissionControl() {
                             <option value="dailyRate">Daily Rate</option>
                           </>
                         )}
-                        {activeSortTab === 'risks' && (
+                        {sortCategory === 'risks' && (
                           <>
                             <option value="level">Risk Level</option>
-                            <option value="daysLeft">Days Left</option>
                             <option value="title">Title</option>
+                            <option value="daysLeft">Days Left</option>
                           </>
                         )}
-                        {activeSortTab === 'locations' && (
+                        {sortCategory === 'locations' && (
                           <>
-                            <option value="progress">Progress %</option>
                             <option value="name">Name</option>
                             <option value="scenes">Scenes</option>
+                            <option value="progress">Progress %</option>
                           </>
                         )}
                       </select>
@@ -939,18 +927,18 @@ export default function MissionControl() {
                     </div>
                   </div>
                   {activeFilterCount > 0 && (
-                    <div className="px-4 py-3 border-t border-white/10 bg-slate-800/50 flex gap-2">
+                    <div className="px-4 py-3 border-t border-white/10 bg-slate-800/50">
                       <button
-                        onClick={() => { setFilterDepartment('all'); setFilterRiskLevel('all'); setFilterLocation('all'); }}
-                        className="flex-1 text-center text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                        onClick={() => { 
+                          setFilterDepartment('all'); 
+                          setFilterRiskLevel('all'); 
+                          setFilterLocation('all'); 
+                          setSortBy('health');
+                          setSortOrder('desc');
+                        }}
+                        className="w-full text-center text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
                       >
-                        Clear Filters
-                      </button>
-                      <button
-                        onClick={handleResetSort}
-                        className="flex-1 text-center text-sm text-purple-400 hover:text-purple-300 transition-colors"
-                      >
-                        Reset Sort
+                        Clear All Filters & Sort
                       </button>
                     </div>
                   )}
@@ -1064,7 +1052,7 @@ export default function MissionControl() {
             <div className="space-y-3">
               <ShortcutRow keys={['R']} description="Refresh mission data" />
               <ShortcutRow keys={['/']} description="Focus search input" />
-              <ShortcutRow keys={['F']} description="Toggle filters & sort panel" />
+              <ShortcutRow keys={['F']} description="Toggle filters panel" />
               <ShortcutRow keys={['S']} description="Toggle sort order (asc/desc)" />
               <ShortcutRow keys={['E']} description="Export dropdown menu" />
               <ShortcutRow keys={['P']} description="Print mission report" />
@@ -1237,7 +1225,7 @@ export default function MissionControl() {
               RISK ALERTS
             </h3>
             <div className="space-y-2">
-              {filteredRisks && filteredRisks.length > 0 ? (
+              {sortedRisks && sortedRisks.length > 0 ? (
                 sortedRisks.map((risk, i) => (
                   <div key={i} className={`p-3 rounded-lg border ${
                     risk.level === 'high' ? 'bg-rose-500/10 border-rose-500/30' :
@@ -1278,7 +1266,7 @@ export default function MissionControl() {
               DEPT HEALTH
             </h3>
             <div className="space-y-2">
-              {filteredDepartments && filteredDepartments.length > 0 ? (
+              {sortedDepartments && sortedDepartments.length > 0 ? (
                 sortedDepartments.slice(0, 5).map((dept, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-1">
@@ -1339,7 +1327,7 @@ export default function MissionControl() {
               LOCATION PROGRESS
             </h3>
             <div className="space-y-2">
-              {filteredLocations && filteredLocations.length > 0 ? (
+              {sortedLocations && sortedLocations.length > 0 ? (
                 sortedLocations.slice(0, 4).map((loc, i) => (
                   <div key={i} className="p-3 bg-slate-800/50 rounded-lg">
                     <div className="flex justify-between mb-2">

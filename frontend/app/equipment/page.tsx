@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, QrCode, Zap, CheckCircle } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -126,25 +126,10 @@ export default function EquipmentPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'status' | 'dailyRate' | 'dateEnd'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [showScanner, setShowScanner] = useState(false)
-  const [scannerMode, setScannerMode] = useState<'lookup' | 'checkin' | 'checkout'>('lookup')
-  const [scannedCode, setScannedCode] = useState('')
-  const [scanResult, setScanResult] = useState<EquipmentRental | null>(null)
-  const [scanError, setScanError] = useState('')
-  const [processingScan, setProcessingScan] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  
-  // Bulk selection state
   const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(new Set())
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  
-  // Refs for bulk selection
-  const selectedEquipmentRef = useRef(selectedEquipment)
-  const showBulkActionsRef = useRef(showBulkActions)
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -167,79 +152,13 @@ export default function EquipmentPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
-
-  // Scanner functions
-  const startScanner = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
-      }
-    } catch (err) {
-      setScanError('Could not access camera. Please ensure camera permissions are granted.')
-    }
-  }, [])
-
-  const stopScanner = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-      streamRef.current = null
-    }
-  }, [])
-
-  const processScannedCode = useCallback((code: string) => {
-    setProcessingScan(true)
-    setScanError('')
-    
-    // Find equipment by ID or name
-    const found = equipment.find(eq => 
-      eq.id.toLowerCase() === code.toLowerCase() ||
-      eq.name.toLowerCase().includes(code.toLowerCase()) ||
-      code.toLowerCase().includes(eq.id.toLowerCase())
-    )
-    
-    if (found) {
-      setScanResult(found)
-      if (scannerMode === 'checkin' && found.status !== 'available') {
-        // Update status to available
-        const updated = equipment.map(eq => 
-          eq.id === found.id ? { ...eq, status: 'available' as const } : eq
-        )
-        setEquipment(updated)
-      } else if (scannerMode === 'checkout' && found.status === 'available') {
-        // Update status to in-use
-        const updated = equipment.map(eq => 
-          eq.id === found.id ? { ...eq, status: 'in-use' as const } : eq
-        )
-        setEquipment(updated)
-      }
-    } else {
-      setScanResult(null)
-      setScanError(`Equipment not found: "${code}"`)
-    }
-    
-    setProcessingScan(false)
-  }, [equipment, scannerMode])
-
-  const handleManualCodeSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    if (scannedCode.trim()) {
-      processScannedCode(scannedCode.trim())
-    }
-  }, [scannedCode, processScannedCode])
-
-  // Cleanup scanner on unmount
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-    }
-  }, [])
+  const bulkStatusMenuRef = useRef<HTMLDivElement>(null)
+  const deleteConfirmRef = useRef<HTMLDivElement>(null)
+  const selectedEquipmentRef = useRef<Set<string>>(new Set())
+  const showBulkActionsRef = useRef<boolean>(false)
+  const clearSelectionRef = useRef<() => void>(() => {})
+  const selectAllEquipmentRef = useRef<() => void>(() => {})
+  const filteredLengthRef = useRef<number>(0)
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -315,173 +234,9 @@ export default function EquipmentPage() {
     fetchEquipment()
   }
 
-  // Update ref when selection changes
-  useEffect(() => {
-    selectedEquipmentRef.current = selectedEquipment
-  }, [selectedEquipment])
-
-  useEffect(() => {
-    showBulkActionsRef.current = showBulkActions
-  }, [showBulkActions])
-
-  // Bulk selection handlers - placeholder (will be defined after filtered)
-  const [bulkHandlersReady, setBulkHandlersReady] = useState(false)
-  
-  const handleSelectEquipment = useCallback((id: string) => {
-    const newSelected = new Set(selectedEquipment)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedEquipment(newSelected)
-    setShowBulkActions(newSelected.size > 0)
-  }, [selectedEquipment])
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedEquipment(new Set())
-    setShowBulkActions(false)
-  }, [])
-
   useEffect(() => {
     fetchEquipment()
   }, [fetchEquipment])
-
-  // Keyboard shortcuts - eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input/textarea/select
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
-        return
-      }
-      
-      switch (e.key.toLowerCase()) {
-        case 'r':
-          e.preventDefault()
-          fetchDataRef.current?.()
-          break
-        case 'f':
-          e.preventDefault()
-          setShowFilters(prev => !prev)
-          break
-        // Bulk selection shortcuts
-        case 'a':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            if (selectedEquipmentRef.current.size === filtered.length) {
-              setSelectedEquipment(new Set())
-              setShowBulkActions(false)
-            } else {
-              setSelectedEquipment(new Set(filtered.map(eq => eq.id)))
-              setShowBulkActions(filtered.length > 0)
-            }
-          }
-          break
-        case 'd':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            if (selectedEquipmentRef.current.size > 0) {
-              setShowDeleteConfirm(true)
-            }
-          }
-          break
-        case 'escape':
-          if (showBulkActionsRef.current) {
-            e.preventDefault()
-            setSelectedEquipment(new Set())
-            setShowBulkActions(false)
-            setShowBulkStatusMenu(false)
-          }
-          break
-        case '/':
-          e.preventDefault()
-          searchInputRef.current?.focus()
-          break
-        case 'n':
-          e.preventDefault()
-          if (!modalOpen && !editModalOpen) {
-            setModalOpen(true)
-            setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
-          }
-          break
-        case 's':
-          e.preventDefault()
-          if (!modalOpen && !editModalOpen) {
-            setShowScanner(true)
-            setScanResult(null)
-            setScanError('')
-            setScannedCode('')
-          }
-          break
-        case '?':
-          e.preventDefault()
-          setShowKeyboardHelp(true)
-          break
-        case 'e':
-          e.preventDefault()
-          setShowExportMenu(prev => !prev)
-          break
-        case 'p':
-          e.preventDefault()
-          if (equipment.length > 0) {
-            handlePrintRef.current?.()
-          }
-          break
-        case 'escape':
-          e.preventDefault()
-          setShowKeyboardHelp(false)
-          setShowExportMenu(false)
-          setShowPrintMenu(false)
-          setShowFilters(false)
-          setSearch('')
-          setFilterCat('all')
-          setFilterStatus('all')
-          break
-        // Number keys for category filter (1-5)
-        case '1':
-          e.preventDefault()
-          setFilterCat('camera')
-          break
-        case '2':
-          e.preventDefault()
-          setFilterCat('lighting')
-          break
-        case '3':
-          e.preventDefault()
-          setFilterCat('sound')
-          break
-        case '4':
-          e.preventDefault()
-          setFilterCat('grip')
-          break
-        case '5':
-          e.preventDefault()
-          setFilterCat('art')
-          break
-        case '0':
-          e.preventDefault()
-          setFilterCat('all')
-          break
-        // Status filter with Shift+number
-        case '!':
-          e.preventDefault()
-          setFilterStatus('available')
-          break
-        case '@':
-          e.preventDefault()
-          setFilterStatus('in-use')
-          break
-        case '#':
-          e.preventDefault()
-          setFilterStatus('maintenance')
-          break
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalOpen, editModalOpen, showExportMenu, equipment.length])
 
   // Click outside to close export menu
   useEffect(() => {
@@ -529,6 +284,36 @@ export default function EquipmentPage() {
     }
   }, [showPrintMenu])
 
+  // Click outside to close bulk status menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bulkStatusMenuRef.current && !bulkStatusMenuRef.current.contains(e.target as Node)) {
+        setShowBulkStatusMenu(false)
+      }
+    }
+    if (showBulkStatusMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showBulkStatusMenu])
+
+  // Click outside to close delete confirm
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (deleteConfirmRef.current && !deleteConfirmRef.current.contains(e.target as Node)) {
+        setShowDeleteConfirm(false)
+      }
+    }
+    if (showDeleteConfirm) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showDeleteConfirm])
+
   const filtered = equipment.filter(eq => {
     const matchSearch = eq.name.toLowerCase().includes(search.toLowerCase()) ||
       (eq.vendor?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
@@ -557,67 +342,6 @@ export default function EquipmentPage() {
     }
     return sortOrder === 'asc' ? comparison : -comparison
   })
-
-  // Bulk selection handlers (after filtered is defined)
-  const handleSelectAllEquipment = useCallback(() => {
-    if (selectedEquipment.size === filtered.length) {
-      setSelectedEquipment(new Set())
-      setShowBulkActions(false)
-    } else {
-      setSelectedEquipment(new Set(filtered.map(eq => eq.id)))
-      setShowBulkActions(filtered.length > 0)
-    }
-  }, [selectedEquipment, filtered])
-
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedEquipment.size === 0) return
-    
-    const idsToDelete = Array.from(selectedEquipment)
-    try {
-      const results = await Promise.all(
-        idsToDelete.map(id => 
-          fetch(`/api/equipment?id=${id}`, { method: 'DELETE' })
-        )
-      )
-      const allOk = results.every(res => res.ok)
-      if (allOk) {
-        await fetchEquipment()
-        setSuccess(`Deleted ${idsToDelete.length} equipment item${idsToDelete.length > 1 ? 's' : ''} successfully!`)
-        setTimeout(() => setSuccess(null), 3000)
-      }
-    } catch (err) {
-      setError('Failed to delete equipment')
-    }
-    handleClearSelection()
-    setShowDeleteConfirm(false)
-  }, [selectedEquipment, fetchEquipment, handleClearSelection])
-
-  const handleBulkStatusChange = useCallback(async (newStatus: string) => {
-    if (selectedEquipment.size === 0) return
-    
-    const idsToUpdate = Array.from(selectedEquipment)
-    try {
-      const results = await Promise.all(
-        idsToUpdate.map(id => 
-          fetch(`/api/equipment?id=${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus }),
-          })
-        )
-      )
-      const allOk = results.every(res => res.ok)
-      if (allOk) {
-        await fetchEquipment()
-        setSuccess(`Updated ${idsToUpdate.length} equipment item${idsToUpdate.length > 1 ? 's' : ''} to ${newStatus}!`)
-        setTimeout(() => setSuccess(null), 3000)
-      }
-    } catch (err) {
-      setError('Failed to update equipment status')
-    }
-    handleClearSelection()
-    setShowBulkStatusMenu(false)
-  }, [selectedEquipment, fetchEquipment, handleClearSelection])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -662,6 +386,169 @@ export default function EquipmentPage() {
       setError('Failed to delete equipment')
     }
   }
+
+  // Bulk selection handlers
+  const toggleEquipmentSelection = useCallback((id: string) => {
+    setSelectedEquipment(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      selectedEquipmentRef.current = newSet
+      setShowBulkActions(newSet.size > 0)
+      showBulkActionsRef.current = newSet.size > 0
+      return newSet
+    })
+  }, [])
+
+  const selectAllEquipment = useCallback(() => {
+    const allIds = new Set(filtered.map(eq => eq.id))
+    setSelectedEquipment(allIds)
+    selectedEquipmentRef.current = allIds
+    setShowBulkActions(allIds.size > 0)
+    showBulkActionsRef.current = allIds.size > 0
+  }, [filtered])
+
+  const clearSelection = useCallback(() => {
+    setSelectedEquipment(new Set())
+    selectedEquipmentRef.current = new Set()
+    setShowBulkActions(false)
+    showBulkActionsRef.current = false
+    setShowBulkStatusMenu(false)
+    setShowDeleteConfirm(false)
+  }, [])
+
+  // Update refs for keyboard shortcuts
+  useEffect(() => {
+    selectAllEquipmentRef.current = selectAllEquipment
+  }, [selectAllEquipment])
+
+  useEffect(() => {
+    clearSelectionRef.current = clearSelection
+  }, [clearSelection])
+
+  useEffect(() => {
+    filteredLengthRef.current = filtered.length
+  }, [filtered.length])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          if (!modalOpen && !editModalOpen) {
+            setModalOpen(true)
+            setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+          }
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
+        case 'p':
+          e.preventDefault()
+          if (equipment.length > 0) {
+            handlePrintRef.current?.()
+          }
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setShowExportMenu(false)
+          setShowPrintMenu(false)
+          setShowFilters(false)
+          setShowBulkStatusMenu(false)
+          setShowDeleteConfirm(false)
+          setSearch('')
+          setFilterCat('all')
+          setFilterStatus('all')
+          if (showBulkActionsRef.current) {
+            clearSelectionRef.current()
+          }
+          break
+        case 'a':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (filteredLengthRef.current > 0) {
+              selectAllEquipmentRef.current()
+            }
+          }
+          break
+        case 'd':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (selectedEquipmentRef.current.size > 0) {
+              setShowDeleteConfirm(true)
+            }
+          }
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [modalOpen, editModalOpen, showExportMenu, equipment.length])
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedEquipment)
+    setShowDeleteConfirm(false)
+    try {
+      const deletePromises = ids.map(id => 
+        fetch(`/api/equipment?id=${id}`, { method: 'DELETE' })
+      )
+      await Promise.all(deletePromises)
+      await fetchEquipment()
+      clearSelection()
+      setSuccess(`${ids.length} equipment item(s) removed!`)
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Failed to delete selected equipment')
+    }
+  }, [selectedEquipment, fetchEquipment, clearSelection])
+
+  const handleBulkStatusChange = useCallback(async (newStatus: string) => {
+    const ids = Array.from(selectedEquipment)
+    setShowBulkStatusMenu(false)
+    try {
+      const updatePromises = ids.map(id => 
+        fetch('/api/equipment', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status: newStatus }),
+        })
+      )
+      await Promise.all(updatePromises)
+      await fetchEquipment()
+      clearSelection()
+      setSuccess(`${ids.length} equipment status changed!`)
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Failed to update equipment status')
+    }
+  }, [selectedEquipment, fetchEquipment, clearSelection])
 
   // Export functions
   const handleExportCSV = () => {
@@ -1119,13 +1006,6 @@ export default function EquipmentPage() {
               )}
             </div>
             <button
-              onClick={() => { setShowScanner(true); setScanResult(null); setScanError(''); setScannedCode(''); }}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-            >
-              <QrCode className="w-4 h-4" />
-              Scan
-            </button>
-            <button
               onClick={() => { setModalOpen(true); setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' }) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
             >
@@ -1272,25 +1152,18 @@ export default function EquipmentPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Select All Header */}
           {filtered.length > 0 && (
-            <div className="col-span-full bg-slate-900/50 border border-slate-800 rounded-xl p-3 mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={selectedEquipment.size === filtered.length && filtered.length > 0}
-                  onChange={handleSelectAllEquipment}
-                  className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
-                />
-                <span className="text-sm text-slate-400">
-                  {selectedEquipment.size > 0 ? `${selectedEquipment.size} of ${filtered.length} selected` : 'Select all'}
-                </span>
-              </div>
+            <div className="col-span-full flex items-center gap-3 mb-2 px-2">
+              <input
+                type="checkbox"
+                checked={selectedEquipment.size === filtered.length && filtered.length > 0}
+                onChange={(e) => e.target.checked ? selectAllEquipment() : clearSelection()}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
+              />
+              <span className="text-sm text-slate-400">
+                {selectedEquipment.size > 0 ? `${selectedEquipment.size} of ${filtered.length} selected` : 'Select all'}
+              </span>
               {selectedEquipment.size > 0 && (
-                <button
-                  onClick={handleClearSelection}
-                  className="text-xs text-slate-500 hover:text-slate-300"
-                >
-                  Clear selection
-                </button>
+                <button onClick={clearSelection} className="text-xs text-indigo-400 hover:text-indigo-300 ml-2">Clear</button>
               )}
             </div>
           )}
@@ -1299,60 +1172,59 @@ export default function EquipmentPage() {
               key={eq.id} 
               className={`bg-slate-900 border rounded-xl p-5 transition-all group ${
                 selectedEquipment.has(eq.id) 
-                  ? 'border-indigo-500 ring-1 ring-indigo-500/30' 
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20' 
                   : 'border-slate-800 hover:border-slate-700'
               }`}
             >
-              <div className="flex items-start gap-3 mb-3">
-                {/* Checkbox */}
+              <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
                   checked={selectedEquipment.has(eq.id)}
-                  onChange={() => handleSelectEquipment(eq.id)}
-                  className="w-4 h-4 mt-1 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 shrink-0"
+                  onChange={() => toggleEquipmentSelection(eq.id)}
+                  className="w-4 h-4 mt-1 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
                 />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
                       <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
                     </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <button
-                    onClick={() => handleEdit(eq)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
-                    title="Edit"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(eq.id)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-400 capitalize">
-                  {eq.category}
-                </span>
-                <StatusBadge status={eq.status} />
-              </div>
-              
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                <div>
-                  <p className="text-sm text-slate-400">₹{eq.dailyRate.toLocaleString()}/day</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500">
-                    {new Date(eq.dateStart).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - 
-                    {new Date(eq.dateEnd).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        onClick={() => handleEdit(eq)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(eq.id)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-400 capitalize">
+                      {eq.category}
+                    </span>
+                    <StatusBadge status={eq.status} />
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                    <div>
+                      <p className="text-sm text-slate-400">₹{eq.dailyRate.toLocaleString()}/day</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">
+                        {new Date(eq.dateStart).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - 
+                        {new Date(eq.dateEnd).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1372,61 +1244,52 @@ export default function EquipmentPage() {
           )}
         </div>
 
-        {/* Bulk Actions Floating Toolbar */}
+        {/* Floating Bulk Actions Toolbar */}
         {showBulkActions && selectedEquipment.size > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-indigo-500/50 rounded-xl shadow-xl shadow-indigo-500/10 px-4 py-3 flex items-center gap-4 z-40">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 z-50 flex items-center gap-4 animate-in slide-in-from-bottom-4">
             <div className="flex items-center gap-2">
-              <span className="bg-indigo-500 text-white text-xs font-medium px-2 py-1 rounded-full">
-                {selectedEquipment.size}
+              <span className="bg-indigo-500 text-white text-sm font-medium px-3 py-1 rounded-full">
+                {selectedEquipment.size} selected
               </span>
-              <span className="text-sm text-slate-300">selected</span>
             </div>
-            
             <div className="h-6 w-px bg-slate-700" />
-            
-            {/* Bulk Status Change */}
-            <div className="relative">
+            <div className="relative" ref={bulkStatusMenuRef}>
               <button
                 onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors"
               >
                 Change Status
                 <ChevronRight className={`w-4 h-4 transition-transform ${showBulkStatusMenu ? 'rotate-90' : ''}`} />
               </button>
-              
               {showBulkStatusMenu && (
-                <div className="absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[140px]">
-                  {[
-                    { key: 'available', label: 'Available' },
-                    { key: 'in-use', label: 'In Use' },
-                    { key: 'maintenance', label: 'Maintenance' },
-                    { key: 'returned', label: 'Returned' },
-                  ].map(status => (
+                <div className="absolute bottom-full mb-2 left-0 bg-slate-700 border border-slate-600 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+                  {['available', 'in-use', 'maintenance', 'returned'].map(status => (
                     <button
-                      key={status.key}
-                      onClick={() => handleBulkStatusChange(status.key)}
-                      className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                      key={status}
+                      onClick={() => handleBulkStatusChange(status)}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-600 transition-colors flex items-center gap-2 capitalize"
                     >
-                      {status.label}
+                      <span className={`w-2 h-2 rounded-full ${
+                        status === 'available' ? 'bg-emerald-500' :
+                        status === 'in-use' ? 'bg-amber-500' :
+                        status === 'maintenance' ? 'bg-red-500' : 'bg-slate-500'
+                      }`} />
+                      {status === 'in-use' ? 'In Use' : status.charAt(0).toUpperCase() + status.slice(1)}
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            
-            {/* Bulk Delete */}
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
             >
               <Trash2 className="w-4 h-4" />
               Delete
             </button>
-            
-            {/* Clear Selection */}
             <button
-              onClick={handleClearSelection}
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-400 hover:text-white transition-colors"
+              onClick={clearSelection}
+              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg text-sm transition-colors"
             >
               Clear
             </button>
@@ -1436,26 +1299,31 @@ export default function EquipmentPage() {
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6" ref={deleteConfirmRef}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <Trash2 className="w-5 h-5 text-red-400" />
+                  </div>
+                  <h2 className="text-xl font-semibold">Delete Equipment</h2>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold">Delete {selectedEquipment.size} Equipment Item{selectedEquipment.size !== 1 ? 's' : ''}?</h3>
-                  <p className="text-sm text-slate-400">This action cannot be undone.</p>
-                </div>
+                <button onClick={() => setShowDeleteConfirm(false)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
+              <p className="text-slate-400 mb-6">
+                Are you sure you want to delete {selectedEquipment.size} equipment item{selectedEquipment.size > 1 ? 's' : ''}? This cannot be undone.
+              </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBulkDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors"
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-400 rounded-lg text-sm font-medium text-white transition-colors"
                 >
                   Delete
                 </button>
@@ -1698,174 +1566,6 @@ export default function EquipmentPage() {
           </div>
         )}
 
-        {/* QR/Barcode Scanner Modal */}
-        {showScanner && (
-          <div 
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-            onClick={() => { setShowScanner(false); stopScanner(); }}
-          >
-            <div 
-              className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-5 border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
-                    <QrCode className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold">Equipment Scanner</h2>
-                    <p className="text-sm text-slate-400">Scan barcode or QR code</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => { setShowScanner(false); stopScanner(); }}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {/* Scanner Mode Selection */}
-                <div className="flex gap-2">
-                  {[
-                    { key: 'lookup', label: 'Lookup', icon: Search },
-                    { key: 'checkin', label: 'Check In', icon: Download },
-                    { key: 'checkout', label: 'Check Out', icon: Zap },
-                  ].map(mode => (
-                    <button
-                      key={mode.key}
-                      onClick={() => setScannerMode(mode.key as typeof scannerMode)}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        scannerMode === mode.key 
-                          ? 'bg-indigo-600 text-white' 
-                          : 'bg-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <mode.icon className="w-4 h-4" />
-                      {mode.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Camera View */}
-                <div className="relative aspect-video bg-slate-800 rounded-xl overflow-hidden">
-                  <video 
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    playsInline
-                    muted
-                  />
-                  <canvas ref={canvasRef} className="hidden" />
-                  
-                  {/* Scanner overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-48 h-48 border-2 border-indigo-500/50 rounded-lg relative">
-                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg" />
-                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg" />
-                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg" />
-                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-indigo-500 rounded-br-lg" />
-                      <div className="absolute inset-x-0 top-1/2 h-0.5 bg-indigo-500/50 animate-pulse" />
-                    </div>
-                  </div>
-                  
-                  {/* Start camera button if not started */}
-                  {!streamRef.current && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
-                      <button
-                        onClick={startScanner}
-                        className="flex flex-col items-center gap-2 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-colors"
-                      >
-                        <Camera className="w-8 h-8" />
-                        <span className="font-medium">Start Camera</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Manual Entry */}
-                <form onSubmit={handleManualCodeSubmit} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={scannedCode}
-                    onChange={(e) => setScannedCode(e.target.value)}
-                    placeholder="Enter equipment ID or scan barcode..."
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!scannedCode.trim() || processingScan}
-                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
-                  >
-                    {processingScan ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
-                  </button>
-                </form>
-
-                {/* Scan Result */}
-                {scanResult && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-400" />
-                      <span className="font-medium text-emerald-400">Equipment Found!</span>
-                      {scannerMode !== 'lookup' && (
-                        <span className="ml-auto text-xs px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded">
-                          Status updated to {scannerMode === 'checkin' ? 'Available' : 'In Use'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Name:</span>
-                        <span className="text-white font-medium">{scanResult.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Category:</span>
-                        <span className="text-white">{scanResult.category}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Status:</span>
-                        <span className={`font-medium ${
-                          scanResult.status === 'available' ? 'text-emerald-400' :
-                          scanResult.status === 'in-use' ? 'text-amber-400' :
-                          scanResult.status === 'maintenance' ? 'text-red-400' : 'text-slate-400'
-                        }`}>
-                          {scanResult.status}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Daily Rate:</span>
-                        <span className="text-white">₹{scanResult.dailyRate.toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedEquipment(new Set([scanResult.id]))
-                        setShowBulkActions(true)
-                        setShowScanner(false)
-                        stopScanner()
-                      }}
-                      className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Select This Equipment
-                    </button>
-                  </div>
-                )}
-
-                {/* Scan Error */}
-                {scanError && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-400" />
-                      <span className="text-red-400">{scanError}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Keyboard Shortcuts Help Modal */}
         {showKeyboardHelp && (
           <div 
@@ -1883,12 +1583,9 @@ export default function EquipmentPage() {
                 </button>
               </div>
               <div className="p-4 space-y-3">
-                {/* Bulk Selection */}
-                <div className="border-b border-slate-700 pb-2 mb-2">
-                  <span className="text-indigo-400 text-sm font-medium">Selection</span>
-                </div>
+                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Selection</div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Select all</span>
+                  <span className="text-slate-300">Select all equipment</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Ctrl+A</kbd>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1899,9 +1596,7 @@ export default function EquipmentPage() {
                   <span className="text-slate-300">Clear selection</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
                 </div>
-                <div className="border-b border-slate-700 pb-2 mb-2 mt-3">
-                  <span className="text-slate-400 text-sm">General</span>
-                </div>
+                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Actions</div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh equipment data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
@@ -1919,10 +1614,6 @@ export default function EquipmentPage() {
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">N</kbd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Open scanner</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">S</kbd>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-slate-300">Export dropdown</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
                 </div>
@@ -1937,48 +1628,6 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Close modal / Clear</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
-                </div>
-                <div className="border-t border-slate-700 pt-3 mt-3">
-                  <span className="text-slate-400 text-sm">Category Filters</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Camera</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Lighting</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Sound</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Grip</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">4</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Art</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">5</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">All Categories</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">0</kbd>
-                </div>
-                <div className="border-t border-slate-700 pt-3 mt-3">
-                  <span className="text-slate-400 text-sm">Status Filters</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Available</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">!</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">In Use</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">@</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Maintenance</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">#</kbd>
                 </div>
               </div>
             </div>

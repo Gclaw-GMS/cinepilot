@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell
 } from 'recharts'
 import { 
-  Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
+  Calendar, RefreshCw, AlertTriangle, AlertCircle, CheckCircle, Clock, 
   MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer
 } from 'lucide-react'
 
@@ -228,7 +228,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true)
   const [optimizing, setOptimizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'timeline' | 'chart'>('timeline')
+  const [viewMode, setViewMode] = useState<'timeline' | 'chart' | 'conflicts'>('timeline')
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
@@ -241,15 +241,20 @@ export default function SchedulePage() {
   const [filterLocation, setFilterLocation] = useState<string>('all')
   
   // Sorting state
-  const [sortBy, setSortBy] = useState<'dayNumber' | 'date' | 'callTime' | 'hours' | 'location' | 'status'>('dayNumber')
+  const [sortBy, setSortBy] = useState<'dayNumber' | 'date' | 'location' | 'status' | 'scenes' | 'hours'>('dayNumber')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
-  // Toggle sort order
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }
+  // Sort options
+  const sortOptions = [
+    { value: 'dayNumber', label: 'Day Number' },
+    { value: 'date', label: 'Date' },
+    { value: 'location', label: 'Location' },
+    { value: 'status', label: 'Status' },
+    { value: 'scenes', label: 'Scenes' },
+    { value: 'hours', label: 'Hours' },
+  ]
   
-  // Calculate active filter count (includes sort)
+  // Calculate active filter count (including sort)
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'dayNumber' || sortOrder !== 'asc' ? 1 : 0)
   
   // Refs
@@ -347,6 +352,10 @@ export default function SchedulePage() {
           e.preventDefault()
           setViewMode('chart')
           break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case 'o':
           e.preventDefault()
           handleOptimizeRef.current?.()
@@ -362,10 +371,6 @@ export default function SchedulePage() {
           setShowPrintMenu(false)
           setSearchQuery('')
           setShowFilters(false)
-          setFilterStatus('all')
-          setFilterLocation('all')
-          setSortBy('dayNumber')
-          setSortOrder('asc')
           break
         case 'e':
           e.preventDefault()
@@ -381,7 +386,7 @@ export default function SchedulePage() {
           break
         case 's':
           e.preventDefault()
-          toggleSortOrder()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
       }
     }
@@ -444,15 +449,17 @@ export default function SchedulePage() {
     
     const exportData = {
       exportDate: new Date().toISOString(),
-      filters: {
-        searchQuery,
+      totalDays: shootingDays.length,
+      stats,
+      sortInfo: {
+        sortBy,
+        sortOrder,
+      },
+      filterInfo: {
         filterStatus,
         filterLocation,
-        sortBy,
-        sortOrder
+        searchQuery,
       },
-      totalDays: filteredShootingDays.length,
-      stats,
       shootingDays: filteredShootingDays.map(day => ({
         dayNumber: day.dayNumber,
         date: day.scheduledDate,
@@ -695,9 +702,9 @@ export default function SchedulePage() {
     return Array.from(locations).sort()
   }, [shootingDays])
 
-  // Filter and sort shooting days
+  // Filter shooting days by search query and filters
   const filteredShootingDays = useMemo(() => {
-    let days = [...shootingDays]
+    let days = shootingDays
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -723,32 +730,37 @@ export default function SchedulePage() {
     }
     
     // Apply sorting
-    days.sort((a, b) => {
+    const sortedDays = [...days].sort((a, b) => {
       let comparison = 0
+      
       switch (sortBy) {
         case 'dayNumber':
           comparison = a.dayNumber - b.dayNumber
           break
         case 'date':
-          comparison = (a.scheduledDate || '').localeCompare(b.scheduledDate || '')
-          break
-        case 'callTime':
-          comparison = (a.callTime || '').localeCompare(b.callTime || '')
-          break
-        case 'hours':
-          comparison = (parseInt(a.estimatedHours || '0') - parseInt(b.estimatedHours || '0'))
+          const dateA = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0
+          const dateB = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0
+          comparison = dateA - dateB
           break
         case 'location':
           comparison = (a.location?.name || '').localeCompare(b.location?.name || '')
           break
         case 'status':
-          comparison = a.status.localeCompare(b.status)
+          const statusOrder = { delayed: 0, 'in-progress': 1, scheduled: 2, completed: 3 }
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] ?? 4) - (statusOrder[b.status as keyof typeof statusOrder] ?? 4)
+          break
+        case 'scenes':
+          comparison = a.dayScenes.length - b.dayScenes.length
+          break
+        case 'hours':
+          comparison = (Number(a.estimatedHours) || 0) - (Number(b.estimatedHours) || 0)
           break
       }
+      
       return sortOrder === 'asc' ? comparison : -comparison
     })
     
-    return days
+    return sortedDays
   }, [shootingDays, searchQuery, filterStatus, filterLocation, sortBy, sortOrder])
 
   // Night vs Day breakdown
@@ -787,6 +799,112 @@ export default function SchedulePage() {
       extScenes,
     }
   }, [shootingDays])
+
+  // Conflict Detection - Detect scheduling issues
+  const conflicts = useMemo(() => {
+    const conflictList: Array<{
+      id: string
+      type: 'overload' | 'light' | 'night_consecutive' | 'location_change' | 'scene_overload'
+      severity: 'high' | 'medium' | 'low'
+      dayNumber: number
+      dayDate: string | null
+      title: string
+      description: string
+    }> = []
+
+    shootingDays.forEach((day, idx) => {
+      const hours = Number(day.estimatedHours || 0)
+      const sceneCount = day.dayScenes.length
+      const isNightShoot = day.dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
+      
+      // 1. Overload Days (> 10 hours)
+      if (hours > 10) {
+        conflictList.push({
+          id: `overload-${day.id}`,
+          type: 'overload',
+          severity: hours > 12 ? 'high' : 'medium',
+          dayNumber: day.dayNumber,
+          dayDate: day.scheduledDate,
+          title: `Day ${day.dayNumber}: Heavy Schedule`,
+          description: `${hours}h scheduled (${hours - 10}h over 10h limit). Risk of crew fatigue and overtime costs.`
+        })
+      }
+      
+      // 2. Light Days (< 6 hours)
+      if (hours > 0 && hours < 6) {
+        conflictList.push({
+          id: `light-${day.id}`,
+          type: 'light',
+          severity: 'low',
+          dayNumber: day.dayNumber,
+          dayDate: day.scheduledDate,
+          title: `Day ${day.dayNumber}: Under-utilized`,
+          description: `Only ${hours}h scheduled. Consider adding scenes or rescheduling for better efficiency.`
+        })
+      }
+      
+      // 3. Scene Overload (> 5 scenes per day)
+      if (sceneCount > 5) {
+        conflictList.push({
+          id: `scene-${day.id}`,
+          type: 'scene_overload',
+          severity: sceneCount > 7 ? 'high' : 'medium',
+          dayNumber: day.dayNumber,
+          dayDate: day.scheduledDate,
+          title: `Day ${day.dayNumber}: Scene Overload`,
+          description: `${sceneCount} scenes scheduled. May impact quality and increase setup time.`
+        })
+      }
+      
+      // 4. Location Changes (multiple different locations in one day)
+      const locations = [...new Set(day.dayScenes.map(ds => ds.scene.location).filter(Boolean))]
+      if (locations.length > 2) {
+        conflictList.push({
+          id: `location-${day.id}`,
+          type: 'location_change',
+          severity: locations.length > 3 ? 'high' : 'medium',
+          dayNumber: day.dayNumber,
+          dayDate: day.scheduledDate,
+          title: `Day ${day.dayNumber}: Multiple Locations`,
+          description: `${locations.length} different locations: ${locations.slice(0, 3).join(', ')}${locations.length > 3 ? '...' : ''}. Consider splitting days.`
+        })
+      }
+    })
+
+    // 5. Consecutive Night Shoots (3+ consecutive nights)
+    let consecutiveNights = 0
+    for (let i = 0; i < shootingDays.length; i++) {
+      const isNight = shootingDays[i].dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
+      if (isNight) {
+        consecutiveNights++
+        if (consecutiveNights >= 3) {
+          conflictList.push({
+            id: `night-consec-${shootingDays[i].id}`,
+            type: 'night_consecutive',
+            severity: consecutiveNights >= 4 ? 'high' : 'medium',
+            dayNumber: shootingDays[i].dayNumber,
+            dayDate: shootingDays[i].scheduledDate,
+            title: `Day ${shootingDays[i].dayNumber}: Consecutive Night Shoots`,
+            description: `${consecutiveNights} consecutive night shoots (Days ${shootingDays[i].dayNumber - consecutiveNights + 1}-${shootingDays[i].dayNumber}). High physical toll on cast & crew.`
+          })
+        }
+      } else {
+        consecutiveNights = 0
+      }
+    }
+
+    // Sort by severity (high first)
+    const severityOrder = { high: 0, medium: 1, low: 2 }
+    return conflictList.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+  }, [shootingDays])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: conflicts.length,
+    high: conflicts.filter(c => c.severity === 'high').length,
+    medium: conflicts.filter(c => c.severity === 'medium').length,
+    low: conflicts.filter(c => c.severity === 'low').length,
+  }), [conflicts])
 
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -859,6 +977,26 @@ export default function SchedulePage() {
             >
               <TrendingUp className="w-4 h-4 inline-block mr-1.5" />
               Analytics
+            </button>
+            <button
+              onClick={() => setViewMode('conflicts')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                viewMode === 'conflicts' 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Conflicts
+              {conflictStats.total > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
+                  conflictStats.high > 0 ? 'bg-red-500 text-white' : 
+                  conflictStats.medium > 0 ? 'bg-amber-500 text-white' : 
+                  'bg-gray-500 text-white'
+                }`}>
+                  {conflictStats.total}
+                </span>
+              )}
             </button>
           </div>
           {/* Filter Toggle Button */}
@@ -977,11 +1115,37 @@ export default function SchedulePage() {
           ref={filterPanelRef}
           className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200"
         >
-          <div className="flex flex-wrap items-center gap-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm font-medium text-gray-300">Filter & Sort:</span>
+              <span className="text-sm font-medium text-gray-300">Filters & Sort:</span>
             </div>
+            {/* Sort Options */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-400">Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                {sortOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                sortBy !== 'dayNumber' || sortOrder !== 'asc'
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title="Toggle Sort Order (S)"
+            >
+              {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+            </button>
+            <div className="w-px h-6 bg-gray-600" />
+            {/* Filter Options */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-400">Status:</label>
               <select
@@ -1009,35 +1173,6 @@ export default function SchedulePage() {
                 ))}
               </select>
             </div>
-          </div>
-          
-          {/* Sort Controls */}
-          <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Sort by:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value="dayNumber">Day Number</option>
-                <option value="date">Date</option>
-                <option value="callTime">Call Time</option>
-                <option value="hours">Hours</option>
-                <option value="location">Location</option>
-                <option value="status">Status</option>
-              </select>
-            </div>
-            <button
-              onClick={toggleSortOrder}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sortOrder === 'asc' 
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
-              }`}
-            >
-              {sortOrder === 'asc' ? 'ASC ↑' : 'DESC ↓'}
-            </button>
             <button
               onClick={() => { 
                 setFilterStatus('all'); 
@@ -1047,7 +1182,7 @@ export default function SchedulePage() {
               }}
               className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
             >
-              Clear All
+              Clear Filters & Sort
             </button>
           </div>
         </div>
@@ -1317,6 +1452,148 @@ export default function SchedulePage() {
         </div>
       )}
 
+      {/* Conflicts View */}
+      {viewMode === 'conflicts' && (
+        <div className="space-y-6">
+          {/* Conflict Stats */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <AlertTriangle className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Total Issues</p>
+                  <p className="text-2xl font-bold text-white">{conflictStats.total}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-800/40 border border-red-900/30 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-500/20">
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">High Priority</p>
+                  <p className="text-2xl font-bold text-red-400">{conflictStats.high}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-800/40 border border-amber-900/30 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Medium</p>
+                  <p className="text-2xl font-bold text-amber-400">{conflictStats.medium}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-800/40 border border-gray-600 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gray-500/20">
+                  <AlertTriangle className="w-5 h-5 text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Low</p>
+                  <p className="text-2xl font-bold text-gray-400">{conflictStats.low}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Conflicts List */}
+          {conflicts.length === 0 ? (
+            <div className="bg-gray-800/40 border border-emerald-900/30 rounded-lg p-8 text-center">
+              <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">Schedule Looks Good!</h3>
+              <p className="text-gray-400">No scheduling conflicts detected. Your schedule is optimized.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {conflicts.map(conflict => (
+                <div 
+                  key={conflict.id}
+                  className={`rounded-lg border p-4 transition-all hover:scale-[1.01] ${
+                    conflict.severity === 'high' 
+                      ? 'bg-red-900/10 border-red-800/50' 
+                      : conflict.severity === 'medium'
+                      ? 'bg-amber-900/10 border-amber-800/50'
+                      : 'bg-gray-800/30 border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      conflict.severity === 'high' 
+                        ? 'bg-red-500/20' 
+                        : conflict.severity === 'medium'
+                        ? 'bg-amber-500/20'
+                        : 'bg-gray-500/20'
+                    }`}>
+                      {conflict.type === 'overload' && <Clock className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
+                      {conflict.type === 'light' && <Clock className="w-4 h-4 text-gray-400" />}
+                      {conflict.type === 'night_consecutive' && <Moon className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
+                      {conflict.type === 'location_change' && <MapPin className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
+                      {conflict.type === 'scene_overload' && <Film className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-white">{conflict.title}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          conflict.severity === 'high' 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : conflict.severity === 'medium'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {conflict.severity}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-400">{conflict.description}</p>
+                      {conflict.dayDate && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          {new Date(conflict.dayDate).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Legend */}
+          {conflicts.length > 0 && (
+            <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-300 mb-3">Conflict Types</h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-red-400" />
+                  <span className="text-gray-400">Overload (&gt;10h)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-400">Light (&lt;6h)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Moon className="w-4 h-4 text-amber-400" />
+                  <span className="text-gray-400">3+ Night Shoots</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-amber-400" />
+                  <span className="text-gray-400">3+ Locations/Day</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Film className="w-4 h-4 text-amber-400" />
+                  <span className="text-gray-400">5+ Scenes/Day</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Version Info */}
       {versions.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
@@ -1507,15 +1784,16 @@ export default function SchedulePage() {
               {[
                 { key: 'R', desc: 'Refresh schedule data' },
                 { key: '/', desc: 'Focus search input' },
-                { key: 'F', desc: 'Toggle filters panel' },
-                { key: 'S', desc: 'Toggle sort order (ASC/DESC)' },
+                { key: 'F', desc: 'Toggle filters & sort panel' },
+                { key: 'S', desc: 'Toggle sort order (asc/desc)' },
                 { key: '1', desc: 'Switch to Timeline view' },
                 { key: '2', desc: 'Switch to Analytics view' },
+                { key: '3', desc: 'Switch to Conflicts view' },
                 { key: 'O', desc: 'Open optimize schedule' },
                 { key: 'E', desc: 'Export schedule (CSV/JSON)' },
                 { key: 'P', desc: 'Print schedule report' },
                 { key: '?', desc: 'Show this help modal' },
-                { key: 'Esc', desc: 'Close modal / Clear search & filters / Reset sort' },
+                { key: 'Esc', desc: 'Close modal / Clear search / Close filters' },
               ].map(({ key, desc }) => (
                 <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-700/50 transition-colors">
                   <span className="text-gray-300">{desc}</span>

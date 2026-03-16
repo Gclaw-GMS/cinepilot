@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
@@ -181,15 +181,91 @@ export default function AnalyticsPage() {
     timePeriod: 'all',
     department: 'all',
   })
-  const [sortBy, setSortBy] = useState<'name' | 'efficiency' | 'utilization'>('name')
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'category' | 'allocated' | 'spent' | 'name' | 'efficiency' | 'utilization' | 'timestamp' | 'type'>('category')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  // Sort options
+  const sortOptions = [
+    { key: 'category', label: 'Category' },
+    { key: 'allocated', label: 'Allocated' },
+    { key: 'spent', label: 'Spent' },
+    { key: 'name', label: 'Department' },
+    { key: 'efficiency', label: 'Efficiency' },
+    { key: 'utilization', label: 'Utilization' },
+    { key: 'timestamp', label: 'Timestamp' },
+    { key: 'type', label: 'Type' },
+  ]
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   // Calculate active filter count
-  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
+  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
+
+  // Sorted data using useMemo
+  const sortedBudgetData = useMemo(() => {
+    if (!dashboard?.budget_breakdown) return []
+    const data = [...dashboard.budget_breakdown]
+    return data.sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'category') {
+        comparison = a.category.localeCompare(b.category)
+      } else if (sortBy === 'allocated') {
+        comparison = a.allocated - b.allocated
+      } else if (sortBy === 'spent') {
+        comparison = a.spent - b.spent
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [dashboard?.budget_breakdown, sortBy, sortOrder])
+
+  const sortedDepartmentData = useMemo(() => {
+    if (!metrics?.department_stats) return []
+    const data = [...metrics.department_stats]
+    return data.sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'name') {
+        comparison = a.name.localeCompare(b.name)
+      } else if (sortBy === 'efficiency') {
+        comparison = a.efficiency - b.efficiency
+      } else if (sortBy === 'utilization') {
+        comparison = a.utilization - b.utilization
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [metrics?.department_stats, sortBy, sortOrder])
+
+  const sortedActivitiesData = useMemo(() => {
+    if (!dashboard?.recent_activities) return []
+    const data = [...dashboard.recent_activities]
+    return data.sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'timestamp') {
+        comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      } else if (sortBy === 'type') {
+        comparison = a.type.localeCompare(b.type)
+      } else if (sortBy === 'category') {
+        comparison = a.type.localeCompare(b.type)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [dashboard?.recent_activities, sortBy, sortOrder])
+
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+
+  // Clear filters and sort
+  const handleClearFilters = () => {
+    setFilters({ timePeriod: 'all', department: 'all' })
+    setSortBy('category')
+    setSortOrder('asc')
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -260,7 +336,7 @@ export default function AnalyticsPage() {
           break
         case 's':
           e.preventDefault()
-          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          toggleSortOrder()
           break
         case 'e':
           e.preventDefault()
@@ -277,6 +353,7 @@ export default function AnalyticsPage() {
           setShowPrintMenu(false)
           setShowFilterPanel(false)
           setSearchQuery('')
+          handleClearFilters()
           break
       }
     }
@@ -327,7 +404,7 @@ export default function AnalyticsPage() {
       [],
       ['Budget Breakdown'],
       ['Category', 'Allocated', 'Spent'],
-      ...dashboard.budget_breakdown.map(b => [b.category, b.allocated.toString(), b.spent.toString()]),
+      ...sortedBudgetData.map(b => [b.category, b.allocated.toString(), b.spent.toString()]),
     ]
 
     const csv = rows.map(r => r.join(',')).join('\n')
@@ -346,24 +423,23 @@ export default function AnalyticsPage() {
 
     const exportData = {
       exportDate: new Date().toISOString(),
-      filters: {
-        timePeriod: filters.timePeriod,
-        department: filters.department,
-        searchQuery,
-      },
-      sort: {
-        sortBy,
-        sortOrder,
-      },
       overview: dashboard.overview,
       timeline: metrics.timeline,
       performance: metrics.performance,
       predictions: metrics.predictions,
-      budgetBreakdown: dashboard.budget_breakdown,
+      budgetBreakdown: sortedBudgetData,
       scheduleProgress: dashboard.schedule_progress,
-      departmentStats: sortedDeptStats,
-      recentActivities: dashboard.recent_activities,
+      departmentStats: sortedDepartmentData,
+      recentActivities: sortedActivitiesData,
       upcomingShoots: dashboard.upcoming_shoots,
+      sortMetadata: {
+        sortBy,
+        sortOrder,
+      },
+      filterMetadata: {
+        timePeriod: filters.timePeriod,
+        department: filters.department,
+      },
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -388,7 +464,7 @@ export default function AnalyticsPage() {
 
   const clearFilters = () => {
     setFilters({ timePeriod: 'all', department: 'all' })
-    setSortBy('name')
+    setSortBy('category')
     setSortOrder('asc')
   }
 
@@ -411,8 +487,8 @@ export default function AnalyticsPage() {
     const timeline = metrics.timeline
     const performance = metrics.performance
     
-    // Build budget breakdown rows
-    const budgetRows = dashboard.budget_breakdown.map(b => {
+    // Build budget breakdown rows (using sorted data)
+    const budgetRows = sortedBudgetData.map(b => {
       const variance = b.allocated - b.spent
       const varianceClass = variance >= 0 ? 'positive' : 'negative'
       return `<tr>
@@ -433,8 +509,8 @@ export default function AnalyticsPage() {
       </tr>`
     }).join('')
     
-    // Build department stats rows
-    const deptRows = metrics.department_stats.map(d => {
+    // Build department stats rows (using sorted data)
+    const deptRows = sortedDepartmentData.map(d => {
       return `<tr>
         <td>${d.name}</td>
         <td>${d.efficiency}%</td>
@@ -608,12 +684,12 @@ export default function AnalyticsPage() {
   const budgetPercent = dashboard ? Math.round((dashboard.overview.budget_spent / dashboard.overview.budget_total) * 100) : 0
   const scenePercent = dashboard ? Math.round((dashboard.overview.completed_scenes / dashboard.overview.total_scenes) * 100) : 0
 
-  const budgetData = dashboard?.budget_breakdown.map(item => ({
+  const budgetData = sortedBudgetData.map(item => ({
     ...item,
     utilization: Math.round((item.spent / item.allocated) * 100),
   })) || []
 
-  const deptData = metrics?.department_stats || []
+  const deptData = sortedDepartmentData
 
   // Filter data based on search query
   const filteredActivities = dashboard?.recent_activities.filter(activity => {
@@ -638,28 +714,11 @@ export default function AnalyticsPage() {
     )
   }) || []
 
-  const filteredDeptStats = metrics?.department_stats.filter(dept => {
+  const filteredDeptStats = sortedDepartmentData.filter(dept => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return dept.name.toLowerCase().includes(query)
   }) || []
-
-  // Sort department stats
-  const sortedDeptStats = [...filteredDeptStats].sort((a, b) => {
-    let comparison = 0
-    switch (sortBy) {
-      case 'name':
-        comparison = a.name.localeCompare(b.name)
-        break
-      case 'efficiency':
-        comparison = a.efficiency - b.efficiency
-        break
-      case 'utilization':
-        comparison = a.utilization - b.utilization
-        break
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  })
 
   if (loading) {
     return (
@@ -722,10 +781,10 @@ export default function AnalyticsPage() {
             <button
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-              title="Filters (F)"
+              title="Filter & Sort (F)"
             >
               <Filter className="w-4 h-4" />
-              Filters
+              Filter & Sort
               {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
                   {activeFilterCount}
@@ -733,9 +792,43 @@ export default function AnalyticsPage() {
               )}
             </button>
             {showFilterPanel && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-700">
                   <h3 className="text-white font-medium mb-3">Filter & Sort</h3>
+                  
+                  {/* Sort Options */}
+                  <div className="mb-4 p-3 bg-indigo-900/30 rounded-lg border border-indigo-700/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-indigo-300 font-medium">Sort By</label>
+                      <button
+                        onClick={toggleSortOrder}
+                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded transition-colors"
+                        title="Toggle sort order (S)"
+                      >
+                        {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                      </button>
+                    </div>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <optgroup label="Budget">
+                        <option value="category">Category</option>
+                        <option value="allocated">Allocated</option>
+                        <option value="spent">Spent</option>
+                      </optgroup>
+                      <optgroup label="Department">
+                        <option value="name">Department</option>
+                        <option value="efficiency">Efficiency</option>
+                        <option value="utilization">Utilization</option>
+                      </optgroup>
+                      <optgroup label="Activities">
+                        <option value="timestamp">Timestamp</option>
+                        <option value="type">Type</option>
+                      </optgroup>
+                    </select>
+                  </div>
                   
                   {/* Time Period Filter */}
                   <div className="mb-4">
@@ -770,36 +863,13 @@ export default function AnalyticsPage() {
                     </select>
                   </div>
                   
-                  {/* Sort Options */}
-                  <div className="mb-4">
-                    <label className="block text-sm text-slate-400 mb-2">Sort By (Dept Stats)</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="name">Name</option>
-                        <option value="efficiency">Efficiency</option>
-                        <option value="utilization">Utilization</option>
-                      </select>
-                      <button
-                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
-                        title="Toggle sort order"
-                      >
-                        {sortOrder === 'asc' ? '↑' : '↓'}
-                      </button>
-                    </div>
-                  </div>
-                  
                   {/* Clear Filters */}
                   {activeFilterCount > 0 && (
                     <button
-                      onClick={clearFilters}
+                      onClick={handleClearFilters}
                       className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
                     >
-                      Clear Filters
+                      Clear Filters & Sort
                     </button>
                   )}
                 </div>
@@ -1167,15 +1237,15 @@ export default function AnalyticsPage() {
               Department Performance
               {searchQuery && (
                 <span className="ml-2 text-sm text-slate-400">
-                  ({sortedDeptStats.length} of {deptData.length})
+                  ({filteredDeptStats.length} of {deptData.length})
                 </span>
               )}
             </h3>
-            {sortedDeptStats.length === 0 && searchQuery ? (
+            {filteredDeptStats.length === 0 && searchQuery ? (
               <p className="text-slate-500 text-center py-8">No departments match "{searchQuery}"</p>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sortedDeptStats}>
+                <BarChart data={filteredDeptStats}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="name" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" domain={[0, 100]} />
@@ -1341,7 +1411,7 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh analytics data' },
-                { key: 'F', description: 'Toggle filters panel' },
+                { key: 'F', description: 'Toggle filter & sort panel' },
                 { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'E', description: 'Toggle export dropdown' },
                 { key: 'P', description: 'Print analytics report' },
@@ -1350,7 +1420,7 @@ export default function AnalyticsPage() {
                 { key: '2', description: 'Switch to Performance view' },
                 { key: '3', description: 'Switch to Forecast view' },
                 { key: '?', description: 'Show this help modal' },
-                { key: 'Esc', description: 'Close modal, menus, or clear search' },
+                { key: 'Esc', description: 'Close modal, menus, or clear filters & sort' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

@@ -8,8 +8,7 @@ import {
   TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText, Printer, Filter
 } from 'lucide-react'
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 
 interface TeamMember {
@@ -94,18 +93,21 @@ export default function CollaborationPage() {
     department: 'all',
     status: 'all',
   })
+  
+  // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'status' | 'dailyRate'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-
+  
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
-
-  // Calculate active filter count
-  const activeFilterCount = (filters.department !== 'all' ? 1 : 0) + (filters.status !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
   const filteredMembersRef = useRef<TeamMember[]>([])
+
+  // Calculate active filter count (including sort)
+  const hasActiveSort = sortBy !== 'name' || sortOrder !== 'asc'
+  const activeFilterCount = (filters.department !== 'all' ? 1 : 0) + (filters.status !== 'all' ? 1 : 0) + (hasActiveSort ? 1 : 0)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -213,9 +215,10 @@ export default function CollaborationPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, showFilters, search, sortBy, sortOrder])
+  }, [showForm, showExportMenu, showPrintMenu, showFilters, search])
 
-  const filteredMembers = useMemo(() => {
+  // Filter and sort members with useMemo for performance
+  const filteredAndSortedMembers = useMemo(() => {
     let result = members.filter(m => {
       const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
         m.role.toLowerCase().includes(search.toLowerCase()) ||
@@ -224,7 +227,7 @@ export default function CollaborationPage() {
       const matchesStatus = filters.status === 'all' || m.status === filters.status
       return matchesSearch && matchesDept && matchesStatus
     })
-
+    
     // Apply sorting
     result = [...result].sort((a, b) => {
       let comparison = 0
@@ -247,22 +250,30 @@ export default function CollaborationPage() {
       }
       return sortOrder === 'asc' ? comparison : -comparison
     })
-
+    
     return result
   }, [members, search, filters, sortBy, sortOrder])
   
   // Update ref for keyboard shortcuts
-  filteredMembersRef.current = filteredMembers
+  filteredMembersRef.current = filteredAndSortedMembers
 
   const activeCount = members.filter(m => m.status === 'active').length
 
-  // Chart data computations
-  const statusChartData = useMemo(() => {
-    const statusCounts = { active: 0, busy: 0, offline: 0 }
+  // Chart data: Department distribution
+  const departmentData = useMemo(() => {
+    const deptCounts: Record<string, number> = {}
     members.forEach(m => {
-      if (statusCounts.hasOwnProperty(m.status)) {
-        statusCounts[m.status as keyof typeof statusCounts]++
-      }
+      const dept = m.department || 'Unassigned'
+      deptCounts[dept] = (deptCounts[dept] || 0) + 1
+    })
+    return Object.entries(deptCounts).map(([name, value]) => ({ name, value }))
+  }, [members])
+
+  // Chart data: Status distribution
+  const statusData = useMemo(() => {
+    const statusCounts: Record<string, number> = { active: 0, busy: 0, offline: 0 }
+    members.forEach(m => {
+      statusCounts[m.status] = (statusCounts[m.status] || 0) + 1
     })
     return [
       { name: 'Active', value: statusCounts.active, color: '#10b981' },
@@ -271,29 +282,25 @@ export default function CollaborationPage() {
     ]
   }, [members])
 
-  const departmentChartData = useMemo(() => {
-    const deptCounts: Record<string, number> = {}
-    members.forEach(m => {
-      const dept = m.department || 'Unknown'
-      deptCounts[dept] = (deptCounts[dept] || 0) + 1
-    })
-    return Object.entries(deptCounts).map(([name, count]) => ({ name, count }))
-  }, [members])
-
-  const dailyRateChartData = useMemo(() => {
+  // Chart data: Daily rate by department
+  const dailyRateData = useMemo(() => {
     const deptRates: Record<string, { total: number; count: number }> = {}
     members.forEach(m => {
-      if (m.dailyRate) {
-        const dept = m.department || 'Unknown'
-        if (!deptRates[dept]) deptRates[dept] = { total: 0, count: 0 }
-        deptRates[dept].total += m.dailyRate
-        deptRates[dept].count++
+      if (m.department && m.dailyRate) {
+        if (!deptRates[m.department]) {
+          deptRates[m.department] = { total: 0, count: 0 }
+        }
+        deptRates[m.department].total += m.dailyRate
+        deptRates[m.department].count += 1
       }
     })
-    return Object.entries(deptRates).map(([name, data]) => ({ 
-      name, 
-      avgRate: Math.round(data.total / data.count / 1000) * 1000 
-    })).sort((a, b) => b.avgRate - a.avgRate)
+    return Object.entries(deptRates)
+      .map(([dept, data]) => ({
+        department: dept,
+        avgRate: Math.round(data.total / data.count / 1000) * 1000, // Round to nearest 1000
+      }))
+      .sort((a, b) => b.avgRate - a.avgRate)
+      .slice(0, 8)
   }, [members])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -390,7 +397,7 @@ export default function CollaborationPage() {
   // Export functions
   const handleExportCSV = () => {
     const headers = ['Name', 'Role', 'Email', 'Phone', 'Department', 'Status', 'Daily Rate', 'Skills']
-    const rows = filteredMembers.map(m => [
+    const rows = filteredAndSortedMembers.map(m => [
       m.name,
       m.role,
       m.email || '',
@@ -415,17 +422,8 @@ export default function CollaborationPage() {
   const handleExportJSON = () => {
     const data = {
       exportDate: new Date().toISOString(),
-      totalMembers: filteredMembers.length,
-      filters: {
-        search,
-        department: filters.department,
-        status: filters.status,
-      },
-      sort: {
-        sortBy,
-        sortOrder,
-      },
-      members: filteredMembers.map(m => ({
+      totalMembers: filteredAndSortedMembers.length,
+      members: filteredAndSortedMembers.map(m => ({
         name: m.name,
         role: m.role,
         email: m.email,
@@ -633,7 +631,7 @@ export default function CollaborationPage() {
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              disabled={exporting || filteredMembers.length === 0}
+              disabled={exporting || filteredAndSortedMembers.length === 0}
               className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
               title="Export (E)"
             >
@@ -664,7 +662,7 @@ export default function CollaborationPage() {
           <div className="relative" ref={printMenuRef}>
             <button
               onClick={() => setShowPrintMenu(!showPrintMenu)}
-              disabled={exporting || filteredMembers.length === 0}
+              disabled={exporting || filteredAndSortedMembers.length === 0}
               className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
               title="Print (P)"
             >
@@ -710,34 +708,9 @@ export default function CollaborationPage() {
               )}
             </button>
             {showFilters && (
-              <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-700">
                   <h3 className="text-white font-medium mb-3">Filter & Sort</h3>
-                  
-                  {/* Sort Options */}
-                  <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                    <label className="block text-sm text-indigo-300 mb-2">Sort By</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="name">Name</option>
-                        <option value="role">Role</option>
-                        <option value="department">Department</option>
-                        <option value="status">Status</option>
-                        <option value="dailyRate">Daily Rate</option>
-                      </select>
-                      <button
-                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
-                        title="Toggle sort order"
-                      >
-                        {sortOrder === 'asc' ? '↑' : '↓'}
-                      </button>
-                    </div>
-                  </div>
                   
                   {/* Department Filter */}
                   <div className="mb-4">
@@ -769,7 +742,36 @@ export default function CollaborationPage() {
                     </select>
                   </div>
                   
-                  {/* Clear Filters */}
+                  {/* Sort Options */}
+                  <div className="mb-4">
+                    <label className="block text-sm text-slate-400 mb-2">Sort By</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="name">Name</option>
+                        <option value="role">Role</option>
+                        <option value="department">Department</option>
+                        <option value="status">Status</option>
+                        <option value="dailyRate">Daily Rate</option>
+                      </select>
+                      <button
+                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          hasActiveSort 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Toggle sort order (S)"
+                      >
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Clear Filters & Sort */}
                   {activeFilterCount > 0 && (
                     <button
                       onClick={() => {
@@ -779,7 +781,7 @@ export default function CollaborationPage() {
                       }}
                       className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
                     >
-                      Clear Filters ({activeFilterCount})
+                      Clear Filters & Sort ({activeFilterCount})
                     </button>
                   )}
                 </div>
@@ -860,68 +862,74 @@ export default function CollaborationPage() {
       {/* Charts Section */}
       {!loading && members.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {/* Status Distribution */}
+          {/* Department Distribution Pie Chart */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-            <h3 className="text-sm font-medium text-slate-400 mb-4">Status Distribution</h3>
-            <ResponsiveContainer width="100%" height={180}>
+            <h3 className="text-sm font-medium text-slate-400 mb-4">Department Distribution</h3>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
-                  data={statusChartData}
+                  data={departmentData}
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={4}
+                  outerRadius={80}
+                  paddingAngle={2}
                   dataKey="value"
                 >
-                  {statusChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {departmentData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f43f5e', '#64748b'][index % 8]} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   itemStyle={{ color: '#e2e8f0' }}
                 />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36}
-                  formatter={(value) => <span className="text-slate-400 text-xs">{value}</span>}
-                />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Department Distribution */}
+          {/* Status Distribution Pie Chart */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-            <h3 className="text-sm font-medium text-slate-400 mb-4">Department Distribution</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={departmentChartData.slice(0, 6)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} />
-                <Tooltip 
+            <h3 className="text-sm font-medium text-slate-400 mb-4">Status Overview</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   itemStyle={{ color: '#e2e8f0' }}
                 />
-                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+              </PieChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Daily Rate by Department */}
+          {/* Daily Rate Bar Chart */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-            <h3 className="text-sm font-medium text-slate-400 mb-4">Avg Daily Rate by Dept</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={dailyRateChartData.slice(0, 5)} layout="vertical">
+            <h3 className="text-sm font-medium text-slate-400 mb-4">Avg Daily Rate by Dept (₹)</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={dailyRateData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} width={80} />
-                <Tooltip 
+                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `₹${(v/1000)}k`} />
+                <YAxis type="category" dataKey="department" tick={{ fill: '#94a3b8', fontSize: 10 }} width={70} />
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                   itemStyle={{ color: '#e2e8f0' }}
-                  formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Avg Rate']}
+                  formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Avg Rate']}
                 />
-                <Bar dataKey="avgRate" fill="#10b981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="avgRate" fill="#6366f1" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -947,7 +955,7 @@ export default function CollaborationPage() {
       {/* Results count */}
       <div className="mb-6">
         <span className="text-slate-400 text-sm">
-          {filteredMembers.length} member{filteredMembers.length !== 1 ? 's' : ''} found
+          {filteredAndSortedMembers.length} member{filteredAndSortedMembers.length !== 1 ? 's' : ''} found
           {activeFilterCount > 0 && (
             <span className="ml-2 text-indigo-400">(filtered)</span>
           )}
@@ -959,7 +967,7 @@ export default function CollaborationPage() {
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         </div>
-      ) : filteredMembers.length === 0 ? (
+      ) : filteredAndSortedMembers.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
           <Users className="w-12 h-12 text-slate-700 mx-auto mb-3" />
           <p className="text-slate-400">No team members found</p>
@@ -969,7 +977,7 @@ export default function CollaborationPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredMembers.map((member) => (
+          {filteredAndSortedMembers.map((member) => (
             <div key={member.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xl font-semibold flex-shrink-0">

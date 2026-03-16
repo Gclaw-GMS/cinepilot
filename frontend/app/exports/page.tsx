@@ -131,13 +131,8 @@ export default function ExportsPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
   // Sort state
-  const [sortBy, setSortBy] = useState<'name' | 'format' | 'category'>('name')
+  const [sortBy, setSortBy] = useState<'name' | 'format' | 'category'>('category')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  
-  // Toggle sort order
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }
   
   // Keyboard shortcuts
   useEffect(() => {
@@ -162,7 +157,7 @@ export default function ExportsPage() {
           break
         case 's':
           e.preventDefault()
-          toggleSortOrder()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case '?':
           e.preventDefault()
@@ -173,9 +168,6 @@ export default function ExportsPage() {
           setShowKeyboardHelp(false)
           setSearchQuery('')
           setShowFilters(false)
-          // Reset sort to default
-          setSortBy('name')
-          setSortOrder('asc')
           break
       }
     }
@@ -199,8 +191,8 @@ export default function ExportsPage() {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
 
-  // Count active filters (including sort state)
-  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
+  // Count active filters (includes sort state)
+  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
   
   // Filter categories by search query and filters
   const filteredCategories = useMemo(() => {
@@ -234,30 +226,25 @@ export default function ExportsPage() {
     }
     
     // Apply sorting
-    categories = categories.map(category => ({
-      ...category,
-      exports: [...category.exports].sort((a, b) => {
-        let comparison = 0
-        switch (sortBy) {
-          case 'name':
-            comparison = a.name.localeCompare(b.name)
-            break
-          case 'format':
-            comparison = a.format.localeCompare(b.format)
-            break
-          case 'category':
-            comparison = category.id.localeCompare(category.id)
-            break
-        }
-        return sortOrder === 'asc' ? comparison : -comparison
-      })
-    }))
-    
-    // Sort categories themselves
-    categories = [...categories].sort((a, b) => {
-      const comparison = a.label.localeCompare(b.label)
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
+    if (sortBy === 'name') {
+      categories = categories.map(category => ({
+        ...category,
+        exports: [...category.exports].sort((a, b) => 
+          sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+        )
+      }))
+    } else if (sortBy === 'format') {
+      categories = categories.map(category => ({
+        ...category,
+        exports: [...category.exports].sort((a, b) => 
+          sortOrder === 'asc' ? a.format.localeCompare(b.format) : b.format.localeCompare(a.format)
+        )
+      }))
+    } else if (sortBy === 'category') {
+      categories = [...categories].sort((a, b) => 
+        sortOrder === 'asc' ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label)
+      )
+    }
     
     return categories
   }, [searchQuery, categoryFilter, formatFilter, sortBy, sortOrder])
@@ -384,7 +371,7 @@ export default function ExportsPage() {
     const handleClickOutside = (e: MouseEvent) => {
       if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
         // Check if click is on filter button
-        const filterButton = document.querySelector('[title="Toggle filters (F)"]')
+        const filterButton = document.querySelector('[title="Toggle filters & sort (F)"]')
         if (filterButton && !filterButton.contains(e.target as Node)) {
           setShowFilters(false)
         }
@@ -443,7 +430,7 @@ export default function ExportsPage() {
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600 pointer-events-none">/</span>
             </div>
             
-            {/* Filter Toggle Button */}
+            {/* Filter & Sort Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
@@ -451,10 +438,10 @@ export default function ExportsPage() {
                   ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
               }`}
-              title="Toggle filters (F)"
+              title="Toggle filters & sort (F)"
             >
               <Filter className="w-4 h-4" />
-              <span className="hidden sm:inline">Filters</span>
+              <span className="hidden sm:inline">Filter & Sort</span>
               {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
                   {activeFilterCount}
@@ -504,7 +491,7 @@ export default function ExportsPage() {
           </div>
         </div>
 
-        {/* Filter Panel */}
+        {/* Filter & Sort Panel */}
         {showFilters && (
           <div className="mb-6 p-4 bg-slate-900 border border-slate-800 rounded-xl" ref={filterPanelRef}>
             <div className="flex flex-wrap items-center gap-4">
@@ -547,41 +534,41 @@ export default function ExportsPage() {
                 <span className="text-sm text-slate-400">Sort:</span>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'format' | 'category')}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                   className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 >
+                  <option value="category">Category</option>
                   <option value="name">Name</option>
                   <option value="format">Format</option>
-                  <option value="category">Category</option>
                 </select>
               </div>
               
               {/* Sort Order Toggle */}
               <button
-                onClick={toggleSortOrder}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  sortOrder === 'asc' 
-                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' 
-                    : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                  sortBy !== 'category' || sortOrder !== 'asc'
+                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
                 }`}
                 title="Toggle sort order (S)"
               >
-                {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
               </button>
               
-              {/* Clear Filters */}
+              {/* Clear Filters & Sort */}
               {activeFilterCount > 0 && (
                 <button
                   onClick={() => {
                     setCategoryFilter('all')
                     setFormatFilter('all')
-                    setSortBy('name')
+                    setSortBy('category')
                     setSortOrder('asc')
                   }}
                   className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors"
                 >
                   <X className="w-4 h-4" />
-                  Clear Filters
+                  Clear Filters & Sort
                 </button>
               )}
               

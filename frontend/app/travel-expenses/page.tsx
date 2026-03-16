@@ -5,8 +5,7 @@ import {
   Plane, Train, Bus, Car, Building, Wallet, Plus, Edit2, Trash2,
   DollarSign, Calendar, MapPin, Search, X, HelpCircle,
   Clock, CreditCard, Receipt, Filter, BarChart3, PieChart as PieChartIcon,
-  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet,
-  CheckCircle, AlertCircle
+  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -75,20 +74,6 @@ export default function TravelExpensesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('dashboard')
 
-  // Bulk selection state
-  const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set())
-  const [showBulkActions, setShowBulkActions] = useState(false)
-  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const selectedExpensesRef = useRef(selectedExpenses)
-  const showBulkActionsRef = useRef(showBulkActions)
-  const showBulkStatusMenuRef = useRef(showBulkStatusMenu)
-  const showDeleteConfirmRef = useRef(showDeleteConfirm)
-  const handleSelectAllRef = useRef<() => void>(() => {})
-  const handleClearSelectionRef = useRef<() => void>(() => {})
-
   // Calculate active filter count using useMemo for efficiency
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -107,102 +92,6 @@ export default function TravelExpensesPage() {
     setSortBy('date')
     setSortOrder('desc')
   }, [])
-
-  // Bulk selection handlers
-  const handleSelectAll = useCallback(() => {
-    const filtered = expenses.filter(e => {
-      const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter
-      const matchesStatus = statusFilter === 'all' || e.status === statusFilter
-      const matchesSearch = !searchQuery || e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.vendor?.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchesCategory && matchesStatus && matchesSearch
-    })
-    const allIds = new Set(filtered.map(e => e.id))
-    setSelectedExpenses(allIds)
-    setShowBulkActions(allIds.size > 0)
-  }, [expenses, categoryFilter, statusFilter, searchQuery])
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedExpenses(new Set())
-    setShowBulkActions(false)
-    setShowBulkStatusMenu(false)
-    setShowDeleteConfirm(false)
-  }, [])
-
-  const handleToggleSelect = useCallback((id: string) => {
-    const newSelected = new Set(selectedExpenses)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedExpenses(newSelected)
-    setShowBulkActions(newSelected.size > 0)
-  }, [selectedExpenses])
-
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedExpenses.size === 0) return
-    setShowDeleteConfirm(false)
-    
-    try {
-      const idsToDelete = Array.from(selectedExpenses)
-      for (const id of idsToDelete) {
-        const res = await fetch('/api/travel-expenses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete', id })
-        })
-        if (!res.ok) {
-          throw new Error(`Failed to delete ${id}`)
-        }
-      }
-      setExpenses(expenses.filter(e => !selectedExpenses.has(e.id)))
-      setSuccess(`${idsToDelete.length} expense(s) deleted`)
-      setTimeout(() => setSuccess(null), 3000)
-      handleClearSelection()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bulk delete failed')
-    }
-  }, [selectedExpenses, expenses, handleClearSelection])
-
-  const handleBulkChangeStatus = useCallback(async (newStatus: string) => {
-    if (selectedExpenses.size === 0) return
-    setShowBulkStatusMenu(false)
-    
-    try {
-      const idsToUpdate = Array.from(selectedExpenses)
-      for (const id of idsToUpdate) {
-        const res = await fetch('/api/travel-expenses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update', id, status: newStatus })
-        })
-        if (!res.ok) {
-          throw new Error(`Failed to update ${id}`)
-        }
-      }
-      setExpenses(expenses.map(e => 
-        selectedExpenses.has(e.id) ? { ...e, status: newStatus } : e
-      ))
-      setSuccess(`${idsToUpdate.length} expense(s) marked as ${newStatus}`)
-      setTimeout(() => setSuccess(null), 3000)
-      handleClearSelection()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bulk update failed')
-    }
-  }, [selectedExpenses, expenses, handleClearSelection])
-
-  // Update refs when state changes
-  useEffect(() => {
-    selectedExpensesRef.current = selectedExpenses
-    showBulkActionsRef.current = showBulkActions
-    showBulkStatusMenuRef.current = showBulkStatusMenu
-    showDeleteConfirmRef.current = showDeleteConfirm
-  }, [selectedExpenses, showBulkActions, showBulkStatusMenu, showDeleteConfirm])
-
-  useEffect(() => {
-    handleSelectAllRef.current = handleSelectAll
-    handleClearSelectionRef.current = handleClearSelection
-  }, [handleSelectAll, handleClearSelection])
 
   const searchInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLDivElement>(null)
@@ -569,21 +458,6 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
         else if (showPrintMenu) setShowPrintMenu(false)
         else if (showHelp) setShowHelp(false)
         else if (showFilters) setShowFilters(false)
-        else if (showBulkActionsRef.current) handleClearSelectionRef.current?.()
-        else if (showDeleteConfirmRef.current) setShowDeleteConfirm(false)
-        else if (showBulkStatusMenuRef.current) setShowBulkStatusMenu(false)
-      }
-      
-      // Bulk selection shortcuts
-      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        e.preventDefault()
-        handleSelectAllRef.current?.()
-        return
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && selectedExpensesRef.current.size > 0) {
-        e.preventDefault()
-        setShowDeleteConfirm(true)
-        return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') { e.preventDefault(); searchInputRef.current?.focus() }
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); setShowForm(true) }
@@ -615,21 +489,6 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      {/* Success/Error Toasts */}
-      {success && (
-        <div className="fixed top-4 right-4 z-50 bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 px-4 py-3 rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2">
-          <CheckCircle className="w-5 h-5" />
-          <span>{success}</span>
-        </div>
-      )}
-      {error && (
-        <div className="fixed top-4 right-4 z-50 bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2">
-          <AlertCircle className="w-5 h-5" />
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-2 hover:text-white"><X className="w-4 h-4" /></button>
-        </div>
-      )}
-
       {/* Header */}
       <div className="bg-slate-800/50 border-b border-slate-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -894,21 +753,6 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <table className="w-full">
                 <thead className="bg-slate-700/50">
                   <tr>
-                    <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm">
-                      <button
-                        onClick={handleSelectAll}
-                        className="flex items-center gap-2 hover:text-amber-400 transition-colors"
-                        title="Select all (Ctrl+A)"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedExpenses.size === filteredExpenses.length && filteredExpenses.length > 0}
-                          onChange={handleSelectAll}
-                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </button>
-                    </th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm cursor-pointer hover:text-white transition-colors" onClick={() => { setSortBy('category'); setSortOrder(sortBy === 'category' && sortOrder === 'asc' ? 'desc' : 'asc') }}>
                       Category {sortBy === 'category' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
                     </th>
@@ -928,22 +772,14 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
                 </thead>
                 <tbody>
                   {filteredExpenses.length === 0 ? (
-                    <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400"><Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No expenses found</p></td></tr>
+                    <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-400"><Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No expenses found</p></td></tr>
                   ) : (
                     filteredExpenses.map(expense => {
                       const catInfo = getCategoryInfo(expense.category)
                       const statusInfo = getStatusInfo(expense.status)
                       const Icon = catInfo.icon
                       return (
-                        <tr key={expense.id} className={`border-t border-slate-700 hover:bg-slate-700/30 transition-colors ${selectedExpenses.has(expense.id) ? 'bg-amber-500/10 ring-1 ring-amber-500/30' : ''}`}>
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedExpenses.has(expense.id)}
-                              onChange={() => handleToggleSelect(expense.id)}
-                              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0"
-                            />
-                          </td>
+                        <tr key={expense.id} className="border-t border-slate-700 hover:bg-slate-700/30">
                           <td className="px-4 py-3"><div className="flex items-center gap-2"><Icon className="w-4 h-4" style={{ color: catInfo.color }} /><span className="text-sm">{catInfo.label}</span></div></td>
                           <td className="px-4 py-3">
                             <div>
@@ -971,97 +807,6 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
             </div>
           </div>
         )}
-
-        {/* Bulk Actions Floating Toolbar */}
-        {showBulkActions && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-            <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 flex items-center gap-4 px-6 py-3 animate-in slide-in-from-bottom-4">
-              <div className="flex items-center gap-2">
-                <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-medium">
-                  {selectedExpenses.size} selected
-                </span>
-              </div>
-              
-              <div className="h-6 w-px bg-slate-700" />
-              
-              {/* Change Status Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Change Status
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showBulkStatusMenu ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showBulkStatusMenu && (
-                  <div className="absolute bottom-full mb-2 left-0 bg-slate-700 border border-slate-600 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
-                    {STATUS_OPTIONS.map((status) => (
-                      <button
-                        key={status.key}
-                        onClick={() => handleBulkChangeStatus(status.key)}
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-slate-600 transition-colors flex items-center gap-2"
-                      >
-                        <span 
-                          className="w-2 h-2 rounded-full" 
-                          style={{ backgroundColor: status.color }}
-                        />
-                        {status.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Delete Button */}
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-              
-              {/* Clear Selection */}
-              <button
-                onClick={handleClearSelection}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-700 rounded-lg text-sm text-slate-400 hover:text-white transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm">
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <Trash2 className="w-8 h-8 text-red-400" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Delete Expenses?</h3>
-                <p className="text-slate-400 mb-6">Are you sure you want to delete {selectedExpenses.size} selected expense(s)? This action cannot be undone.</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Keyboard Shortcuts Help Modal */}
@@ -1081,14 +826,6 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <div className="flex items-center justify-between"><span className="text-slate-300">Export menu</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+E</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Close modal / Clear</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Esc</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Show shortcuts</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">?</kbd></div>
-              
-              {/* Bulk Selection Shortcuts */}
-              <div className="pt-2 border-t border-slate-700">
-                <div className="text-xs font-medium text-amber-400 uppercase tracking-wider mb-2">Bulk Selection</div>
-              </div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Select all visible</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+A</kbd></div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Delete selected</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+D</kbd></div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Clear selection</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Esc</kbd></div>
             </div>
           </div>
         </div>

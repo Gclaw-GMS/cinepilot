@@ -368,16 +368,18 @@ export default function AIToolsPage() {
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'name' | 'category' | 'desc'>('name')
+  const [sortBy, setSortBy] = useState<'name' | 'category' | 'description'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [showSortPanel, setShowSortPanel] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const printMenuRef = useRef<HTMLDivElement>(null)
-  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const sortPanelRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
   
   // Refs for keyboard shortcuts
@@ -388,6 +390,10 @@ export default function AIToolsPage() {
   // Refs to store latest values for handlePrint function
   const filteredToolsRef = useRef<typeof tools>([])
   const allCategoriesRef = useRef<string[]>([])
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+  const searchQueryRef = useRef(searchQuery)
+  const categoryFilterRef = useRef(categoryFilter)
 
   // Fetch tools from API on mount
   useEffect(() => {
@@ -465,6 +471,14 @@ export default function AIToolsPage() {
     const exportData = {
       exportDate: new Date().toISOString(),
       totalTools: filteredTools.length,
+      filters: {
+        search: searchQuery || null,
+        category: categoryFilter !== 'all' ? categoryFilter : null,
+      },
+      sort: {
+        by: sortBy,
+        order: sortOrder,
+      },
       categories: allCategories,
       tools: filteredTools.map(tool => ({
         name: tool.name,
@@ -496,11 +510,24 @@ export default function AIToolsPage() {
 
     const currentFilteredTools = filteredToolsRef.current
     const currentAllCategories = allCategoriesRef.current
+    const currentSortBy = sortByRef.current
+    const currentSortOrder = sortOrderRef.current
+    const currentSearchQuery = searchQueryRef.current
+    const currentCategoryFilter = categoryFilterRef.current
     
     const toolCategories = currentAllCategories.reduce((acc: Record<string, number>, cat) => {
       acc[cat] = currentFilteredTools.filter(t => t.category === cat).length
       return acc
     }, {})
+    
+    // Build filter info string
+    const filterParts = []
+    if (currentSearchQuery) filterParts.push(`Search: "${currentSearchQuery}"`)
+    if (currentCategoryFilter !== 'all') filterParts.push(`Category: ${currentCategoryFilter}`)
+    if (currentSortBy !== 'name' || currentSortOrder !== 'asc') {
+      filterParts.push(`Sort: ${currentSortBy} (${currentSortOrder})`)
+    }
+    const filterInfo = filterParts.length > 0 ? filterParts.join(' | ') : 'None'
 
     const html = `<!DOCTYPE html>
 <html>
@@ -541,6 +568,9 @@ export default function AIToolsPage() {
   <div class="header">
     <h1>🤖 CinePilot - AI Tools Report</h1>
     <div class="timestamp">Generated: ${timestamp}</div>
+  </div>
+  <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
+    <strong>Filters & Sort:</strong> ${filterInfo}
   </div>
   <div class="stats">
     <div class="stat">
@@ -611,7 +641,7 @@ export default function AIToolsPage() {
     handlePrintRef.current = handlePrint
   }, [handlePrint])
 
-  // Click outside to close export menu
+  // Click outside to close menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -623,10 +653,13 @@ export default function AIToolsPage() {
       if (showFilterPanel && filterRef.current && !filterRef.current.contains(e.target as Node)) {
         setShowFilterPanel(false)
       }
+      if (showSortPanel && sortPanelRef.current && !sortPanelRef.current.contains(e.target as Node)) {
+        setShowSortPanel(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportMenu, showPrintMenu, showFilterPanel])
+  }, [showExportMenu, showPrintMenu, showFilterPanel, showSortPanel])
 
   // Keyboard shortcuts handler
   useEffect(() => {
@@ -641,7 +674,7 @@ export default function AIToolsPage() {
         setShowFilterPanel(!showFilterPanel)
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
-        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         handleRefresh()
@@ -662,6 +695,7 @@ export default function AIToolsPage() {
         setShowExportMenu(false)
         setShowPrintMenu(false)
         setShowFilterPanel(false)
+        setShowSortPanel(false)
         setSearchQuery('')
         setSortBy('name')
         setSortOrder('asc')
@@ -670,11 +704,20 @@ export default function AIToolsPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, showFilterPanel])
+  }, [handleRefresh, showFilterPanel, sortOrder])
+
+  // Active filter count (includes sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (categoryFilter !== 'all') count++
+    if (searchQuery.trim()) count++
+    if (sortBy !== 'name' || sortOrder !== 'asc') count++
+    return count
+  }, [categoryFilter, searchQuery, sortBy, sortOrder])
 
   // Convert tools to renderable format with search, category filtering, and sorting
   const filteredTools = useMemo(() => {
-    const filtered = tools.filter(t => {
+    let result = tools.filter(t => {
       const matchesSearch = !searchQuery.trim() || 
         t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -684,17 +727,23 @@ export default function AIToolsPage() {
     })
     
     // Apply sorting
-    return [...filtered].sort((a, b) => {
+    result = [...result].sort((a, b) => {
       let comparison = 0
-      if (sortBy === 'name') {
-        comparison = a.name.localeCompare(b.name)
-      } else if (sortBy === 'category') {
-        comparison = a.category.localeCompare(b.category)
-      } else if (sortBy === 'desc') {
-        comparison = a.desc.length - b.desc.length
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'category':
+          comparison = a.category.localeCompare(b.category)
+          break
+        case 'description':
+          comparison = a.desc.localeCompare(b.desc)
+          break
       }
       return sortOrder === 'asc' ? comparison : -comparison
     })
+    
+    return result
   }, [tools, searchQuery, categoryFilter, sortBy, sortOrder])
   
   const aiFeatures = filteredTools.map(apiToolToFeature)
@@ -734,7 +783,11 @@ export default function AIToolsPage() {
   useEffect(() => {
     filteredToolsRef.current = filteredTools
     allCategoriesRef.current = allCategories
-  }, [filteredTools, allCategories])
+    sortByRef.current = sortBy
+    sortOrderRef.current = sortOrder
+    searchQueryRef.current = searchQuery
+    categoryFilterRef.current = categoryFilter
+  }, [filteredTools, allCategories, sortBy, sortOrder, searchQuery, categoryFilter])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -764,45 +817,47 @@ export default function AIToolsPage() {
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600">(/)</span>
               </div>
               
-              {/* Filter Toggle Button */}
-              <div className="relative" ref={filterRef}>
-                <button 
-                  onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
-                    categoryFilter !== 'all' || sortBy !== 'name' || sortOrder !== 'asc'
-                      ? 'bg-indigo-500 text-white' 
-                      : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
-                  }`}
-                  title="Toggle filters (F)"
-                >
-                  <Search className="w-4 h-4" />
-                  <span className="text-sm">Filters</span>
-                  {(categoryFilter !== 'all' || sortBy !== 'name' || sortOrder !== 'asc') && (
-                    <span className="ml-1 px-1.5 py-0.5 bg-white text-indigo-500 text-xs rounded-full">
-                      {(categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)}
-                    </span>
-                  )}
-                </button>
-                {showFilterPanel && (
-                  <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-                    <div className="p-4 border-b border-slate-700">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold">Filter & Sort</h3>
-                        {(categoryFilter !== 'all' || sortBy !== 'name' || sortOrder !== 'asc') && (
-                          <button 
-                            onClick={() => { setCategoryFilter('all'); setSortBy('name'); setSortOrder('asc'); }}
-                            className="text-xs text-indigo-400 hover:text-indigo-300"
-                          >
-                            Clear All
-                          </button>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Category</label>
-                        <select 
-                          value={categoryFilter} 
-                          onChange={(e) => setCategoryFilter(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+              {/* Filter & Sort Toggle Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Filter Toggle Button */}
+                <div className="relative" ref={filterRef}>
+                  <button 
+                    onClick={() => setShowFilterPanel(!showFilterPanel)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                      categoryFilter !== 'all' || searchQuery.trim()
+                        ? 'bg-indigo-500 text-white' 
+                        : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                    }`}
+                    title="Toggle filters (F)"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span className="text-sm">Filters</span>
+                    {(categoryFilter !== 'all' || searchQuery.trim()) && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-white text-indigo-500 text-xs rounded-full">
+                        {(categoryFilter !== 'all' ? 1 : 0) + (searchQuery.trim() ? 1 : 0)}
+                      </span>
+                    )}
+                  </button>
+                  {showFilterPanel && (
+                    <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className="p-4 border-b border-slate-700">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold">Filter Tools</h3>
+                          {categoryFilter !== 'all' && (
+                            <button 
+                              onClick={() => setCategoryFilter('all')}
+                              className="text-xs text-indigo-400 hover:text-indigo-300"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Category</label>
+                          <select 
+                            value={categoryFilter} 
+                            onChange={(e) => setCategoryFilter(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                         >
                           <option value="all">All Categories</option>
                           {categories.length > 0 ? categories.map(cat => (
@@ -818,34 +873,74 @@ export default function AIToolsPage() {
                           )}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Sort By</label>
-                        <select 
-                          value={sortBy} 
-                          onChange={(e) => setSortBy(e.target.value as 'name' | 'category' | 'desc')}
-                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                        >
-                          <option value="name">Name</option>
-                          <option value="category">Category</option>
-                          <option value="desc">Description Length</option>
-                        </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Sort Toggle Button */}
+              <div className="relative" ref={sortPanelRef}>
+                <button 
+                  onClick={() => setShowSortPanel(!showSortPanel)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                    sortBy !== 'name' || sortOrder !== 'asc'
+                      ? 'bg-indigo-500 text-white' 
+                      : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                  }`}
+                  title="Toggle sort (S)"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="text-sm">Sort</span>
+                  {sortBy !== 'name' || sortOrder !== 'asc' ? (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white text-indigo-500 text-xs rounded-full">1</span>
+                  ) : null}
+                </button>
+                {showSortPanel && (
+                  <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="p-4 border-b border-slate-700">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold">Sort Tools</h3>
+                        {(sortBy !== 'name' || sortOrder !== 'asc') && (
+                          <button 
+                            onClick={() => { setSortBy('name'); setSortOrder('asc') }}
+                            className="text-xs text-indigo-400 hover:text-indigo-300"
+                          >
+                            Reset
+                          </button>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-400">Sort Order</span>
-                        <button
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Sort By</label>
+                          <select 
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                          >
+                            <option value="name">Name</option>
+                            <option value="category">Category</option>
+                            <option value="description">Description</option>
+                          </select>
+                        </div>
+                        <button 
                           onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
-                            sortBy !== 'name' || sortOrder !== 'asc'
-                              ? 'bg-indigo-500 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition ${
+                            sortOrder === 'asc' 
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                              : 'bg-amber-600 hover:bg-amber-500 text-white'
                           }`}
                         >
-                          {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+                          {sortOrder === 'asc' ? (
+                            <>↑ Ascending</>
+                          ) : (
+                            <>↓ Descending</>
+                          )}
                         </button>
                       </div>
                     </div>
                   </div>
                 )}
+              </div>
               </div>
               
               {/* Refresh Button */}

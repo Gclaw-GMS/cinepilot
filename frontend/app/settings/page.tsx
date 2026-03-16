@@ -20,6 +20,7 @@ import {
   X,
   Printer,
   Download,
+  Filter,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -120,7 +121,10 @@ export default function SettingsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
   const printMenuRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSettings = useCallback(async () => {
@@ -198,20 +202,37 @@ export default function SettingsPage() {
         handlePrintRef.current?.();
       }
 
+      // F: Toggle filters
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        setShowFilterPanel(!showFilterPanel);
+      }
+
       // Escape: Close modal
       if (e.key === 'Escape') {
         setShowShortcuts(false);
         setShowPrintMenu(false);
+        setShowFilterPanel(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchSettings]);
+  }, [fetchSettings, showFilterPanel]);
 
   const set = useCallback((key: string, value: unknown) => {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-  }, []);
+    setLocal((prev) => ({ ...prev, [key]: value }))
+    
+    // Immediately apply theme change
+    if (key === 'theme') {
+      const theme = value as 'dark' | 'light' | 'system'
+      // Call global theme setter if available
+      const globalSetTheme = (window as Window & { __setTheme?: (theme: string) => void }).__setTheme
+      if (globalSetTheme) {
+        globalSetTheme(theme)
+      }
+    }
+  }, [])
 
   const get = useCallback((key: string): unknown => {
     return local[key] ?? settings[key];
@@ -343,16 +364,19 @@ export default function SettingsPage() {
     handlePrintRef.current = handlePrint;
   }, [handlePrint]);
 
-  // Click outside to close print menu
+  // Click outside to close print menu and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false);
       }
+      if (showFilterPanel && filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPrintMenu]);
+  }, [showPrintMenu, showFilterPanel]);
 
   if (loading) {
     return (
@@ -392,6 +416,91 @@ export default function SettingsPage() {
                 >
                   <X className="w-3 h-3 text-slate-500" />
                 </button>
+              )}
+            </div>
+            {/* Filter Toggle Button */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                  activeFilter !== 'all'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                }`}
+                title="Toggle filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="text-sm">Filters</span>
+                {activeFilter !== 'all' && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-white text-emerald-500 text-xs rounded-full">1</span>
+                )}
+              </button>
+              {showFilterPanel && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-3 border-b border-slate-700">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">Filter Settings</span>
+                      {activeFilter !== 'all' && (
+                        <button
+                          onClick={() => setActiveFilter('all')}
+                          className="text-xs text-emerald-400 hover:text-emerald-300"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <button
+                      onClick={() => { setActiveFilter('all'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      All Settings
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('language'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'language' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Language & Region
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('ai'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'ai' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      AI & Language
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('appearance'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'appearance' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Appearance
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('notifications'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'notifications' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Notifications
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('production'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'production' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Production
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
             <button
@@ -717,6 +826,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               {[
                 { key: '/', action: 'Focus search' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
                 { key: 'P', action: 'Print settings' },

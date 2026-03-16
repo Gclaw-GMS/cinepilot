@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   User, Shirt, Palette, Sparkles, Plus, Edit2, Trash2, 
   Users, Calendar, Download, Filter, Search, Loader2,
@@ -120,11 +120,13 @@ export default function CharacterCostumePage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('all')
-  const [sortBy, setSortBy] = useState<'name' | 'role' | 'age' | 'budget' | 'status'>('name')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [exporting, setExporting] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'role' | 'status' | 'budget' | 'gender'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -177,9 +179,9 @@ export default function CharacterCostumePage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
-        case 'f':
+        case 's':
           e.preventDefault()
-          setShowFilters(prev => !prev)
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case '/':
           e.preventDefault()
@@ -198,10 +200,6 @@ export default function CharacterCostumePage() {
           // Focus the role filter dropdown
           const roleSelect = document.querySelector('select') as HTMLSelectElement
           roleSelect?.focus()
-          break
-        case 's':
-          e.preventDefault()
-          toggleSortOrder()
           break
         case '?':
           e.preventDefault()
@@ -242,7 +240,7 @@ export default function CharacterCostumePage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showFilters, filterRole, filterStatus, sortOrder])
+  }, [showForm, showFilters, filterRole, filterStatus, sortBy, sortOrder])
 
   // Click outside handler for export menu and filter panel
   useEffect(() => {
@@ -293,7 +291,7 @@ export default function CharacterCostumePage() {
   const handleExportCSV = () => {
     setExporting(true)
     const headers = ['Name', 'Age', 'Gender', 'Role', 'Appearance', 'Personality', 'Costume Style', 'Fabrics', 'Color Palette', 'Description', 'Designer', 'Budget', 'Status']
-    const rows = sortedCharacters.map(char => [
+    const rows = filteredCharacters.map(char => [
       char.name,
       char.age,
       char.gender,
@@ -327,17 +325,13 @@ export default function CharacterCostumePage() {
     setExporting(true)
     const exportData = {
       exportDate: new Date().toISOString(),
-      totalCharacters: sortedCharacters.length,
+      totalCharacters: filteredCharacters.length,
       summary: summary ? {
         totalCharacters: summary.totalCharacters,
         byRole: summary.byRole,
         totalBudget: summary.totalBudget,
       } : null,
-      sortBy,
-      sortOrder,
-      filterRole,
-      filterStatus,
-      characters: sortedCharacters.map(char => ({
+      characters: filteredCharacters.map(char => ({
         name: char.name,
         age: char.age,
         gender: char.gender,
@@ -481,7 +475,7 @@ export default function CharacterCostumePage() {
         </tr>
       </thead>
       <tbody>
-        ${sortedCharacters.map(char => `
+        ${filteredCharacters.map(char => `
           <tr>
             <td class="character-name">${char.name}</td>
             <td><span class="badge badge-${char.role}">${char.role}</span></td>
@@ -586,52 +580,57 @@ export default function CharacterCostumePage() {
     setFormData({ ...formData, [field]: updated })
   }
 
-  // Apply filtering
-  const filteredCharacters = characters.filter(char => {
-    const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = filterRole === 'all' || char.role === filterRole
-    const matchesStatus = filterStatus === 'all' || char.status === filterStatus
-    return matchesSearch && matchesRole && matchesStatus
-  })
+  // Filter and sort characters using useMemo for performance
+  const filteredCharacters = useMemo(() => {
+    let result = characters.filter(char => {
+      const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        char.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesRole = filterRole === 'all' || char.role === filterRole
+      const matchesStatus = filterStatus === 'all' || char.status === filterStatus
+      return matchesSearch && matchesRole && matchesStatus
+    })
+    
+    // Apply sorting
+    const sorted = [...result].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'role':
+          comparison = a.role.localeCompare(b.role)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'budget':
+          comparison = (a.estimatedBudget || 0) - (b.estimatedBudget || 0)
+          break
+        case 'gender':
+          comparison = a.gender.localeCompare(b.gender)
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return sorted
+  }, [characters, searchTerm, filterRole, filterStatus, sortBy, sortOrder])
 
-  // Apply sorting
-  const sortedCharacters = [...filteredCharacters].sort((a, b) => {
-    let comparison = 0
-    switch (sortBy) {
-      case 'name':
-        comparison = a.name.localeCompare(b.name)
-        break
-      case 'role':
-        comparison = a.role.localeCompare(b.role)
-        break
-      case 'age':
-        comparison = (a.ageNumber || 0) - (b.ageNumber || 0)
-        break
-      case 'budget':
-        comparison = (a.estimatedBudget || 0) - (b.estimatedBudget || 0)
-        break
-      case 'status':
-        comparison = a.status.localeCompare(b.status)
-        break
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  })
+  // Calculate active filter count (including sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0)
+    if (sortBy !== 'name' || sortOrder !== 'asc') count++
+    return count
+  }, [filterRole, filterStatus, sortBy, sortOrder])
 
-  // Calculate active filter count
-  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
-
-  // Clear all filters
+  // Clear all filters and sort
   const clearFilters = () => {
     setFilterRole('all')
     setFilterStatus('all')
     setSortBy('name')
     setSortOrder('asc')
-  }
-
-  // Toggle sort order
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
   const roleData = summary ? Object.entries(summary.byRole).map(([name, value]) => ({
@@ -789,11 +788,11 @@ export default function CharacterCostumePage() {
                   </span>
                 )}
               </button>
-              {/* Filter Panel */}
+              {/* Filter & Sort Panel */}
               {showFilters && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-medium">Filters</span>
+                    <span className="text-sm font-medium">Filter & Sort</span>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -803,42 +802,69 @@ export default function CharacterCostumePage() {
                       </button>
                     )}
                   </div>
-                  <div className="p-4">
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Role</label>
-                    <select
-                      value={filterRole}
-                      onChange={(e) => setFilterRole(e.target.value)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="all">All Roles</option>
-                      <option value="protagonist">Protagonist</option>
-                      <option value="antagonist">Antagonist</option>
-                      <option value="supporting">Supporting</option>
-                      <option value="comic">Comic</option>
-                      <option value="romantic">Romantic</option>
-                      <option value="mentor">Mentor</option>
-                      <option value="tragic">Tragic</option>
-                    </select>
-                  </div>
-                  <div className="p-4 border-t border-slate-700">
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Sort By</label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 mb-2"
-                    >
-                      <option value="name">Name</option>
-                      <option value="role">Role</option>
-                      <option value="age">Age</option>
-                      <option value="budget">Budget</option>
-                      <option value="status">Status</option>
-                    </select>
-                    <button
-                      onClick={toggleSortOrder}
-                      className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
-                    >
-                      {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
-                    </button>
+                  <div className="p-4 space-y-4">
+                    {/* Role Filter */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Role</label>
+                      <select
+                        value={filterRole}
+                        onChange={(e) => setFilterRole(e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="all">All Roles</option>
+                        <option value="protagonist">Protagonist</option>
+                        <option value="antagonist">Antagonist</option>
+                        <option value="supporting">Supporting</option>
+                        <option value="comic">Comic</option>
+                        <option value="romantic">Romantic</option>
+                        <option value="mentor">Mentor</option>
+                        <option value="tragic">Tragic</option>
+                      </select>
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Status</label>
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="planning">Planning</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                    
+                    {/* Sort Options */}
+                    <div className="border-t border-slate-700 pt-4">
+                      <label className="text-xs text-purple-400 uppercase tracking-wider block mb-2">Sort By</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="name">Name</option>
+                          <option value="role">Role</option>
+                          <option value="status">Status</option>
+                          <option value="budget">Budget</option>
+                          <option value="gender">Gender</option>
+                        </select>
+                        <button
+                          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            sortOrder === 'asc' 
+                              ? 'bg-purple-600 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                          title="Toggle sort order (S)"
+                        >
+                          {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1108,14 +1134,14 @@ export default function CharacterCostumePage() {
           <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-400">
             {error}
           </div>
-        ) : sortedCharacters.length === 0 ? (
+        ) : filteredCharacters.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
             <p className="text-slate-400">No characters found. Add your first character!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedCharacters.map((char) => (
+            {filteredCharacters.map((char) => (
               <div
                 key={char.id}
                 className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden hover:border-purple-500/50 transition-colors"

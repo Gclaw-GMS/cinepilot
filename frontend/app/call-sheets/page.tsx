@@ -5,7 +5,7 @@ import {
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
   Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2,
-  Keyboard, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Copy
+  Keyboard, Search, Filter
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -60,13 +60,6 @@ export default function CallSheetsPage() {
   const [callSheets, setCallSheets] = useState<CallSheet[]>([])
   const [crew, setCrew] = useState<CrewMember[]>([])
   const [selected, setSelected] = useState<CallSheet | null>(null)
-  
-  // Bulk selection state
-  const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set())
-  const [showBulkActions, setShowBulkActions] = useState(false)
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
-  const [bulkDeleting, setBulkDeleting] = useState(false)
-  
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +73,7 @@ export default function CallSheetsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterLocation, setFilterLocation] = useState('all')
   const [filterMonth, setFilterMonth] = useState('all')
-  const [sortBy, setSortBy] = useState<'date' | 'title' | 'location' | 'callTime'>('date')
+  const [sortBy, setSortBy] = useState<'date' | 'title' | 'location'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -88,10 +81,8 @@ export default function CallSheetsPage() {
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
   const deleteSheetRef = useRef<(id: string) => Promise<void>>()
-  const duplicateSheetRef = useRef<(sheet: CallSheet) => Promise<void>>()
   const startEditingRef = useRef<() => void>()
   const cancelEditingRef = useRef<() => void>()
-  const toggleSortOrderRef = useRef<() => void>()
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -102,88 +93,6 @@ export default function CallSheetsPage() {
   const [newScene, setNewScene] = useState('')
   const [newCrewMember, setNewCrewMember] = useState('')
   const [showAddCrew, setShowAddCrew] = useState(false)
-
-  // Bulk selection helpers - use refs to avoid dependency issues
-  const selectedSheetsRef = useRef(selectedSheets)
-  const showBulkActionsRef = useRef(showBulkActions)
-  const showBulkDeleteConfirmRef = useRef(showBulkDeleteConfirm)
-  const clearSelectionRef = useRef<() => void>(() => {})
-
-  // Update refs when state changes
-  useEffect(() => {
-    selectedSheetsRef.current = selectedSheets
-  }, [selectedSheets])
-
-  useEffect(() => {
-    showBulkActionsRef.current = showBulkActions
-  }, [showBulkActions])
-
-  useEffect(() => {
-    showBulkDeleteConfirmRef.current = showBulkDeleteConfirm
-  }, [showBulkDeleteConfirm])
-
-  const toggleSheetSelection = useCallback((id: string) => {
-    setSelectedSheets(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }, [])
-
-  const selectAllSheets = useCallback(() => {
-    // This will be called after filteredCallSheets is defined
-    // We'll handle it in a useEffect
-  }, [])
-
-  const selectAllSheetsRef = useRef(selectAllSheets)
-  selectAllSheetsRef.current = selectAllSheets
-
-  const clearSelection = useCallback(() => {
-    setSelectedSheets(new Set())
-    setShowBulkActions(false)
-  }, [])
-
-  // Update clearSelection ref after function is defined
-  useEffect(() => {
-    clearSelectionRef.current = clearSelection
-  }, [clearSelection])
-
-  const handleBulkDelete = useCallback(async () => {
-    try {
-      setBulkDeleting(true)
-      const idsToDelete = Array.from(selectedSheets)
-      
-      // Delete each selected call sheet
-      await Promise.all(
-        idsToDelete.map(async (id) => {
-          await fetch('/api/call-sheets', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id }),
-          })
-        })
-      )
-      
-      // Remove deleted sheets from state
-      setCallSheets(prev => prev.filter(sheet => !selectedSheets.has(sheet.id)))
-      setSelectedSheets(new Set())
-      setShowBulkActions(false)
-      setShowBulkDeleteConfirm(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete selected call sheets')
-    } finally {
-      setBulkDeleting(false)
-    }
-  }, [selectedSheets])
-
-  // Update showBulkActions when selection changes
-  useEffect(() => {
-    setShowBulkActions(selectedSheets.size > 0)
-  }, [selectedSheets])
 
   const fetchCallSheets = useCallback(async () => {
     try {
@@ -225,6 +134,11 @@ export default function CallSheetsPage() {
     fetchCrew()
   }, [fetchCallSheets, fetchCrew])
 
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }, [])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -264,7 +178,7 @@ export default function CallSheetsPage() {
         case 's':
           e.preventDefault()
           if (!creating && !isEditing) {
-            toggleSortOrderRef.current?.()
+            toggleSortOrder()
           }
           break
         case 'x':
@@ -277,12 +191,6 @@ export default function CallSheetsPage() {
           e.preventDefault()
           if (selected && !isEditing && !deleting) {
             deleteSheetRef.current?.(selected.id)
-          }
-          break
-        case 'c':
-          e.preventDefault()
-          if (selected && !isEditing && !creating) {
-            duplicateSheetRef.current?.(selected)
           }
           break
         case 'p':
@@ -303,33 +211,12 @@ export default function CallSheetsPage() {
             setShowExportMenu(false)
           } else if (showFilters) {
             setShowFilters(false)
-          } else if (showBulkDeleteConfirmRef.current) {
-            setShowBulkDeleteConfirm(false)
-          } else if (showBulkActionsRef.current) {
-            clearSelectionRef.current?.()
           } else if (isEditing) {
             cancelEditingRef.current?.()
           } else {
-            // Reset sort to default when no modal/panel is open
+            // Reset sort to default
             setSortBy('date')
             setSortOrder('desc')
-          }
-          break
-        default:
-          // Bulk selection shortcuts (Ctrl/Cmd + key)
-          if (e.ctrlKey || e.metaKey) {
-            switch (e.key.toLowerCase()) {
-              case 'a':
-                e.preventDefault()
-                selectAllSheetsRef.current()
-                break
-              case 'd':
-                e.preventDefault()
-                if (selectedSheetsRef.current.size > 0 && !showBulkDeleteConfirmRef.current) {
-                  setShowBulkDeleteConfirm(true)
-                }
-                break
-            }
           }
           break
       }
@@ -337,7 +224,7 @@ export default function CallSheetsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets])
+  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets, toggleSortOrder])
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -388,7 +275,6 @@ export default function CallSheetsPage() {
     // Apply sorting
     result = [...result].sort((a, b) => {
       let comparison = 0
-      
       switch (sortBy) {
         case 'date':
           comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -399,38 +285,12 @@ export default function CallSheetsPage() {
         case 'location':
           comparison = (a.content?.location || '').localeCompare(b.content?.location || '')
           break
-        case 'callTime':
-          comparison = (a.content?.callTime || '').localeCompare(b.content?.callTime || '')
-          break
       }
-      
       return sortOrder === 'asc' ? comparison : -comparison
     })
     
     return result
   }, [callSheets, searchQuery, filterLocation, filterMonth, sortBy, sortOrder])
-
-  // Bulk select all function - defined after filteredCallSheets
-  const handleSelectAllSheets = useCallback(() => {
-    if (selectedSheets.size === filteredCallSheets.length) {
-      setSelectedSheets(new Set())
-    } else {
-      setSelectedSheets(new Set(filteredCallSheets.map(s => s.id)))
-    }
-  }, [filteredCallSheets, selectedSheets.size])
-
-  // Update the ref
-  selectAllSheetsRef.current = handleSelectAllSheets
-
-  // Active filter count
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (searchQuery) count++
-    if (filterLocation !== 'all') count++
-    if (filterMonth !== 'all') count++
-    if (sortBy !== 'date' || sortOrder !== 'desc') count++
-    return count
-  }, [searchQuery, filterLocation, filterMonth, sortBy, sortOrder])
 
   // Get unique locations for filter
   const uniqueLocations = useMemo(() => {
@@ -455,18 +315,22 @@ export default function CallSheetsPage() {
     return Array.from(months).sort().reverse()
   }, [callSheets])
 
-  // Clear all filters
+  // Active filter count (includes sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterLocation !== 'all') count++
+    if (filterMonth !== 'all') count++
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++
+    return count
+  }, [filterLocation, filterMonth, sortBy, sortOrder])
+
+  // Clear all filters and sort
   const clearFilters = () => {
     setFilterLocation('all')
     setFilterMonth('all')
     setSortBy('date')
     setSortOrder('desc')
   }
-
-  // Toggle sort order
-  const toggleSortOrder = useCallback(() => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }, [])
 
   const createNew = async () => {
     try {
@@ -540,42 +404,6 @@ export default function CallSheetsPage() {
     }
   }, [selected, setCallSheets, setSelected, setIsEditing, setError, setDeleting])
 
-  // Duplicate call sheet function
-  const duplicateSheet = useCallback(async (sheet: CallSheet) => {
-    try {
-      setLoading(true)
-      const newTitle = sheet.title ? `${sheet.title} (Copy)` : `Call Sheet - Copy`
-      const newDate = new Date()
-      newDate.setDate(newDate.getDate() + 1) // Default to next day
-      const dateStr = newDate.toISOString().split('T')[0]
-      
-      const res = await fetch('/api/call-sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newTitle,
-          date: dateStr,
-          content: sheet.content || {},
-          notes: sheet.notes || '',
-          projectId: sheet.projectId,
-          shootingDayId: sheet.shootingDayId,
-        }),
-      })
-      
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? 'Failed to duplicate call sheet')
-      }
-      
-      const newSheet = await res.json()
-      setCallSheets(prev => [newSheet, ...prev])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to duplicate call sheet')
-    } finally {
-      setLoading(false)
-    }
-  }, [setCallSheets, setError, setLoading])
-
   const selectSheet = (sheet: CallSheet) => {
     setSelected(sheet)
     setIsEditing(false)
@@ -616,20 +444,12 @@ export default function CallSheetsPage() {
   }, [deleteSheet])
 
   useEffect(() => {
-    duplicateSheetRef.current = duplicateSheet
-  }, [duplicateSheet])
-
-  useEffect(() => {
     startEditingRef.current = startEditing
   }, [startEditing])
 
   useEffect(() => {
     cancelEditingRef.current = cancelEditing
   }, [cancelEditing])
-
-  useEffect(() => {
-    toggleSortOrderRef.current = toggleSortOrder
-  }, [toggleSortOrder])
 
   const saveChanges = async () => {
     if (!selected) return
@@ -913,7 +733,7 @@ export default function CallSheetsPage() {
                   ? 'bg-cyan-600 border-cyan-500 text-white'
                   : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
               }`}
-              title="Filter (F)"
+              title="Filter & Sort (F)"
             >
               <Filter className="w-4 h-4" />
               {activeFilterCount > 0 && (
@@ -938,24 +758,27 @@ export default function CallSheetsPage() {
                 <div className="p-4 space-y-4">
                   {/* Sort Options */}
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Sort By</label>
+                    <label className="text-xs text-cyan-500 uppercase tracking-wider block mb-2">Sort By</label>
                     <div className="flex gap-2">
                       <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as 'date' | 'title' | 'location' | 'callTime')}
+                        onChange={(e) => setSortBy(e.target.value as 'date' | 'title' | 'location')}
                         className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                       >
                         <option value="date">Date</option>
                         <option value="title">Title</option>
                         <option value="location">Location</option>
-                        <option value="callTime">Call Time</option>
                       </select>
                       <button
                         onClick={toggleSortOrder}
-                        className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white flex items-center gap-1 transition-colors"
-                        title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          sortOrder === 'asc' 
+                            ? 'bg-cyan-600 text-white hover:bg-cyan-500' 
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Toggle sort order (S)"
                       >
-                        {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                        {sortOrder === 'asc' ? 'ASC' : 'DESC'}
                       </button>
                     </div>
                   </div>
@@ -1121,71 +944,6 @@ export default function CallSheetsPage() {
         </div>
       )}
 
-      {/* Bulk Actions Toolbar */}
-      {showBulkActions && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-cyan-900/95 backdrop-blur-sm border border-cyan-500/50 rounded-xl p-4 shadow-2xl z-40 flex items-center gap-4">
-          <div className="flex items-center gap-2 text-white font-medium">
-            <input
-              type="checkbox"
-              checked={true}
-              onChange={clearSelection}
-              className="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-700"
-            />
-            <span>{selectedSheets.size} selected</span>
-          </div>
-          
-          <div className="w-px h-6 bg-cyan-700"></div>
-          
-          <button
-            onClick={() => setShowBulkDeleteConfirm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete
-          </button>
-          
-          <button
-            onClick={clearSelection}
-            className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
-      {/* Bulk Delete Confirmation Modal */}
-      {showBulkDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowBulkDeleteConfirm(false)}>
-          <div className="bg-slate-900 border border-red-500/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Delete Selected Call Sheets</h3>
-            </div>
-            <p className="text-slate-400 mb-6">
-              Are you sure you want to delete {selectedSheets.size} selected call sheet{selectedSheets.size > 1 ? 's' : ''}? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowBulkDeleteConfirm(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkDeleting}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
-                {bulkDeleting && <RefreshCw className="w-4 h-4 animate-spin" />}
-                Delete {selectedSheets.size} Call Sheet{selectedSheets.size > 1 ? 's' : ''}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-3 gap-6 p-6">
         {/* Sidebar - Call Sheet List */}
         <div className="col-span-1 bg-slate-900/50 rounded-xl border border-slate-800 p-4">
@@ -1218,44 +976,15 @@ export default function CallSheetsPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {/* Select All Row */}
-              <div className="flex items-center justify-between gap-2 rounded-lg p-2 bg-slate-800/50 border border-slate-700">
-                <button
-                  onClick={handleSelectAllSheets}
-                  className="flex items-center gap-2 text-sm text-slate-300 hover:text-white"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSheets.size === filteredCallSheets.length && filteredCallSheets.length > 0}
-                    onChange={handleSelectAllSheets}
-                    className="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-700"
-                  />
-                  <span className="font-medium">Select All</span>
-                </button>
-                {selectedSheets.size > 0 && (
-                  <span className="text-xs text-cyan-400">{selectedSheets.size} selected</span>
-                )}
-              </div>
-              
               {filteredCallSheets.map((sheet) => (
                 <div
                   key={sheet.id}
                   className={`flex items-center justify-between gap-2 rounded-lg p-3 cursor-pointer transition-all ${
                     selected?.id === sheet.id
                       ? 'bg-cyan-500/20 border-2 border-cyan-500'
-                      : selectedSheets.has(sheet.id)
-                        ? 'bg-cyan-500/10 border-2 border-cyan-500/50'
-                        : 'bg-slate-800 hover:bg-slate-700 border-2 border-transparent'
+                      : 'bg-slate-800 hover:bg-slate-700 border-2 border-transparent'
                   }`}
                 >
-                  {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={selectedSheets.has(sheet.id)}
-                    onChange={() => toggleSheetSelection(sheet.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-slate-700 shrink-0"
-                  />
                   <button
                     onClick={() => selectSheet(sheet)}
                     className="flex-1 text-left min-w-0"
@@ -1266,16 +995,6 @@ export default function CallSheetsPage() {
                     <div className="text-sm text-slate-400 truncate">
                       {sheet.title ?? 'Untitled'}
                     </div>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      duplicateSheet(sheet)
-                    }}
-                    className="p-2 text-slate-400 hover:text-cyan-400 rounded"
-                    title="Duplicate"
-                  >
-                    <Copy className="h-4 w-4" />
                   </button>
                   <button
                     onClick={(e) => {
@@ -1377,14 +1096,6 @@ export default function CallSheetsPage() {
                       >
                         <Edit2 className="w-4 h-4" />
                         Edit
-                      </button>
-                      <button
-                        onClick={() => duplicateSheet(selected)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm"
-                        title="Duplicate this call sheet"
-                      >
-                        <Copy className="w-4 h-4" />
-                        Duplicate
                       </button>
                     </>
                   )}
@@ -1775,39 +1486,18 @@ export default function CallSheetsPage() {
             </div>
 
             <div className="space-y-3">
-              {/* General Shortcuts */}
-              <div className="text-xs text-cyan-400 uppercase tracking-wider mb-2">General</div>
               {[
                 { key: 'R', description: 'Refresh call sheets' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'F', description: 'Toggle filters & sort' },
-                { key: 'S', description: 'Toggle sort order' },
+                { key: 'F', description: 'Toggle filters' },
+                { key: 'S', description: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', description: 'New call sheet' },
                 { key: 'E', description: 'Edit selected sheet' },
-                { key: 'C', description: 'Duplicate selected sheet' },
                 { key: 'X', description: 'Export dropdown menu' },
                 { key: 'D', description: 'Delete selected sheet' },
                 { key: 'P', description: 'Print selected sheet' },
                 { key: '?', description: 'Show keyboard shortcuts' },
                 { key: 'Esc', description: 'Close modal / filters / Cancel editing' },
-              ].map((shortcut) => (
-                <div 
-                  key={shortcut.key}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
-                >
-                  <span className="text-slate-300">{shortcut.description}</span>
-                  <kbd className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-cyan-400 font-mono text-sm font-medium">
-                    {shortcut.key}
-                  </kbd>
-                </div>
-              ))}
-              
-              {/* Bulk Selection Shortcuts */}
-              <div className="text-xs text-cyan-400 uppercase tracking-wider mb-2 mt-4">Selection</div>
-              {[
-                { key: 'Ctrl+A', description: 'Select / Deselect all' },
-                { key: 'Ctrl+D', description: 'Delete selected' },
-                { key: 'Esc', description: 'Clear selection' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

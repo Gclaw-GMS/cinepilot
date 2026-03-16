@@ -100,9 +100,11 @@ export default function ProgressPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in_progress' | 'pending' | 'delayed' | 'blocked'>('all')
   const [filterPriority, setFilterPriority] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
+  
   // Sorting state
-  const [sortBy, setSortBy] = useState<'dueDate' | 'name' | 'status' | 'priority' | 'progress' | 'date'>('dueDate')
+  const [sortBy, setSortBy] = useState<'name' | 'status' | 'priority' | 'progress' | 'date' | 'tasks'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(progress)
@@ -112,15 +114,19 @@ export default function ProgressPage() {
     progressRef.current = progress
   }, [progress])
 
-  // Calculate active filter count
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (sortBy !== 'dueDate' || sortOrder !== 'asc' ? 1 : 0)
+  // Calculate active filter count (includes sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0)
+    if (sortBy !== 'date' || sortOrder !== 'asc') count++
+    return count
+  }, [filterStatus, filterPriority, sortBy, sortOrder])
 
-  // Clear all filters and sort
+  // Clear all filters
   const clearFilters = useCallback(() => {
     setFilterStatus('all')
     setFilterPriority('all')
     setSearchQuery('')
-    setSortBy('dueDate')
+    setSortBy('date')
     setSortOrder('asc')
   }, [])
 
@@ -505,7 +511,7 @@ export default function ProgressPage() {
           setShowPrintMenu(false)
           setShowFilters(false)
           setSearchQuery('')
-          setSortBy('dueDate')
+          setSortBy('date')
           setSortOrder('asc')
           searchInputRef.current?.blur()
           break
@@ -553,10 +559,10 @@ export default function ProgressPage() {
     return { taskStatus, priorityDist, milestoneProgress, phaseProgress }
   }, [progress])
 
-  // Filter tasks based on search, status, and priority filters
+  // Filter and sort tasks based on search, status, priority filters and sort options
   const filteredTasks = useMemo(() => {
     if (!progress?.tasks) return []
-    let tasks = progress.tasks.filter(task => {
+    let result = progress.tasks.filter(task => {
       // Apply status filter
       if (filterStatus !== 'all' && task.status !== filterStatus) {
         return false
@@ -579,40 +585,37 @@ export default function ProgressPage() {
     })
     
     // Apply sorting
-    const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
-    const statusOrder: Record<string, number> = { completed: 4, in_progress: 3, pending: 2, blocked: 1, delayed: 1 }
-    
-    tasks.sort((a, b) => {
+    result.sort((a, b) => {
       let comparison = 0
       switch (sortBy) {
-        case 'dueDate':
-          const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
-          const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
-          comparison = dateA - dateB
-          break
         case 'name':
           comparison = a.name.localeCompare(b.name)
           break
         case 'status':
-          comparison = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0)
+          comparison = a.status.localeCompare(b.status)
           break
         case 'priority':
-          comparison = (priorityOrder[a.priority] || 0) - (priorityOrder[b.priority] || 0)
+          const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 }
+          comparison = (priorityOrder[a.priority as keyof typeof priorityOrder] || 0) - (priorityOrder[b.priority as keyof typeof priorityOrder] || 0)
           break
         case 'progress':
           comparison = a.progress - b.progress
+          break
+        case 'date':
+        default:
+          comparison = (a.dueDate || '').localeCompare(b.dueDate || '')
           break
       }
       return sortOrder === 'asc' ? comparison : -comparison
     })
     
-    return tasks
+    return result
   }, [progress?.tasks, filterStatus, filterPriority, searchQuery, sortBy, sortOrder])
 
-  // Filter milestones based on search and status filters
+  // Filter and sort milestones based on search, status filters and sort options
   const filteredMilestones = useMemo(() => {
     if (!progress?.milestones) return []
-    let milestones = progress.milestones.filter(milestone => {
+    let result = progress.milestones.filter(milestone => {
       // Apply status filter
       if (filterStatus !== 'all' && milestone.status !== filterStatus) {
         return false
@@ -629,32 +632,27 @@ export default function ProgressPage() {
     })
     
     // Apply sorting
-    const statusOrder: Record<string, number> = { completed: 4, in_progress: 3, pending: 2, delayed: 1 }
-    
-    milestones.sort((a, b) => {
+    result.sort((a, b) => {
       let comparison = 0
       switch (sortBy) {
-        case 'dueDate':
-        case 'date':
-          const dateA = new Date(a.date).getTime()
-          const dateB = new Date(b.date).getTime()
-          comparison = dateA - dateB
-          break
         case 'name':
           comparison = a.name.localeCompare(b.name)
           break
         case 'status':
-          comparison = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0)
+          comparison = a.status.localeCompare(b.status)
           break
-        case 'priority':
-        case 'progress':
+        case 'date':
+        default:
+          comparison = a.date.localeCompare(b.date)
+          break
+        case 'tasks':
           comparison = a.tasks - b.tasks
           break
       }
       return sortOrder === 'asc' ? comparison : -comparison
     })
     
-    return milestones
+    return result
   }, [progress?.milestones, filterStatus, searchQuery, sortBy, sortOrder])
 
   const handleInitialize = async () => {
@@ -781,7 +779,7 @@ export default function ProgressPage() {
                   ? 'bg-cyan-500 text-black'
                   : 'bg-slate-800 hover:bg-slate-700'
               }`}
-              title="Toggle Filter & Sort (F)"
+              title="Toggle Filters (F)"
             >
               <Filter className="w-5 h-5" />
               {activeFilterCount > 0 && (
@@ -906,7 +904,7 @@ export default function ProgressPage() {
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
               >
-                <option value="dueDate">Due Date</option>
+                <option value="date">Due Date</option>
                 <option value="name">Name</option>
                 <option value="status">Status</option>
                 <option value="priority">Priority</option>
@@ -918,13 +916,14 @@ export default function ProgressPage() {
               <label className="block text-xs text-slate-500 mb-2">Order</label>
               <button
                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-center gap-2 bg-slate-800 border rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   sortOrder === 'asc' 
-                    ? 'bg-cyan-400/20 text-cyan-400 border border-cyan-400/50' 
-                    : 'bg-slate-800 text-slate-300 border border-slate-700 hover:border-slate-600'
+                    ? 'border-cyan-500 text-cyan-400' 
+                    : 'border-cyan-500 text-cyan-400'
                 }`}
               >
-                {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
+                <span>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                <span>{sortOrder === 'asc' ? 'Ascending' : 'Descending'}</span>
               </button>
             </div>
           </div>
@@ -932,7 +931,7 @@ export default function ProgressPage() {
       )}
 
       {/* Filtered Item Count */}
-      {hasData && (filterStatus !== 'all' || filterPriority !== 'all' || searchQuery || sortBy !== 'dueDate' || sortOrder !== 'asc') && (
+      {hasData && (filterStatus !== 'all' || filterPriority !== 'all' || searchQuery || sortBy !== 'date' || sortOrder !== 'asc') && (
         <div className="mb-4 text-sm text-slate-400 flex items-center gap-2">
           <Filter className="w-4 h-4" />
           Showing <span className="text-cyan-400 font-semibold">{filteredTasks.length}</span> tasks
@@ -963,7 +962,7 @@ export default function ProgressPage() {
               {[
                 { key: 'R', action: 'Refresh data' },
                 { key: '/', action: 'Focus search' },
-                { key: 'F', action: 'Toggle filter & sort' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order' },
                 { key: '1', action: 'Timeline view' },
                 { key: '2', action: 'Tasks view' },
@@ -971,7 +970,7 @@ export default function ProgressPage() {
                 { key: 'E', action: 'Export menu' },
                 { key: 'P', action: 'Print report' },
                 { key: '?', action: 'Show shortcuts' },
-                { key: 'Esc', action: 'Close modal / Clear filters & sort' },
+                { key: 'Esc', action: 'Close modal / Clear search' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">
                   <span className="text-slate-300">{shortcut.action}</span>

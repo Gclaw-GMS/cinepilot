@@ -1,68 +1,98 @@
 # CinePilot Night Build Notes - March 16, 2026
 
-## Build Status: ✅ PASSING (2:28 AM)
+## Build Status: ✅ PASSING (7:09 AM)
 
-### Feature Perfected: Crew Page - Skills Matrix View (March 16, 2026 2:28 AM)
-Added a new Skills Matrix view to the Crew Management page for better production planning:
+### 36. Schedule Page - Conflict Detection Feature (March 16, 2026 7:09 AM)
+Added comprehensive conflict detection to the Shooting Schedule page:
 
-**New Features Added:**
-- **View Mode Toggle**: Switch between List View and Skills Matrix View
-- **Skills Matrix**: Visual grid showing crew members and their skills
-  - Rows: Crew members with name, role, department
-  - Columns: All unique skills from crew data
-  - Checkmarks/X marks showing who has which skills
-  - Color-coded department badges
-- **Keyboard Shortcuts**:
-  - `V`: Toggle between views
-  - `1`: List view
-  - `2`: Skills matrix view
-- **View Toggle Button**: Professional toggle in header with emerald accent
-- **Help Modal Updated**: Added new shortcuts to keyboard help
+- **Conflict Detection Types**:
+  - **Overload Days**: Days with > 10 hours of shooting (high/medium severity)
+  - **Light Days**: Days with < 6 hours scheduled (under-utilization warning)
+  - **Scene Overload**: > 5 scenes in a single day (quality risk)
+  - **Location Changes**: > 2 different locations in one day
+  - **Consecutive Night Shoots**: 3+ consecutive night shoots (physically demanding)
 
-**Skills Matrix Features:**
-- Automatically extracts unique skills from all crew members
-- Horizontal scroll for many skills
-- Sticky first column for crew names
-- Visual checkmarks (green) and X marks (gray) for easy scanning
-- Responsive design with smooth transitions
+- **Conflict Stats Dashboard**: Shows total, high, medium, and low priority counts
+- **Visual Conflict Cards**: Display conflicts with severity badges and descriptions
+- **Severity Color Coding**: Red (high), Amber (medium), Gray (low)
+- **New View Mode**: Added "Conflicts" tab in the view switcher
+- **Conflict Badge**: Shows count of issues on the Conflicts button
+- **Keyboard Shortcut**: '3' key switches to Conflicts view
+- **Empty State**: "Schedule Looks Good!" message when no conflicts
+- **Legend**: Explains each conflict type with icons
 
-### Previous Build: PASSING (March 15, 2026 8:02 PM) - CRON CHECK
+- **Build**: Clean build with 82 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+- **Tests:** 803 passing, 0 failing
 
-### Feature Verification - March 15, 2026 8:02 PM
-Verified all 4 requested features are already fully built:
-
-1. **Audience Sentiment** ✅
-   - Platform support: YouTube, Instagram, Twitter
-   - Sentiment analysis: positive/negative/neutral
-   - Charts: Pie charts, bar charts (Recharts)
-   - Poster improvement tips
-   - Demo data included
-
-2. **Travel Expenses** ✅
-   - Categories: Flight, Train, Bus, Taxi, Auto, Hotel, Stay, Per Diem, Daily Allowance
-   - Status tracking: Pending, Approved, Rejected, Reimbursed
-   - Charts and analytics
-   - Export/Print functionality
-
-3. **Character Costume** ✅
-   - Character parsing from script
-   - Age, appearance, personality traits
-   - Costume look suggestions
-   - Mood boards
-
-4. **Catering** ✅
-   - Meal tracking per shoot day
-   - Menu planning
-   - Dietary restrictions: Vegetarian, Vegan, Allergies
-   - Budget per meal
-   - Caterer contacts
-
-Build: Clean build with 86 routes
-Next.js Build: Successful
-TypeScript: No errors
+### Schedule Conflict Detection Feature Checklist
+- [x] Feature works 100% (conflict detection functional)
+- [x] All conflict types detected (overload, light, scene, location, night)
+- [x] Stats dashboard shows counts by severity
+- [x] Visual conflict cards with descriptions
+- [x] Severity color coding (red/amber/gray)
+- [x] New Conflicts view mode with tab
+- [x] Conflict count badge on button
+- [x] Keyboard shortcut '3' works
+- [x] Empty state when no conflicts
+- [x] Legend explains conflict types
+- [x] Build passes
 
 ---
-## Previous Build (6:55 AM)
+
+## Build Status: ✅ PASSING (11:58 PM)
+
+### 35. Locations Page - Enhanced Sorting Feature (March 15, 2026 11:58 PM)
+Enhanced sorting functionality to the Locations page with more sort options:
+
+- **Sort State**: Added `sortBy` and `sortOrder` state variables
+- **Sort Options Added**: 
+  - Score (default) - Sort by total score (highest/lowest)
+  - Name - Sort alphabetically by location name
+  - **Type** - Sort by place type (beach, temple, restaurant, etc.) - NEW
+  - **Access** - Sort by accessibility score - NEW
+  - **Locality** - Sort by locality score - NEW
+- **Sort Toggle**: Ascending/Descending toggle button with emerald accent (matching locations page theme)
+- **Visual UI**: Emerald accent for active sort controls, matching app theme
+- **Sorting Logic**: Properly implemented using useMemo for performance
+- **Filter Compatibility**: Sorting works alongside existing filters (place type, int/ext, time of day, favorites)
+- **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+- **Active Filter Count**: Badge now shows count including sort state
+- **Clear Filters**: Clears sort state along with other filters
+- **Export CSV**: Uses sorted/filtered data for export
+- **Export JSON**: Uses sorted/filtered data with sort metadata
+- **Print Report**: Uses sorted/filtered data
+- **Keyboard Shortcuts Modal**: Updated with 'S' shortcut for sort toggle
+
+- **Build**: Clean build with 82 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+- **Lint:** Passes (no warnings or errors)
+- **Tests:** 803 passing, 0 failing
+
+### Locations Page Enhanced Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied to filtered locations)
+- [x] Sort options available: Score, Name, Type, Access, Locality
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (emerald accent, matches app theme)
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (place type, int/ext, time of day, favorites)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Clear filters resets sort state
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes sort metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Keyboard shortcuts modal updated with 'S' shortcut
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+- [x] Tests pass (803)
+
+---
+
+## Build Status: ✅ PASSING (6:55 AM)
 
 ### 34. DOOD Page - Sorting Feature (March 15, 2026 6:55 AM)
 Added sorting functionality to the Day Out of Days (DOOD) page:
@@ -913,3 +943,52 @@ This ensures consistency between Tailwind utility classes and CSS variables.
 - Lucide React for icons
 - Framer Motion for animations
 - Responsive design
+
+---
+
+## Build Status: ✅ PASSING (10:28 PM)
+
+### 35. Reports Page - Sorting Feature (March 15, 2026 10:28 PM)
+Added sorting functionality to the Reports page:
+- **Sort State**: Added `sortBy` and `sortOrder` state variables
+- **Sort Options**: Date (default), Name, Value
+- **Sort Toggle**: Ascending/Descending toggle button with indigo accent (matching reports page theme)
+- **Filter Panel Integration**: Sort options integrated into the filter panel (renamed to "Filter & Sort")
+- **Visual UI**: Indigo accent for active sort, matching app theme
+- **Sorting Logic**: Properly implemented using useMemo for performance
+- **Filter Compatibility**: Sorting works alongside existing filters (tab filter, search)
+- **Keyboard Shortcut**: 'S' key toggles sort order (asc/desc)
+- **Active Filter Count**: Badge now shows count including sort state
+- **Click Outside**: Filter panel closes when clicking outside
+- **Clear Filters**: Clears sort state along with other filters (renamed to "Clear Filters & Sort")
+- **Export JSON**: Uses filter/sort metadata in export
+- **Export CSV**: Uses sorted/filtered data for export
+- **Print Report**: Uses sorted/filtered data
+- **Keyboard Help Modal**: Updated with 'S' shortcut
+
+- **Build**: Clean build with 82 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors
+- **Lint:** Passes
+- **Tests:** 803 passing, 0 failing
+
+### Reports Sorting Feature Checklist
+- [x] Feature works 100% (sorting applied)
+- [x] Sort options available: Date, Name, Value
+- [x] Toggle button for asc/desc order
+- [x] UI professional & visual (indigo accent, matches app theme)
+- [x] Filter panel integration complete (renamed to "Filter & Sort")
+- [x] Sorting uses useMemo for performance
+- [x] Works with existing filters (tab filter, search query)
+- [x] 'S' keyboard shortcut toggles sort order
+- [x] Active filter count includes sort state
+- [x] Click outside closes filter panel
+- [x] Export CSV uses sorted/filtered data
+- [x] Export JSON uses sorted/filtered data (includes filter metadata)
+- [x] Print report uses sorted/filtered data
+- [x] Keyboard help modal updated with 'S' shortcut
+- [x] Clear filters resets sort state
+- [x] Error handling complete
+- [x] Build passes
+- [x] Lint passes
+- [x] Tests pass

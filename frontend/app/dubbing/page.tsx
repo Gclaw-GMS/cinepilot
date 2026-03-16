@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown, AlertCircle, AlertTriangle } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -76,6 +76,39 @@ export default function DubbingPage() {
   // Sort state
   const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
+  // Budget tracking state
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000)
+  const [costPerLanguage, setCostPerLanguage] = useState<Record<string, number>>({
+    telugu: 75000,
+    hindi: 85000,
+    malayalam: 65000,
+    kannada: 60000,
+    english: 100000,
+  })
+  
+  // Budget calculations
+  const budgetCalculations = useMemo(() => {
+    const totalEstimated = dubbedVersions.reduce((sum, dub) => {
+      const cost = costPerLanguage[dub.language] || 50000
+      return sum + cost
+    }, 0)
+    
+    const budgetUsedPercent = budgetLimit > 0 ? (totalEstimated / budgetLimit) * 100 : 0
+    const budgetRemaining = budgetLimit - totalEstimated
+    const isOverBudget = totalEstimated > budgetLimit
+    const isWarning = !isOverBudget && budgetUsedPercent >= 80
+    const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
+    
+    return {
+      totalEstimated,
+      budgetUsedPercent,
+      budgetRemaining,
+      isOverBudget,
+      isWarning,
+      budgetStatus,
+    }
+  }, [dubbedVersions, budgetLimit, costPerLanguage])
   
   // Computed filtered and sorted versions
   const filteredVersions = useMemo(() => {
@@ -743,6 +776,129 @@ export default function DubbingPage() {
               <span className="text-sm text-slate-400">Preview Scenes</span>
             </div>
             <p className="text-2xl font-semibold text-white">{preview.length}</p>
+          </div>
+        </div>
+
+        {/* Budget Tracking Card */}
+        <div className={`bg-slate-900 border rounded-xl p-6 ${
+          budgetCalculations.budgetStatus === 'over' ? 'border-red-500/50' :
+          budgetCalculations.budgetStatus === 'warning' ? 'border-amber-500/50' :
+          'border-slate-800'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-indigo-400" />
+              Dubbing Budget Tracking
+            </h3>
+            <div className="flex items-center gap-2">
+              {budgetCalculations.budgetStatus === 'over' && (
+                <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                  <AlertCircle className="w-3 h-3" /> Over Budget
+                </span>
+              )}
+              {budgetCalculations.budgetStatus === 'warning' && (
+                <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full">
+                  <AlertTriangle className="w-3 h-3" /> Warning
+                </span>
+              )}
+              {budgetCalculations.budgetStatus === 'ok' && (
+                <span className="flex items-center gap-1 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full">
+                  <CheckCircle className="w-3 h-3" /> On Track
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* Budget Input */}
+          <div className="flex items-center gap-4 mb-4">
+            <label className="text-sm text-slate-400">Budget Limit (₹):</label>
+            <input
+              type="number"
+              value={budgetLimit}
+              onChange={(e) => setBudgetLimit(Math.max(0, parseInt(e.target.value) || 0))}
+              className={`bg-slate-950 border rounded-lg px-3 py-2 text-white text-sm w-40 focus:outline-none focus:border-indigo-500 ${
+                budgetCalculations.budgetStatus === 'over' ? 'border-red-500/50' :
+                budgetCalculations.budgetStatus === 'warning' ? 'border-amber-500/50' :
+                'border-slate-700'
+              }`}
+              placeholder="500000"
+            />
+            <span className="text-xs text-slate-500">
+              Default: ₹5,00,000
+            </span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="mb-4">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-slate-400">Budget Used</span>
+              <span className={
+                budgetCalculations.budgetStatus === 'over' ? 'text-red-400' :
+                budgetCalculations.budgetStatus === 'warning' ? 'text-amber-400' :
+                'text-emerald-400'
+              }>
+                {budgetCalculations.budgetUsedPercent.toFixed(1)}%
+              </span>
+            </div>
+            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  budgetCalculations.budgetStatus === 'over' ? 'bg-gradient-to-r from-red-600 to-red-500' :
+                  budgetCalculations.budgetStatus === 'warning' ? 'bg-gradient-to-r from-amber-600 to-amber-500' :
+                  'bg-gradient-to-r from-emerald-600 to-emerald-500'
+                }`}
+                style={{ width: `${Math.min(100, budgetCalculations.budgetUsedPercent)}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Budget Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-1">Estimated Total</p>
+              <p className="text-lg font-semibold text-white">₹{budgetCalculations.totalEstimated.toLocaleString('en-IN')}</p>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-1">Budget Limit</p>
+              <p className="text-lg font-semibold text-white">₹{budgetLimit.toLocaleString('en-IN')}</p>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-1">
+                {budgetCalculations.budgetRemaining >= 0 ? 'Remaining' : 'Over Budget'}
+              </p>
+              <p className={`text-lg font-semibold ${
+                budgetCalculations.budgetRemaining >= 0 ? 'text-emerald-400' : 'text-red-400'
+              }`}>
+                ₹{Math.abs(budgetCalculations.budgetRemaining).toLocaleString('en-IN')}
+                {budgetCalculations.budgetRemaining < 0 && ' (Over)'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Status Message */}
+          <div className={`mt-4 p-3 rounded-lg text-sm ${
+            budgetCalculations.budgetStatus === 'over' ? 'bg-red-500/10 text-red-400' :
+            budgetCalculations.budgetStatus === 'warning' ? 'bg-amber-500/10 text-amber-400' :
+            'bg-emerald-500/10 text-emerald-400'
+          }`}>
+            {budgetCalculations.budgetStatus === 'over' && (
+              <span className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Budget exceeded by ₹{Math.abs(budgetCalculations.budgetRemaining).toLocaleString('en-IN')}. Consider reducing dubbing scope or increasing budget.
+              </span>
+            )}
+            {budgetCalculations.budgetStatus === 'warning' && (
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Approaching budget limit ({budgetCalculations.budgetUsedPercent.toFixed(1)}% used). {dubbedVersions.length} language{dubbedVersions.length !== 1 ? 's' : ''} currently in progress.
+              </span>
+            )}
+            {budgetCalculations.budgetStatus === 'ok' && (
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Budget is on track. ₹{budgetCalculations.budgetRemaining.toLocaleString('en-IN')} remaining for {TARGET_LANGUAGES.length - dubbedVersions.length} additional language{dubbedVersions.length !== TARGET_LANGUAGES.length - 1 ? 's' : ''}.
+              </span>
+            )}
           </div>
         </div>
 

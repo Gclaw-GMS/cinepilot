@@ -143,6 +143,12 @@ export default function TasksPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  
+  // Bulk selection state
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
@@ -181,6 +187,20 @@ export default function TasksPage() {
     fetchTasks()
   }, [fetchTasks])
 
+  // Refs for keyboard shortcuts
+  const selectedTasksRef = useRef(selectedTasks)
+  const showBulkActionsRef = useRef(showBulkActions)
+  const filteredTasksRef = useRef<Task[]>([])
+  
+  // Update refs when state changes
+  useEffect(() => {
+    selectedTasksRef.current = selectedTasks
+  }, [selectedTasks])
+  
+  useEffect(() => {
+    showBulkActionsRef.current = showBulkActions
+  }, [showBulkActions])
+
   // Keyboard shortcuts handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Ignore if user is typing in an input
@@ -214,6 +234,35 @@ export default function TasksPage() {
         setSelectedRowIndex(-1)
         setShowExportMenu(false)
         setShowFilters(false)
+        // Clear bulk selection when bulk actions are shown
+        if (showBulkActionsRef.current) {
+          setSelectedTasks(new Set())
+          setShowBulkActions(false)
+          setShowBulkStatusMenu(false)
+          setShowDeleteConfirm(false)
+        }
+        break
+      // Bulk selection shortcuts
+      case 'a':
+      case 'A':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault()
+          // Inline select all logic to avoid dependency issues
+          if (selectedTasksRef.current.size === filteredTasksRef.current.length) {
+            setSelectedTasks(new Set())
+          } else {
+            setSelectedTasks(new Set(filteredTasksRef.current.map(t => t.id)))
+          }
+        }
+        break
+      case 'd':
+      case 'D':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault()
+          if (selectedTasksRef.current.size > 0) {
+            setShowDeleteConfirm(true)
+          }
+        }
         break
       case '?':
         if (e.shiftKey) {
@@ -382,6 +431,86 @@ export default function TasksPage() {
     
     return result
   }, [tasks, filterStatus, filterPriority, searchQuery, sortBy, sortOrder])
+
+  // Update filteredTasksRef when filteredTasks changes
+  useEffect(() => {
+    filteredTasksRef.current = filteredTasks
+  }, [filteredTasks])
+
+  // Bulk selection handlers (must be after filteredTasks)
+  const toggleTaskSelection = useCallback((taskId: string) => {
+    setSelectedTasks(prev => {
+      const newSelected = new Set(prev)
+      if (newSelected.has(taskId)) {
+        newSelected.delete(taskId)
+      } else {
+        newSelected.add(taskId)
+      }
+      return newSelected
+    })
+  }, [])
+
+  const selectAllTasks = useCallback(() => {
+    if (selectedTasks.size === filteredTasks.length) {
+      setSelectedTasks(new Set())
+    } else {
+      setSelectedTasks(new Set(filteredTasks.map(t => t.id)))
+    }
+  }, [filteredTasks, selectedTasks])
+
+  const clearSelection = useCallback(() => {
+    setSelectedTasks(new Set())
+    setShowBulkActions(false)
+    setShowBulkStatusMenu(false)
+    setShowDeleteConfirm(false)
+  }, [])
+
+  // Bulk delete handler
+  const handleBulkDelete = useCallback(async () => {
+    const idsToDelete = Array.from(selectedTasks)
+    if (idsToDelete.length === 0) return
+    
+    try {
+      // Delete each selected task
+      await Promise.all(idsToDelete.map(id => 
+        fetch(`/api/tasks?id=${id}`, { method: 'DELETE' })
+      ))
+      setTasks(prev => prev.filter(t => !selectedTasks.has(t.id)))
+      setSelectedTasks(new Set())
+      setShowBulkActions(false)
+      setShowDeleteConfirm(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete tasks')
+    }
+  }, [selectedTasks])
+
+  // Bulk status change handler
+  const handleBulkStatusChange = useCallback(async (newStatus: string) => {
+    const idsToUpdate = Array.from(selectedTasks)
+    if (idsToUpdate.length === 0) return
+    
+    try {
+      // Update each selected task's status
+      await Promise.all(idsToUpdate.map(id => 
+        fetch(`/api/tasks?id=${id}`, { 
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        })
+      ))
+      setTasks(prev => prev.map(t => 
+        selectedTasks.has(t.id) ? { ...t, status: newStatus } : t
+      ))
+      setShowBulkStatusMenu(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update tasks')
+    }
+  }, [selectedTasks])
+
+  // Show/hide bulk actions toolbar based on selection
+  useEffect(() => {
+    setShowBulkActions(selectedTasks.size > 0)
+  }, [selectedTasks])
 
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1049,6 +1178,39 @@ export default function TasksPage() {
                 Row {selectedRowIndex + 1} selected
               </span>
             )}
+            
+            {/* Bulk Selection - Select All */}
+            {filteredTasks.length > 0 && (
+              <button
+                onClick={selectAllTasks}
+                className="flex items-center gap-2 px-2 py-1 text-sm text-slate-400 hover:text-white transition-colors ml-2"
+                title={selectedTasks.size === filteredTasks.length ? "Deselect All (Ctrl+A)" : "Select All (Ctrl+A)"}
+              >
+                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                  selectedTasks.size === filteredTasks.length && filteredTasks.length > 0
+                    ? 'bg-indigo-500 border-indigo-500'
+                    : 'border-slate-600 hover:border-indigo-500'
+                }`}>
+                  {selectedTasks.size === filteredTasks.length && filteredTasks.length > 0 && (
+                    <CheckCircle className="w-3 h-3 text-white" />
+                  )}
+                </div>
+                <span className="text-xs">
+                  {selectedTasks.size === filteredTasks.length && filteredTasks.length > 0 ? 'Deselect' : 'Select'} All
+                </span>
+              </button>
+            )}
+            
+            {/* Clear Selection Button */}
+            {selectedTasks.size > 0 && (
+              <button
+                onClick={clearSelection}
+                className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors ml-2"
+                title="Clear Selection (Esc)"
+              >
+                Clear ({selectedTasks.size})
+              </button>
+            )}
           </div>
         </div>
 
@@ -1088,10 +1250,28 @@ export default function TasksPage() {
                       <div
                         key={task.id}
                         data-task-card
-                        className="bg-slate-800/50 border border-slate-700 hover:border-slate-600 rounded-lg p-3 cursor-pointer transition-all hover:shadow-lg"
+                        className={`bg-slate-800/50 border rounded-lg p-3 cursor-pointer transition-all hover:shadow-lg ${
+                          selectedTasks.has(task.id)
+                            ? 'border-indigo-500 ring-1 ring-indigo-500/30' 
+                            : 'border-slate-700 hover:border-slate-600'
+                        }`}
                         onClick={() => openEditForm(task)}
                       >
                         <div className="flex items-start gap-2">
+                          {/* Selection Checkbox */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleTaskSelection(task.id) }}
+                            className={`mt-1 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                              selectedTasks.has(task.id)
+                                ? 'bg-indigo-500 border-indigo-500' 
+                                : 'border-slate-500 hover:border-indigo-500'
+                            }`}
+                            title={selectedTasks.has(task.id) ? "Deselect" : "Select"}
+                          >
+                            {selectedTasks.has(task.id) && <CheckCircle className="w-2.5 h-2.5 text-white" />}
+                          </button>
+                          
+                          {/* Status Checkbox */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed') }}
                             className={`mt-1 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -1181,6 +1361,8 @@ export default function TasksPage() {
                   formatDate={formatDate}
                   getDaysUntilDue={getDaysUntilDue}
                   isSelected={selectedRowIndex === index}
+                  isChecked={selectedTasks.has(task.id)}
+                  onToggleSelect={() => toggleTaskSelection(task.id)}
                 />
               ))}
             </div>
@@ -1195,6 +1377,112 @@ export default function TasksPage() {
             formatDate={formatDate}
             getDaysUntilDue={getDaysUntilDue}
           />
+        )}
+
+        {/* Floating Bulk Actions Toolbar */}
+        {showBulkActions && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-4 duration-200">
+            <div className="bg-slate-900 border border-indigo-500/50 rounded-xl shadow-2xl shadow-indigo-500/20 flex items-center gap-4 px-6 py-3">
+              {/* Selection Count */}
+              <div className="flex items-center gap-2">
+                <span className="bg-indigo-500 text-white text-sm font-medium px-2 py-1 rounded-full">
+                  {selectedTasks.size}
+                </span>
+                <span className="text-sm text-slate-400">selected</span>
+              </div>
+              
+              <div className="w-px h-6 bg-slate-700" />
+              
+              {/* Change Status Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-white transition-colors"
+                >
+                  <Flag className="w-4 h-4" />
+                  <span>Change Status</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                
+                {/* Status Dropdown Menu */}
+                {showBulkStatusMenu && (
+                  <div className="absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+                    {['pending', 'in_progress', 'completed', 'blocked'].map(status => {
+                      const statusInfo = STATUS_COLORS[status] || STATUS_COLORS.pending
+                      return (
+                        <button
+                          key={status}
+                          onClick={() => handleBulkStatusChange(status)}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2 ${statusInfo.text}`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${statusInfo.bg} ${statusInfo.border} border`} />
+                          <span className="capitalize">{status.replace('_', ' ')}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              
+              {/* Delete Button */}
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 rounded-lg text-sm text-red-400 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete</span>
+              </button>
+              
+              <div className="w-px h-6 bg-slate-700" />
+              
+              {/* Clear Selection */}
+              <button
+                onClick={clearSelection}
+                className="text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowDeleteConfirm(false)
+            }}
+          >
+            <div className="bg-slate-900 border border-red-500/50 rounded-2xl w-full max-w-md shadow-2xl shadow-red-500/10">
+              <div className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <AlertTriangle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Delete {selectedTasks.size} Task(s)?</h3>
+                    <p className="text-sm text-slate-400">This action cannot be undone.</p>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors"
+                  >
+                    Delete {selectedTasks.size} Task(s)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Task Form Modal */}
@@ -1344,7 +1632,9 @@ export default function TasksPage() {
                   { keys: ['↑', '↓'], desc: 'Navigate tasks', category: 'Navigation' },
                   { keys: ['Home'], desc: 'Go to first task', category: 'Navigation' },
                   { keys: ['End'], desc: 'Go to last task', category: 'Navigation' },
-                  { keys: ['Esc'], desc: 'Clear selection', category: 'Navigation' },
+                  { keys: ['Ctrl', 'A'], desc: 'Select all tasks', category: 'Selection' },
+                  { keys: ['Ctrl', 'D'], desc: 'Delete selected', category: 'Selection' },
+                  { keys: ['Esc'], desc: 'Clear selection', category: 'Selection' },
                   { keys: ['N'], desc: 'New task', category: 'Actions' },
                   { keys: ['F'], desc: 'Toggle filters', category: 'Actions' },
                   { keys: ['S'], desc: 'Toggle sort order', category: 'Actions' },
@@ -1403,7 +1693,9 @@ function TaskCard({
   onDelete,
   formatDate,
   getDaysUntilDue,
-  isSelected
+  isSelected,
+  isChecked,
+  onToggleSelect
 }: { 
   task: Task
   onStatusChange: (id: string, status: string) => void
@@ -1412,6 +1704,8 @@ function TaskCard({
   formatDate: (date: string) => string
   getDaysUntilDue: (date: string) => number
   isSelected?: boolean
+  isChecked?: boolean
+  onToggleSelect?: () => void
 }) {
   const [showMenu, setShowMenu] = useState(false)
   const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS.pending
@@ -1423,12 +1717,27 @@ function TaskCard({
     <div 
       data-task-card 
       className={`bg-slate-900 border rounded-xl p-4 transition-all ${
-        isSelected 
+        isChecked || isSelected
           ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/10' 
           : 'border-slate-800 hover:border-slate-700'
       }`}
     >
       <div className="flex items-start gap-4">
+        {/* Selection Checkbox (for bulk selection) */}
+        {onToggleSelect && (
+          <button
+            onClick={onToggleSelect}
+            className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+              isChecked
+                ? 'bg-indigo-500 border-indigo-500' 
+                : 'border-slate-600 hover:border-indigo-500'
+            }`}
+            title={isChecked ? "Deselect" : "Select"}
+          >
+            {isChecked && <CheckCircle className="w-3 h-3 text-white" />}
+          </button>
+        )}
+
         {/* Status Checkbox */}
         <button
           onClick={() => onStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed')}

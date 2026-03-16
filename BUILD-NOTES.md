@@ -1,6 +1,32 @@
-# CinePilot Night Build Notes - March 15, 2026
+# CinePilot Night Build Notes - March 16, 2026
 
-## Build Status: ✅ PASSING (8:02 PM) - CRON CHECK
+## Build Status: ✅ PASSING (2:28 AM)
+
+### Feature Perfected: Crew Page - Skills Matrix View (March 16, 2026 2:28 AM)
+Added a new Skills Matrix view to the Crew Management page for better production planning:
+
+**New Features Added:**
+- **View Mode Toggle**: Switch between List View and Skills Matrix View
+- **Skills Matrix**: Visual grid showing crew members and their skills
+  - Rows: Crew members with name, role, department
+  - Columns: All unique skills from crew data
+  - Checkmarks/X marks showing who has which skills
+  - Color-coded department badges
+- **Keyboard Shortcuts**:
+  - `V`: Toggle between views
+  - `1`: List view
+  - `2`: Skills matrix view
+- **View Toggle Button**: Professional toggle in header with emerald accent
+- **Help Modal Updated**: Added new shortcuts to keyboard help
+
+**Skills Matrix Features:**
+- Automatically extracts unique skills from all crew members
+- Horizontal scroll for many skills
+- Sticky first column for crew names
+- Visual checkmarks (green) and X marks (gray) for easy scanning
+- Responsive design with smooth transitions
+
+### Previous Build: PASSING (March 15, 2026 8:02 PM) - CRON CHECK
 
 ### Feature Verification - March 15, 2026 8:02 PM
 Verified all 4 requested features are already fully built:

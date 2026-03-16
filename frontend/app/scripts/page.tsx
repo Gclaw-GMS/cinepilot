@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer, Copy, Check } from 'lucide-react'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer, Copy, Check, TrendingUp } from 'lucide-react'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import ScriptComparison from '@/components/ScriptComparison'
 
 interface ScriptData {
@@ -163,7 +164,7 @@ interface AnalysisData {
   createdAt: string
 }
 
-type ActiveTab = 'upload' | 'scenes' | 'characters' | 'quality' | 'warnings' | 'compare'
+type ActiveTab = 'upload' | 'scenes' | 'characters' | 'quality' | 'warnings' | 'compare' | 'analytics'
 
 export default function ScriptsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -291,6 +292,10 @@ export default function ScriptsPage() {
         case '6':
           e.preventDefault()
           setActiveTab('compare')
+          break
+        case '7':
+          e.preventDefault()
+          setActiveTab('analytics')
           break
       }
     }
@@ -626,6 +631,92 @@ Warnings: ${allWarnings.length}`
   const summaryAnalysis = analyses.find(a => a.analysisType === 'breakdown_summary')
   const allWarnings = scenes.flatMap(s => s.warnings.map(w => ({ ...w, sceneNumber: s.sceneNumber })))
 
+  // Analytics data computation
+  const analyticsData = useMemo(() => {
+    // INT/EXT Distribution
+    const intExtCount: Record<string, number> = {}
+    scenes.forEach(s => {
+      const key = s.intExt || 'UNKNOWN'
+      intExtCount[key] = (intExtCount[key] || 0) + 1
+    })
+    const intExtData = Object.entries(intExtCount).map(([name, value]) => ({ name, value }))
+
+    // Time of Day Distribution
+    const timeOfDayCount: Record<string, number> = {}
+    scenes.forEach(s => {
+      const key = s.timeOfDay || 'UNKNOWN'
+      timeOfDayCount[key] = (timeOfDayCount[key] || 0) + 1
+    })
+    const timeOfDayData = Object.entries(timeOfDayCount).map(([name, value]) => ({ name, value }))
+
+    // Top Locations
+    const locationCount: Record<string, number> = {}
+    scenes.forEach(s => {
+      const key = s.location || 'UNKNOWN'
+      locationCount[key] = (locationCount[key] || 0) + 1
+    })
+    const locationData = Object.entries(locationCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, scenes]) => ({ name, scenes }))
+
+    // Character Appearances
+    const charCount: Record<string, number> = {}
+    scenes.forEach(s => {
+      s.sceneCharacters?.forEach(sc => {
+        charCount[sc.character.name] = (charCount[sc.character.name] || 0) + 1
+      })
+    })
+    const characterData = Object.entries(charCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, appearances]) => ({ name, appearances }))
+
+    // Warning Severity Distribution
+    const warningSeverityCount: Record<string, number> = { High: 0, Medium: 0, Low: 0 }
+    allWarnings.forEach(w => {
+      if (w.severity === 'high') warningSeverityCount.High++
+      else if (w.severity === 'medium') warningSeverityCount.Medium++
+      else warningSeverityCount.Low++
+    })
+    const warningSeverityData = Object.entries(warningSeverityCount)
+      .filter(([_, value]) => value > 0)
+      .map(([name, value]) => ({ name, value }))
+
+    // Confidence Distribution
+    const confidenceCount: Record<string, number> = { High: 0, Medium: 0, Low: 0 }
+    scenes.forEach(s => {
+      if (s.confidence >= 0.8) confidenceCount.High++
+      else if (s.confidence >= 0.5) confidenceCount.Medium++
+      else confidenceCount.Low++
+    })
+    const confidenceData = Object.entries(confidenceCount).map(([name, value]) => ({ name, value }))
+
+    // Summary stats
+    const uniqueLocations = new Set(scenes.map(s => s.location)).size
+    const uniqueCharacters = new Set(scenes.flatMap(s => s.sceneCharacters?.map(sc => sc.character.name) || [])).size
+    const avgConfidence = scenes.length > 0 
+      ? scenes.reduce((sum, s) => sum + (s.confidence || 0), 0) / scenes.length 
+      : 0
+
+    return {
+      totalScenes: scenes.length,
+      totalCharacters: uniqueCharacters,
+      totalWarnings: allWarnings.length,
+      totalLocations: uniqueLocations,
+      avgConfidence,
+      intExtData,
+      timeOfDayData,
+      locationData,
+      characterData,
+      warningSeverityData,
+      confidenceData,
+    }
+  }, [scenes, allWarnings])
+
+  // Chart colors
+  const CHART_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#ef4444', '#84cc16']
+
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -750,6 +841,7 @@ Warnings: ${allWarnings.length}`
     { key: 'quality', label: 'Quality' },
     { key: 'warnings', label: 'Warnings', count: allWarnings.length },
     { key: 'compare', label: 'Compare' },
+    { key: 'analytics', label: 'Analytics' },
   ]
 
   if (loading) {
@@ -1418,6 +1510,206 @@ Warnings: ${allWarnings.length}`
       {/* Compare Tab */}
       {activeTab === 'compare' && <ScriptComparison />}
 
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <div className="text-gray-400 text-sm mb-1">Total Scenes</div>
+              <div className="text-2xl font-bold text-cinepilot-accent">{analyticsData.totalScenes}</div>
+            </div>
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <div className="text-gray-400 text-sm mb-1">Characters</div>
+              <div className="text-2xl font-bold text-purple-400">{analyticsData.totalCharacters}</div>
+            </div>
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <div className="text-gray-400 text-sm mb-1">Warnings</div>
+              <div className="text-2xl font-bold text-amber-400">{analyticsData.totalWarnings}</div>
+            </div>
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <div className="text-gray-400 text-sm mb-1">Avg Confidence</div>
+              <div className="text-2xl font-bold text-emerald-400">{(analyticsData.avgConfidence * 100).toFixed(0)}%</div>
+            </div>
+          </div>
+
+          {/* Charts Row 1 */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* INT/EXT Distribution */}
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-indigo-400" />
+                INT/EXT Distribution
+              </h3>
+              {analyticsData.intExtData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.intExtData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {analyticsData.intExtData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-500">No scene data</div>
+              )}
+            </div>
+
+            {/* Time of Day Distribution */}
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-400" />
+                Time of Day
+              </h3>
+              {analyticsData.timeOfDayData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.timeOfDayData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {analyticsData.timeOfDayData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-500">No time data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Charts Row 2 */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Top Locations */}
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                Top Locations
+              </h3>
+              {analyticsData.locationData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analyticsData.locationData} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis type="number" stroke="#9ca3af" />
+                    <YAxis dataKey="name" type="category" width={120} stroke="#9ca3af" tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Bar dataKey="scenes" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-gray-500">No location data</div>
+              )}
+            </div>
+
+            {/* Character Appearances */}
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-pink-400" />
+                Character Appearances
+              </h3>
+              {analyticsData.characterData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analyticsData.characterData} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis type="number" stroke="#9ca3af" />
+                    <YAxis dataKey="name" type="category" width={80} stroke="#9ca3af" tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Bar dataKey="appearances" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-gray-500">No character data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Charts Row 3 */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Warning Severity */}
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-400" />
+                Warnings by Severity
+              </h3>
+              {analyticsData.warningSeverityData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.warningSeverityData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {analyticsData.warningSeverityData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? '#ef4444' : index === 1 ? '#f59e0b' : '#6b7280'} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-500">No warnings</div>
+              )}
+            </div>
+
+            {/* Confidence Distribution */}
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                Confidence Distribution
+              </h3>
+              {analyticsData.confidenceData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.confidenceData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {analyticsData.confidenceData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : index === 1 ? '#f59e0b' : '#ef4444'} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-500">No confidence data</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Keyboard Help Modal */}
       {showKeyboardHelp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
@@ -1444,6 +1736,7 @@ Warnings: ${allWarnings.length}`
                 { key: '4', action: 'Quality tab' },
                 { key: '5', action: 'Warnings tab' },
                 { key: '6', action: 'Compare tab' },
+                { key: '7', action: 'Analytics tab' },
                 { key: '?', action: 'Show this help' },
                 { key: 'Esc', action: 'Close modal / Clear filters' },
               ].map(({ key, action }) => (

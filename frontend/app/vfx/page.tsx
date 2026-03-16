@@ -42,6 +42,18 @@ type Summary = {
   estimatedTotalDuration: number;
 };
 
+// VFX Conflict Types
+type VfxConflict = {
+  id: string;
+  type: 'budget' | 'certification' | 'complexity' | 'timeline' | 'technical';
+  severity: 'high' | 'medium' | 'low';
+  scene: string;
+  sceneHeading?: string;
+  title: string;
+  description: string;
+  recommendation: string;
+};
+
 // VFX Cost estimation constants (in INR per second)
 const VFX_COST_PER_SECOND = {
   simple: 5000,
@@ -147,7 +159,7 @@ export default function VfxPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isUsingDemo, setIsUsingDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost' | 'conflicts'>('overview');
   
   // Form states for add/edit
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -276,6 +288,10 @@ export default function VfxPage() {
         case '3':
           e.preventDefault()
           setActiveTab('cost')
+          break
+        case '4':
+          e.preventDefault()
+          setActiveTab('conflicts')
           break
       }
     }
@@ -413,6 +429,122 @@ export default function VfxPage() {
       return aIdx - bIdx;
     });
   }, [filteredNotes, vfxWarnings, vfxProps]);
+
+  // VFX Conflict Detection
+  const VFX_BUDGET_LIMIT = 5000000; // ₹50L threshold
+
+  const vfxConflicts = useMemo(() => {
+    const conflicts: VfxConflict[] = [];
+    const sceneVfxCounts = new Map<string, number>();
+
+    // Count VFX shots per scene
+    for (const note of vfxNotes) {
+      const sceneKey = note.scene.sceneNumber;
+      sceneVfxCounts.set(sceneKey, (sceneVfxCounts.get(sceneKey) || 0) + 1);
+    }
+
+    // 1. Budget Overrun Detection
+    if (summary && summary.estimatedTotalCost > VFX_BUDGET_LIMIT) {
+      conflicts.push({
+        id: 'conflict-budget',
+        type: 'budget',
+        severity: 'high',
+        scene: 'N/A',
+        title: 'Budget Overrun Risk',
+        description: `Estimated VFX cost (₹${(summary.estimatedTotalCost / 100000).toFixed(1)}L) exceeds budget limit (₹50L)`,
+        recommendation: 'Consider reducing VFX complexity or negotiating rates with VFX vendors',
+      });
+    }
+
+    // 2. Certification Risk Detection
+    const explicitTypes = ['explicit', 'blood', 'violence', 'gore'];
+    for (const note of vfxNotes) {
+      if (explicitTypes.includes(note.vfxType.toLowerCase()) || 
+          note.description.toLowerCase().includes('blood') ||
+          note.description.toLowerCase().includes('violence') ||
+          note.description.toLowerCase().includes('gore')) {
+        const existingConflict = conflicts.find(c => c.type === 'certification');
+        if (!existingConflict) {
+          conflicts.push({
+            id: 'conflict-certification',
+            type: 'certification',
+            severity: 'medium',
+            scene: note.scene.sceneNumber,
+            sceneHeading: note.scene.headingRaw || undefined,
+            title: 'Certification Risk Detected',
+            description: `Scene ${note.scene.sceneNumber} contains explicit VFX content that may impact UA/A certification`,
+            recommendation: 'Review content and prepare alternate takes for censor board submission',
+          });
+        }
+      }
+    }
+
+    // 3. Complexity Warning Detection
+    const complexNotes = vfxNotes.filter(n => n.confidence >= 0.8);
+    if (complexNotes.length >= 3) {
+      conflicts.push({
+        id: 'conflict-complexity',
+        type: 'complexity',
+        severity: 'medium',
+        scene: 'N/A',
+        title: 'High Complexity VFX',
+        description: `${complexNotes.length} scenes have high complexity VFX (confidence ≥80%)`,
+        recommendation: 'Start VFX prep early and allocate additional render time in schedule',
+      });
+    }
+
+    // 4. Timeline Conflict Detection (>5 VFX shots per scene)
+    for (const [scene, count] of sceneVfxCounts) {
+      if (count > 5) {
+        const sceneNote = vfxNotes.find(n => n.scene.sceneNumber === scene);
+        conflicts.push({
+          id: `conflict-timeline-${scene}`,
+          type: 'timeline',
+          severity: 'high',
+          scene: scene,
+          sceneHeading: sceneNote?.scene.headingRaw || undefined,
+          title: 'Timeline Conflict',
+          description: `Scene ${scene} has ${count} VFX shots - may impact daily shooting schedule`,
+          recommendation: 'Consider splitting VFX-heavy scenes across multiple shoot days',
+        });
+      }
+    }
+
+    // 5. Technical Feasibility Detection (confidence < 50%)
+    for (const note of vfxNotes) {
+      if (note.confidence < 0.5) {
+        conflicts.push({
+          id: `conflict-technical-${note.id}`,
+          type: 'technical',
+          severity: 'low',
+          scene: note.scene.sceneNumber,
+          sceneHeading: note.scene.headingRaw || undefined,
+          title: 'Technical Feasibility Concern',
+          description: `Scene ${note.scene.sceneNumber}: Low confidence (${Math.round(note.confidence * 100)}%) for "${note.description.slice(0, 50)}..."`,
+          recommendation: 'Consult with VFX supervisor for feasibility assessment',
+        });
+      }
+    }
+
+    return conflicts;
+  }, [vfxNotes, summary]);
+
+  // Conflict statistics
+  const conflictStats = useMemo(() => {
+    return {
+      total: vfxConflicts.length,
+      high: vfxConflicts.filter(c => c.severity === 'high').length,
+      medium: vfxConflicts.filter(c => c.severity === 'medium').length,
+      low: vfxConflicts.filter(c => c.severity === 'low').length,
+      byType: {
+        budget: vfxConflicts.filter(c => c.type === 'budget').length,
+        certification: vfxConflicts.filter(c => c.type === 'certification').length,
+        complexity: vfxConflicts.filter(c => c.type === 'complexity').length,
+        timeline: vfxConflicts.filter(c => c.type === 'timeline').length,
+        technical: vfxConflicts.filter(c => c.type === 'technical').length,
+      },
+    };
+  }, [vfxConflicts]);
 
   // Form handlers
   const resetForm = () => {
@@ -1344,6 +1476,21 @@ export default function VfxPage() {
               >
                 Cost Analysis
               </button>
+              <button
+                onClick={() => setActiveTab('conflicts')}
+                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-2 ${
+                  activeTab === 'conflicts'
+                    ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Conflicts
+                {conflictStats.high > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {conflictStats.high}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Visualization Charts */}
@@ -1635,7 +1782,113 @@ export default function VfxPage() {
             </div>
           </div>
         )}
-        
+
+        {/* Conflicts Tab */}
+        {displayScenes.length > 0 && activeTab === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="text-sm text-slate-400 mb-1">Total Conflicts</div>
+                <div className="text-3xl font-bold text-white">{conflictStats.total}</div>
+              </div>
+              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                <div className="text-sm text-red-400 mb-1">High Priority</div>
+                <div className="text-3xl font-bold text-red-400">{conflictStats.high}</div>
+              </div>
+              <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl p-4">
+                <div className="text-sm text-amber-400 mb-1">Medium Priority</div>
+                <div className="text-3xl font-bold text-amber-400">{conflictStats.medium}</div>
+              </div>
+              <div className="bg-slate-700/30 border border-slate-600 rounded-xl p-4">
+                <div className="text-sm text-slate-400 mb-1">Low Priority</div>
+                <div className="text-3xl font-bold text-slate-400">{conflictStats.low}</div>
+              </div>
+            </div>
+
+            {/* Conflict Type Summary */}
+            {conflictStats.total > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {Object.entries(conflictStats.byType).map(([type, count]) => (
+                  count > 0 && (
+                    <div key={type} className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
+                      <span className="text-sm text-slate-400 capitalize">{type}</span>
+                      <span className="text-lg font-semibold text-purple-400">{count}</span>
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+
+            {/* Conflicts List or Empty State */}
+            {conflictStats.total === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">All Clear!</h3>
+                <p className="text-slate-400">No VFX conflicts detected. Your production is on track.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {vfxConflicts.map((conflict) => {
+                  const severityStyles = {
+                    high: 'border-red-500/50 bg-red-900/10',
+                    medium: 'border-amber-500/50 bg-amber-900/10',
+                    low: 'border-slate-600 bg-slate-800/30',
+                  };
+                  const severityTextColors = {
+                    high: 'text-red-400',
+                    medium: 'text-amber-400',
+                    low: 'text-slate-400',
+                  };
+                  const typeIcons: Record<string, typeof DollarSign> = {
+                    budget: DollarSign,
+                    certification: AlertCircle,
+                    complexity: AlertTriangle,
+                    timeline: Clock,
+                    technical: AlertTriangle,
+                  };
+                  const TypeIcon = typeIcons[conflict.type] || AlertCircle;
+
+                  return (
+                    <div
+                      key={conflict.id}
+                      className={`border rounded-xl p-5 ${severityStyles[conflict.severity]}`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`p-2 rounded-lg ${
+                          conflict.severity === 'high' ? 'bg-red-500/20' :
+                          conflict.severity === 'medium' ? 'bg-amber-500/20' : 'bg-slate-700/50'
+                        }`}>
+                          <TypeIcon className={`w-5 h-5 ${severityTextColors[conflict.severity]}`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-semibold text-white">{conflict.title}</h4>
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${
+                              conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                              conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'
+                            }`}>
+                              {conflict.severity.toUpperCase()}
+                            </span>
+                            {conflict.scene !== 'N/A' && (
+                              <span className="text-sm text-slate-500">Scene {conflict.scene}</span>
+                            )}
+                          </div>
+                          <p className="text-slate-300 mb-3">{conflict.description}</p>
+                          <div className="bg-slate-900/50 rounded-lg p-3">
+                            <span className="text-xs text-slate-500 uppercase tracking-wide">Recommendation: </span>
+                            <span className="text-sm text-slate-300">{conflict.recommendation}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Keyboard Help Modal */}
         {showKeyboardHelp && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
@@ -1689,6 +1942,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Cost Analysis tab</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Conflicts tab</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Show shortcuts</span>

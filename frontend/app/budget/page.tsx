@@ -158,6 +158,7 @@ export default function BudgetPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleRefreshRef = useRef<() => Promise<void>>()
+  const generateRecommendationsRef = useRef<() => void>()
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -468,14 +469,14 @@ export default function BudgetPage() {
         setForecast(DEMO_FORECAST)
       }
       // Generate recommendations based on budget data
-      generateRecommendations()
+      generateRecommendationsRef.current?.()
     } catch (e) {
       console.error('Budget fetch error:', e)
       // Fallback to demo data with error logged
       setItems(DEMO_BUDGET_ITEMS)
       setExpenses(DEMO_EXPENSES)
       setForecast(DEMO_FORECAST)
-      generateRecommendations()
+      generateRecommendationsRef.current?.()
     } finally {
       setLoading(false)
     }
@@ -605,6 +606,11 @@ export default function BudgetPage() {
 
     setRecommendations(newRecommendations)
   }, [forecast])
+
+  // Update generateRecommendations ref when function changes
+  useEffect(() => {
+    generateRecommendationsRef.current = generateRecommendations
+  }, [generateRecommendations])
 
   useEffect(() => { fetchData() }, [fetchData])
 

@@ -120,6 +120,8 @@ export default function CharacterCostumePage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('all')
+  const [sortBy, setSortBy] = useState<'name' | 'role' | 'age' | 'budget' | 'status'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [exporting, setExporting] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
@@ -197,6 +199,10 @@ export default function CharacterCostumePage() {
           const roleSelect = document.querySelector('select') as HTMLSelectElement
           roleSelect?.focus()
           break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -210,6 +216,8 @@ export default function CharacterCostumePage() {
           setSearchTerm('')
           setFilterRole('all')
           setFilterStatus('all')
+          setSortBy('name')
+          setSortOrder('asc')
           break
         case 'f':
           e.preventDefault()
@@ -234,7 +242,7 @@ export default function CharacterCostumePage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showFilters, filterRole, filterStatus])
+  }, [showForm, showFilters, filterRole, filterStatus, sortOrder])
 
   // Click outside handler for export menu and filter panel
   useEffect(() => {
@@ -285,7 +293,7 @@ export default function CharacterCostumePage() {
   const handleExportCSV = () => {
     setExporting(true)
     const headers = ['Name', 'Age', 'Gender', 'Role', 'Appearance', 'Personality', 'Costume Style', 'Fabrics', 'Color Palette', 'Description', 'Designer', 'Budget', 'Status']
-    const rows = filteredCharacters.map(char => [
+    const rows = sortedCharacters.map(char => [
       char.name,
       char.age,
       char.gender,
@@ -319,13 +327,17 @@ export default function CharacterCostumePage() {
     setExporting(true)
     const exportData = {
       exportDate: new Date().toISOString(),
-      totalCharacters: filteredCharacters.length,
+      totalCharacters: sortedCharacters.length,
       summary: summary ? {
         totalCharacters: summary.totalCharacters,
         byRole: summary.byRole,
         totalBudget: summary.totalBudget,
       } : null,
-      characters: filteredCharacters.map(char => ({
+      sortBy,
+      sortOrder,
+      filterRole,
+      filterStatus,
+      characters: sortedCharacters.map(char => ({
         name: char.name,
         age: char.age,
         gender: char.gender,
@@ -469,7 +481,7 @@ export default function CharacterCostumePage() {
         </tr>
       </thead>
       <tbody>
-        ${filteredCharacters.map(char => `
+        ${sortedCharacters.map(char => `
           <tr>
             <td class="character-name">${char.name}</td>
             <td><span class="badge badge-${char.role}">${char.role}</span></td>
@@ -574,6 +586,7 @@ export default function CharacterCostumePage() {
     setFormData({ ...formData, [field]: updated })
   }
 
+  // Apply filtering
   const filteredCharacters = characters.filter(char => {
     const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       char.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -582,13 +595,43 @@ export default function CharacterCostumePage() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
+  // Apply sorting
+  const sortedCharacters = [...filteredCharacters].sort((a, b) => {
+    let comparison = 0
+    switch (sortBy) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name)
+        break
+      case 'role':
+        comparison = a.role.localeCompare(b.role)
+        break
+      case 'age':
+        comparison = (a.ageNumber || 0) - (b.ageNumber || 0)
+        break
+      case 'budget':
+        comparison = (a.estimatedBudget || 0) - (b.estimatedBudget || 0)
+        break
+      case 'status':
+        comparison = a.status.localeCompare(b.status)
+        break
+    }
+    return sortOrder === 'asc' ? comparison : -comparison
+  })
+
   // Calculate active filter count
-  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0)
+  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
 
   // Clear all filters
   const clearFilters = () => {
     setFilterRole('all')
     setFilterStatus('all')
+    setSortBy('name')
+    setSortOrder('asc')
+  }
+
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
   const roleData = summary ? Object.entries(summary.byRole).map(([name, value]) => ({
@@ -776,6 +819,26 @@ export default function CharacterCostumePage() {
                       <option value="mentor">Mentor</option>
                       <option value="tragic">Tragic</option>
                     </select>
+                  </div>
+                  <div className="p-4 border-t border-slate-700">
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Sort By</label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 mb-2"
+                    >
+                      <option value="name">Name</option>
+                      <option value="role">Role</option>
+                      <option value="age">Age</option>
+                      <option value="budget">Budget</option>
+                      <option value="status">Status</option>
+                    </select>
+                    <button
+                      onClick={toggleSortOrder}
+                      className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
+                    >
+                      {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -1045,14 +1108,14 @@ export default function CharacterCostumePage() {
           <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-400">
             {error}
           </div>
-        ) : filteredCharacters.length === 0 ? (
+        ) : sortedCharacters.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
             <p className="text-slate-400">No characters found. Add your first character!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCharacters.map((char) => (
+            {sortedCharacters.map((char) => (
               <div
                 key={char.id}
                 className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden hover:border-purple-500/50 transition-colors"
@@ -1545,12 +1608,12 @@ export default function CharacterCostumePage() {
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Focus search</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">/</kbd>
+                  <span className="text-slate-300">Toggle sort order</span>
+                  <kbd className="px-2 py-1 bg-purple-600 text-white rounded text-sm">S</kbd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Toggle filters</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
+                  <span className="text-slate-300">Focus search</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">/</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Export data</span>

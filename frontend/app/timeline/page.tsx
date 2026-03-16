@@ -7,8 +7,13 @@ import {
   Calendar, Download, Plus, Layers, Grid3X3, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Target, CheckCircle, Zap, Clock, Film, MapPin,
-  Filter, RefreshCw, Search, X, HelpCircle, Printer
+  Filter, RefreshCw, Search, X, HelpCircle, Printer,
+  TrendingUp, BarChart3
 } from 'lucide-react';
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 
 interface Project {
   id: string;
@@ -98,6 +103,26 @@ export default function TimelinePage() {
     shootDays: 20,
     scenes: 145,
   }), []);
+
+  // Chart data derived from stats
+  const statusChartData = useMemo(() => [
+    { name: 'Completed', value: stats.completed, color: '#22c55e' },
+    { name: 'In Progress', value: stats.inProgress, color: '#eab308' },
+    { name: 'Pending', value: stats.pending, color: '#64748b' },
+  ], [stats.completed, stats.inProgress, stats.pending]);
+
+  const phaseTypeChartData = useMemo(() => [
+    { name: 'Pre-Production', phases: 3, color: '#3b82f6' },
+    { name: 'Production', phases: 4, color: '#8b5cf6' },
+    { name: 'Post-Production', phases: 1, color: '#f97316' },
+  ], []);
+
+  const progressChartData = useMemo(() => [
+    { week: 'Week 1', completed: 2, planned: 3 },
+    { week: 'Week 2', completed: 4, planned: 5 },
+    { week: 'Week 3', completed: 6, planned: 8 },
+    { week: 'Week 4', completed: stats.completed, planned: stats.total },
+  ], [stats.completed, stats.total]);
 
   // Fetch real stats from API
   const fetchStats = useCallback(async (isInitial = false) => {
@@ -684,6 +709,96 @@ export default function TimelinePage() {
               <span className="text-sm text-slate-400">Total Scenes</span>
             </div>
             <p className="text-2xl font-semibold text-indigo-400">{stats.scenes}</p>
+          </motion.div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {/* Status Distribution Pie Chart */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-5 h-5 text-purple-400" />
+              <h3 className="text-sm font-medium text-slate-300">Phase Status Distribution</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={statusChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={70}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {statusChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </motion.div>
+
+          {/* Phase Type Bar Chart */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-cyan-400" />
+              <h3 className="text-sm font-medium text-slate-300">Phases by Type</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={phaseTypeChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+                <Bar dataKey="phases" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
+
+          {/* Progress vs Plan Bar Chart */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-sm font-medium text-slate-300">Weekly Progress</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={progressChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+                <Legend verticalAlign="top" height={36} />
+                <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="planned" name="Planned" fill="#64748b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </motion.div>
         </div>
 

@@ -7,6 +7,10 @@ import {
   Trash2, Edit2, X, DollarSign, Briefcase, Send, RefreshCw,
   TrendingUp, UserPlus, AlertCircle, HelpCircle, Download, FileText, Printer, Filter
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
 
 interface TeamMember {
   id: string
@@ -251,6 +255,46 @@ export default function CollaborationPage() {
   filteredMembersRef.current = filteredMembers
 
   const activeCount = members.filter(m => m.status === 'active').length
+
+  // Chart data computations
+  const statusChartData = useMemo(() => {
+    const statusCounts = { active: 0, busy: 0, offline: 0 }
+    members.forEach(m => {
+      if (statusCounts.hasOwnProperty(m.status)) {
+        statusCounts[m.status as keyof typeof statusCounts]++
+      }
+    })
+    return [
+      { name: 'Active', value: statusCounts.active, color: '#10b981' },
+      { name: 'Busy', value: statusCounts.busy, color: '#f59e0b' },
+      { name: 'Offline', value: statusCounts.offline, color: '#64748b' },
+    ]
+  }, [members])
+
+  const departmentChartData = useMemo(() => {
+    const deptCounts: Record<string, number> = {}
+    members.forEach(m => {
+      const dept = m.department || 'Unknown'
+      deptCounts[dept] = (deptCounts[dept] || 0) + 1
+    })
+    return Object.entries(deptCounts).map(([name, count]) => ({ name, count }))
+  }, [members])
+
+  const dailyRateChartData = useMemo(() => {
+    const deptRates: Record<string, { total: number; count: number }> = {}
+    members.forEach(m => {
+      if (m.dailyRate) {
+        const dept = m.department || 'Unknown'
+        if (!deptRates[dept]) deptRates[dept] = { total: 0, count: 0 }
+        deptRates[dept].total += m.dailyRate
+        deptRates[dept].count++
+      }
+    })
+    return Object.entries(deptRates).map(([name, data]) => ({ 
+      name, 
+      avgRate: Math.round(data.total / data.count / 1000) * 1000 
+    })).sort((a, b) => b.avgRate - a.avgRate)
+  }, [members])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -812,6 +856,77 @@ export default function CollaborationPage() {
           <p className="text-2xl font-bold text-violet-400">{loading ? '-' : stats.messages}</p>
         </div>
       </div>
+
+      {/* Charts Section */}
+      {!loading && members.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* Status Distribution */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-medium text-slate-400 mb-4">Status Distribution</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={statusChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={70}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {statusChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(value) => <span className="text-slate-400 text-xs">{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Department Distribution */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-medium text-slate-400 mb-4">Department Distribution</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={departmentChartData.slice(0, 6)}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Daily Rate by Department */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-medium text-slate-400 mb-4">Avg Daily Rate by Dept</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={dailyRateChartData.slice(0, 5)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#475569' }} width={80} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                  formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Avg Rate']}
+                />
+                <Bar dataKey="avgRate" fill="#10b981" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6">

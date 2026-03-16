@@ -18,12 +18,14 @@ import {
   UsersRound,
   AlertCircle,
   CheckCircle,
+  Check,
   TrendingUp,
   Keyboard,
   RefreshCw,
   ChevronDown,
   FileText,
   Printer,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart,
@@ -140,13 +142,15 @@ export default function CrewPage() {
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'dailyRate'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'skills'>('list');
+
   // Bulk selection state
   const [selectedCrew, setSelectedCrew] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [showBulkDepartmentMenu, setShowBulkDepartmentMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const selectedCrewRef = useRef(selectedCrew);
-  const showBulkActionsRef = useRef(showBulkActions);
+  const bulkActionsRef = useRef<HTMLDivElement>(null);
 
   // Sort options for UI
   const sortOptions = [
@@ -155,6 +159,25 @@ export default function CrewPage() {
     { key: 'department', label: 'Department' },
     { key: 'dailyRate', label: 'Daily Rate' },
   ];
+
+  // View mode options
+  const viewModeOptions = [
+    { key: 'list', label: 'List View', icon: Users },
+    { key: 'skills', label: 'Skills Matrix', icon: Briefcase },
+  ];
+
+  // Bulk selection handlers
+  const toggleSelectCrew = useCallback((id: string) => {
+    setSelectedCrew(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
 
   const fetchCrew = useCallback(async () => {
     setLoading(true);
@@ -193,50 +216,12 @@ export default function CrewPage() {
     }
   }, [fetchCrew])
 
-  // Update refs when values change
-  useEffect(() => {
-    selectedCrewRef.current = selectedCrew
-    showBulkActionsRef.current = showBulkActions
-  }, [selectedCrew, showBulkActions])
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea/select
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
         return
-      }
-      
-      // Bulk selection shortcuts - using inline to avoid dependency issues
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'a') {
-          e.preventDefault()
-          // Select all - will use filtered from closure via state
-          const checkboxes = document.querySelectorAll('input[type="checkbox"]')
-          checkboxes.forEach((cb) => {
-            if (cb instanceof HTMLInputElement) {
-              cb.checked = true
-            }
-          })
-          return
-        }
-        if (e.key === 'd' && selectedCrewRef.current.size > 0) {
-          e.preventDefault()
-          setShowDeleteConfirm(true)
-          return
-        }
-      }
-      
-      // Escape to clear selection
-      if (e.key === 'Escape') {
-        if (showBulkActionsRef.current) {
-          e.preventDefault()
-          setSelectedCrew(new Set())
-          setShowBulkActions(false)
-          setShowBulkDepartmentMenu(false)
-          setShowDeleteConfirm(false)
-          return
-        }
       }
       
       switch (e.key.toLowerCase()) {
@@ -256,10 +241,6 @@ export default function CrewPage() {
             setForm({ name: '', role: '', department: '', phone: '', email: '', dailyRate: '', notes: '' })
           }
           break
-        case 'd':
-          e.preventDefault()
-          // Could add department filter cycling here
-          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -270,10 +251,13 @@ export default function CrewPage() {
           setShowExportMenu(false)
           setShowPrintMenu(false)
           setShowFilters(false)
-          setShowBulkDepartmentMenu(false)
           setShowDeleteConfirm(false)
           setSearch('')
           setDeptFilter('all')
+          // Clear bulk selection when pressing Esc
+          if (selectedCrewRef.current.size > 0) {
+            clearSelection()
+          }
           break
         case 'f':
           e.preventDefault()
@@ -286,6 +270,32 @@ export default function CrewPage() {
         case 'p':
           e.preventDefault()
           handlePrintRef.current?.()
+          break
+        case 'v':
+          e.preventDefault()
+          setViewMode(prev => prev === 'list' ? 'skills' : 'list')
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('skills')
+          break
+        case 'a':
+          // Ctrl+A or Cmd+A for select all
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            selectAllCrew()
+          }
+          break
+        case 'd':
+          // Ctrl+D or Cmd+D for delete selected (when not in input)
+          if ((e.ctrlKey || e.metaKey) && selectedCrewRef.current.size > 0) {
+            e.preventDefault()
+            setShowDeleteConfirm(true)
+          }
           break
       }
     }
@@ -328,6 +338,47 @@ export default function CrewPage() {
     });
   }, [crew, search, deptFilter, sortBy, sortOrder]);
 
+  // Bulk selection handlers (defined after filtered to avoid reference errors)
+  const selectAllCrew = useCallback(() => {
+    setSelectedCrew(new Set(filtered.map(c => c.id)));
+  }, [filtered]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedCrew(new Set());
+    setShowBulkActions(false);
+  }, []);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedCrew.size === 0) return;
+    
+    try {
+      const idsToDelete = Array.from(selectedCrew);
+      // Delete each selected crew member
+      await Promise.all(
+        idsToDelete.map(async (id) => {
+          await fetch(`/api/crew?id=${id}`, { method: 'DELETE' });
+        })
+      );
+      setSuccess(`Successfully deleted ${idsToDelete.length} crew member(s)`);
+      setSelectedCrew(new Set());
+      setShowBulkActions(false);
+      setShowDeleteConfirm(false);
+      fetchCrew();
+    } catch (err) {
+      setError('Failed to delete selected crew');
+    }
+  }, [selectedCrew, fetchCrew]);
+
+  // Update selectedCrew ref
+  useEffect(() => {
+    selectedCrewRef.current = selectedCrew;
+    if (selectedCrew.size > 0) {
+      setShowBulkActions(true);
+    } else {
+      setShowBulkActions(false);
+    }
+  }, [selectedCrew]);
+
   const formatINR = (amount: number | string | null | undefined) => {
     if (amount === null || amount === undefined) return '₹0';
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -356,88 +407,6 @@ export default function CrewPage() {
     return { total, deptCounts, totalDailyRate, avgDailyRate, projected30Day, departments: Object.keys(deptCounts).length };
   }, [crew]);
 
-  // Bulk selection handlers
-  const handleSelectAll = useCallback(() => {
-    const allIds = new Set(filtered.map(c => c.id))
-    setSelectedCrew(allIds)
-    setShowBulkActions(allIds.size > 0)
-  }, [filtered])
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedCrew(new Set())
-    setShowBulkActions(false)
-    setShowBulkDepartmentMenu(false)
-    setShowDeleteConfirm(false)
-  }, [])
-
-  const handleToggleSelect = useCallback((id: string) => {
-    const newSelected = new Set(selectedCrew)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedCrew(newSelected)
-    setShowBulkActions(newSelected.size > 0)
-  }, [selectedCrew])
-
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedCrew.size === 0) return
-    setShowDeleteConfirm(false)
-    
-    setError(null)
-    try {
-      const idsToDelete = Array.from(selectedCrew)
-      for (const id of idsToDelete) {
-        const res = await fetch('/api/crew', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        })
-        if (!res.ok) {
-          throw new Error(`Failed to delete ${id}`)
-        }
-      }
-      setSuccess(`${idsToDelete.length} crew member(s) removed`)
-      setTimeout(() => setSuccess(null), 3000)
-      handleClearSelection()
-      await fetchCrew()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Bulk delete failed'
-      setError(message)
-    }
-  }, [selectedCrew, fetchCrew, handleClearSelection])
-
-  const handleBulkChangeDepartment = useCallback(async (newDepartment: string) => {
-    if (selectedCrew.size === 0) return
-    setShowBulkDepartmentMenu(false)
-    
-    setError(null)
-    try {
-      const idsToUpdate = Array.from(selectedCrew)
-      for (const id of idsToUpdate) {
-        const crewMember = crew.find(c => c.id === id)
-        if (crewMember) {
-          const res = await fetch('/api/crew', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, department: newDepartment }),
-          })
-          if (!res.ok) {
-            throw new Error(`Failed to update ${id}`)
-          }
-        }
-      }
-      setSuccess(`${idsToUpdate.length} crew member(s) moved to ${newDepartment}`)
-      setTimeout(() => setSuccess(null), 3000)
-      handleClearSelection()
-      await fetchCrew()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Bulk update failed'
-      setError(message)
-    }
-  }, [selectedCrew, crew, fetchCrew, handleClearSelection])
-
   const deptData = useMemo(() => {
     return DEPARTMENTS.map(dept => ({
       name: dept,
@@ -453,6 +422,30 @@ export default function CrewPage() {
         return sum + (isNaN(r) ? 0 : r);
       }, 0) / 1000,
     })).filter(d => d.rate > 0).sort((a, b) => b.rate - a.rate);
+  }, [crew]);
+
+  // Skills Matrix data computation
+  const skillsMatrix = useMemo(() => {
+    // Extract all unique skills from crew
+    const allSkills = new Set<string>();
+    crew.forEach(c => {
+      if (c.skills && Array.isArray(c.skills)) {
+        c.skills.forEach(s => allSkills.add(s));
+      }
+    });
+    const sortedSkills = Array.from(allSkills).sort();
+    
+    // Build matrix: crew member -> skills
+    const matrix = crew.map(c => ({
+      id: c.id,
+      name: c.name,
+      role: c.role,
+      department: c.department || 'Unassigned',
+      skills: c.skills || [],
+      hasSkill: (skill: string) => (c.skills || []).includes(skill),
+    }));
+    
+    return { skills: sortedSkills, matrix };
   }, [crew]);
 
   const openAddModal = () => {
@@ -864,6 +857,28 @@ export default function CrewPage() {
                   </div>
                 )}
               </div>
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1 border border-slate-700">
+                {viewModeOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isActive = viewMode === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => setViewMode(option.key as typeof viewMode)}
+                      className={`px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
+                        isActive 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                      title={`${option.label} (${option.key === 'list' ? '1' : '2'})`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="hidden md:inline">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
               <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium transition-colors">
                 <Plus className="w-4 h-4" />
                 Add Crew
@@ -1037,6 +1052,29 @@ export default function CrewPage() {
               <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-xs rounded-full">{activeFilterCount}</span>
             )}
           </button>
+          {/* Bulk Selection Controls */}
+          {selectedCrew.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-emerald-400 font-medium">{selectedCrew.size} selected</span>
+              <button
+                onClick={clearSelection}
+                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 transition-colors"
+                title="Clear Selection (Esc)"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={selectAllCrew}
+              disabled={filtered.length === 0}
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2"
+              title="Select All (Ctrl+A)"
+            >
+              <Check className="w-4 h-4" />
+              Select All
+            </button>
+          )}
           <span className="text-sm text-slate-500">{filtered.length} of {crew.length}</span>
         </div>
 
@@ -1107,26 +1145,108 @@ export default function CrewPage() {
           </div>
         )}
 
+        {/* Skills Matrix View */}
+        {viewMode === 'skills' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden mb-6">
+            <div className="p-4 border-b border-slate-800">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-emerald-400" />
+                Skills Matrix
+              </h3>
+              <p className="text-sm text-slate-400 mt-1">Visual overview of crew skills across all departments</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-900">
+                      Crew Member
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Department
+                    </th>
+                    {skillsMatrix.skills.map(skill => (
+                      <th key={skill} className="text-center px-2 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[80px]">
+                        <span className="transform -rotate-45 origin-center block" title={skill}>
+                          {skill.length > 10 ? skill.substring(0, 10) + '...' : skill}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(member => (
+                    <tr key={member.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                      <td className="px-4 py-3 sticky left-0 bg-slate-900">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-medium text-xs">
+                            {getInitials(member.name)}
+                          </div>
+                          <div>
+                            <p className="font-medium text-white text-sm">{member.name}</p>
+                            <p className="text-xs text-slate-500">{member.role}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {member.department ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${DEPT_COLORS[member.department] || '#64748b'}20`, color: DEPT_COLORS[member.department] || '#94a3b8' }}>
+                            {member.department}
+                          </span>
+                        ) : (<span className="text-slate-500 text-sm">—</span>)}
+                      </td>
+                      {skillsMatrix.skills.map(skill => {
+                        const hasSkill = (member.skills || []).includes(skill);
+                        return (
+                          <td key={skill} className="text-center px-2 py-3">
+                            {hasSkill ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-800 text-slate-600">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {skillsMatrix.skills.length === 0 && (
+              <div className="p-8 text-center text-slate-500">
+                No skills data available. Add skills to crew members to see the matrix.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Crew Table */}
+        {viewMode === 'list' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-800">
-                <th className="text-left px-4 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  <button
-                    onClick={handleSelectAll}
-                    className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
-                    title="Select all (Ctrl+A)"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCrew.size === filtered.length && filtered.length > 0}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <span>Name</span>
-                  </button>
+                <th className="text-left w-12 px-4 py-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedCrew.size === filtered.length && filtered.length > 0}
+                    onChange={() => selectedCrew.size === filtered.length ? clearSelection() : selectAllCrew()}
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
+                  />
+                </th>
+                <th 
+                  className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
+                  onClick={() => { setSortBy('name'); setSortOrder(sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
+                >
+                  Name {sortBy === 'name' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
                 </th>
                 <th 
                   className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
@@ -1148,7 +1268,7 @@ export default function CrewPage() {
                 >
                   Daily Rate {sortBy === 'dailyRate' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
                 </th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                <th className="text-right w-24 px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -1160,18 +1280,17 @@ export default function CrewPage() {
                 </tr>
               ) : (
                 filtered.map((member) => (
-                  <tr 
-                    key={member.id} 
-                    className={`hover:bg-slate-800/50 transition-colors ${selectedCrew.has(member.id) ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : ''}`}
-                  >
+                  <tr key={member.id} className={`hover:bg-slate-800/50 transition-colors ${selectedCrew.has(member.id) ? 'bg-emerald-500/5' : ''}`}>
                     <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedCrew.has(member.id)}
+                        onChange={() => toggleSelectCrew(member.id)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedCrew.has(member.id)}
-                          onChange={() => handleToggleSelect(member.id)}
-                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
-                        />
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-medium text-sm">
                           {getInitials(member.name)}
                         </div>
@@ -1227,93 +1346,68 @@ export default function CrewPage() {
             </tbody>
           </table>
         </div>
+        )}
 
-        {/* Bulk Actions Floating Toolbar */}
-        {showBulkActions && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 flex items-center gap-4 px-6 py-3 animate-in slide-in-from-bottom-4">
-              <div className="flex items-center gap-2">
-                <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-medium">
-                  {selectedCrew.size} selected
-                </span>
-              </div>
-              
-              <div className="h-6 w-px bg-slate-700" />
-              
-              {/* Change Department Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowBulkDepartmentMenu(!showBulkDepartmentMenu)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
-                >
-                  <Briefcase className="w-4 h-4" />
-                  Change Department
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showBulkDepartmentMenu ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showBulkDepartmentMenu && (
-                  <div className="absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[180px]">
-                    {DEPARTMENTS.map((dept) => (
-                      <button
-                        key={dept}
-                        onClick={() => handleBulkChangeDepartment(dept)}
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
-                      >
-                        <span 
-                          className="w-2 h-2 rounded-full" 
-                          style={{ backgroundColor: DEPT_COLORS[dept] || '#64748b' }}
-                        />
-                        {dept}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Delete Button */}
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-              
-              {/* Clear Selection */}
-              <button
-                onClick={handleClearSelection}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-800 rounded-lg text-sm text-slate-400 hover:text-white transition-colors"
-              >
-                Clear
-              </button>
+        {/* Floating Bulk Actions Toolbar */}
+        {showBulkActions && selectedCrew.size > 0 && (
+          <div 
+            ref={bulkActionsRef}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl px-6 py-3 flex items-center gap-4 z-30 animate-in slide-in-from-bottom-4"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-medium text-white">{selectedCrew.size} selected</span>
             </div>
+            <div className="h-6 w-px bg-slate-700" />
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm">
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <Trash2 className="w-8 h-8 text-red-400" />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowDeleteConfirm(false)}>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 rounded-full bg-red-500/20">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Delete {selectedCrew.size} Crew Member{selectedCrew.size !== 1 ? 's' : ''}?</h3>
-                <p className="text-slate-400 text-sm mb-6">This action cannot be undone. All selected crew members will be permanently removed.</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm text-white transition-colors"
-                  >
-                    Delete
-                  </button>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Delete Crew?</h3>
+                  <p className="text-sm text-slate-400">This action cannot be undone</p>
                 </div>
+              </div>
+              <p className="text-slate-300 mb-6">
+                Are you sure you want to delete <span className="font-semibold text-white">{selectedCrew.size}</span> selected crew member{selectedCrew.size > 1 ? 's' : ''}? This will permanently remove them from your crew list.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-medium text-white transition-colors"
+                >
+                  Delete {selectedCrew.size > 1 ? `${selectedCrew.size} Items` : 'Item'}
+                </button>
               </div>
             </div>
           </div>
@@ -1449,22 +1543,31 @@ export default function CrewPage() {
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Show shortcuts</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
-              </div>
-              <div className="py-2 border-b border-slate-800">
-                <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Bulk Selection</span>
+                <span className="text-slate-300">Toggle view mode</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">V</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Select all visible</span>
+                <span className="text-slate-300">Select all (when list view)</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Ctrl+A</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Delete selected</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Ctrl+D</kbd>
               </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">List view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Skills matrix view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Show shortcuts</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
+              </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-slate-300">Clear selection</span>
+                <span className="text-slate-300">Close / Clear selection</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
               </div>
             </div>

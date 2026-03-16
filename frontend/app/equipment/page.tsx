@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, CheckCircle } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -89,6 +89,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<EquipmentRental[]>([])
   const [stats, setStats] = useState<EquipmentStats>({ totalItems: 0, totalDailyRate: 0, available: 0, inUse: 0, maintenance: 0, returned: 0 })
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default budget limit: ₹5,00,000
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -184,6 +185,33 @@ export default function EquipmentPage() {
     })
     return Object.entries(breakdown).map(([name, value]) => ({ name, value }))
   }, [equipment])
+
+  // Budget tracking calculations
+  const budgetData = useMemo(() => {
+    // Calculate total estimated cost based on daily rate * rental days * quantity
+    const estimatedTotal = equipment.reduce((acc, eq) => {
+      const startDate = new Date(eq.dateStart)
+      const endDate = new Date(eq.dateEnd)
+      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+      const totalCost = eq.dailyRate * days * eq.quantity
+      return acc + totalCost
+    }, 0)
+    
+    const budgetUsedPercent = budgetLimit > 0 ? (estimatedTotal / budgetLimit) * 100 : 0
+    const budgetRemaining = budgetLimit - estimatedTotal
+    const isOverBudget = budgetRemaining < 0
+    const isWarning = !isOverBudget && budgetUsedPercent >= 80
+    const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
+    
+    return {
+      estimatedTotal,
+      budgetUsedPercent,
+      budgetRemaining,
+      isOverBudget,
+      isWarning,
+      budgetStatus,
+    }
+  }, [equipment, budgetLimit])
 
   const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
   const STATUS_COLORS: Record<string, string> = {
@@ -1028,6 +1056,85 @@ export default function EquipmentPage() {
             {success}
           </div>
         )}
+
+        {/* Budget Tracking */}
+        <div className={`rounded-xl border p-4 mb-4 ${
+          budgetData.budgetStatus === 'over' 
+            ? 'bg-red-500/10 border-red-500/30' 
+            : budgetData.budgetStatus === 'warning'
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : 'bg-emerald-500/10 border-emerald-500/30'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {budgetData.budgetStatus === 'over' ? (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              ) : budgetData.budgetStatus === 'warning' ? (
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+              )}
+              <span className={`font-semibold ${
+                budgetData.budgetStatus === 'over' 
+                  ? 'text-red-400' 
+                  : budgetData.budgetStatus === 'warning'
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+              }`}>
+                {budgetData.budgetStatus === 'over' 
+                  ? 'Over Budget!' 
+                  : budgetData.budgetStatus === 'warning'
+                  ? 'Budget Warning'
+                  : 'Budget OK'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-400">Budget Limit:</span>
+              <input
+                type="number"
+                value={budgetLimit}
+                onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter budget"
+              />
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="relative h-4 bg-slate-800 rounded-full overflow-hidden mb-2">
+            <div 
+              className={`absolute left-0 top-0 h-full transition-all duration-500 ${
+                budgetData.budgetStatus === 'over' 
+                  ? 'bg-red-500' 
+                  : budgetData.budgetStatus === 'warning'
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-500'
+              }`}
+              style={{ width: `${Math.min(budgetData.budgetUsedPercent, 100)}%` }}
+            />
+            {budgetData.budgetUsedPercent > 100 && (
+              <div 
+                className="absolute top-0 h-full bg-red-600"
+                style={{ width: `${Math.min(budgetData.budgetUsedPercent - 100, 100)}%`, left: '100%', transform: 'translateX(-100%)' }}
+              />
+            )}
+          </div>
+          
+          {/* Budget Stats */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400">
+              Estimated: <span className="text-white font-medium">₹{(budgetData.estimatedTotal / 100000).toFixed(2)}L</span>
+            </span>
+            <span className="text-slate-400">
+              {budgetData.budgetUsedPercent.toFixed(1)}% used
+            </span>
+            <span className={budgetData.budgetRemaining >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+              {budgetData.budgetRemaining >= 0 
+                ? `₹${(budgetData.budgetRemaining / 100000).toFixed(2)}L remaining`
+                : `₹${(Math.abs(budgetData.budgetRemaining) / 100000).toFixed(2)}L over`}
+            </span>
+          </div>
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

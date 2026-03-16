@@ -35,6 +35,7 @@ import {
   Download,
   FileText,
   Printer,
+  DollarSign,
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -74,6 +75,7 @@ interface Task {
   dueDate?: string
   createdAt: string
   updatedAt?: string
+  budgetAmount?: number // Budget allocated for this task
 }
 
 interface TaskStats {
@@ -85,6 +87,8 @@ interface TaskStats {
   overdue: number
   highPriority: number
   completionPercent: number
+  totalBudget: number
+  usedBudget: number
 }
 
 type ViewMode = 'list' | 'board' | 'calendar'
@@ -93,14 +97,14 @@ type FilterPriority = 'all' | 'high' | 'medium' | 'low'
 
 // Demo data fallback for when database is not connected
 const DEMO_TASKS: Task[] = [
-  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'completed', priority: 'high', assignee: 'Director', dueDate: '2026-03-12', createdAt: '2026-03-01' },
-  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'in_progress', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-15', createdAt: '2026-03-01' },
-  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-10', createdAt: '2026-02-28' },
-  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-16', createdAt: '2026-03-02' },
-  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-18', createdAt: '2026-03-01' },
-  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'blocked', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-11', createdAt: '2026-03-01' },
-  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-08', createdAt: '2026-02-27' },
-  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-11', createdAt: '2026-03-01' },
+  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'completed', priority: 'high', assignee: 'Director', dueDate: '2026-03-12', createdAt: '2026-03-01', budgetAmount: 50000 },
+  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'in_progress', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-15', createdAt: '2026-03-01', budgetAmount: 150000 },
+  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-10', createdAt: '2026-02-28', budgetAmount: 350000 },
+  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-16', createdAt: '2026-03-02', budgetAmount: 200000 },
+  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-18', createdAt: '2026-03-01', budgetAmount: 120000 },
+  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'blocked', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-11', createdAt: '2026-03-01', budgetAmount: 250000 },
+  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-08', createdAt: '2026-02-27', budgetAmount: 75000 },
+  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-11', createdAt: '2026-03-01', budgetAmount: 100000 },
 ]
 
 export default function TasksPage() {
@@ -133,11 +137,13 @@ export default function TasksPage() {
     priority: 'medium',
     assignee: '',
     dueDate: '',
+    budgetAmount: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
+  const [budgetLimit, setBudgetLimit] = useState<number>(1000000) // Default ₹10L
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   
@@ -237,7 +243,7 @@ export default function TasksPage() {
         if (!e.ctrlKey && !e.metaKey) {
           e.preventDefault()
           setEditingTask(null)
-          setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' })
+          setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '', budgetAmount: '' })
           setShowForm(true)
         }
         break
@@ -357,6 +363,10 @@ export default function TasksPage() {
     
     console.log('[Tasks] Calculating stats from', total, 'tasks')
     
+    // Budget calculations
+    const totalBudget = tasks.reduce((sum, t) => sum + (t.budgetAmount || 0), 0)
+    const usedBudget = tasks.filter(t => t.status !== 'pending').reduce((sum, t) => sum + (t.budgetAmount || 0), 0)
+    
     return {
       total,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -366,6 +376,8 @@ export default function TasksPage() {
       overdue: tasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'completed').length,
       highPriority: tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length,
       completionPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
+      totalBudget,
+      usedBudget,
     }
   }, [tasks])
 
@@ -449,6 +461,7 @@ export default function TasksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          budgetAmount: formData.budgetAmount ? Number(formData.budgetAmount) : 0,
           projectId: 'default-project',
         }),
       })
@@ -465,7 +478,7 @@ export default function TasksPage() {
       
       setShowForm(false)
       setEditingTask(null)
-      setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' })
+      setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '', budgetAmount: '' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save task')
     } finally {
@@ -807,6 +820,7 @@ export default function TasksPage() {
       priority: task.priority,
       assignee: task.assignee || '',
       dueDate: task.dueDate || '',
+      budgetAmount: task.budgetAmount?.toString() || '',
     })
     setShowForm(true)
   }
@@ -940,7 +954,7 @@ export default function TasksPage() {
               )}
             </div>
             <button
-              onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
+              onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '', budgetAmount: '' }); setShowForm(true) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -976,13 +990,45 @@ export default function TasksPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
           <StatCard label="Total" value={stats.total} icon={<ListChecks className="w-4 h-4" />} color="indigo" />
           <StatCard label="Pending" value={stats.pending} icon={<Clock className="w-4 h-4" />} color="slate" />
           <StatCard label="In Progress" value={stats.inProgress} icon={<TrendingUp className="w-4 h-4" />} color="blue" />
           <StatCard label="Completed" value={stats.completed} icon={<CheckCircle className="w-4 h-4" />} color="emerald" />
           <StatCard label="Overdue" value={stats.overdue} icon={<AlertCircle className="w-4 h-4" />} color="red" />
           <StatCard label="High Priority" value={stats.highPriority} icon={<Flag className="w-4 h-4" />} color="amber" />
+          {/* Budget Card */}
+          <div className={`bg-slate-900 border rounded-xl p-3 ${
+            stats.usedBudget > budgetLimit ? 'border-red-500/50' :
+            stats.totalBudget > budgetLimit * 0.8 ? 'border-amber-500/50' :
+            'border-slate-800'
+          }`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-slate-500">Budget</span>
+              <DollarSign className={`w-3 h-3 ${
+                stats.usedBudget > budgetLimit ? 'text-red-400' :
+                stats.totalBudget > budgetLimit * 0.8 ? 'text-amber-400' :
+                'text-emerald-400'
+              }`} />
+            </div>
+            <div className={`text-xl font-bold ${
+              stats.usedBudget > budgetLimit ? 'text-red-400' :
+              stats.totalBudget > budgetLimit * 0.8 ? 'text-amber-400' :
+              'text-white'
+            }`}>
+              ₹{(stats.totalBudget / 100000).toFixed(1)}L
+            </div>
+            <div className="text-[10px] text-slate-500">
+              Limit: ₹{(budgetLimit / 100000).toFixed(0)}L
+            </div>
+            <div className="mt-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${
+                stats.totalBudget > budgetLimit ? 'bg-red-500' :
+                stats.totalBudget > budgetLimit * 0.8 ? 'bg-amber-500' :
+                'bg-emerald-500'
+              }`} style={{ width: `${Math.min((stats.totalBudget / budgetLimit) * 100, 100)}%` }} />
+            </div>
+          </div>
         </div>
 
         {/* Charts */}
@@ -1138,6 +1184,20 @@ export default function TasksPage() {
                   >
                     {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
                   </button>
+                </div>
+                {/* Budget Limit */}
+                <div className="flex items-center gap-2 ml-auto pl-2 border-l border-slate-600">
+                  <label className="text-sm text-slate-400">Budget Limit:</label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-sm">₹</span>
+                    <input
+                      type="number"
+                      value={budgetLimit}
+                      onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                      className="w-24 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+                      placeholder="1000000"
+                    />
+                  </div>
                 </div>
                 <button
                   onClick={() => {
@@ -1506,6 +1566,16 @@ export default function TasksPage() {
                       type="date"
                       value={formData.dueDate}
                       onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Budget Amount (₹)</label>
+                    <input
+                      type="number"
+                      value={formData.budgetAmount}
+                      onChange={(e) => setFormData({ ...formData, budgetAmount: e.target.value })}
+                      placeholder="0"
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>

@@ -1,6 +1,40 @@
 # CinePilot Night Build Notes - March 17, 2026
 
-## Build Status: ✅ PASSING (8:34 AM)
+## Build Status: ✅ PASSING (9:14 AM)
+
+### 37. Analytics Page - Markdown Export Feature (March 17, 2026 9:14 AM)
+Added Markdown export capability to the Analytics page:
+
+- **Export Option**: New "Export as Markdown" button in the export dropdown (cyan colored icon)
+- **Professional Format**: Clean Markdown with comprehensive formatting:
+  - **Production Overview**: Total/completed scenes, completion %, locations, characters, shooting days, crew
+  - **Budget Summary**: Total/spent/remaining with utilization %, plus breakdown table
+  - **Shot & VFX Progress**: Total/completed/remaining for shots and VFX
+  - **Timeline Metrics**: Overall progress, days remaining, scenes remaining, budget utilization
+  - **Performance Metrics**: Avg scenes/day, avg shots/scene, budget burn rate, efficiency score
+  - **Predictions**: Projected completion date, budget overrun amount, risk level
+  - **Department Efficiency**: Table with efficiency and utilization % per department
+  - **Upcoming Shoots**: Date, location, scenes, call time for each scheduled shoot
+  - **Recent Activities**: Last 10 activities with timestamps and formatted descriptions
+  - **Filters Applied**: Shows current time period, department, and sort settings
+- **Content Preservation**: Full analytics data (dashboard, metrics, sorted data)
+- **Works with Filters**: Exports currently filtered data only
+- **File Naming**: Auto-generated (analytics-report-YYYY-MM-DD.md)
+- **Consistent UI**: Matches existing JSON/CSV buttons style
+- **Keyboard Shortcut**: 'M' key for direct Markdown export
+- **Keyboard Help**: Added 'M' to shortcuts modal
+- **useCallback**: handleExportMarkdown properly memoized
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard accessibility
+- **Error Handling**: Checks dashboard && metrics before export, handles empty data
+- **Lint Fix**: Added eslint-disable for useEffect dependencies (refs are stable)
+
+- **Build**: Clean build with 82 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors  
+- **Lint:** Passes (no warnings or errors)
+- **Tests:** 803 passing
+
+---
 
 ### 36. DOOD Page - Markdown Export Feature (March 17, 2026 8:34 AM)
 Added Markdown export capability to the Day Out of Days (DOOD) page:

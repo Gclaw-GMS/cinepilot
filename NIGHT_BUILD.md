@@ -1,5 +1,229 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (4:14 AM) - Crew Markdown Export IMPLEMENTED
+
+---
+
+## 4:14 AM - Crew Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Crew Page - Markdown Export**: Added ability to export crew data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan icon)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total crew, total daily rate, average rate, departments)
+    - Department Breakdown table with member counts
+    - Crew Details table with name, role, department, daily rate, contact info
+    - Skills Overview section listing all unique skills
+  - **Content Preservation**: Full crew data included in export
+  - **Works with Filters**: Exports currently filtered crew members
+  - **File Naming**: Auto-generated filename with date (crew-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: exportToMarkdown() generates formatted markdown
+- **Summary Stats**: Includes total crew, total daily rate, average rate, department count
+- **Department Breakdown**: Groups and counts crew by department
+- **Details Table**: Markdown table showing all crew with role, department, rate, contact
+- **Skills Section**: Unique skills from all crew members listed
+- **Blob Creation**: Creates downloadable text/markdown blob
+- **useCallback Pattern**: Uses useCallback for proper memoization
+- **useRef Pattern**: Uses refs to avoid dependency issues with useMemo variables
+- **useEffect Assignment**: Updates ref when exportToMarkdown function changes
+
+### Keyboard Shortcuts
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print crew report
+- **R** - Refresh data
+- **N** - Add new crew member
+- **F** - Toggle filters
+- **V** - Toggle view mode
+- **1** - Switch to List view
+- **2** - Switch to Skills view
+- **3** - Switch to Analytics view
+- **4** - Switch to Conflicts view
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Crew Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Department breakdown shows member counts
+- [x] Crew details in table format with contact info
+- [x] Skills overview section included
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (empty check)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## Build Status: ✅ PASSING (3:34 AM) - Budget Markdown Export IMPLEMENTED
+
+---
+
+## 3:34 AM - Budget Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Budget Page - Markdown Export**: Added ability to export budget data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan icon)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total planned, spent, remaining, usage %, items, categories)
+    - Budget by Category breakdown with amounts
+    - Budget Items table with all details (#, Category, Subcategory, Description, Quantity, Unit, Total)
+    - Expenses section with date, category, description, amount, vendor, status
+    - Forecast section with planned, actual, EAC, variance, % spent
+    - Category Forecast table with planned, actual, forecast, status per category
+  - **Content Preservation**: Full budget data included in export
+  - **Works with Filters**: Respects current sort settings
+  - **File Naming**: Auto-generated filename with date (budget-report-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown() generates formatted markdown
+- **Summary Stats**: Includes total planned, spent, remaining, usage %, items, categories
+- **Category Breakdown**: Groups and totals budget items by category
+- **Items Table**: Full budget items with all details
+- **Expenses Section**: Included when expenses data is available
+- **Forecast Section**: Included when forecast data is available
+- **Blob Creation**: Creates downloadable text/markdown blob
+- **useCallback Pattern**: Uses useCallback for proper memoization
+- **useRef Pattern**: Uses refs to avoid dependency issues with useMemo variables
+
+### Keyboard Shortcuts
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print budget report
+- **R** - Refresh data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **N** - Add new expense
+- **/** - Focus search
+- **1-5** - Switch tabs (Overview/Breakdown/Expenses/Forecast/Recommendations)
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search / Reset filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Budget Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Budget by category breakdown shows amounts
+- [x] Budget items table with all details
+- [x] Expenses section included when available
+- [x] Forecast section included when available
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (empty check)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## Build Status: ✅ PASSING (3:14 AM) - Catering Markdown Export IMPLEMENTED
+
+---
+
+## 3:14 AM - Catering Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Catering Page - Markdown Export**: Added ability to export catering data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan icon)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total budget, spent, remaining, usage %, shoot days, total meals, total people)
+    - Meals by Type breakdown with counts
+    - Dietary Requirements section showing count per dietary option
+    - Meal Schedule table with date, people count, meals, budget, and actual costs
+  - **Content Preservation**: Full catering data included in export
+  - **Works with Filters**: Exports currently filtered shoot days only
+  - **Sort Applied**: Respects current sort settings (date, budget, mealType, people)
+  - **Search Applied**: Respects current search query
+  - **File Naming**: Auto-generated filename with date (catering-report-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown() generates formatted markdown
+- **Ref Pattern**: Uses planRef to access data and applies filtering/sorting internally
+- **Summary Stats**: Includes total budget, spent, remaining, usage %, shoot days, meals, people
+- **Meals by Type**: Groups and counts meals by type (breakfast, lunch, snacks, dinner)
+- **Dietary Requirements**: Shows count per dietary restriction option
+- **Meal Schedule Table**: Markdown table with date, people, meals, budget, actual
+- **Blob Creation**: Creates downloadable text/markdown blob
+- **useCallback Pattern**: Uses useCallback for proper memoization
+- **useRef Pattern**: Uses refs to avoid dependency issues with useMemo variables
+
+### Keyboard Shortcuts
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print catering report
+- **N** - Add new shoot day
+- **R** - Refresh data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Catering Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Meals by type breakdown shows counts
+- [x] Dietary requirements section with counts
+- [x] Meal schedule table with date, people, meals, budget, actual
+- [x] Filters applied to export
+- [x] Sort order applied to export
+- [x] Search query applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (empty check)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
 ## Build Status: ✅ PASSING (2:53 AM) - Tasks Markdown Export IMPLEMENTED
 
 ---

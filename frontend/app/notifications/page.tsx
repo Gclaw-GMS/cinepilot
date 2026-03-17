@@ -24,7 +24,25 @@ import {
   Keyboard,
   Download,
   Printer,
+  BarChart3,
+  PieChart as PieChartIcon,
+  TrendingUp,
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from 'recharts';
 
 type Notification = {
   id: string;
@@ -198,6 +216,7 @@ export default function NotificationsPage() {
   const [exporting, setExporting] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
@@ -577,6 +596,66 @@ export default function NotificationsPage() {
     failed: notifications.filter(n => n.status === 'failed').length,
   };
 
+  // Analytics data for charts
+  const channelData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notifications.forEach(n => {
+      counts[n.channel] = (counts[n.channel] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+    }));
+  }, [notifications]);
+
+  const statusData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notifications.forEach(n => {
+      counts[n.status] = (counts[n.status] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+    }));
+  }, [notifications]);
+
+  const priorityData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notifications.forEach(n => {
+      counts[n.priority] = (counts[n.priority] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+    }));
+  }, [notifications]);
+
+  // Time-based data for area chart
+  const timeData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notifications.forEach(n => {
+      const date = new Date(n.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+      counts[date] = (counts[date] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(-7); // Last 7 unique days
+  }, [notifications]);
+
+  const CHANNEL_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+  const STATUS_COLORS_CHART = {
+    Unread: '#3b82f6',
+    Sent: '#10b981',
+    Read: '#64748b',
+    Failed: '#ef4444',
+  };
+  const PRIORITY_COLORS_CHART = {
+    High: '#ef4444',
+    Medium: '#f59e0b',
+    Low: '#64748b',
+  };
+
   // Filter notifications
   const filteredNotifications = notifications.filter(n => {
     const matchesTab = filterTab === 'all' 
@@ -765,6 +844,20 @@ export default function NotificationsPage() {
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+
+            {/* Analytics Toggle Button */}
+            <button
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                showAnalytics
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600'
+              }`}
+              title="Analytics"
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span>Analytics</span>
+            </button>
             
             {/* Filter Toggle Button */}
             <button
@@ -883,6 +976,191 @@ export default function NotificationsPage() {
             ✉️ Compose
           </button>
         </div>
+
+        {showAnalytics && activeTab !== 'compose' && (
+          /* Analytics Dashboard */
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500">
+                <BarChart3 className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Analytics</h2>
+                <p className="text-sm text-slate-400">Notification distribution and trends</p>
+              </div>
+            </div>
+
+            {/* Chart Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Channel Distribution - Pie Chart */}
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                  <PieChartIcon className="h-4 w-4 text-blue-400" />
+                  By Channel
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={channelData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={60}
+                        paddingAngle={4}
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={false}
+                      >
+                        {channelData.map((entry, index) => (
+                          <Cell key={entry.name} fill={CHANNEL_COLORS[index % CHANNEL_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number) => [`${value} notifications`, '']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Status Distribution - Bar Chart */}
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-emerald-400" />
+                  By Status
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={statusData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} width={60} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number) => [`${value} notifications`, '']}
+                      />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {statusData.map((entry) => (
+                          <Cell key={entry.name} fill={STATUS_COLORS_CHART[entry.name as keyof typeof STATUS_COLORS_CHART] || '#64748b'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Priority Distribution - Donut Chart */}
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-amber-400" />
+                  By Priority
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={priorityData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={55}
+                        paddingAngle={4}
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={false}
+                      >
+                        {priorityData.map((entry) => (
+                          <Cell key={entry.name} fill={PRIORITY_COLORS_CHART[entry.name as keyof typeof PRIORITY_COLORS_CHART] || '#64748b'} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number) => [`${value} notifications`, '']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Time Trend - Area Chart */}
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-cyan-400" />
+                  Recent Trend
+                </h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={timeData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="date" stroke="#64748b" fontSize={10} />
+                      <YAxis stroke="#64748b" fontSize={10} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number) => [`${value} notifications`, '']}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#06b6d4"
+                        fill="#06b6d4"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
+                <p className="text-xs text-slate-400">Top Channel</p>
+                <p className="text-lg font-semibold text-white">
+                  {channelData.length > 0 ? channelData.sort((a, b) => b.value - a.value)[0]?.name : '-'}
+                </p>
+              </div>
+              <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
+                <p className="text-xs text-slate-400">Most Common Status</p>
+                <p className="text-lg font-semibold text-white">
+                  {statusData.length > 0 ? statusData.sort((a, b) => b.value - a.value)[0]?.name : '-'}
+                </p>
+              </div>
+              <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
+                <p className="text-xs text-slate-400">Highest Priority</p>
+                <p className="text-lg font-semibold text-white">
+                  {priorityData.length > 0 ? priorityData.sort((a, b) => b.value - a.value)[0]?.name : '-'}
+                </p>
+              </div>
+              <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
+                <p className="text-xs text-slate-400">Total Time Span</p>
+                <p className="text-lg font-semibold text-white">
+                  {timeData.length > 0 ? `${timeData.length} days` : '-'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'compose' ? (
           /* Compose Form */

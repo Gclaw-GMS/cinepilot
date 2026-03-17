@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson, Printer } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson, Printer, Shield } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -40,18 +40,6 @@ type Summary = {
   complexityBreakdown: { simple: number; moderate: number; complex: number };
   estimatedTotalCost: number;
   estimatedTotalDuration: number;
-};
-
-// VFX Conflict Types
-type VfxConflict = {
-  id: string;
-  type: 'budget' | 'certification' | 'complexity' | 'timeline' | 'technical';
-  severity: 'high' | 'medium' | 'low';
-  scene: string;
-  sceneHeading?: string;
-  title: string;
-  description: string;
-  recommendation: string;
 };
 
 // VFX Cost estimation constants (in INR per second)
@@ -199,6 +187,36 @@ export default function VfxPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
+  
+  // Budget tracking state
+  const [budgetLimit, setBudgetLimit] = useState<number>(5000000); // Default ₹5Cr VFX budget
+  
+  // Budget calculations
+  const budgetUsedPercent = useMemo(() => {
+    if (!summary || budgetLimit === 0) return 0;
+    return Math.round((summary.estimatedTotalCost / budgetLimit) * 100);
+  }, [summary, budgetLimit]);
+  
+  const budgetRemaining = useMemo(() => {
+    if (!summary) return budgetLimit;
+    return budgetLimit - summary.estimatedTotalCost;
+  }, [summary, budgetLimit]);
+  
+  const isOverBudget = useMemo(() => {
+    if (!summary) return false;
+    return summary.estimatedTotalCost > budgetLimit;
+  }, [summary, budgetLimit]);
+  
+  const isWarning = useMemo(() => {
+    if (!summary || isOverBudget) return false;
+    return budgetUsedPercent >= 80;
+  }, [summary, budgetUsedPercent, isOverBudget]);
+  
+  const budgetStatus = useMemo(() => {
+    if (isOverBudget) return 'over';
+    if (isWarning) return 'warning';
+    return 'ok';
+  }, [isOverBudget, isWarning]);
   
   // Refs for keyboard shortcuts and menus
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -431,120 +449,119 @@ export default function VfxPage() {
   }, [filteredNotes, vfxWarnings, vfxProps]);
 
   // VFX Conflict Detection
-  const VFX_BUDGET_LIMIT = 5000000; // ₹50L threshold
+  type Conflict = {
+    id: string;
+    type: 'budget' | 'certification' | 'complexity' | 'timeline' | 'technical';
+    severity: 'high' | 'medium' | 'low';
+    scene: string;
+    sceneHeading: string | null;
+    title: string;
+    description: string;
+    recommendation?: string;
+  };
 
   const vfxConflicts = useMemo(() => {
-    const conflicts: VfxConflict[] = [];
-    const sceneVfxCounts = new Map<string, number>();
-
-    // Count VFX shots per scene
-    for (const note of vfxNotes) {
-      const sceneKey = note.scene.sceneNumber;
-      sceneVfxCounts.set(sceneKey, (sceneVfxCounts.get(sceneKey) || 0) + 1);
-    }
-
+    const conflicts: Conflict[] = [];
+    const COMPLEX_SCENE_THRESHOLD = 3;
+    const EXPLICIT_CONTENT_WARNING = ['explicit', 'blood', 'violence', 'gore'];
+    
     // 1. Budget Overrun Detection
-    if (summary && summary.estimatedTotalCost > VFX_BUDGET_LIMIT) {
+    if (summary && summary.estimatedTotalCost > budgetLimit) {
+      const overrun = summary.estimatedTotalCost - budgetLimit;
       conflicts.push({
-        id: 'conflict-budget',
+        id: 'budget-1',
         type: 'budget',
-        severity: 'high',
-        scene: 'N/A',
-        title: 'Budget Overrun Risk',
-        description: `Estimated VFX cost (₹${(summary.estimatedTotalCost / 100000).toFixed(1)}L) exceeds budget limit (₹50L)`,
-        recommendation: 'Consider reducing VFX complexity or negotiating rates with VFX vendors',
+        severity: overrun > 2000000 ? 'high' : 'medium',
+        scene: 'All',
+        sceneHeading: null,
+        title: 'Budget Overrun Warning',
+        description: `Estimated VFX cost (₹${(summary.estimatedTotalCost / 100000).toFixed(1)}L) exceeds budget limit (₹${budgetLimit / 100000}L) by ₹${(overrun / 100000).toFixed(1)}L`,
+        recommendation: 'Consider simplifying complex shots or moving some VFX to post-production'
       });
     }
 
-    // 2. Certification Risk Detection
-    const explicitTypes = ['explicit', 'blood', 'violence', 'gore'];
-    for (const note of vfxNotes) {
-      if (explicitTypes.includes(note.vfxType.toLowerCase()) || 
-          note.description.toLowerCase().includes('blood') ||
-          note.description.toLowerCase().includes('violence') ||
-          note.description.toLowerCase().includes('gore')) {
-        const existingConflict = conflicts.find(c => c.type === 'certification');
-        if (!existingConflict) {
-          conflicts.push({
-            id: 'conflict-certification',
-            type: 'certification',
-            severity: 'medium',
-            scene: note.scene.sceneNumber,
-            sceneHeading: note.scene.headingRaw || undefined,
-            title: 'Certification Risk Detected',
-            description: `Scene ${note.scene.sceneNumber} contains explicit VFX content that may impact UA/A certification`,
-            recommendation: 'Review content and prepare alternate takes for censor board submission',
-          });
-        }
-      }
-    }
-
-    // 3. Complexity Warning Detection
-    const complexNotes = vfxNotes.filter(n => n.confidence >= 0.8);
-    if (complexNotes.length >= 3) {
+    // 2. Complex Scene Detection
+    const complexScenes = vfxNotes.filter(n => n.vfxType === 'explicit' || n.vfxType === 'simulation');
+    if (complexScenes.length > COMPLEX_SCENE_THRESHOLD) {
+      const complexSceneNumbers = [...new Set(complexScenes.map(n => n.scene.sceneNumber))].slice(0, 5);
       conflicts.push({
-        id: 'conflict-complexity',
+        id: 'complexity-1',
         type: 'complexity',
-        severity: 'medium',
-        scene: 'N/A',
-        title: 'High Complexity VFX',
-        description: `${complexNotes.length} scenes have high complexity VFX (confidence ≥80%)`,
-        recommendation: 'Start VFX prep early and allocate additional render time in schedule',
+        severity: complexScenes.length > 6 ? 'high' : 'medium',
+        scene: complexSceneNumbers.join(', '),
+        sceneHeading: complexScenes[0]?.scene.headingRaw || null,
+        title: 'High Complexity Scenes Detected',
+        description: `${complexScenes.length} complex VFX shots detected (explicit content, simulations). This may impact production timeline.`,
+        recommendation: 'Schedule these shots early in the shoot to allow buffer time for corrections'
       });
     }
 
-    // 4. Timeline Conflict Detection (>5 VFX shots per scene)
-    for (const [scene, count] of sceneVfxCounts) {
-      if (count > 5) {
-        const sceneNote = vfxNotes.find(n => n.scene.sceneNumber === scene);
-        conflicts.push({
-          id: `conflict-timeline-${scene}`,
-          type: 'timeline',
-          severity: 'high',
-          scene: scene,
-          sceneHeading: sceneNote?.scene.headingRaw || undefined,
-          title: 'Timeline Conflict',
-          description: `Scene ${scene} has ${count} VFX shots - may impact daily shooting schedule`,
-          recommendation: 'Consider splitting VFX-heavy scenes across multiple shoot days',
-        });
-      }
+    // 3. Certification Issues Detection
+    const explicitNotes = vfxNotes.filter(n => 
+      n.vfxType === 'explicit' || n.description.toLowerCase().includes('blood') || 
+      n.description.toLowerCase().includes('violence') || n.description.toLowerCase().includes('gore')
+    );
+    if (explicitNotes.length > 0) {
+      const uniqueScenes = [...new Set(explicitNotes.map(n => n.scene.sceneNumber))];
+      conflicts.push({
+        id: 'cert-1',
+        type: 'certification',
+        severity: 'high',
+        scene: uniqueScenes.join(', '),
+        sceneHeading: explicitNotes[0]?.scene.headingRaw || null,
+        title: 'Certification Risk Detected',
+        description: `${explicitNotes.length} explicit VFX shots detected across ${uniqueScenes.length} scenes. May require UA/A certification cuts.`,
+        recommendation: 'Plan for alternate takes or post-production edits for theatrical release'
+      });
     }
 
-    // 5. Technical Feasibility Detection (confidence < 50%)
-    for (const note of vfxNotes) {
-      if (note.confidence < 0.5) {
+    // 4. Low Confidence Detection (Technical Feasibility)
+    const lowConfidenceNotes = vfxNotes.filter(n => n.confidence < 0.5);
+    if (lowConfidenceNotes.length > 0) {
+      conflicts.push({
+        id: 'tech-1',
+        type: 'technical',
+        severity: 'low',
+        scene: lowConfidenceNotes.map(n => n.scene.sceneNumber).join(', '),
+        sceneHeading: lowConfidenceNotes[0]?.scene.headingRaw || null,
+        title: 'Low Confidence VFX Shots',
+        description: `${lowConfidenceNotes.length} VFX shots have low confidence scores (<50%). These may need additional planning or reference material.`,
+        recommendation: 'Gather more reference material or consult with VFX supervisor for these shots'
+      });
+    }
+
+    // 5. Timeline Conflict - too many VFX shots per scene
+    const sceneVfxCount = new Map<string, number>();
+    vfxNotes.forEach(note => {
+      const count = sceneVfxCount.get(note.scene.sceneNumber) || 0;
+      sceneVfxCount.set(note.scene.sceneNumber, count + 1);
+    });
+    sceneVfxCount.forEach((count, sceneNum) => {
+      if (count > 5) {
+        const note = vfxNotes.find(n => n.scene.sceneNumber === sceneNum);
         conflicts.push({
-          id: `conflict-technical-${note.id}`,
-          type: 'technical',
-          severity: 'low',
-          scene: note.scene.sceneNumber,
-          sceneHeading: note.scene.headingRaw || undefined,
-          title: 'Technical Feasibility Concern',
-          description: `Scene ${note.scene.sceneNumber}: Low confidence (${Math.round(note.confidence * 100)}%) for "${note.description.slice(0, 50)}..."`,
-          recommendation: 'Consult with VFX supervisor for feasibility assessment',
+          id: `timeline-${sceneNum}`,
+          type: 'timeline',
+          severity: count > 8 ? 'high' : 'medium',
+          scene: sceneNum,
+          sceneHeading: note?.scene.headingRaw || null,
+          title: 'High VFX Shot Count',
+          description: `Scene ${sceneNum} has ${count} VFX shots - may require multiple shoot days or extended post time.`,
+          recommendation: 'Consider splitting into pickup shoots or simplifying during pre-production'
         });
       }
-    }
+    });
 
     return conflicts;
-  }, [vfxNotes, summary]);
+  }, [vfxNotes, summary, budgetLimit]);
 
-  // Conflict statistics
-  const conflictStats = useMemo(() => {
-    return {
-      total: vfxConflicts.length,
-      high: vfxConflicts.filter(c => c.severity === 'high').length,
-      medium: vfxConflicts.filter(c => c.severity === 'medium').length,
-      low: vfxConflicts.filter(c => c.severity === 'low').length,
-      byType: {
-        budget: vfxConflicts.filter(c => c.type === 'budget').length,
-        certification: vfxConflicts.filter(c => c.type === 'certification').length,
-        complexity: vfxConflicts.filter(c => c.type === 'complexity').length,
-        timeline: vfxConflicts.filter(c => c.type === 'timeline').length,
-        technical: vfxConflicts.filter(c => c.type === 'technical').length,
-      },
-    };
-  }, [vfxConflicts]);
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: vfxConflicts.length,
+    high: vfxConflicts.filter(c => c.severity === 'high').length,
+    medium: vfxConflicts.filter(c => c.severity === 'medium').length,
+    low: vfxConflicts.filter(c => c.severity === 'low').length,
+  }), [vfxConflicts]);
 
   // Form handlers
   const resetForm = () => {
@@ -1422,6 +1439,83 @@ export default function VfxPage() {
                 </div>
                 <div className="text-2xl font-bold">{formatDuration(summary.estimatedTotalDuration)}</div>
               </div>
+              {/* Budget Tracking Card */}
+              <div className={`bg-slate-900 border rounded-xl p-4 ${
+                budgetStatus === 'over' ? 'border-red-500/50 bg-red-900/20' :
+                budgetStatus === 'warning' ? 'border-amber-500/50 bg-amber-900/20' :
+                'border-emerald-500/30 bg-emerald-900/10'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className={`w-4 h-4 ${
+                      budgetStatus === 'over' ? 'text-red-400' :
+                      budgetStatus === 'warning' ? 'text-amber-400' :
+                      'text-emerald-400'
+                    }`} />
+                    <span className={`text-xs ${
+                      budgetStatus === 'over' ? 'text-red-300' :
+                      budgetStatus === 'warning' ? 'text-amber-300' :
+                      'text-emerald-300'
+                    }`}>Budget Limit</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {budgetStatus === 'over' ? (
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                    ) : budgetStatus === 'warning' ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    )}
+                  </div>
+                </div>
+                {/* Budget Progress Bar */}
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-400">{budgetUsedPercent}% used</span>
+                    <span className={
+                      budgetStatus === 'over' ? 'text-red-400' :
+                      budgetStatus === 'warning' ? 'text-amber-400' :
+                      'text-emerald-400'
+                    }>{budgetRemaining >= 0 ? formatCurrency(budgetRemaining) : `-${formatCurrency(Math.abs(budgetRemaining))}`} remaining</span>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${
+                      budgetStatus === 'over' ? 'bg-red-500' :
+                      budgetStatus === 'warning' ? 'bg-amber-500' :
+                      'bg-emerald-500'
+                    }`} style={{ width: `${Math.min(budgetUsedPercent, 100)}%` }} />
+                  </div>
+                </div>
+                {/* Budget Limit Input */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-xs">Set Limit:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-400">₹</span>
+                    <input
+                      type="number"
+                      value={budgetLimit}
+                      onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                      className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+                {/* Status Message */}
+                {budgetStatus === 'over' && (
+                  <p className="text-xs text-red-400 mt-2">
+                    ⚠️ Over budget by {formatCurrency(Math.abs(budgetRemaining))}
+                  </p>
+                )}
+                {budgetStatus === 'warning' && budgetRemaining >= 0 && (
+                  <p className="text-xs text-amber-400 mt-2">
+                    ⚠️ Approaching budget limit ({budgetUsedPercent}%)
+                  </p>
+                )}
+                {budgetStatus === 'ok' && budgetRemaining > 0 && (
+                  <p className="text-xs text-emerald-400 mt-2">
+                    ✓ Within budget
+                  </p>
+                )}
+              </div>
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -1478,7 +1572,7 @@ export default function VfxPage() {
               </button>
               <button
                 onClick={() => setActiveTab('conflicts')}
-                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors flex items-center gap-2 ${
+                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors relative ${
                   activeTab === 'conflicts'
                     ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1486,7 +1580,7 @@ export default function VfxPage() {
               >
                 Conflicts
                 {conflictStats.high > 0 && (
-                  <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold">
                     {conflictStats.high}
                   </span>
                 )}
@@ -1784,9 +1878,9 @@ export default function VfxPage() {
         )}
 
         {/* Conflicts Tab */}
-        {displayScenes.length > 0 && activeTab === 'conflicts' && (
+        {activeTab === 'conflicts' && (
           <div className="space-y-6">
-            {/* Conflict Summary Stats */}
+            {/* Conflict Stats Dashboard */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <div className="text-sm text-slate-400 mb-1">Total Conflicts</div>
@@ -1800,95 +1894,106 @@ export default function VfxPage() {
                 <div className="text-sm text-amber-400 mb-1">Medium Priority</div>
                 <div className="text-3xl font-bold text-amber-400">{conflictStats.medium}</div>
               </div>
-              <div className="bg-slate-700/30 border border-slate-600 rounded-xl p-4">
+              <div className="bg-slate-700/30 border border-slate-600/30 rounded-xl p-4">
                 <div className="text-sm text-slate-400 mb-1">Low Priority</div>
                 <div className="text-3xl font-bold text-slate-400">{conflictStats.low}</div>
               </div>
             </div>
 
-            {/* Conflict Type Summary */}
-            {conflictStats.total > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {Object.entries(conflictStats.byType).map(([type, count]) => (
-                  count > 0 && (
-                    <div key={type} className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
-                      <span className="text-sm text-slate-400 capitalize">{type}</span>
-                      <span className="text-lg font-semibold text-purple-400">{count}</span>
-                    </div>
-                  )
-                ))}
-              </div>
-            )}
-
-            {/* Conflicts List or Empty State */}
-            {conflictStats.total === 0 ? (
+            {/* All Clear State */}
+            {vfxConflicts.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
                 <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">All Clear!</h3>
-                <p className="text-slate-400">No VFX conflicts detected. Your production is on track.</p>
+                <h3 className="text-xl font-semibold text-white mb-2">VFX Plan Looks Good!</h3>
+                <p className="text-slate-400">No conflicts detected. Your VFX shots are within budget and timeline.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              /* Conflict Cards Grid */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {vfxConflicts.map((conflict) => {
                   const severityStyles = {
-                    high: 'border-red-500/50 bg-red-900/10',
-                    medium: 'border-amber-500/50 bg-amber-900/10',
-                    low: 'border-slate-600 bg-slate-800/30',
+                    high: { bg: 'bg-red-900/20', border: 'border-red-500/30', text: 'text-red-400', badge: 'bg-red-500' },
+                    medium: { bg: 'bg-amber-900/20', border: 'border-amber-500/30', text: 'text-amber-400', badge: 'bg-amber-500' },
+                    low: { bg: 'bg-slate-800/30', border: 'border-slate-600/30', text: 'text-slate-400', badge: 'bg-slate-500' },
                   };
-                  const severityTextColors = {
-                    high: 'text-red-400',
-                    medium: 'text-amber-400',
-                    low: 'text-slate-400',
+                  const typeIcons = {
+                    budget: <DollarSign className="w-5 h-5" />,
+                    certification: <Shield className="w-5 h-5" />,
+                    complexity: <AlertTriangle className="w-5 h-5" />,
+                    timeline: <Clock className="w-5 h-5" />,
+                    technical: <Wand2 className="w-5 h-5" />,
                   };
-                  const typeIcons: Record<string, typeof DollarSign> = {
-                    budget: DollarSign,
-                    certification: AlertCircle,
-                    complexity: AlertTriangle,
-                    timeline: Clock,
-                    technical: AlertTriangle,
+                  const typeLabels = {
+                    budget: 'Budget',
+                    certification: 'Certification',
+                    complexity: 'Complexity',
+                    timeline: 'Timeline',
+                    technical: 'Technical',
                   };
-                  const TypeIcon = typeIcons[conflict.type] || AlertCircle;
-
+                  const style = severityStyles[conflict.severity];
+                  
                   return (
-                    <div
-                      key={conflict.id}
-                      className={`border rounded-xl p-5 ${severityStyles[conflict.severity]}`}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className={`p-2 rounded-lg ${
-                          conflict.severity === 'high' ? 'bg-red-500/20' :
-                          conflict.severity === 'medium' ? 'bg-amber-500/20' : 'bg-slate-700/50'
-                        }`}>
-                          <TypeIcon className={`w-5 h-5 ${severityTextColors[conflict.severity]}`} />
+                    <div key={conflict.id} className={`${style.bg} border ${style.border} rounded-xl p-5`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`${style.text}`}>
+                            {typeIcons[conflict.type]}
+                          </span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text} border ${style.border}`}>
+                            {typeLabels[conflict.type]}
+                          </span>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-semibold text-white">{conflict.title}</h4>
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
-                              conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-400'
-                            }`}>
-                              {conflict.severity.toUpperCase()}
-                            </span>
-                            {conflict.scene !== 'N/A' && (
-                              <span className="text-sm text-slate-500">Scene {conflict.scene}</span>
-                            )}
-                          </div>
-                          <p className="text-slate-300 mb-3">{conflict.description}</p>
-                          <div className="bg-slate-900/50 rounded-lg p-3">
-                            <span className="text-xs text-slate-500 uppercase tracking-wide">Recommendation: </span>
-                            <span className="text-sm text-slate-300">{conflict.recommendation}</span>
-                          </div>
-                        </div>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${style.badge}`}>
+                          {conflict.severity.toUpperCase()}
+                        </span>
                       </div>
+                      
+                      <h4 className="text-lg font-semibold text-white mb-2">{conflict.title}</h4>
+                      
+                      {conflict.scene && (
+                        <div className="text-sm text-slate-400 mb-2">
+                          <span className="text-slate-500">Scene:</span> {conflict.scene}
+                        </div>
+                      )}
+                      
+                      <p className="text-sm text-slate-300 mb-3">{conflict.description}</p>
+                      
+                      {conflict.recommendation && (
+                        <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
+                          <div className="text-xs text-purple-400 font-medium mb-1">Recommendation</div>
+                          <p className="text-sm text-slate-300">{conflict.recommendation}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
+
+            {/* Conflict Summary by Type */}
+            {vfxConflicts.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4">Conflicts by Type</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {[
+                    { type: 'budget', label: 'Budget', icon: DollarSign, count: vfxConflicts.filter(c => c.type === 'budget').length },
+                    { type: 'certification', label: 'Certification', icon: Shield, count: vfxConflicts.filter(c => c.type === 'certification').length },
+                    { type: 'complexity', label: 'Complexity', icon: AlertTriangle, count: vfxConflicts.filter(c => c.type === 'complexity').length },
+                    { type: 'timeline', label: 'Timeline', icon: Clock, count: vfxConflicts.filter(c => c.type === 'timeline').length },
+                    { type: 'technical', label: 'Technical', icon: Wand2, count: vfxConflicts.filter(c => c.type === 'technical').length },
+                  ].map(({ type, label, icon: Icon, count }) => (
+                    <div key={type} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
+                      <Icon className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-white">{count}</div>
+                      <div className="text-xs text-slate-500">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
-
+        
         {/* Keyboard Help Modal */}
         {showKeyboardHelp && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>

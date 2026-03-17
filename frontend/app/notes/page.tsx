@@ -219,7 +219,6 @@ export default function NotesPage() {
   const handleDuplicateRef = useRef<((note: Note) => Promise<void>) | null>(null)
   const handleRefreshRef = useRef<() => void>(() => {})
   const printNotesReportRef = useRef<() => void>(() => {})
-  const handleExportMarkdownRef = useRef<() => void>(() => {})
   const notesLengthRef = useRef(0)
   const notesRef = useRef<Note[]>([])
   const filteredNotesRef = useRef<Note[]>([])
@@ -301,12 +300,6 @@ export default function NotesPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
-          break
-        case 'm':
-          e.preventDefault()
-          if (notesLengthRef.current > 0) {
-            handleExportMarkdownRef.current?.()
-          }
           break
         case 's':
           e.preventDefault()
@@ -508,7 +501,7 @@ export default function NotesPage() {
     setShowForm(true)
   }
 
-  const handleExport = async (format: 'csv' | 'json') => {
+  const handleExport = async (format: 'csv' | 'json' | 'markdown') => {
     setExporting(true)
     setShowExportMenu(false)
     
@@ -535,7 +528,56 @@ export default function NotesPage() {
       })
     })
     
-    if (format === 'json') {
+    if (format === 'markdown') {
+      // Generate Markdown format
+      let markdown = `# Production Notes Report\n\n`
+      markdown += `**Export Date:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+      markdown += `## Summary\n\n`
+      markdown += `- **Total Notes:** ${notes.length}\n`
+      markdown += `- **Filtered Notes:** ${filteredNotes.length}\n`
+      markdown += `- **Pinned Notes:** ${pinnedNotes.length}\n`
+      markdown += `- **Categories:** ${Object.keys(categoryCounts).length}\n`
+      markdown += `- **Unique Tags:** ${Object.keys(tagCounts).length}\n\n`
+      
+      if (Object.keys(categoryCounts).length > 0) {
+        markdown += `## Category Breakdown\n\n`
+        Object.entries(categoryCounts).forEach(([cat, count]) => {
+          markdown += `- **${cat}:** ${count} notes\n`
+        })
+        markdown += `\n`
+      }
+      
+      if (Object.keys(tagCounts).length > 0) {
+        markdown += `## Top Tags\n\n`
+        const topTags = Object.entries(tagCounts).sort(([,a], [,b]) => b - a).slice(0, 10)
+        topTags.forEach(([tag, count]) => {
+          markdown += `- \`${tag}\`: ${count}\n`
+        })
+        markdown += `\n`
+      }
+      
+      markdown += `---\n\n`
+      markdown += `## Notes\n\n`
+      
+      filteredNotesRef.current.forEach((note, idx) => {
+        if (note.isPinned) markdown += `📌 **PINNED**\n\n`
+        markdown += `### ${idx + 1}. ${note.title}\n\n`
+        markdown += `**Category:** ${note.category}  \n`
+        markdown += `**Tags:** ${note.tags.join(', ') || 'None'}  \n`
+        markdown += `**Created:** ${new Date(note.createdAt).toLocaleDateString('en-IN')}  \n`
+        markdown += `**Updated:** ${new Date(note.updatedAt).toLocaleDateString('en-IN')}\n\n`
+        markdown += `${note.content}\n\n`
+        markdown += `---\n\n`
+      })
+      
+      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `production-notes-${new Date().toISOString().split('T')[0]}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else if (format === 'json') {
       const exportData = {
         exportDate: new Date().toISOString(),
         summary: {
@@ -573,97 +615,6 @@ export default function NotesPage() {
     }
     setExporting(false)
   }
-
-  // Markdown export function
-  const handleExportMarkdown = useCallback(() => {
-    const data = filteredNotesRef.current
-    
-    // Calculate summary stats
-    const categoryCounts: Record<string, number> = {}
-    const tagCounts: Record<string, number> = {}
-    notes.forEach(note => {
-      categoryCounts[note.category] = (categoryCounts[note.category] || 0) + 1
-      note.tags.forEach(tag => {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1
-      })
-    })
-    
-    // Get unique categories
-    const uniqueCategories = [...new Set(notes.map(n => n.category))]
-    const uniqueTags = [...new Set(notes.flatMap(n => n.tags))]
-    
-    let markdown = `# 📝 CinePilot Production Notes
-
-> Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}
-
-## Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Notes | ${notes.length} |
-| Filtered Notes | ${data.length} |
-| Pinned Notes | ${pinnedNotes.length} |
-| Categories | ${uniqueCategories.length} |
-| Unique Tags | ${uniqueTags.length} |
-
-## Category Breakdown
-
-| Category | Count |
-|----------|-------|
-${Object.entries(categoryCounts).map(([cat, count]) => `| ${cat.charAt(0).toUpperCase() + cat.slice(1)} | ${count} |`).join('\n')}
-
-## Top Tags
-
-${Object.entries(tagCounts)
-  .sort(([,a], [,b]) => b - a)
-  .slice(0, 10)
-  .map(([tag, count]) => `- **${tag}**: ${count}`)
-  .join('\n')}
-
-## Notes
-
-${data.length === 0 ? '*No notes to display*' : ''}
-
-`
-
-    // Add notes grouped by category
-    const categories = ['general', 'production', 'creative', 'technical', 'logistics', 'budget']
-    categories.forEach(cat => {
-      const catNotes = data.filter(n => n.category === cat)
-      if (catNotes.length > 0) {
-        markdown += `### ${cat.charAt(0).toUpperCase() + cat.slice(1)} (${catNotes.length})\n\n`
-        catNotes.forEach(note => {
-          markdown += `#### ${note.isPinned ? '📌 ' : ''}${note.title}\n\n`
-          markdown += `${note.content}\n\n`
-          if (note.tags.length > 0) {
-            markdown += `*Tags: ${note.tags.join(', ')}*\n\n`
-          }
-          markdown += `*Created: ${new Date(note.createdAt).toLocaleDateString('en-IN')} | Updated: ${new Date(note.updatedAt).toLocaleDateString('en-IN')}*\n\n`
-          markdown += `---\n\n`
-        })
-      }
-    })
-
-    markdown += `
----
-
-* CinePilot - Film Production Management System *
-`
-
-    const blob = new Blob([markdown], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `production-notes-${new Date().toISOString().split('T')[0]}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-    setShowExportMenu(false)
-  }, [notes, pinnedNotes])
-
-  // Update ref for markdown export
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
 
   // Print Notes Report
   const printNotesReport = useCallback(() => {
@@ -1111,12 +1062,12 @@ ${data.length === 0 ? '*No notes to display*' : ''}
                     Export as JSON
                   </button>
                   <button
-                    onClick={() => handleExportMarkdownRef.current?.()}
+                    onClick={() => handleExport('markdown')}
                     disabled={exporting}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap flex items-center gap-2 text-cyan-400"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap flex items-center gap-2"
                   >
                     <Download className="w-3 h-3" />
-                    Export Markdown
+                    Export as Markdown
                   </button>
                 </div>
               )}
@@ -1667,7 +1618,6 @@ ${data.length === 0 ? '*No notes to display*' : ''}
                 { key: 'P', action: 'Pin/unpin selected note' },
                 { key: 'D', action: 'Duplicate selected note' },
                 { key: 'E', action: 'Export notes' },
-                { key: 'M', action: 'Export Markdown' },
                 { key: 'O', action: 'Print notes report' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Ctrl+A', action: 'Select all notes' },

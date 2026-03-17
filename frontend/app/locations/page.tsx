@@ -138,7 +138,6 @@ export default function LocationsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
-  const handleExportMarkdownRef = useRef<() => void>()
 
   // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -210,9 +209,6 @@ export default function LocationsPage() {
           break
         case 'e':
           setShowExportMenu(prev => !prev)
-          break
-        case 'm':
-          handleExportMarkdownRef.current?.()
           break
         case 'p':
           setShowPrintMenu(prev => !prev)
@@ -352,103 +348,87 @@ export default function LocationsPage() {
     setShowExportMenu(false)
   }
 
-  // Markdown Export handler - defined as regular function (not useCallback) to avoid hoisting issues with filteredCandidates
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Markdown export handler
   const handleExportMarkdown = () => {
     if (filteredCandidates.length === 0) return
-
-    // Calculate summary statistics
+    
+    // Build summary statistics
     const totalCandidates = filteredCandidates.length
-    const favoritesCount = filteredCandidates.filter(c => favorites.has(c.id || '')).length
-    const averageScore = totalCandidates > 0 
-      ? filteredCandidates.reduce((sum, c) => sum + c.scoreTotal, 0) / totalCandidates 
-      : 0
-
+    const favoritesCount = filteredCandidates.filter((c: CandidateData) => favorites.has(c.id || '')).length
+    const avgScore = filteredCandidates.reduce((sum: number, c: CandidateData) => sum + (c.scoreTotal || 0), 0) / totalCandidates
+    
     // Group by place type
-    const byPlaceType = filteredCandidates.reduce((acc, c) => {
+    const byPlaceType = filteredCandidates.reduce((acc: Record<string, number>, c: CandidateData) => {
       const type = c.placeType || 'unknown'
       acc[type] = (acc[type] || 0) + 1
       return acc
-    }, {} as Record<string, number>)
-
-    // Get top 5 locations by score
+    }, {})
+    
+    // Top scored locations
     const topLocations = [...filteredCandidates]
-      .sort((a, b) => b.scoreTotal - a.scoreTotal)
+      .sort((a: CandidateData, b: CandidateData) => b.scoreTotal - a.scoreTotal)
       .slice(0, 5)
+    
+    // Build markdown content
+    let markdown = `# CinePilot Location Report
 
-    // Build Markdown content
-    let markdown = `# CinePilot - Location Scouting Report
+**Generated:** ${new Date().toISOString().split('T')[0]}
 
-**Generated:** ${new Date().toLocaleDateString('en-US', { 
-  year: 'numeric', month: 'long', day: 'numeric', 
-  hour: '2-digit', minute: '2-digit' 
-})}
+${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
+- **Heading:** ${selectedScene.headingRaw || 'N/A'}
+- **Location:** ${selectedScene.location || 'N/A'}
+- **Int/Ext:** ${selectedScene.intExt || 'N/A'}
+- **Time of Day:** ${selectedScene.timeOfDay || 'N/A'}
 
----
+` : ''}## Summary
 
-## Scene Information
+- **Total Candidates:** ${totalCandidates}
+- **Favorites:** ${favoritesCount}
+- **Average Score:** ${avgScore.toFixed(1)}
+- **Scenes with Intents:** ${scenes.length}
 
-| Field | Value |
-|-------|-------|
-| **Scene #** | ${selectedScene?.sceneNumber || 'N/A'} |
-| **Location** | ${selectedScene?.location || 'N/A'} |
-| **INT/EXT** | ${selectedScene?.intExt || 'N/A'} |
-| **Time of Day** | ${selectedScene?.timeOfDay || 'N/A'} |
-
----
-
-## Summary Statistics
-
-| Metric | Value |
-|--------|-------|
-| **Total Candidates** | ${totalCandidates} |
-| **Favorites** | ${favoritesCount} ⭐ |
-| **Average Score** | ${averageScore.toFixed(1)} / 100 |
-| **Scenes Analyzed** | ${scenes.length} |
-
----
-
-## By Place Type
+### By Place Type
 
 `
     
     // Add place type breakdown
-    Object.entries(byPlaceType)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([type, count]) => {
-        const percentage = ((count / totalCandidates) * 100).toFixed(1)
-        markdown += `- **${type}**: ${count} (${percentage}%)\n`
-      })
-
-    markdown += `\n---\n\n## Top 5 Locations (Ranked by Score)\n\n`
-    markdown += `| Rank | Name | Type | Score | Access | Locality | Favorite |\n`
-    markdown += `|------|------|------|-------|--------|----------|----------|\n`
+    Object.entries(byPlaceType).forEach(([type, count]) => {
+      markdown += `- **${type}:** ${count}\n`
+    })
     
-    topLocations.forEach((c, idx) => {
-      const isFav = favorites.has(c.id || '') ? '⭐ Yes' : '-'
+    markdown += `\n## Top Locations (by score)
+
+| Rank | Name | Type | Score | Access | Locality | Favorite |
+|------|------|------|-------|--------|----------|----------|
+`
+    
+    topLocations.forEach((c: CandidateData, idx: number) => {
+      const isFav = favorites.has(c.id || '') ? '⭐' : ''
       markdown += `| ${idx + 1} | ${c.name || 'Unknown'} | ${c.placeType || 'N/A'} | ${c.scoreTotal} | ${c.scoreAccess || 'N/A'} | ${c.scoreLocality || 'N/A'} | ${isFav} |\n`
     })
-
-    markdown += `\n---\n\n## All Locations\n\n`
     
-    filteredCandidates.forEach((c) => {
+    markdown += `\n## All Locations
+
+`
+    
+    // Add all candidates sorted by score
+    const sortedCandidates = [...filteredCandidates].sort((a: CandidateData, b: CandidateData) => b.scoreTotal - a.scoreTotal)
+    sortedCandidates.forEach((c: CandidateData) => {
       const isFav = favorites.has(c.id || '') ? '⭐ ' : ''
       markdown += `### ${isFav}${c.name || 'Unknown'}\n`
       markdown += `- **Type:** ${c.placeType || 'N/A'}\n`
-      markdown += `- **Total Score:** ${c.scoreTotal} / 100\n`
-      markdown += `- **Accessibility:** ${c.scoreAccess || 'N/A'} / 100\n`
-      markdown += `- **Locality:** ${c.scoreLocality || 'N/A'} / 100\n`
+      markdown += `- **Score:** ${c.scoreTotal} (Access: ${c.scoreAccess || 'N/A'}, Locality: ${c.scoreLocality || 'N/A'})\n`
       if (c.riskFlags && c.riskFlags.length > 0) {
         markdown += `- **Risk Flags:** ${c.riskFlags.join(', ')}\n`
       }
       if (c.explanation) {
         markdown += `- **Notes:** ${c.explanation}\n`
       }
-      markdown += `\n`
+      markdown += '\n'
     })
-
-    markdown += `---\n\n*Report generated by CinePilot Production Management*`
-
+    
+    markdown += `---\n*Generated by CinePilot - Film Production Management*\n`
+    
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -1026,7 +1006,6 @@ export default function LocationsPage() {
                 { key: '1', action: 'Switch to Cards view' },
                 { key: '2', action: 'Switch to Analysis view' },
                 { key: 'E', action: 'Toggle export menu' },
-                { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Toggle print menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },

@@ -18,14 +18,12 @@ import {
   UsersRound,
   AlertCircle,
   CheckCircle,
-  Check,
   TrendingUp,
   Keyboard,
   RefreshCw,
   ChevronDown,
   FileText,
   Printer,
-  AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart,
@@ -127,9 +125,6 @@ export default function CrewPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
   const handlePrintRef = useRef<() => void>();
-  const selectAllCrewRef = useRef<() => void>(() => {});
-  const clearSelectionRef = useRef<() => void>(() => {});
-  const exportToMarkdownRef = useRef<() => void>();
 
   const [form, setForm] = useState({
     name: '',
@@ -146,17 +141,7 @@ export default function CrewPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'skills' | 'analytics' | 'conflicts'>('list');
-  
-  // Budget limit for conflict detection
-  const [budgetLimit, setBudgetLimit] = useState<number>(500000); // ₹5L default
-
-  // Bulk selection state
-  const [selectedCrew, setSelectedCrew] = useState<Set<string>>(new Set());
-  const [showBulkActions, setShowBulkActions] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const selectedCrewRef = useRef(selectedCrew);
-  const bulkActionsRef = useRef<HTMLDivElement>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'skills'>('list');
 
   // Sort options for UI
   const sortOptions = [
@@ -170,22 +155,7 @@ export default function CrewPage() {
   const viewModeOptions = [
     { key: 'list', label: 'List View', icon: Users },
     { key: 'skills', label: 'Skills Matrix', icon: Briefcase },
-    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { key: 'conflicts', label: 'Conflicts', icon: AlertTriangle },
   ];
-
-  // Bulk selection handlers
-  const toggleSelectCrew = useCallback((id: string) => {
-    setSelectedCrew(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  }, []);
 
   const fetchCrew = useCallback(async () => {
     setLoading(true);
@@ -249,6 +219,10 @@ export default function CrewPage() {
             setForm({ name: '', role: '', department: '', phone: '', email: '', dailyRate: '', notes: '' })
           }
           break
+        case 'd':
+          e.preventDefault()
+          // Could add department filter cycling here
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -259,13 +233,8 @@ export default function CrewPage() {
           setShowExportMenu(false)
           setShowPrintMenu(false)
           setShowFilters(false)
-          setShowDeleteConfirm(false)
           setSearch('')
           setDeptFilter('all')
-          // Clear bulk selection when pressing Esc
-          if (selectedCrewRef.current.size > 0) {
-            clearSelectionRef.current()
-          }
           break
         case 'f':
           e.preventDefault()
@@ -274,10 +243,6 @@ export default function CrewPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
-          break
-        case 'm':
-          e.preventDefault()
-          exportToMarkdownRef.current?.()
           break
         case 'p':
           e.preventDefault()
@@ -294,28 +259,6 @@ export default function CrewPage() {
         case '2':
           e.preventDefault()
           setViewMode('skills')
-          break
-        case '3':
-          e.preventDefault()
-          setViewMode('analytics')
-          break
-        case '4':
-          e.preventDefault()
-          setViewMode('conflicts')
-          break
-        case 'a':
-          // Ctrl+A or Cmd+A for select all
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            selectAllCrewRef.current()
-          }
-          break
-        case 'd':
-          // Ctrl+D or Cmd+D for delete selected (when not in input)
-          if ((e.ctrlKey || e.metaKey) && selectedCrewRef.current.size > 0) {
-            e.preventDefault()
-            setShowDeleteConfirm(true)
-          }
           break
       }
     }
@@ -357,256 +300,6 @@ export default function CrewPage() {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [crew, search, deptFilter, sortBy, sortOrder]);
-
-  // Analytics data computation
-  const analyticsData = useMemo(() => {
-    // Department distribution
-    const deptDistribution = crew.reduce((acc, c) => {
-      const dept = c.department || 'Unassigned';
-      acc[dept] = (acc[dept] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    const deptData = Object.entries(deptDistribution).map(([name, count]) => ({
-      name,
-      count,
-      color: DEPT_COLORS[name] || '#64748b',
-    })).sort((a, b) => b.count - a.count);
-
-    // Cost analysis by department
-    const deptCosts = crew.reduce((acc, c) => {
-      const dept = c.department || 'Unassigned';
-      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
-      acc[dept] = (acc[dept] || 0) + rate;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    const costData = Object.entries(deptCosts).map(([name, total]) => ({
-      name,
-      total,
-      color: DEPT_COLORS[name] || '#64748b',
-    })).sort((a, b) => b.total - a.total);
-
-    // Daily rate distribution
-    const rateRanges = [
-      { range: '₹0-5K', min: 0, max: 5000, count: 0 },
-      { range: '₹5K-10K', min: 5000, max: 10000, count: 0 },
-      { range: '₹10K-20K', min: 10000, max: 20000, count: 0 },
-      { range: '₹20K-30K', min: 20000, max: 30000, count: 0 },
-      { range: '₹30K+', min: 30000, max: Infinity, count: 0 },
-    ];
-    
-    crew.forEach(c => {
-      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
-      const range = rateRanges.find(r => rate >= r.min && rate < r.max);
-      if (range) range.count++;
-    });
-
-    const rateDistribution = rateRanges.map(r => ({
-      name: r.range,
-      count: r.count,
-    }));
-
-    // Summary stats
-    const totalCrew = crew.length;
-    const totalDailyRate = crew.reduce((sum, c) => sum + (c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0), 0);
-    const avgDailyRate = totalCrew > 0 ? totalDailyRate / totalCrew : 0;
-    const highestRate = Math.max(...crew.map(c => c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0));
-    const departments = Object.keys(deptDistribution).length;
-
-    return {
-      deptData,
-      costData,
-      rateDistribution,
-      stats: {
-        totalCrew,
-        totalDailyRate,
-        avgDailyRate,
-        highestRate,
-        departments,
-      },
-    };
-  }, [crew]);
-
-  // Crew conflict detection
-  const crewConflicts = useMemo(() => {
-    const conflicts: Array<{
-      id: string;
-      type: 'high-cost' | 'missing-contact' | 'skill-gap' | 'department-imbalance' | 'unassigned';
-      severity: 'high' | 'medium' | 'low';
-      crewId: string;
-      title: string;
-      description: string;
-      recommendation: string;
-    }> = [];
-
-    // Check for high daily rates (potential budget issues)
-    crew.forEach(c => {
-      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0;
-      if (rate > 40000) { // > ₹40K/day
-        conflicts.push({
-          id: `high-cost-${c.id}`,
-          type: 'high-cost',
-          severity: 'high',
-          crewId: c.id,
-          title: `High Daily Rate: ${c.name}`,
-          description: `Daily rate is ₹${rate.toLocaleString()}, which exceeds ₹40K threshold`,
-          recommendation: 'Verify this rate is justified and within budget'
-        });
-      } else if (rate > 25000) {
-        conflicts.push({
-          id: `high-cost-${c.id}`,
-          type: 'high-cost',
-          severity: 'medium',
-          crewId: c.id,
-          title: `Elevated Daily Rate: ${c.name}`,
-          description: `Daily rate is ₹${rate.toLocaleString()}, which exceeds ₹25K threshold`,
-          recommendation: 'Review rate against industry standards'
-        });
-      }
-    });
-
-    // Check for missing contact information
-    crew.forEach(c => {
-      if (!c.phone && !c.email) {
-        conflicts.push({
-          id: `missing-contact-${c.id}`,
-          type: 'missing-contact',
-          severity: 'medium',
-          crewId: c.id,
-          title: `Missing Contact Info: ${c.name}`,
-          description: 'No phone or email contact information available',
-          recommendation: 'Add contact details for communication'
-        });
-      }
-    });
-
-    // Check for unassigned department
-    crew.forEach(c => {
-      if (!c.department) {
-        conflicts.push({
-          id: `unassigned-${c.id}`,
-          type: 'unassigned',
-          severity: 'low',
-          crewId: c.id,
-          title: `Unassigned Department: ${c.name}`,
-          description: 'Crew member has no department assigned',
-          recommendation: 'Assign to appropriate department'
-        });
-      }
-    });
-
-    // Check for department imbalance (too many or too few in a department)
-    const deptCount = crew.reduce((acc, c) => {
-      const dept = c.department || 'Unassigned';
-      acc[dept] = (acc[dept] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    Object.entries(deptCount).forEach(([dept, count]) => {
-      if (count > 5) { // Too many in one department
-        conflicts.push({
-          id: `dept-imbalance-${dept}`,
-          type: 'department-imbalance',
-          severity: count > 8 ? 'high' : 'medium',
-          crewId: '',
-          title: `Department Overstaffed: ${dept}`,
-          description: `${count} crew members in ${dept} department (potential resource imbalance)`,
-          recommendation: 'Review if additional crew in this department is necessary'
-        });
-      }
-    });
-
-    // Check for missing key departments
-    const requiredDepts = ['Camera', 'Direction', 'Sound', 'Lighting'];
-    requiredDepts.forEach(dept => {
-      if (!deptCount[dept] || deptCount[dept] === 0) {
-        conflicts.push({
-          id: `skill-gap-${dept}`,
-          type: 'skill-gap',
-          severity: 'high',
-          crewId: '',
-          title: `Missing Department: ${dept}`,
-          description: `No crew members assigned to ${dept} department`,
-          recommendation: `Recruit or assign crew for ${dept} role`
-        });
-      }
-    });
-
-    // Check total daily rate against budget
-    const totalDailyRate = crew.reduce((sum, c) => sum + (c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0), 0);
-    if (totalDailyRate > budgetLimit) {
-      conflicts.push({
-        id: 'budget-overrun',
-        type: 'high-cost',
-        severity: 'high',
-        crewId: '',
-        title: 'Crew Budget Exceeded',
-        description: `Total daily rate (₹${(totalDailyRate / 100000).toFixed(2)}L) exceeds budget limit (₹${(budgetLimit / 100000).toFixed(2)}L)`,
-        recommendation: 'Review crew rates and consider reducing team size or negotiating rates'
-      });
-    }
-
-    return conflicts;
-  }, [crew, budgetLimit]);
-
-  // Conflict stats
-  const conflictStats = useMemo(() => ({
-    total: crewConflicts.length,
-    high: crewConflicts.filter(c => c.severity === 'high').length,
-    medium: crewConflicts.filter(c => c.severity === 'medium').length,
-    low: crewConflicts.filter(c => c.severity === 'low').length,
-  }), [crewConflicts]);
-
-  // Bulk selection handlers (defined after filtered to avoid reference errors)
-  const selectAllCrew = useCallback(() => {
-    setSelectedCrew(new Set(filtered.map(c => c.id)));
-  }, [filtered]);
-
-  const clearSelection = useCallback(() => {
-    setSelectedCrew(new Set());
-    setShowBulkActions(false);
-  }, []);
-
-  // Update refs for keyboard shortcuts
-  useEffect(() => {
-    selectAllCrewRef.current = selectAllCrew;
-  }, [selectAllCrew]);
-
-  useEffect(() => {
-    clearSelectionRef.current = clearSelection;
-  }, [clearSelection]);
-
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedCrew.size === 0) return;
-    
-    try {
-      const idsToDelete = Array.from(selectedCrew);
-      // Delete each selected crew member
-      await Promise.all(
-        idsToDelete.map(async (id) => {
-          await fetch(`/api/crew?id=${id}`, { method: 'DELETE' });
-        })
-      );
-      setSuccess(`Successfully deleted ${idsToDelete.length} crew member(s)`);
-      setSelectedCrew(new Set());
-      setShowBulkActions(false);
-      setShowDeleteConfirm(false);
-      fetchCrew();
-    } catch (err) {
-      setError('Failed to delete selected crew');
-    }
-  }, [selectedCrew, fetchCrew]);
-
-  // Update selectedCrew ref
-  useEffect(() => {
-    selectedCrewRef.current = selectedCrew;
-    if (selectedCrew.size > 0) {
-      setShowBulkActions(true);
-    } else {
-      setShowBulkActions(false);
-    }
-  }, [selectedCrew]);
 
   const formatINR = (amount: number | string | null | undefined) => {
     if (amount === null || amount === undefined) return '₹0';
@@ -899,59 +592,92 @@ export default function CrewPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  // Markdown Export function (uses sorted/filtered data)
-  const exportToMarkdown = () => {
+  const handleExportMarkdown = () => {
     setExporting(true)
     
-    // Calculate summary stats
+    // Calculate stats
     const totalDailyRate = crew.reduce((sum, c) => {
       const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
       return sum + (isNaN(rate) ? 0 : rate)
     }, 0)
-
+    
     const deptCounts = crew.reduce<Record<string, number>>((acc, c) => {
       const d = c.department || 'Unassigned'
       acc[d] = (acc[d] ?? 0) + 1
       return acc
     }, {})
-
-    // Build markdown content
+    
+    // Group crew by department
+    const deptGroups = DEPARTMENTS.map(dept => ({
+      name: dept,
+      members: crew.filter(c => c.department === dept)
+    })).filter(d => d.members.length > 0)
+    
+    // Top paid crew
+    const topPaid = [...crew]
+      .filter(c => c.dailyRate)
+      .sort((a, b) => {
+        const aRate = typeof a.dailyRate === 'string' ? parseFloat(a.dailyRate) : Number(a.dailyRate)
+        const bRate = typeof b.dailyRate === 'string' ? parseFloat(b.dailyRate) : Number(b.dailyRate)
+        return bRate - aRate
+      })
+      .slice(0, 5)
+    
+    // Build markdown
     let markdown = `# CinePilot Crew Report
-Generated: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
 
-## Summary Statistics
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+---
+
+## Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total Crew** | ${crew.length} |
-| **Total Daily Rate** | ₹${totalDailyRate.toLocaleString('en-IN')} |
-| **Average Rate** | ₹${Math.round(totalDailyRate / crew.length || 0).toLocaleString('en-IN')} |
-| **Departments** | ${Object.keys(deptCounts).length} |
+| Total Crew Members | ${crew.length} |
+| Total Daily Rate | ₹${totalDailyRate.toLocaleString('en-IN')} |
+| Average Rate | ₹${(totalDailyRate / crew.length || 0).toLocaleString('en-IN')} |
+| Departments | ${Object.keys(deptCounts).length} |
+
+---
 
 ## Department Breakdown
 
-| Department | Members |
-|------------|---------|
-${Object.entries(deptCounts).map(([dept, count]) => `| ${dept} | ${count} |`).join('\n')}
-
-## Crew Details
-
-| # | Name | Role | Department | Daily Rate (₹) | Contact |
-|---|------|------|------------|----------------|---------|
-${filtered.map((c, i) => {
-  const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
-  const contact = c.phone || c.email || '-'
-  return `| ${i + 1} | ${c.name} | ${c.role} | ${c.department || 'Unassigned'} | ${rate > 0 ? rate.toLocaleString('en-IN') : '-'} | ${contact} |`
-}).join('\n')}
-
-## Skills Overview
-
-${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- ${skill}`).join('\n')}
-
----
-*Generated by CinePilot - Film Production Management*
 `
-
+    
+    // Add department counts
+    Object.entries(deptCounts)
+      .sort(([,a], [,b]) => b - a)
+      .forEach(([dept, count]) => {
+        markdown += `- **${dept}:** ${count} member${count !== 1 ? 's' : ''}\n`
+      })
+    
+    markdown += `\n---\n\n## Top 5 Highest Paid\n\n| Rank | Name | Role | Department | Daily Rate |\n|------|------|------|------------|------------|\n`
+    
+    topPaid.forEach((member, i) => {
+      const rate = member.dailyRate ? (typeof member.dailyRate === 'string' ? parseFloat(member.dailyRate) : Number(member.dailyRate)) : 0
+      markdown += `| ${i + 1} | ${member.name} | ${member.role} | ${member.department || '—'} | ₹${rate.toLocaleString('en-IN')} |\n`
+    })
+    
+    markdown += `\n---\n\n## Crew Directory\n\n`
+    
+    // Add each department's crew
+    deptGroups.forEach(group => {
+      markdown += `### ${group.name}\n\n`
+      markdown += `| Name | Role | Contact | Daily Rate |\n`
+      markdown += `|------|------|---------|------------|\n`
+      
+      group.members.forEach(member => {
+        const rate = member.dailyRate ? (typeof member.dailyRate === 'string' ? parseFloat(member.dailyRate) : Number(member.dailyRate)) : 0
+        const contact = member.phone || member.email || '—'
+        markdown += `| ${member.name} | ${member.role} | ${contact} | ₹${rate.toLocaleString('en-IN')} |\n`
+      })
+      
+      markdown += `\n`
+    })
+    
+    markdown += `---\n\n*Generated by CinePilot - Film Production Management*\n`
+    
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -965,11 +691,6 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
     setSuccess('Crew exported to Markdown!')
     setTimeout(() => setSuccess(null), 3000)
   }
-
-  // Assign exportToMarkdown to ref for keyboard shortcuts
-  useEffect(() => {
-    exportToMarkdownRef.current = exportToMarkdown
-  })
 
   const handlePrint = useCallback(() => {
     const totalDailyRate = crew.reduce((sum, c) => {
@@ -1118,7 +839,7 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
                   <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
                 </button>
                 {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
                     <button
                       onClick={handleExportCSV}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
@@ -1134,10 +855,10 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
                       Export JSON
                     </button>
                     <button
-                      onClick={() => { exportToMarkdown(); setShowExportMenu(false); }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-400 hover:bg-slate-700 transition-colors text-left"
+                      onClick={handleExportMarkdown}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
                     >
-                      <FileText className="w-4 h-4" />
+                      <FileText className="w-4 h-4 text-cyan-400" />
                       Export Markdown
                     </button>
                   </div>
@@ -1360,29 +1081,6 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
               <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-xs rounded-full">{activeFilterCount}</span>
             )}
           </button>
-          {/* Bulk Selection Controls */}
-          {selectedCrew.size > 0 ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-emerald-400 font-medium">{selectedCrew.size} selected</span>
-              <button
-                onClick={clearSelection}
-                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 transition-colors"
-                title="Clear Selection (Esc)"
-              >
-                Clear
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={selectAllCrew}
-              disabled={filtered.length === 0}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-2"
-              title="Select All (Ctrl+A)"
-            >
-              <Check className="w-4 h-4" />
-              Select All
-            </button>
-          )}
           <span className="text-sm text-slate-500">{filtered.length} of {crew.length}</span>
         </div>
 
@@ -1536,275 +1234,12 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
           </div>
         )}
 
-        {/* Analytics View */}
-        {viewMode === 'analytics' && (
-          <div className="space-y-6">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <Users className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Total Crew</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analyticsData.stats.totalCrew}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <DollarSign className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Total Daily Rate</span>
-                </div>
-                <p className="text-2xl font-bold text-white">₹{(analyticsData.stats.totalDailyRate / 1000).toFixed(0)}K</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Avg Daily Rate</span>
-                </div>
-                <p className="text-2xl font-bold text-white">₹{(analyticsData.stats.avgDailyRate / 1000).toFixed(1)}K</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Highest Rate</span>
-                </div>
-                <p className="text-2xl font-bold text-white">₹{(analyticsData.stats.highestRate / 1000).toFixed(0)}K</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <Briefcase className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Departments</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analyticsData.stats.departments}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Total Cost/Day</span>
-                </div>
-                <p className="text-2xl font-bold text-emerald-400">₹{(analyticsData.stats.totalDailyRate / 100000).toFixed(2)}L</p>
-              </div>
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Department Distribution */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <PieChart className="w-5 h-5 text-emerald-400" />
-                  Department Distribution
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analyticsData.deptData}
-                        dataKey="count"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        labelLine={false}
-                      >
-                        {analyticsData.deptData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f1f5f9' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Cost by Department */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-emerald-400" />
-                  Cost by Department
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.costData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis type="number" stroke="#94a3b8" tickFormatter={(v) => `₹${(v/1000).toFixed(0)}K`} />
-                      <YAxis dataKey="name" type="category" stroke="#94a3b8" width={80} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f1f5f9' }}
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Total Rate']}
-                      />
-                      <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                        {analyticsData.costData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Daily Rate Distribution */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 md:col-span-2">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  Daily Rate Distribution
-                </h3>
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.rateDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="name" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f1f5f9' }}
-                      />
-                      <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Crew Count" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Conflicts View */}
-        {viewMode === 'conflicts' && (
-          <div className="space-y-6">
-            {/* Conflict Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Total Conflicts</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{conflictStats.total}</p>
-              </div>
-              <div className="bg-slate-900 border border-red-500/30 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-red-400 mb-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">High Priority</span>
-                </div>
-                <p className="text-2xl font-bold text-red-400">{conflictStats.high}</p>
-              </div>
-              <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-amber-400 mb-1">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Medium Priority</span>
-                </div>
-                <p className="text-2xl font-bold text-amber-400">{conflictStats.medium}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-400 mb-1">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs uppercase tracking-wider">Low Priority</span>
-                </div>
-                <p className="text-2xl font-bold text-slate-400">{conflictStats.low}</p>
-              </div>
-            </div>
-
-            {/* Budget Limit Input */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm font-medium text-white">Daily Rate Budget Limit:</span>
-                </div>
-                <input
-                  type="number"
-                  value={budgetLimit}
-                  onChange={(e) => setBudgetLimit(Number(e.target.value))}
-                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm w-40"
-                  placeholder="₹5,00,000"
-                />
-                <span className="text-xs text-slate-500">(Default: ₹5,00,000)</span>
-              </div>
-            </div>
-
-            {/* Conflict Cards */}
-            {crewConflicts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {crewConflicts.map((conflict) => (
-                  <div
-                    key={conflict.id}
-                    className={`bg-slate-900 border rounded-xl p-4 ${
-                      conflict.severity === 'high'
-                        ? 'border-red-500/30'
-                        : conflict.severity === 'medium'
-                        ? 'border-amber-500/30'
-                        : 'border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3 mb-3">
-                      <div
-                        className={`p-2 rounded-lg ${
-                          conflict.severity === 'high'
-                            ? 'bg-red-500/20'
-                            : conflict.severity === 'medium'
-                            ? 'bg-amber-500/20'
-                            : 'bg-slate-800'
-                        }`}
-                      >
-                        <AlertTriangle
-                          className={`w-5 h-5 ${
-                            conflict.severity === 'high'
-                              ? 'text-red-400'
-                              : conflict.severity === 'medium'
-                              ? 'text-amber-400'
-                              : 'text-slate-400'
-                          }`}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-white text-sm">{conflict.title}</h4>
-                        <span
-                          className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${
-                            conflict.severity === 'high'
-                              ? 'bg-red-500/20 text-red-400'
-                              : conflict.severity === 'medium'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-slate-700 text-slate-400'
-                          }`}
-                        >
-                          {conflict.severity.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-400 mb-3">{conflict.description}</p>
-                    <div className="pt-3 border-t border-slate-800">
-                      <p className="text-xs text-slate-500 mb-1">Recommendation:</p>
-                      <p className="text-sm text-slate-300">{conflict.recommendation}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
-                <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">Crew Looks Good!</h3>
-                <p className="text-slate-400">No conflicts detected in your crew data.</p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Crew Table */}
         {viewMode === 'list' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-800">
-                <th className="text-left w-12 px-4 py-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedCrew.size === filtered.length && filtered.length > 0}
-                    onChange={() => selectedCrew.size === filtered.length ? clearSelection() : selectAllCrew()}
-                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
-                  />
-                </th>
                 <th 
                   className="text-left px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors"
                   onClick={() => { setSortBy('name'); setSortOrder(sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc'); }}
@@ -1831,27 +1266,19 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
                 >
                   Daily Rate {sortBy === 'dailyRate' && <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
                 </th>
-                <th className="text-right w-24 px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                <th className="text-right px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     No crew members found. Add your first crew member!
                   </td>
                 </tr>
               ) : (
                 filtered.map((member) => (
-                  <tr key={member.id} className={`hover:bg-slate-800/50 transition-colors ${selectedCrew.has(member.id) ? 'bg-emerald-500/5' : ''}`}>
-                    <td className="px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedCrew.has(member.id)}
-                        onChange={() => toggleSelectCrew(member.id)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
-                      />
-                    </td>
+                  <tr key={member.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-medium text-sm">
@@ -1909,71 +1336,6 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
             </tbody>
           </table>
         </div>
-        )}
-
-        {/* Floating Bulk Actions Toolbar */}
-        {showBulkActions && selectedCrew.size > 0 && (
-          <div 
-            ref={bulkActionsRef}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl px-6 py-3 flex items-center gap-4 z-30 animate-in slide-in-from-bottom-4"
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm font-medium text-white">{selectedCrew.size} selected</span>
-            </div>
-            <div className="h-6 w-px bg-slate-700" />
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowDeleteConfirm(false)}>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 rounded-full bg-red-500/20">
-                  <AlertTriangle className="w-6 h-6 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Delete Crew?</h3>
-                  <p className="text-sm text-slate-400">This action cannot be undone</p>
-                </div>
-              </div>
-              <p className="text-slate-300 mb-6">
-                Are you sure you want to delete <span className="font-semibold text-white">{selectedCrew.size}</span> selected crew member{selectedCrew.size > 1 ? 's' : ''}? This will permanently remove them from your crew list.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-300 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBulkDelete}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-medium text-white transition-colors"
-                >
-                  Delete {selectedCrew.size > 1 ? `${selectedCrew.size} Items` : 'Item'}
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       </main>
 
@@ -2102,24 +1464,12 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Export Markdown</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Print crew report</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle view mode</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">V</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Select all (when list view)</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Ctrl+A</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Delete selected</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Ctrl+D</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">List view</span>
@@ -2134,7 +1484,7 @@ ${[...new Set(crew.flatMap(c => c.skills || []))].slice(0, 20).map(skill => `- $
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-slate-300">Close / Clear selection</span>
+                <span className="text-slate-300">Close / Clear filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
               </div>
             </div>

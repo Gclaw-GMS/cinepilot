@@ -37,6 +37,8 @@ const DEMO_SENTIMENTS = [
     status: 'completed',
     errorMsg: null,
     createdAt: '2024-02-15T10:00:00Z',
+    regionalCinema: 'tamil',
+    languageBreakdown: { tamil: 8500, english: 4200, telugu: 1200, hindi: 300, malayalam: 150, kannada: 70, other: 0 }
   },
   {
     id: 'demo-2',
@@ -72,6 +74,8 @@ const DEMO_SENTIMENTS = [
     status: 'completed',
     errorMsg: null,
     createdAt: '2024-01-20T08:30:00Z',
+    regionalCinema: 'hindi',
+    languageBreakdown: { tamil: 1200, english: 8500, telugu: 3200, hindi: 12000, malayalam: 800, kannada: 450, other: 2800 }
   },
   {
     id: 'demo-3',

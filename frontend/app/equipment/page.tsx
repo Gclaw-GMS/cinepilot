@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, CheckCircle, BarChart3 } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, Check } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -25,6 +25,17 @@ interface EquipmentStats {
   inUse: number
   maintenance: number
   returned: number
+}
+
+interface EquipmentConflict {
+  id: string
+  type: 'overdue' | 'maintenance' | 'budget' | 'missing-date' | 'high-value' | 'quantity'
+  severity: 'high' | 'medium' | 'low'
+  equipmentId: string
+  equipmentName: string
+  title: string
+  description: string
+  recommendation: string
 }
 
 const CATEGORIES = [
@@ -89,7 +100,6 @@ function StatusBadge({ status }: { status: string }) {
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<EquipmentRental[]>([])
   const [stats, setStats] = useState<EquipmentStats>({ totalItems: 0, totalDailyRate: 0, available: 0, inUse: 0, maintenance: 0, returned: 0 })
-  const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default budget limit: ₹5,00,000
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -132,6 +142,7 @@ export default function EquipmentPage() {
   const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
+  const [budgetLimit, setBudgetLimit] = useState<number>(50000) // Daily budget limit for rentals
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -154,7 +165,6 @@ export default function EquipmentPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
-  const handleExportMarkdownRef = useRef<() => void>()
   const bulkStatusMenuRef = useRef<HTMLDivElement>(null)
   const deleteConfirmRef = useRef<HTMLDivElement>(null)
   const selectedEquipmentRef = useRef<Set<string>>(new Set())
@@ -188,152 +198,112 @@ export default function EquipmentPage() {
     return Object.entries(breakdown).map(([name, value]) => ({ name, value }))
   }, [equipment])
 
-  // Budget tracking calculations
-  const budgetData = useMemo(() => {
-    // Calculate total estimated cost based on daily rate * rental days * quantity
-    const estimatedTotal = equipment.reduce((acc, eq) => {
+  // Conflict detection
+  const equipmentConflicts = useMemo(() => {
+    const conflicts: EquipmentConflict[] = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    equipment.forEach(eq => {
       const startDate = new Date(eq.dateStart)
       const endDate = new Date(eq.dateEnd)
-      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
-      const totalCost = eq.dailyRate * days * eq.quantity
-      return acc + totalCost
-    }, 0)
-    
-    const budgetUsedPercent = budgetLimit > 0 ? (estimatedTotal / budgetLimit) * 100 : 0
-    const budgetRemaining = budgetLimit - estimatedTotal
-    const isOverBudget = budgetRemaining < 0
-    const isWarning = !isOverBudget && budgetUsedPercent >= 80
-    const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
-    
-    return {
-      estimatedTotal,
-      budgetUsedPercent,
-      budgetRemaining,
-      isOverBudget,
-      isWarning,
-      budgetStatus,
-    }
-  }, [equipment, budgetLimit])
-
-  // Equipment conflict detection
-  const equipmentConflicts = useMemo(() => {
-    const conflicts: Array<{
-      id: string
-      type: 'double-booking' | 'maintenance-scheduled' | 'budget-overrun' | 'high-value' | 'date-overlap'
-      severity: 'high' | 'medium' | 'low'
-      equipmentId: string
-      title: string
-      description: string
-      recommendation: string
-    }> = []
-
-    // Check for double bookings (same equipment, overlapping dates)
-    for (let i = 0; i < equipment.length; i++) {
-      for (let j = i + 1; j < equipment.length; j++) {
-        const eq1 = equipment[i]
-        const eq2 = equipment[j]
-        
-        // Only check same equipment name
-        if (eq1.name.toLowerCase() !== eq2.name.toLowerCase()) continue
-        
-        const start1 = new Date(eq1.dateStart)
-        const end1 = new Date(eq1.dateEnd)
-        const start2 = new Date(eq2.dateStart)
-        const end2 = new Date(eq2.dateEnd)
-        
-        // Check for overlap
-        if (start1 <= end2 && start2 <= end1) {
-          conflicts.push({
-            id: `double-${eq1.id}-${eq2.id}`,
-            type: 'double-booking',
-            severity: 'high',
-            equipmentId: eq1.id,
-            title: `Double Booking: ${eq1.name}`,
-            description: `This equipment is booked for overlapping periods: ${eq1.dateStart} to ${eq1.dateEnd} and ${eq2.dateStart} to ${eq2.dateEnd}`,
-            recommendation: 'Review rental dates and coordinate with vendors to resolve overlap'
-          })
-        }
+      
+      // 1. Overdue Returns: Past return date but still in-use
+      if (eq.status === 'in-use' && endDate < today) {
+        const daysOverdue = Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24))
+        conflicts.push({
+          id: `overdue-${eq.id}`,
+          type: 'overdue',
+          severity: daysOverdue > 7 ? 'high' : 'medium',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'Overdue Return',
+          description: `${eq.name} was due ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago (${eq.dateEnd}) but is still marked as in-use`,
+          recommendation: 'Confirm return status with vendor or update the equipment status'
+        })
       }
-    }
 
-    // Check for maintenance equipment scheduled for use
-    equipment.forEach(eq => {
+      // 2. Maintenance Issues: Equipment in maintenance for too long
       if (eq.status === 'maintenance') {
-        const startDate = new Date(eq.dateStart)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        if (startDate <= today) {
+        const daysInMaintenance = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysInMaintenance > 7) {
           conflicts.push({
             id: `maintenance-${eq.id}`,
-            type: 'maintenance-scheduled',
-            severity: 'high',
+            type: 'maintenance',
+            severity: daysInMaintenance > 14 ? 'high' : 'medium',
             equipmentId: eq.id,
-            title: `Maintenance Equipment in Use: ${eq.name}`,
-            description: `This equipment is marked as under maintenance but has past start date: ${eq.dateStart}`,
-            recommendation: 'Update equipment status or rental dates to reflect current state'
+            equipmentName: eq.name,
+            title: 'Extended Maintenance',
+            description: `${eq.name} has been in maintenance for ${daysInMaintenance} days`,
+            recommendation: 'Review maintenance status and either return to service or arrange replacement'
           })
         }
       }
-    })
 
-    // Check for budget overrun (individual item high cost)
-    equipment.forEach(eq => {
-      const startDate = new Date(eq.dateStart)
-      const endDate = new Date(eq.dateEnd)
-      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
-      const totalCost = eq.dailyRate * days * eq.quantity
-      
-      if (totalCost > 100000) { // > ₹1L
+      // 3. Missing Return Date
+      if (!eq.dateEnd || eq.dateEnd === '') {
+        conflicts.push({
+          id: `missing-date-${eq.id}`,
+          type: 'missing-date',
+          severity: 'medium',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'Missing Return Date',
+          description: `${eq.name} does not have a return date specified`,
+          recommendation: 'Add a return date to track rental period'
+        })
+      }
+
+      // 4. High Value Items: Expensive daily rate
+      if (eq.dailyRate > 20000) {
         conflicts.push({
           id: `high-value-${eq.id}`,
           type: 'high-value',
-          severity: totalCost > 500000 ? 'high' : 'medium',
+          severity: 'low',
           equipmentId: eq.id,
-          title: `High Value Rental: ${eq.name}`,
-          description: `This equipment rental costs ₹${(totalCost / 100000).toFixed(2)}L (₹${eq.dailyRate.toLocaleString()}/day × ${days} days)`,
-          recommendation: 'Verify this high-cost rental is essential for production'
+          equipmentName: eq.name,
+          title: 'High Value Rental',
+          description: `${eq.name} has a daily rate of ₹${eq.dailyRate.toLocaleString()}`,
+          recommendation: 'Ensure adequate insurance coverage for this high-value item'
+        })
+      }
+
+      // 5. Quantity Issues
+      if (eq.quantity < 1) {
+        conflicts.push({
+          id: `quantity-${eq.id}`,
+          type: 'quantity',
+          severity: 'high',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'Invalid Quantity',
+          description: `${eq.name} has quantity of ${eq.quantity}, which is invalid`,
+          recommendation: 'Update quantity to at least 1 or remove the equipment'
         })
       }
     })
 
-    // Check for budget overrun (total)
-    if (budgetData.isOverBudget) {
+    // 6. Budget Overrun: Check total daily rate against budget limit
+    const totalDailyRate = equipment
+      .filter(eq => eq.status === 'in-use')
+      .reduce((acc, eq) => acc + eq.dailyRate * eq.quantity, 0)
+    
+    if (totalDailyRate > budgetLimit) {
+      const overrun = totalDailyRate - budgetLimit
       conflicts.push({
-        id: 'budget-overrun-total',
-        type: 'budget-overrun',
-        severity: 'high',
-        equipmentId: '',
-        title: 'Equipment Budget Exceeded',
-        description: `Total equipment costs (₹${(budgetData.estimatedTotal / 100000).toFixed(2)}L) exceed budget limit (₹${(budgetLimit / 100000).toFixed(2)}L)`,
-        recommendation: 'Review equipment rentals and consider alternatives or reduce rental periods'
+        id: 'budget-overrun',
+        type: 'budget',
+        severity: overrun > budgetLimit * 0.5 ? 'high' : 'medium',
+        equipmentId: 'budget',
+        equipmentName: 'All In-Use Equipment',
+        title: 'Budget Overrun',
+        description: `Total daily rental cost (₹${totalDailyRate.toLocaleString()}) exceeds budget limit (₹${budgetLimit.toLocaleString()}) by ₹${overrun.toLocaleString()}`,
+        recommendation: 'Review active rentals and consider returning unused equipment'
       })
     }
 
-    // Check for date overlaps (different equipment on same dates - resource contention)
-    const dateGroups: Record<string, EquipmentRental[]> = {}
-    equipment.forEach(eq => {
-      const startKey = eq.dateStart
-      if (!dateGroups[startKey]) dateGroups[startKey] = []
-      dateGroups[startKey].push(eq)
-    })
-    
-    Object.entries(dateGroups).forEach(([date, items]) => {
-      if (items.length > 3) {
-        conflicts.push({
-          id: `date-overlap-${date}`,
-          type: 'date-overlap',
-          severity: items.length > 5 ? 'high' : 'medium',
-          equipmentId: items[0].id,
-          title: `Resource Contention: ${date}`,
-          description: `${items.length} equipment items scheduled for the same start date (${date}), potential coordination issues`,
-          recommendation: 'Stagger rental start dates or coordinate with multiple vendors'
-        })
-      }
-    })
-
     return conflicts
-  }, [equipment, budgetData.isOverBudget, budgetData.estimatedTotal, budgetLimit])
+  }, [equipment, budgetLimit])
 
   // Conflict stats
   const conflictStats = useMemo(() => ({
@@ -342,6 +312,15 @@ export default function EquipmentPage() {
     medium: equipmentConflicts.filter(c => c.severity === 'medium').length,
     low: equipmentConflicts.filter(c => c.severity === 'low').length,
   }), [equipmentConflicts])
+
+  // Conflict type breakdown
+  const conflictTypeStats = useMemo(() => {
+    const types: Record<string, number> = {}
+    equipmentConflicts.forEach(c => {
+      types[c.type] = (types[c.type] || 0) + 1
+    })
+    return Object.entries(types).map(([type, count]) => ({ type, count }))
+  }, [equipmentConflicts])
 
   const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
   const STATUS_COLORS: Record<string, string> = {
@@ -607,6 +586,18 @@ export default function EquipmentPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case '1':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -628,8 +619,8 @@ export default function EquipmentPage() {
           break
         case 'm':
           e.preventDefault()
-          if (equipment.length > 0) {
-            handleExportMarkdownRef.current?.()
+          if (filtered.length > 0) {
+            handleExportMarkdownRef.current()
           }
           break
         case 'p':
@@ -637,18 +628,6 @@ export default function EquipmentPage() {
           if (equipment.length > 0) {
             handlePrintRef.current?.()
           }
-          break
-        case '1':
-          e.preventDefault()
-          setViewMode('list')
-          break
-        case '2':
-          e.preventDefault()
-          setViewMode('analytics')
-          break
-        case '3':
-          e.preventDefault()
-          setViewMode('conflicts')
           break
         case 'escape':
           e.preventDefault()
@@ -686,7 +665,8 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalOpen, editModalOpen, showExportMenu, equipment.length, viewMode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, editModalOpen, showExportMenu])
 
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedEquipment)
@@ -798,28 +778,33 @@ export default function EquipmentPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  // Markdown export functionality
   const handleExportMarkdown = useCallback(() => {
     setExporting(true)
     
-    // Calculate stats
     const totalItems = filtered.length
-    const totalDailyRate = filtered.reduce((acc, eq) => acc + eq.dailyRate * eq.quantity, 0)
-    const statusCounts = {
-      available: filtered.filter(eq => eq.status === 'available').length,
-      inUse: filtered.filter(eq => eq.status === 'in-use').length,
-      maintenance: filtered.filter(eq => eq.status === 'maintenance').length,
-      returned: filtered.filter(eq => eq.status === 'returned').length,
+    const totalDailyRate = filtered.reduce((acc, eq) => acc + eq.dailyRate, 0)
+    const available = filtered.filter(eq => eq.status === 'available').length
+    const inUse = filtered.filter(eq => eq.status === 'in-use').length
+    const maintenance = filtered.filter(eq => eq.status === 'maintenance').length
+    const returned = filtered.filter(eq => eq.status === 'returned').length
+    
+    // Category breakdown
+    const categoryBreakdown: Record<string, number> = {}
+    filtered.forEach(eq => {
+      categoryBreakdown[eq.category] = (categoryBreakdown[eq.category] || 0) + 1
+    })
+    
+    // Status breakdown with emojis
+    const statusEmoji: Record<string, string> = {
+      available: '✅',
+      'in-use': '📷',
+      maintenance: '🔧',
+      returned: '📦',
     }
-    const categoryCounts = CATEGORIES.map(cat => ({
-      category: cat.label,
-      count: filtered.filter(eq => eq.category === cat.id).length
-    })).filter(c => c.count > 0)
+    
+    let markdown = `# Equipment Rental Report - CinePilot
 
-    // Generate markdown
-    let markdown = `# CinePilot Equipment Report
-
-> Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+**Generated:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
 
 ---
 
@@ -827,43 +812,35 @@ export default function EquipmentPage() {
 
 | Metric | Value |
 |--------|-------|
-| **Total Equipment Items** | ${totalItems} |
-| **Total Daily Rate** | ₹${totalDailyRate.toLocaleString('en-IN')} |
-| **Available** | ${statusCounts.available} |
-| **In Use** | ${statusCounts.inUse} |
-| **Under Maintenance** | ${statusCounts.maintenance} |
-| **Returned** | ${statusCounts.returned} |
+| Total Items | ${totalItems} |
+| Total Daily Rate | $${totalDailyRate.toLocaleString()} |
+| Available | ${available} |
+| In Use | ${inUse} |
+| Maintenance | ${maintenance} |
+| Returned | ${returned} |
 
 ---
 
 ## By Category
 
-| Category | Count |
-|----------|-------|
-${categoryCounts.map(c => `| ${c.category} | ${c.count} |`).join('\n')}
-
----
-
-## Equipment Details
-
-| # | Name | Category | Start Date | End Date | Daily Rate | Vendor | Status | Qty |
-|---|------|----------|------------|----------|------------|--------|--------|-----|
-${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateStart.split('T')[0]} | ${eq.dateEnd.split('T')[0]} | ₹${eq.dailyRate.toLocaleString('en-IN')} | ${eq.vendor || '-'} | ${eq.status} | ${eq.quantity} |`).join('\n')}
-
----
-
-## Budget Overview
-
-- **Total Daily Rate:** ₹${totalDailyRate.toLocaleString('en-IN')}
-- **Budget Limit:** ₹${budgetLimit.toLocaleString('en-IN')}
-- **Remaining:** ₹${(budgetLimit - totalDailyRate).toLocaleString('en-IN')}
-- **Usage:** ${((totalDailyRate / budgetLimit) * 100).toFixed(1)}%
-
----
-
-*Generated by CinePilot - Film Production Management System*
 `
-
+    
+    Object.entries(categoryBreakdown).forEach(([category, count]) => {
+      const dailyRate = filtered.filter(eq => eq.category === category).reduce((acc, eq) => acc + eq.dailyRate, 0)
+      markdown += `- **${category.charAt(0).toUpperCase() + category.slice(1)}**: ${count} items ($${dailyRate.toLocaleString()}/day)\n`
+    })
+    
+    markdown += `\n## Equipment Details\n\n`
+    markdown += `| Name | Category | Status | Daily Rate | Vendor | Start Date | End Date | Qty |\n`
+    markdown += `|------|----------|--------|------------|--------|------------|----------|-----|\n`
+    
+    filtered.forEach(eq => {
+      const statusIcon = statusEmoji[eq.status] || '❓'
+      markdown += `| ${eq.name} | ${eq.category} | ${statusIcon} ${eq.status} | $${eq.dailyRate.toLocaleString()} | ${eq.vendor || '-'} | ${eq.dateStart.split('T')[0]} | ${eq.dateEnd.split('T')[0]} | ${eq.quantity} |\n`
+    })
+    
+    markdown += `\n---\n\n*Generated by CinePilot - Film Production Management*`
+    
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -877,7 +854,11 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
     setExporting(false)
     setSuccess('Equipment exported to Markdown!')
     setTimeout(() => setSuccess(null), 3000)
-  }, [filtered, budgetLimit])
+  }, [filtered])
+
+  // Assign handleExportMarkdown to ref for keyboard shortcuts
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  handleExportMarkdownRef.current = handleExportMarkdown
 
   // Print functionality
   const handlePrint = useCallback(() => {
@@ -1000,11 +981,6 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
   useEffect(() => {
     handlePrintRef.current = handlePrint
   }, [handlePrint])
-
-  // Assign handleExportMarkdown to ref for keyboard shortcuts
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
 
   const handleEdit = (eq: EquipmentRental) => {
     setEditingEquipment(eq)
@@ -1284,54 +1260,6 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
           </div>
         </div>
 
-        {/* View Mode Tabs */}
-        <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-lg w-fit">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'list' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <Package className="w-4 h-4" />
-              List
-            </span>
-          </button>
-          <button
-            onClick={() => setViewMode('analytics')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'analytics' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Analytics
-            </span>
-          </button>
-          <button
-            onClick={() => setViewMode('conflicts')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
-              viewMode === 'conflicts' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Conflicts
-            </span>
-            {conflictStats.high > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                {conflictStats.high}
-              </span>
-            )}
-          </button>
-        </div>
-
         {error && (
           <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl px-5 py-3 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1346,85 +1274,52 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
           </div>
         )}
 
-        {/* Budget Tracking */}
-        <div className={`rounded-xl border p-4 mb-4 ${
-          budgetData.budgetStatus === 'over' 
-            ? 'bg-red-500/10 border-red-500/30' 
-            : budgetData.budgetStatus === 'warning'
-            ? 'bg-amber-500/10 border-amber-500/30'
-            : 'bg-emerald-500/10 border-emerald-500/30'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              {budgetData.budgetStatus === 'over' ? (
-                <AlertCircle className="w-5 h-5 text-red-400" />
-              ) : budgetData.budgetStatus === 'warning' ? (
-                <AlertTriangle className="w-5 h-5 text-amber-400" />
-              ) : (
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-              )}
-              <span className={`font-semibold ${
-                budgetData.budgetStatus === 'over' 
-                  ? 'text-red-400' 
-                  : budgetData.budgetStatus === 'warning'
-                  ? 'text-amber-400'
-                  : 'text-emerald-400'
-              }`}>
-                {budgetData.budgetStatus === 'over' 
-                  ? 'Over Budget!' 
-                  : budgetData.budgetStatus === 'warning'
-                  ? 'Budget Warning'
-                  : 'Budget OK'}
+        {/* View Mode Tabs */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'list'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Package className="w-4 h-4 inline-block mr-2" />
+            List
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'analytics'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <DollarSign className="w-4 h-4 inline-block mr-2" />
+            Analytics
+          </button>
+          <button
+            onClick={() => setViewMode('conflicts')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+              viewMode === 'conflicts'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4 inline-block" />
+            Conflicts
+            {conflictStats.high > 0 && (
+              <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {conflictStats.high}
               </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-400">Budget Limit:</span>
-              <input
-                type="number"
-                value={budgetLimit}
-                onChange={(e) => setBudgetLimit(Number(e.target.value))}
-                className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter budget"
-              />
-            </div>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="relative h-4 bg-slate-800 rounded-full overflow-hidden mb-2">
-            <div 
-              className={`absolute left-0 top-0 h-full transition-all duration-500 ${
-                budgetData.budgetStatus === 'over' 
-                  ? 'bg-red-500' 
-                  : budgetData.budgetStatus === 'warning'
-                  ? 'bg-amber-500'
-                  : 'bg-emerald-500'
-              }`}
-              style={{ width: `${Math.min(budgetData.budgetUsedPercent, 100)}%` }}
-            />
-            {budgetData.budgetUsedPercent > 100 && (
-              <div 
-                className="absolute top-0 h-full bg-red-600"
-                style={{ width: `${Math.min(budgetData.budgetUsedPercent - 100, 100)}%`, left: '100%', transform: 'translateX(-100%)' }}
-              />
             )}
-          </div>
-          
-          {/* Budget Stats */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400">
-              Estimated: <span className="text-white font-medium">₹{(budgetData.estimatedTotal / 100000).toFixed(2)}L</span>
-            </span>
-            <span className="text-slate-400">
-              {budgetData.budgetUsedPercent.toFixed(1)}% used
-            </span>
-            <span className={budgetData.budgetRemaining >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-              {budgetData.budgetRemaining >= 0 
-                ? `₹${(budgetData.budgetRemaining / 100000).toFixed(2)}L remaining`
-                : `₹${(Math.abs(budgetData.budgetRemaining) / 100000).toFixed(2)}L over`}
-            </span>
-          </div>
+          </button>
+          <span className="text-xs text-slate-500 ml-2">Press 1, 2, 3 to switch views</span>
         </div>
 
+        {/* List/Analytics View */}
+        {(viewMode === 'list' || viewMode === 'analytics') && (
+          <>
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <StatCard title="Total Items" value={stats.totalItems} color="indigo" icon={<Package className="w-5 h-5 text-indigo-400" />} />
@@ -1435,8 +1330,8 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
           <StatCard title="Returned" value={stats.returned} color="slate" icon={<Package className="w-5 h-5 text-slate-400" />} />
         </div>
 
-        {/* Charts - Only show in analytics mode */}
-        {viewMode === 'analytics' && categoryData.length > 0 && (
+        {/* Charts */}
+        {categoryData.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Category Breakdown */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -1493,106 +1388,124 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
             </div>
           </div>
         )}
+          </>
+        )}
 
         {/* Conflicts View */}
         {viewMode === 'conflicts' && (
           <div className="space-y-6">
-            {/* Conflict Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className={`p-4 rounded-xl border ${conflictStats.total > 0 ? 'bg-indigo-500/10 border-indigo-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">Total Conflicts</p>
-                    <p className="text-2xl font-semibold mt-1">{conflictStats.total}</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-indigo-400" />
+            {/* Budget Limit Input */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Daily Budget Limit</h3>
+                  <p className="text-sm text-slate-400">Set threshold for budget alerts</p>
                 </div>
-              </div>
-              <div className={`p-4 rounded-xl border ${conflictStats.high > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">High Priority</p>
-                    <p className="text-2xl font-semibold mt-1 text-red-400">{conflictStats.high}</p>
-                  </div>
-                  <AlertCircle className="w-8 h-8 text-red-400" />
-                </div>
-              </div>
-              <div className={`p-4 rounded-xl border ${conflictStats.medium > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">Medium Priority</p>
-                    <p className="text-2xl font-semibold mt-1 text-amber-400">{conflictStats.medium}</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-amber-400" />
-                </div>
-              </div>
-              <div className={`p-4 rounded-xl border ${conflictStats.low > 0 ? 'bg-slate-500/10 border-slate-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">Low Priority</p>
-                    <p className="text-2xl font-semibold mt-1 text-slate-400">{conflictStats.low}</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-slate-400" />
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    value={budgetLimit}
+                    onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                    className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Conflicts List */}
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Total Issues</p>
+                <p className="text-3xl font-bold mt-1">{conflictStats.total}</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-xs text-red-400 uppercase tracking-wider">High Priority</p>
+                <p className="text-3xl font-bold text-red-400 mt-1">{conflictStats.high}</p>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                <p className="text-xs text-amber-400 uppercase tracking-wider">Medium Priority</p>
+                <p className="text-3xl font-bold text-amber-400 mt-1">{conflictStats.medium}</p>
+              </div>
+              <div className="bg-slate-500/10 border border-slate-500/20 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Low Priority</p>
+                <p className="text-3xl font-bold text-slate-400 mt-1">{conflictStats.low}</p>
+              </div>
+            </div>
+
+            {/* Conflict Type Summary */}
+            {conflictTypeStats.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <h3 className="font-semibold mb-3">Issues by Type</h3>
+                <div className="flex flex-wrap gap-3">
+                  {conflictTypeStats.map(({ type, count }) => (
+                    <span key={type} className="px-3 py-1.5 bg-slate-800 rounded-lg text-sm">
+                      <span className="capitalize">{type.replace('-', ' ')}</span>: <span className="text-indigo-400 font-medium">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Clear State */}
             {equipmentConflicts.length === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
-                <CheckCircle className="w-16 h-16 mx-auto mb-4 text-emerald-400" />
-                <h3 className="text-xl font-semibold mb-2">Equipment Schedule Looks Good!</h3>
-                <p className="text-slate-400">No conflicts detected in your equipment rentals.</p>
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-8 text-center">
+                <Check className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-emerald-400">All Clear!</h3>
+                <p className="text-slate-400 mt-2">No issues detected with your equipment rentals.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {equipmentConflicts.map(conflict => (
-                  <div 
+              /* Conflict Cards */
+              <div className="grid gap-4">
+                {equipmentConflicts.map((conflict) => (
+                  <div
                     key={conflict.id}
-                    className={`p-4 rounded-xl border ${
-                      conflict.severity === 'high' 
-                        ? 'bg-red-500/5 border-red-500/20' 
+                    className={`bg-slate-900 border rounded-xl p-5 ${
+                      conflict.severity === 'high'
+                        ? 'border-red-500/30'
                         : conflict.severity === 'medium'
-                        ? 'bg-amber-500/5 border-amber-500/20'
-                        : 'bg-slate-800/50 border-slate-700'
+                        ? 'border-amber-500/30'
+                        : 'border-slate-700'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      {conflict.severity === 'high' ? (
-                        <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                      ) : conflict.severity === 'medium' ? (
-                        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                      ) : (
-                        <AlertTriangle className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            conflict.severity === 'high' 
-                              ? 'bg-red-500/20 text-red-400' 
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className={`p-2 rounded-lg ${
+                          conflict.severity === 'high'
+                            ? 'bg-red-500/20'
+                            : conflict.severity === 'medium'
+                            ? 'bg-amber-500/20'
+                            : 'bg-slate-800'
+                        }`}>
+                          <AlertTriangle className={`w-5 h-5 ${
+                            conflict.severity === 'high'
+                              ? 'text-red-400'
                               : conflict.severity === 'medium'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-slate-700 text-slate-400'
-                          }`}>
-                            {conflict.severity.charAt(0).toUpperCase() + conflict.severity.slice(1)}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            conflict.type === 'double-booking' ? 'bg-red-500/20 text-red-400' :
-                            conflict.type === 'budget-overrun' ? 'bg-red-500/20 text-red-400' :
-                            conflict.type === 'maintenance-scheduled' ? 'bg-red-500/20 text-red-400' :
-                            conflict.type === 'high-value' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-slate-700 text-slate-400'
-                          }`}>
-                            {conflict.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                          </span>
+                              ? 'text-amber-400'
+                              : 'text-slate-400'
+                          }`} />
                         </div>
-                        <h4 className="font-semibold mb-1">{conflict.title}</h4>
-                        <p className="text-sm text-slate-400 mb-2">{conflict.description}</p>
-                        <div className="text-xs text-indigo-400">
-                          <span className="text-slate-500">Recommendation: </span>
-                          {conflict.recommendation}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{conflict.title}</h4>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              conflict.severity === 'high'
+                                ? 'bg-red-500/20 text-red-400'
+                                : conflict.severity === 'medium'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-slate-700 text-slate-400'
+                            }`}>
+                              {conflict.severity}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-400 mt-1">{conflict.description}</p>
                         </div>
                       </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-800">
+                      <p className="text-xs text-slate-500">
+                        <span className="text-indigo-400 font-medium">Recommendation:</span> {conflict.recommendation}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -1601,9 +1514,6 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
           </div>
         )}
 
-        {/* List/Analytics View */}
-        {(viewMode === 'list' || viewMode === 'analytics') && (
-          <>
         {/* Filters */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex flex-wrap items-center gap-4">
@@ -1749,8 +1659,6 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
             </div>
           )}
         </div>
-          </>
-        )}
 
         {/* Floating Bulk Actions Toolbar */}
         {showBulkActions && selectedEquipment.size > 0 && (
@@ -2091,19 +1999,6 @@ ${filtered.map((eq, i) => `| ${i + 1} | ${eq.name} | ${eq.category} | ${eq.dateS
                 </button>
               </div>
               <div className="p-4 space-y-3">
-                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">View Modes</div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Switch to List view</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Switch to Analytics view</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Switch to Conflicts view</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
-                </div>
                 <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Selection</div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Select all equipment</span>

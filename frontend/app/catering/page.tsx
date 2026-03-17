@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
-  Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
+  Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, CheckCircle, X,
   TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, Printer, Filter
 } from 'lucide-react'
 import {
@@ -82,28 +82,7 @@ export default function CateringPage() {
   })
   const [sortBy, setSortBy] = useState<'date' | 'budget' | 'mealType' | 'people'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default budget limit: ₹5,00,000
-  
-  // Budget tracking calculations
-  const budgetData = useMemo(() => {
-    if (!plan) return { usedPercent: 0, remaining: 0, isOverBudget: false, isWarning: false, status: 'ok' }
-    
-    const estimatedTotal = plan.totalSpent || plan.totalBudget
-    const budgetUsedPercent = budgetLimit > 0 ? (estimatedTotal / budgetLimit) * 100 : 0
-    const budgetRemaining = budgetLimit - estimatedTotal
-    const isOverBudget = budgetRemaining < 0
-    const isWarning = !isOverBudget && budgetUsedPercent >= 80
-    const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
-    
-    return {
-      usedPercent: budgetUsedPercent,
-      remaining: budgetRemaining,
-      isOverBudget,
-      isWarning,
-      status: budgetStatus,
-      estimatedTotal
-    }
-  }, [plan, budgetLimit])
+  const [viewMode, setViewMode] = useState<'calendar' | 'analytics' | 'conflicts'>('calendar')
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -211,142 +190,6 @@ export default function CateringPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
-
-  // Markdown export function
-  const handleExportMarkdown = useCallback(() => {
-    const currentPlan = planRef.current
-    if (!currentPlan) return
-
-    // Apply same filtering as the view
-    let days = currentPlan.shootDays.filter(sd => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
-        const mealMatch = sd.meals.some(m => 
-          m.menu.some(item => item.toLowerCase().includes(query)) ||
-          m.type.toLowerCase().includes(query) ||
-          m.dietary.some(d => d.toLowerCase().includes(query))
-        )
-        if (!dateMatch && !mealMatch) return false
-      }
-      if (filters.mealType !== 'all') {
-        const hasMealType = sd.meals.some(m => m.type === filters.mealType)
-        if (!hasMealType) return false
-      }
-      if (filters.dietary !== 'all') {
-        const hasDietary = sd.meals.some(m => m.dietary.includes(filters.dietary))
-        if (!hasDietary) return false
-      }
-      return true
-    })
-
-    // Apply sorting
-    days = [...days].sort((a, b) => {
-      let comparison = 0
-      switch (sortBy) {
-        case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
-          break
-        case 'budget':
-          const budgetA = a.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
-          const budgetB = b.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
-          comparison = budgetA - budgetB
-          break
-        case 'mealType':
-          const typesA = a.meals.map(m => m.type).join(',')
-          const typesB = b.meals.map(m => m.type).join(',')
-          comparison = typesA.localeCompare(typesB)
-          break
-        case 'people':
-          comparison = (a.totalCrew + a.totalCast) - (b.totalCrew + b.totalCast)
-          break
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-
-    const totalSpent = days.reduce((sum: number, sd: ShootDayMeal) => 
-      sum + sd.meals.reduce((s: number, m: Meal) => s + (m.actualCost || m.budget), 0), 0)
-
-    const totalBudget = currentPlan.totalBudget
-    const totalMeals = days.reduce((sum: number, sd: ShootDayMeal) => sum + sd.meals.length, 0)
-    const totalPeople = days.reduce((sum: number, sd: ShootDayMeal) => sum + sd.totalCast + sd.totalCrew, 0)
-
-    // Group meals by type
-    const mealsByType = days.flatMap((sd: ShootDayMeal) => sd.meals).reduce((acc: Record<string, number>, meal: Meal) => {
-      acc[meal.type] = (acc[meal.type] || 0) + 1
-      return acc
-    }, {})
-
-    // Group by dietary
-    const dietaryCounts = days.flatMap((sd: ShootDayMeal) => sd.meals).flatMap((m: Meal) => m.dietary).reduce((acc: Record<string, number>, d: string) => {
-      acc[d] = (acc[d] || 0) + 1
-      return acc
-    }, {})
-
-    let markdown = `# 🍽️ CinePilot Catering Report
-
-> Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}
-
-## Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Budget | ₹${totalBudget.toLocaleString('en-IN')} |
-| Total Spent | ₹${totalSpent.toLocaleString('en-IN')} |
-| Remaining | ₹${(totalBudget - totalSpent).toLocaleString('en-IN')} |
-| Budget Used | ${((totalSpent / totalBudget) * 100).toFixed(1)}% |
-| Shoot Days | ${days.length} |
-| Total Meals | ${totalMeals} |
-| Total People | ${totalPeople} |
-
-## Meals by Type
-
-| Meal Type | Count |
-|-----------|-------|
-${Object.entries(mealsByType).map(([type, count]) => `| ${type.charAt(0).toUpperCase() + type.slice(1)} | ${count} |`).join('\n')}
-
-## Dietary Requirements
-
-| Dietary Option | Count |
-|----------------|-------|
-${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`).join('\n')}
-
-## Meal Schedule
-
-| Date | People | Meals | Budget | Actual |
-|------|--------|-------|--------|--------|
-`
-
-    days.forEach((sd: ShootDayMeal) => {
-      const dateStr = new Date(sd.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-      const people = sd.totalCrew + sd.totalCast
-      const meals = sd.meals.map((m: Meal) => `${m.type}: ${m.menu.slice(0, 2).join(', ')}${m.menu.length > 2 ? '...' : ''}`).join('; ')
-      const budget = sd.meals.reduce((sum: number, m: Meal) => sum + m.budget, 0)
-      const actual = sd.meals.reduce((sum: number, m: Meal) => sum + (m.actualCost || m.budget), 0)
-      markdown += `| ${dateStr} | ${people} | ${meals} | ₹${budget.toLocaleString('en-IN')} | ₹${actual.toLocaleString('en-IN')} |\n`
-    })
-
-    markdown += `
----
-
-* CinePilot - Film Production Management System *
-`
-
-    const blob = new Blob([markdown], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `catering-report-${new Date().toISOString().split('T')[0]}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-    setShowExportMenu(false)
-  }, [searchQuery, filters, sortBy, sortOrder])
-
-  // Ref for markdown export
-  const handleExportMarkdownRef = useRef(handleExportMarkdown)
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
 
   // Print function
   const handlePrint = () => {
@@ -490,10 +333,6 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
-        case 'm':
-          e.preventDefault()
-          if (planRef.current) handleExportMarkdownRef.current()
-          break
         case 'p':
           e.preventDefault()
           if (planRef.current) setShowPrintMenu(prev => !prev)
@@ -501,6 +340,18 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
         case 's':
           e.preventDefault()
           toggleSortOrder()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('calendar')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
           break
       }
     }
@@ -589,6 +440,135 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
     meals: filteredShootDays.reduce((sum, sd) => sum + sd.meals.length, 0),
     totalPeople: filteredShootDays.length > 0 ? filteredShootDays.reduce((sum, sd) => sum + sd.totalCast + sd.totalCrew, 0) : 0,
   }
+
+  // Conflict detection for catering
+  interface CateringConflict {
+    id: string
+    type: 'budget_overrun' | 'dietary_mismatch' | 'missing_meal' | 'low_attendance' | 'high_cost'
+    severity: 'high' | 'medium' | 'low'
+    day?: string
+    title: string
+    description: string
+  }
+
+  const detectedConflicts = useMemo((): CateringConflict[] => {
+    if (!plan) return []
+    
+    const conflictList: CateringConflict[] = []
+    
+    // Check budget overrun (actual cost > budget)
+    plan.shootDays.forEach(sd => {
+      const dayBudget = sd.meals.reduce((sum, m) => sum + m.budget, 0)
+      const dayActual = sd.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+      const overrunPercent = dayBudget > 0 ? ((dayActual - dayBudget) / dayBudget) * 100 : 0
+      
+      if (overrunPercent > 20) {
+        conflictList.push({
+          id: `budget-${sd.date}`,
+          type: 'budget_overrun',
+          severity: overrunPercent > 50 ? 'high' : 'medium',
+          day: sd.date,
+          title: `Budget Overrun: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+          description: `Actual cost (₹${dayActual.toLocaleString('en-IN')}) exceeds budget (₹${dayBudget.toLocaleString('en-IN')}) by ${overrunPercent.toFixed(0)}%`
+        })
+      }
+    })
+    
+    // Check for missing meals on shoot days
+    plan.shootDays.forEach(sd => {
+      const mealTypes = sd.meals.map(m => m.type)
+      const hasBreakfast = mealTypes.includes('breakfast')
+      const hasLunch = mealTypes.includes('lunch')
+      const hasDinner = mealTypes.includes('dinner')
+      const totalPeople = sd.totalCrew + sd.totalCast
+      
+      if (totalPeople > 20) {
+        if (!hasBreakfast || !hasLunch || !hasDinner) {
+          const missing = []
+          if (!hasBreakfast) missing.push('breakfast')
+          if (!hasLunch) missing.push('lunch')
+          if (!hasDinner) missing.push('dinner')
+          
+          conflictList.push({
+            id: `meal-${sd.date}`,
+            type: 'missing_meal',
+            severity: 'high',
+            day: sd.date,
+            title: `Missing Meals: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+            description: `${totalPeople} crew members but missing: ${missing.join(', ')}`
+          })
+        }
+      }
+    })
+    
+    // Check for high per-person cost
+    plan.shootDays.forEach(sd => {
+      const totalCost = sd.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+      const totalPeople = sd.totalCrew + sd.totalCast
+      const costPerPerson = totalPeople > 0 ? totalCost / totalPeople : 0
+      
+      if (costPerPerson > 500 && totalPeople > 10) {
+        conflictList.push({
+          id: `cost-${sd.date}`,
+          type: 'high_cost',
+          severity: costPerPerson > 1000 ? 'high' : 'medium',
+          day: sd.date,
+          title: `High Meal Cost: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+          description: `₹${costPerPerson.toFixed(0)} per person (${totalPeople} people, total: ₹${totalCost.toLocaleString('en-IN')})`
+        })
+      }
+    })
+    
+    // Check for low attendance days (meals scheduled but low crew)
+    plan.shootDays.forEach(sd => {
+      const totalMeals = sd.meals.length
+      const totalPeople = sd.totalCrew + sd.totalCast
+      
+      if (totalMeals > 0 && totalPeople < 5) {
+        conflictList.push({
+          id: `attendance-${sd.date}`,
+          type: 'low_attendance',
+          severity: 'low',
+          day: sd.date,
+          title: `Low Attendance: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+          description: `Only ${totalPeople} people scheduled but ${totalMeals} meals planned`
+        })
+      }
+    })
+    
+    // Check dietary requirements are being met
+    if (plan.dietaryRestrictions) {
+      plan.shootDays.forEach(sd => {
+        const totalPeople = sd.totalCrew + sd.totalCast
+        const vegCount = plan.dietaryRestrictions['Vegetarian'] || 0
+        
+        // If more than 30% are vegetarian, check for veg options
+        if (totalPeople > 10 && vegCount / totalPeople > 0.3) {
+          const hasVegOption = sd.meals.some(m => m.dietary.includes('Vegetarian'))
+          if (!hasVegOption) {
+            conflictList.push({
+              id: `dietary-${sd.date}`,
+              type: 'dietary_mismatch',
+              severity: 'medium',
+              day: sd.date,
+              title: `Dietary Gap: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+              description: `${vegCount} vegetarian crew but no vegetarian-specific meal option listed`
+            })
+          }
+        }
+      })
+    }
+    
+    return conflictList
+  }, [plan])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: detectedConflicts.length,
+    high: detectedConflicts.filter(c => c.severity === 'high').length,
+    medium: detectedConflicts.filter(c => c.severity === 'medium').length,
+    low: detectedConflicts.filter(c => c.severity === 'low').length,
+  }), [detectedConflicts])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -748,9 +728,11 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
               <ShortcutRow keys={['F']} description="Toggle filters" />
               <ShortcutRow keys={['S']} description="Toggle sort order" />
+              <ShortcutRow keys={['1']} description="Switch to Calendar view" />
+              <ShortcutRow keys={['2']} description="Switch to Analytics view" />
+              <ShortcutRow keys={['3']} description="Switch to Conflicts view" />
               <ShortcutRow keys={['N']} description="Add new shoot day" />
               <ShortcutRow keys={['E']} description="Export menu" />
-              <ShortcutRow keys={['M']} description="Export Markdown" />
               <ShortcutRow keys={['P']} description="Print catering report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
@@ -798,6 +780,45 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+
+              {/* View Mode Switcher */}
+              <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'calendar' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Calendar view (1)"
+                >
+                  Calendar
+                </button>
+                <button
+                  onClick={() => setViewMode('analytics')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'analytics' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Analytics view (2)"
+                >
+                  Analytics
+                </button>
+                <button
+                  onClick={() => setViewMode('conflicts')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'conflicts' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Conflicts view (3)"
+                >
+                  Conflicts
+                  {conflictStats.total > 0 && (
+                    <span className={`px-1.5 py-0.5 text-xs font-bold rounded-full ${
+                      conflictStats.high > 0 ? 'bg-red-500 text-white' : 
+                      conflictStats.medium > 0 ? 'bg-amber-500 text-white' : 'bg-slate-500 text-white'
+                    }`}>
+                      {conflictStats.total}
+                    </span>
+                  )}
+                </button>
+              </div>
 
               {/* Filter Toggle Button */}
               <div className="relative" ref={filterPanelRef}>
@@ -917,13 +938,6 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
                     >
                       <FileText className="w-4 h-4 text-slate-400" />
                       Export JSON
-                    </button>
-                    <button
-                      onClick={() => { handleExportMarkdown(); setShowExportMenu(false) }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
-                    >
-                      <FileText className="w-4 h-4 text-cyan-400" />
-                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -1045,75 +1059,101 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
               </div>
             </div>
 
-            {/* Budget Tracking Card */}
-            <div className={`bg-slate-900 border rounded-xl p-5 ${budgetData.status === 'over' ? 'border-red-500/30' : budgetData.status === 'warning' ? 'border-amber-500/30' : 'border-emerald-500/30'}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${budgetData.status === 'over' ? 'bg-red-500/20' : budgetData.status === 'warning' ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}>
-                    {budgetData.status === 'over' ? <AlertCircle className="w-5 h-5 text-red-400" /> : budgetData.status === 'warning' ? <AlertCircle className="w-5 h-5 text-amber-400" /> : <DollarSign className="w-5 h-5 text-emerald-400" />}
+            {/* Conflicts View */}
+            {viewMode === 'conflicts' && (
+              <div className="space-y-6">
+                {/* Conflict Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-red-500/20"><AlertCircle className="w-4 h-4 text-red-400" /></div>
+                      <span className="text-sm text-slate-400">High Priority</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-red-400">{conflictStats.high}</p>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-white">Catering Budget Tracker</h3>
-                    <p className={`text-xs ${budgetData.status === 'over' ? 'text-red-400' : budgetData.status === 'warning' ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {budgetData.status === 'over' ? 'Over Budget!' : budgetData.status === 'warning' ? 'Approaching budget limit' : 'Within budget'}
-                    </p>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-amber-500/20"><AlertCircle className="w-4 h-4 text-amber-400" /></div>
+                      <span className="text-sm text-slate-400">Medium Priority</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-amber-400">{conflictStats.medium}</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-slate-500/20"><AlertCircle className="w-4 h-4 text-slate-400" /></div>
+                      <span className="text-sm text-slate-400">Low Priority</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-slate-400">{conflictStats.low}</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-blue-500/20"><AlertCircle className="w-4 h-4 text-blue-400" /></div>
+                      <span className="text-sm text-slate-400">Total Issues</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-white">{conflictStats.total}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400">Budget Limit:</span>
-                  <input
-                    type="number"
-                    value={budgetLimit}
-                    onChange={(e) => setBudgetLimit(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-32 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
-                    placeholder="Enter limit"
-                  />
-                </div>
-              </div>
-              
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-slate-400">Budget Used: ₹{(budgetData.estimatedTotal || 0).toLocaleString('en-IN')}</span>
-                  <span className="text-slate-400">Limit: ₹{budgetLimit.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${budgetData.status === 'over' ? 'bg-red-500' : budgetData.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                    style={{ width: `${Math.min(budgetData.usedPercent, 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs mt-1">
-                  <span className="text-slate-500">{budgetData.usedPercent.toFixed(1)}% used</span>
-                  <span className={budgetData.isOverBudget ? 'text-red-400' : 'text-slate-500'}>
-                    {budgetData.isOverBudget 
-                      ? `Over by ₹${Math.abs(budgetData.remaining).toLocaleString('en-IN')}` 
-                      : `₹${budgetData.remaining.toLocaleString('en-IN')} remaining`}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Status Messages */}
-              <div className="flex flex-wrap gap-2">
-                {budgetData.isOverBudget && (
-                  <span className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Over budget by ₹{Math.abs(budgetData.remaining).toLocaleString('en-IN')}
-                  </span>
-                )}
-                {budgetData.isWarning && !budgetData.isOverBudget && (
-                  <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Approaching budget limit ({budgetData.usedPercent.toFixed(0)}%)
-                  </span>
-                )}
-                {!budgetData.isOverBudget && !budgetData.isWarning && (
-                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full flex items-center gap-1">
-                    <DollarSign className="w-3 h-3" /> {(100 - budgetData.usedPercent).toFixed(0)}% budget remaining
-                  </span>
-                )}
-              </div>
-            </div>
 
-            {/* Charts */}
+                {/* Conflicts List */}
+                {detectedConflicts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {detectedConflicts.map((conflict) => (
+                      <div
+                        key={conflict.id}
+                        className={`bg-slate-900 border rounded-xl p-5 ${
+                          conflict.severity === 'high' ? 'border-red-500/30' :
+                          conflict.severity === 'medium' ? 'border-amber-500/30' :
+                          'border-slate-700/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg shrink-0 ${
+                            conflict.severity === 'high' ? 'bg-red-500/20' :
+                            conflict.severity === 'medium' ? 'bg-amber-500/20' :
+                            'bg-slate-500/20'
+                          }`}>
+                            {conflict.severity === 'high' ? (
+                              <AlertCircle className="w-5 h-5 text-red-400" />
+                            ) : conflict.severity === 'medium' ? (
+                              <AlertCircle className="w-5 h-5 text-amber-400" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                                conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-slate-500/20 text-slate-400'
+                              }`}>
+                                {conflict.severity.toUpperCase()}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {conflict.type.replace('_', ' ')}
+                              </span>
+                            </div>
+                            <h4 className="font-medium text-white text-sm mb-1">{conflict.title}</h4>
+                            <p className="text-xs text-slate-400">{conflict.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 mb-4">
+                      <CheckCircle className="w-8 h-8 text-emerald-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Catering Plan Looks Good!</h3>
+                    <p className="text-slate-400 max-w-md mx-auto">No catering issues detected. Your meal planning is on track.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Calendar/Analytics View - show charts for calendar and analytics modes */}
+            {viewMode !== 'conflicts' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><Leaf className="w-5 h-5 text-emerald-400" /> Dietary Restrictions</h3>
@@ -1156,6 +1196,7 @@ ${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`)
                 )}
               </div>
             </div>
+            )}
 
             {/* Caterer */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">

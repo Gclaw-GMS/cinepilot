@@ -32,10 +32,10 @@ import {
   LayoutGrid,
   Keyboard,
   ChevronDown,
+  ChevronRight,
   Download,
   FileText,
   Printer,
-  DollarSign,
 } from 'lucide-react'
 import {
   PieChart as RechartsPie,
@@ -75,7 +75,6 @@ interface Task {
   dueDate?: string
   createdAt: string
   updatedAt?: string
-  budgetAmount?: number // Budget allocated for this task
 }
 
 interface TaskStats {
@@ -87,24 +86,63 @@ interface TaskStats {
   overdue: number
   highPriority: number
   completionPercent: number
-  totalBudget: number
-  usedBudget: number
 }
 
-type ViewMode = 'list' | 'board' | 'calendar'
+type ViewMode = 'list' | 'board' | 'calendar' | 'conflicts'
 type FilterStatus = 'all' | 'overdue' | 'pending' | 'in_progress' | 'completed' | 'blocked'
 type FilterPriority = 'all' | 'high' | 'medium' | 'low'
 
+// Task templates for quick creation
+const TASK_TEMPLATES = [
+  { 
+    category: 'Production', 
+    tasks: [
+      { title: 'Confirm location permits', description: 'Get final approval from municipal office', priority: 'high', status: 'pending' },
+      { title: 'Equipment rental confirmation', description: 'Confirm camera and lighting equipment', priority: 'medium', status: 'pending' },
+      { title: 'Cast travel bookings', description: 'Book flights and accommodation for cast', priority: 'medium', status: 'pending' },
+      { title: 'Catering arrangements', description: 'Confirm meals for crew members', priority: 'low', status: 'pending' },
+      { title: 'Insurance certificates', description: 'Get all insurance docs ready', priority: 'medium', status: 'pending' },
+    ]
+  },
+  { 
+    category: 'Creative', 
+    tasks: [
+      { title: 'Finalize shot list', description: 'Complete detailed shot list with angles', priority: 'high', status: 'pending' },
+      { title: 'Storyboard review', description: 'Review final storyboards with director', priority: 'high', status: 'pending' },
+      { title: 'VFX brief preparation', description: 'Create detailed brief for VFX shots', priority: 'high', status: 'pending' },
+      { title: 'Script lock confirmation', description: 'Get final sign-off on script', priority: 'medium', status: 'pending' },
+    ]
+  },
+  { 
+    category: 'Logistics', 
+    tasks: [
+      { title: 'Transport scheduling', description: 'Arrange vehicles for crew and equipment', priority: 'medium', status: 'pending' },
+      { title: 'Parking permits', description: 'Secure parking for production vehicles', priority: 'low', status: 'pending' },
+      { title: 'Security deployment', description: 'Coordinate security for shoot locations', priority: 'medium', status: 'pending' },
+      { title: 'Emergency contacts list', description: 'Prepare emergency contact directory', priority: 'low', status: 'pending' },
+    ]
+  },
+  { 
+    category: 'Post-Production', 
+    tasks: [
+      { title: 'Editor onboarding', description: 'Brief editor on project requirements', priority: 'medium', status: 'pending' },
+      { title: 'VFX pipeline setup', description: 'Establish workflow for VFX deliverables', priority: 'high', status: 'pending' },
+      { title: 'Music composer brief', description: 'Share reference tracks and timeline', priority: 'medium', status: 'pending' },
+      { title: 'Color grading workflow', description: 'Set up color pipeline and looks', priority: 'low', status: 'pending' },
+    ]
+  },
+]
+
 // Demo data fallback for when database is not connected
 const DEMO_TASKS: Task[] = [
-  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'completed', priority: 'high', assignee: 'Director', dueDate: '2026-03-12', createdAt: '2026-03-01', budgetAmount: 50000 },
-  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'in_progress', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-15', createdAt: '2026-03-01', budgetAmount: 150000 },
-  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-10', createdAt: '2026-02-28', budgetAmount: 350000 },
-  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-16', createdAt: '2026-03-02', budgetAmount: 200000 },
-  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-18', createdAt: '2026-03-01', budgetAmount: 120000 },
-  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'blocked', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-11', createdAt: '2026-03-01', budgetAmount: 250000 },
-  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-08', createdAt: '2026-02-27', budgetAmount: 75000 },
-  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-11', createdAt: '2026-03-01', budgetAmount: 100000 },
+  { id: 'demo-1', projectId: 'default-project', title: 'Finalize shot list for Day 1', description: 'Complete the detailed shot list with camera angles and lens specifications', status: 'completed', priority: 'high', assignee: 'Director', dueDate: '2026-03-12', createdAt: '2026-03-01' },
+  { id: 'demo-2', projectId: 'default-project', title: 'Confirm location permits', description: 'Get final approval from municipal office for temple shooting', status: 'in_progress', priority: 'high', assignee: 'Production Manager', dueDate: '2026-03-15', createdAt: '2026-03-01' },
+  { id: 'demo-3', projectId: 'default-project', title: 'Equipment rental confirmation', description: 'Confirm ARRI Alexa Mini LF and Angenieux lenses', status: 'completed', priority: 'medium', assignee: 'Unit Production Manager', dueDate: '2026-03-10', createdAt: '2026-02-28' },
+  { id: 'demo-4', projectId: 'default-project', title: 'Cast travel bookings', description: 'Book flights for lead actors arriving from Mumbai', status: 'in_progress', priority: 'medium', assignee: 'Line Producer', dueDate: '2026-03-16', createdAt: '2026-03-02' },
+  { id: 'demo-5', projectId: 'default-project', title: 'Catering menu finalization', description: 'Confirm diet-specific meals for 80 crew members', status: 'pending', priority: 'low', assignee: 'Unit Production Manager', dueDate: '2026-03-18', createdAt: '2026-03-01' },
+  { id: 'demo-6', projectId: 'default-project', title: 'VFX brief preparation', description: 'Create detailed brief for 12 VFX shots', status: 'blocked', priority: 'high', assignee: 'VFX Supervisor', dueDate: '2026-03-11', createdAt: '2026-03-01' },
+  { id: 'demo-7', projectId: 'default-project', title: 'Insurance certificates', description: 'Get all insurance docs ready for shoot days', status: 'completed', priority: 'medium', assignee: 'Production Coordinator', dueDate: '2026-03-08', createdAt: '2026-02-27' },
+  { id: 'demo-8', projectId: 'default-project', title: 'Storyboard review meeting', description: 'Review final storyboards with director and DP', status: 'blocked', priority: 'high', assignee: 'Storyboard Artist', dueDate: '2026-03-11', createdAt: '2026-03-01' },
 ]
 
 export default function TasksPage() {
@@ -113,6 +151,9 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  
+  // Task conflicts detection
+  const [taskConflicts, setTaskConflicts] = useState<{id: string; type: string; severity: 'high' | 'medium' | 'low'; taskId: string; title: string; description: string; recommendation: string}[]>([])
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterPriority, setFilterPriority] = useState<FilterPriority>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -129,6 +170,7 @@ export default function TasksPage() {
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (sortBy ? 1 : 0)
   
   const [showForm, setShowForm] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [formData, setFormData] = useState({
     title: '',
@@ -137,13 +179,11 @@ export default function TasksPage() {
     priority: 'medium',
     assignee: '',
     dueDate: '',
-    budgetAmount: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1)
-  const [budgetLimit, setBudgetLimit] = useState<number>(1000000) // Default ₹10L
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   
@@ -243,7 +283,7 @@ export default function TasksPage() {
         if (!e.ctrlKey && !e.metaKey) {
           e.preventDefault()
           setEditingTask(null)
-          setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '', budgetAmount: '' })
+          setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' })
           setShowForm(true)
         }
         break
@@ -272,8 +312,12 @@ export default function TasksPage() {
       case 'V':
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
           e.preventDefault()
-          setViewMode(prev => prev === 'list' ? 'board' : prev === 'board' ? 'calendar' : 'list')
+          setViewMode(prev => prev === 'list' ? 'board' : prev === 'board' ? 'calendar' : prev === 'calendar' ? 'conflicts' : 'list')
         }
+        break
+      case '4':
+        e.preventDefault()
+        setViewMode('conflicts')
         break
       case 'e':
       case 'E':
@@ -284,8 +328,8 @@ export default function TasksPage() {
         break
       case 'm':
       case 'M':
-        if (!e.ctrlKey && !e.metaKey) {
-          e.preventDefault()
+        e.preventDefault()
+        if (filteredTasksRef.current.length > 0) {
           handleExportMarkdownRef.current?.()
         }
         break
@@ -370,10 +414,6 @@ export default function TasksPage() {
     
     console.log('[Tasks] Calculating stats from', total, 'tasks')
     
-    // Budget calculations
-    const totalBudget = tasks.reduce((sum, t) => sum + (t.budgetAmount || 0), 0)
-    const usedBudget = tasks.filter(t => t.status !== 'pending').reduce((sum, t) => sum + (t.budgetAmount || 0), 0)
-    
     return {
       total,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -383,8 +423,121 @@ export default function TasksPage() {
       overdue: tasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'completed').length,
       highPriority: tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length,
       completionPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
-      totalBudget,
-      usedBudget,
+    }
+  }, [tasks])
+
+  // Detect task conflicts
+  const conflictStats = useMemo(() => {
+    const conflicts: {id: string; type: string; severity: 'high' | 'medium' | 'low'; taskId: string; title: string; description: string; recommendation: string}[] = []
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    
+    tasks.forEach(task => {
+      const isOverdue = task.dueDate && task.dueDate < today && task.status !== 'completed'
+      const isDueSoon = task.dueDate && task.dueDate >= today && task.dueDate <= thirtyDaysFromNow && task.status !== 'completed'
+      const isHighPriority = task.priority === 'high' && task.status !== 'completed'
+      const isBlocked = task.status === 'blocked'
+      
+      // 1. Overdue task (high severity)
+      if (isOverdue) {
+        const daysOverdue = task.dueDate ? Math.floor((now.getTime() - new Date(task.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0
+        conflicts.push({
+          id: `overdue-${task.id}`,
+          type: 'overdue',
+          severity: daysOverdue > 7 ? 'high' : daysOverdue > 3 ? 'medium' : 'low',
+          taskId: task.id,
+          title: task.title,
+          description: `Task is ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue (due: ${task.dueDate})`,
+          recommendation: daysOverdue > 7 ? 'Urgent: Complete or reschedule immediately' : 'Complete or extend due date',
+        })
+      }
+      
+      // 2. High priority task due soon (medium severity)
+      if (isHighPriority && isDueSoon) {
+        const daysUntilDue = task.dueDate ? Math.floor((new Date(task.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
+        conflicts.push({
+          id: `high-priority-soon-${task.id}`,
+          type: 'high-priority-soon',
+          severity: daysUntilDue <= 2 ? 'high' : 'medium',
+          taskId: task.id,
+          title: task.title,
+          description: `High priority task due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}`,
+          recommendation: 'Prioritize this task in upcoming work',
+        })
+      }
+      
+      // 3. Blocked high priority task (high severity)
+      if (isBlocked && isHighPriority) {
+        conflicts.push({
+          id: `blocked-high-${task.id}`,
+          type: 'blocked-high-priority',
+          severity: 'high',
+          taskId: task.id,
+          title: task.title,
+          description: 'High priority task is blocked',
+          recommendation: 'Resolve blocker or reassign to unblock',
+        })
+      }
+      
+      // 4. Task without assignee (low severity)
+      if (!task.assignee && task.status !== 'completed') {
+        conflicts.push({
+          id: `unassigned-${task.id}`,
+          type: 'unassigned',
+          severity: isHighPriority ? 'medium' : 'low',
+          taskId: task.id,
+          title: task.title,
+          description: 'Task has no assignee',
+          recommendation: 'Assign to a team member',
+        })
+      }
+      
+      // 5. Task without due date (low severity)
+      if (!task.dueDate && task.status !== 'completed') {
+        conflicts.push({
+          id: `no-date-${task.id}`,
+          type: 'no-due-date',
+          severity: isHighPriority ? 'medium' : 'low',
+          taskId: task.id,
+          title: task.title,
+          description: 'Task has no due date',
+          recommendation: 'Set a realistic due date',
+        })
+      }
+    })
+    
+    // Check for duplicate titles
+    const titleMap = new Map<string, string[]>()
+    tasks.forEach(task => {
+      const normalizedTitle = task.title.toLowerCase().trim()
+      if (!titleMap.has(normalizedTitle)) {
+        titleMap.set(normalizedTitle, [])
+      }
+      titleMap.get(normalizedTitle)!.push(task.id)
+    })
+    titleMap.forEach((taskIds, title) => {
+      if (taskIds.length > 1) {
+        const duplicateTasks = tasks.filter(t => t.title.toLowerCase().trim() === title)
+        duplicateTasks.forEach(task => {
+          conflicts.push({
+            id: `duplicate-${task.id}`,
+            type: 'duplicate',
+            severity: 'low',
+            taskId: task.id,
+            title: task.title,
+            description: `Duplicate task title: "${task.title}"`,
+            recommendation: 'Review and merge duplicate tasks',
+          })
+        })
+      }
+    })
+    
+    return {
+      conflicts,
+      highCount: conflicts.filter(c => c.severity === 'high').length,
+      mediumCount: conflicts.filter(c => c.severity === 'medium').length,
+      lowCount: conflicts.filter(c => c.severity === 'low').length,
     }
   }, [tasks])
 
@@ -468,7 +621,6 @@ export default function TasksPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          budgetAmount: formData.budgetAmount ? Number(formData.budgetAmount) : 0,
           projectId: 'default-project',
         }),
       })
@@ -485,9 +637,68 @@ export default function TasksPage() {
       
       setShowForm(false)
       setEditingTask(null)
-      setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '', budgetAmount: '' })
+      setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save task')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Handle adding task from template
+  const handleAddFromTemplate = async (template: { title: string; description: string; priority: string; status: string }) => {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: template.title,
+          description: template.description,
+          priority: template.priority,
+          status: template.status,
+          projectId: 'default-project',
+        }),
+      })
+      
+      if (!res.ok) throw new Error('Failed to add task from template')
+      
+      const data = await res.json()
+      setTasks(prev => [...prev, data.data])
+      setShowTemplates(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add task from template')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Handle bulk add from templates
+  const handleBulkAddFromTemplate = async (templates: { title: string; description: string; priority: string; status: string }[]) => {
+    setSubmitting(true)
+    try {
+      // Add all templates
+      const results = await Promise.all(
+        templates.map(template =>
+          fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: template.title,
+              description: template.description,
+              priority: template.priority,
+              status: template.status,
+              projectId: 'default-project',
+            }),
+          }).then(r => r.json())
+        )
+      )
+      
+      const newTasks = results.map(r => r.data).filter(Boolean)
+      setTasks(prev => [...prev, ...newTasks])
+      setShowTemplates(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add tasks from templates')
     } finally {
       setSubmitting(false)
     }
@@ -624,12 +835,6 @@ export default function TasksPage() {
   const handleBulkStatusChangeRef = useRef(handleBulkStatusChange)
   const handleSelectAllRef = useRef(handleSelectAll)
   
-  useEffect(() => {
-    handleBulkDeleteRef.current = handleBulkDelete
-    handleBulkStatusChangeRef.current = handleBulkStatusChange
-    handleSelectAllRef.current = handleSelectAll
-  }, [handleBulkDelete, handleBulkStatusChange, handleSelectAll])
-
   // Export tasks to CSV
   const handleExportCSV = () => {
     const headers = ['Title', 'Description', 'Status', 'Priority', 'Assignee', 'Due Date', 'Created']
@@ -697,86 +902,93 @@ export default function TasksPage() {
   }
 
   // Export tasks to Markdown
-  const handleExportMarkdown = useCallback(() => {
+  const handleExportMarkdown = () => {
     if (filteredTasks.length === 0) return
 
-    const formatDate = (dateStr?: string) => {
-      if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    }
+    // Build summary statistics
+    const byStatus: Record<string, number> = {}
+    const byPriority: Record<string, number> = {}
+    const byAssignee: Record<string, number> = {}
+    
+    filteredTasks.forEach(task => {
+      byStatus[task.status] = (byStatus[task.status] || 0) + 1
+      byPriority[task.priority] = (byPriority[task.priority] || 0) + 1
+      if (task.assignee) {
+        byAssignee[task.assignee] = (byAssignee[task.assignee] || 0) + 1
+      }
+    })
 
-    const getPriorityIcon = (p: string) => {
-      if (p === 'high') return '🔴'
-      if (p === 'medium') return '🟡'
-      return '⚪'
-    }
-
-    const getStatusIcon = (s: string) => {
-      if (s === 'completed') return '✅'
-      if (s === 'in_progress') return '🔄'
-      if (s === 'blocked') return '🚫'
-      if (s === 'pending') return '⏳'
-      return '📋'
-    }
-
-    // Summary statistics
-    const totalBudget = filteredTasks.reduce((sum, t) => sum + (t.budgetAmount || 0), 0)
-    const highPriorityTasks = filteredTasks.filter(t => t.priority === 'high').length
-    const overdueTasks = filteredTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed').length
-
+    // Build markdown content
     let markdown = `# CinePilot Tasks Report
 
-**Generated:** ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+**Generated:** ${new Date().toISOString().split('T')[0]}
 
 ## Summary
 
-| Metric | Value |
-|--------|-------|
-| Total Tasks | ${filteredTasks.length} |
-| Completed | ${stats.completed} |
-| In Progress | ${stats.inProgress} |
-| Pending | ${stats.pending} |
-| Blocked | ${stats.blocked} |
-| Overdue | ${overdueTasks} |
-| High Priority | ${highPriorityTasks} |
-| Completion Rate | ${stats.completionPercent}% |
-| Total Budget | ₹${(totalBudget / 100000).toFixed(2)}L |
+- **Total Tasks:** ${stats.total}
+- **Pending:** ${stats.pending}
+- **In Progress:** ${stats.inProgress}
+- **Completed:** ${stats.completed}
+- **Blocked:** ${stats.blocked}
+- **Overdue:** ${stats.overdue}
+- **High Priority:** ${stats.highPriority}
+- **Completion:** ${stats.completionPercent}%
 
-## By Status
+### By Status
 
 | Status | Count |
 |--------|-------|
-| ✅ Completed | ${stats.completed} |
-| 🔄 In Progress | ${stats.inProgress} |
-| ⏳ Pending | ${stats.pending} |
-| 🚫 Blocked | ${stats.blocked} |
+`
+    Object.entries(byStatus).forEach(([status, count]) => {
+      const emoji = status === 'completed' ? '✅' : status === 'in_progress' ? '🔄' : status === 'blocked' ? '🚫' : '⏳'
+      markdown += `| ${emoji} ${status.replace('_', ' ')} | ${count} |\n`
+    })
+
+    markdown += `
+### By Priority
+
+| Priority | Count |
+|----------|-------|
+`
+    Object.entries(byPriority).forEach(([priority, count]) => {
+      const emoji = priority === 'high' ? '🔴' : priority === 'medium' ? '🟡' : '⚪'
+      markdown += `| ${emoji} ${priority} | ${count} |\n`
+    })
+
+    markdown += `
+### By Assignee
+
+| Assignee | Tasks |
+|----------|-------|
+`
+    Object.entries(byAssignee).forEach(([assignee, count]) => {
+      markdown += `| ${assignee} | ${count} |\n`
+    })
+
+    markdown += `
+---
 
 ## Tasks Detail
 
-| # | Title | Status | Priority | Assignee | Due Date |
-|---|-------|--------|----------|----------|----------|
-${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.status)} ${t.status.replace('_', ' ')} | ${getPriorityIcon(t.priority)} ${t.priority} | ${t.assignee || '-'} | ${formatDate(t.dueDate)} |`).join('\n')}
-
----
-
-*Exported from CinePilot - Production Management System*
+| Title | Status | Priority | Assignee | Due Date |
+|-------|--------|----------|----------|----------|
 `
+    filteredTasks.forEach(task => {
+      const statusEmoji = task.status === 'completed' ? '✅' : task.status === 'in_progress' ? '🔄' : task.status === 'blocked' ? '🚫' : '⏳'
+      const priorityEmoji = task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '⚪'
+      markdown += `| ${task.title} | ${statusEmoji} ${task.status.replace('_', ' ')} | ${priorityEmoji} ${task.priority} | ${task.assignee || '-'} | ${task.dueDate || '-'} |\n`
+    })
 
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `tasks-report-${new Date().toISOString().split('T')[0]}.md`
+    link.download = `tasks-export-${new Date().toISOString().split('T')[0]}.md`
     link.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
-  }, [filteredTasks, stats])
-
-  // Ref for keyboard shortcut
-  const handleExportMarkdownRef = useRef<() => void>(() => {})
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
+  }
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
 
   // Print tasks report
   const handlePrint = () => {
@@ -909,7 +1121,6 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
       priority: task.priority,
       assignee: task.assignee || '',
       dueDate: task.dueDate || '',
-      budgetAmount: task.budgetAmount?.toString() || '',
     })
     setShowForm(true)
   }
@@ -1007,20 +1218,20 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
                     Export CSV
                   </button>
                   <button
-                    onClick={handleExportJSON}
-                    disabled={filteredTasks.length === 0}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-purple-900/30 hover:text-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Export JSON
-                  </button>
-                  <button
                     onClick={handleExportMarkdown}
                     disabled={filteredTasks.length === 0}
                     className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-cyan-900/30 hover:text-cyan-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FileText className="w-4 h-4" />
                     Export Markdown
+                  </button>
+                  <button
+                    onClick={handleExportJSON}
+                    disabled={filteredTasks.length === 0}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-purple-900/30 hover:text-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export JSON
                   </button>
                 </div>
               )}
@@ -1051,7 +1262,14 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
               )}
             </div>
             <button
-              onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '', budgetAmount: '' }); setShowForm(true) }}
+              onClick={() => setShowTemplates(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-sm font-medium transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Templates
+            </button>
+            <button
+              onClick={() => { setEditingTask(null); setFormData({ title: '', description: '', status: 'pending', priority: 'medium', assignee: '', dueDate: '' }); setShowForm(true) }}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -1087,45 +1305,13 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
           <StatCard label="Total" value={stats.total} icon={<ListChecks className="w-4 h-4" />} color="indigo" />
           <StatCard label="Pending" value={stats.pending} icon={<Clock className="w-4 h-4" />} color="slate" />
           <StatCard label="In Progress" value={stats.inProgress} icon={<TrendingUp className="w-4 h-4" />} color="blue" />
           <StatCard label="Completed" value={stats.completed} icon={<CheckCircle className="w-4 h-4" />} color="emerald" />
           <StatCard label="Overdue" value={stats.overdue} icon={<AlertCircle className="w-4 h-4" />} color="red" />
           <StatCard label="High Priority" value={stats.highPriority} icon={<Flag className="w-4 h-4" />} color="amber" />
-          {/* Budget Card */}
-          <div className={`bg-slate-900 border rounded-xl p-3 ${
-            stats.usedBudget > budgetLimit ? 'border-red-500/50' :
-            stats.totalBudget > budgetLimit * 0.8 ? 'border-amber-500/50' :
-            'border-slate-800'
-          }`}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-500">Budget</span>
-              <DollarSign className={`w-3 h-3 ${
-                stats.usedBudget > budgetLimit ? 'text-red-400' :
-                stats.totalBudget > budgetLimit * 0.8 ? 'text-amber-400' :
-                'text-emerald-400'
-              }`} />
-            </div>
-            <div className={`text-xl font-bold ${
-              stats.usedBudget > budgetLimit ? 'text-red-400' :
-              stats.totalBudget > budgetLimit * 0.8 ? 'text-amber-400' :
-              'text-white'
-            }`}>
-              ₹{(stats.totalBudget / 100000).toFixed(1)}L
-            </div>
-            <div className="text-[10px] text-slate-500">
-              Limit: ₹{(budgetLimit / 100000).toFixed(0)}L
-            </div>
-            <div className="mt-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${
-                stats.totalBudget > budgetLimit ? 'bg-red-500' :
-                stats.totalBudget > budgetLimit * 0.8 ? 'bg-amber-500' :
-                'bg-emerald-500'
-              }`} style={{ width: `${Math.min((stats.totalBudget / budgetLimit) * 100, 100)}%` }} />
-            </div>
-          </div>
         </div>
 
         {/* Charts */}
@@ -1282,20 +1468,6 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
                     {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
                   </button>
                 </div>
-                {/* Budget Limit */}
-                <div className="flex items-center gap-2 ml-auto pl-2 border-l border-slate-600">
-                  <label className="text-sm text-slate-400">Budget Limit:</label>
-                  <div className="flex items-center gap-1">
-                    <span className="text-slate-500 text-sm">₹</span>
-                    <input
-                      type="number"
-                      value={budgetLimit}
-                      onChange={(e) => setBudgetLimit(Number(e.target.value))}
-                      className="w-24 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
-                      placeholder="1000000"
-                    />
-                  </div>
-                </div>
                 <button
                   onClick={() => {
                     setFilterStatus('all')
@@ -1332,6 +1504,18 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
                 title="Calendar View"
               >
                 <CalendarDays className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('conflicts')}
+                className={`p-2 rounded-md transition-colors relative ${viewMode === 'conflicts' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Conflicts View"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                {conflictStats.highCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold">
+                    {conflictStats.highCount}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -1526,6 +1710,136 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
           />
         )}
 
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Stats Summary */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{conflictStats.highCount}</p>
+                    <p className="text-sm text-slate-400">High Priority</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{conflictStats.mediumCount}</p>
+                    <p className="text-sm text-slate-400">Medium Priority</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-500/20 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{conflictStats.lowCount}</p>
+                    <p className="text-sm text-slate-400">Low Priority</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                    <CheckSquare className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{conflictStats.conflicts.length}</p>
+                    <p className="text-sm text-slate-400">Total Issues</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* All Clear Message */}
+            {conflictStats.conflicts.length === 0 && (
+              <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-xl p-8 text-center">
+                <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-emerald-400 mb-2">All Clear!</h3>
+                <p className="text-slate-400">No task conflicts detected. Your tasks are in good shape.</p>
+              </div>
+            )}
+
+            {/* Conflict Cards */}
+            {conflictStats.conflicts.length > 0 && (
+              <div className="grid gap-4">
+                {conflictStats.conflicts
+                  .sort((a, b) => {
+                    const severityOrder = { high: 0, medium: 1, low: 2 }
+                    return severityOrder[a.severity] - severityOrder[b.severity]
+                  })
+                  .map((conflict) => (
+                    <div
+                      key={conflict.id}
+                      className={`bg-slate-900/50 border rounded-xl p-4 cursor-pointer hover:border-slate-600 transition-colors ${
+                        conflict.severity === 'high' 
+                          ? 'border-red-700/30 hover:border-red-600' 
+                          : conflict.severity === 'medium'
+                          ? 'border-amber-700/30 hover:border-amber-600'
+                          : 'border-slate-700/30 hover:border-slate-600'
+                      }`}
+                      onClick={() => {
+                        const task = tasks.find(t => t.id === conflict.taskId)
+                        if (task) openEditForm(task)
+                      }}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          conflict.severity === 'high' 
+                            ? 'bg-red-500/20' 
+                            : conflict.severity === 'medium'
+                            ? 'bg-amber-500/20'
+                            : 'bg-slate-500/20'
+                        }`}>
+                          {conflict.severity === 'high' ? (
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                          ) : conflict.severity === 'medium' ? (
+                            <AlertCircle className="w-4 h-4 text-amber-400" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              conflict.severity === 'high' 
+                                ? 'bg-red-500/20 text-red-400' 
+                                : conflict.severity === 'medium'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {conflict.severity.toUpperCase()}
+                            </span>
+                            <span className="text-xs text-slate-500 uppercase">
+                              {conflict.type.replace(/-/g, ' ')}
+                            </span>
+                          </div>
+                          <h4 className="font-medium text-white truncate">{conflict.title}</h4>
+                          <p className="text-sm text-slate-400 mt-1">{conflict.description}</p>
+                          <div className="mt-2 flex items-center gap-2 text-xs text-indigo-400">
+                            <Target className="w-3 h-3" />
+                            {conflict.recommendation}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-slate-500 shrink-0" />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Bulk Actions Toolbar */}
         {showBulkActions && selectedTasks.size > 0 && (
           <div 
@@ -1666,16 +1980,6 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Budget Amount (₹)</label>
-                    <input
-                      type="number"
-                      value={formData.budgetAmount}
-                      onChange={(e) => setFormData({ ...formData, budgetAmount: e.target.value })}
-                      placeholder="0"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-4">
@@ -1781,6 +2085,76 @@ ${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.statu
           </div>
         )}
       </div>
+
+      {/* Task Templates Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowTemplates(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Task Templates</h2>
+                  <p className="text-sm text-slate-400">Quick-add common production tasks</p>
+                </div>
+              </div>
+              <button onClick={() => setShowTemplates(false)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {TASK_TEMPLATES.map((category) => (
+                <div key={category.category} className="mb-6 last:mb-0">
+                  <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-indigo-400 rounded-full"></span>
+                    {category.category}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {category.tasks.map((template, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleAddFromTemplate(template)}
+                        disabled={submitting}
+                        className="flex items-start gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-lg text-left transition-all disabled:opacity-50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{template.title}</p>
+                          <p className="text-xs text-slate-400 truncate mt-0.5">{template.description}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          template.priority === 'high' ? 'bg-red-500/20 text-red-400' :
+                          template.priority === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                          'bg-slate-500/20 text-slate-400'
+                        }`}>
+                          {template.priority}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Add All Button */}
+              <div className="mt-6 pt-4 border-t border-slate-800">
+                <button
+                  onClick={() => {
+                    const allTemplates = TASK_TEMPLATES.flatMap(cat => cat.tasks)
+                    handleBulkAddFromTemplate(allTemplates)
+                  }}
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add All Templates ({TASK_TEMPLATES.reduce((acc, cat) => acc + cat.tasks.length, 0)} tasks)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

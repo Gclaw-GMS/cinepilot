@@ -6,8 +6,8 @@ import {
   Users, Calendar, Download, Filter, Search, Loader2,
   Image, MessageSquare, TrendingUp, Save, X, Copy,
   Palette as PaletteIcon, Crown, Heart, Zap, Shield, Star,
-  DollarSign, RefreshCw, HelpCircle, Printer, AlertTriangle,
-  AlertCircle, CheckCircle
+  DollarSign, RefreshCw, HelpCircle, Printer, AlertCircle, CheckCircle,
+  List, AlertTriangle, BarChart3
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -84,16 +84,6 @@ interface CostumeSummary {
   totalBudget: number
 }
 
-interface CostumeConflict {
-  id: string
-  type: 'budget' | 'costume_change' | 'similar_style' | 'missing_info' | 'fabric' | 'color'
-  severity: 'high' | 'medium' | 'low'
-  character: string
-  title: string
-  description: string
-  recommendation: string
-}
-
 const DEMO_PROJECT_ID = 'demo-project'
 
 export default function CharacterCostumePage() {
@@ -138,7 +128,132 @@ export default function CharacterCostumePage() {
   // Sorting state
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'status' | 'budget' | 'gender'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [showConflicts, setShowConflicts] = useState(false)
+  
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
+  
+  // Budget tracking state
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000)
+  
+  // Budget calculations
+  const totalEstimatedBudget = summary?.totalBudget || 0
+  const budgetUsedPercent = Math.min((totalEstimatedBudget / budgetLimit) * 100, 100)
+  const budgetRemaining = budgetLimit - totalEstimatedBudget
+  const isOverBudget = totalEstimatedBudget > budgetLimit
+  const isWarning = totalEstimatedBudget >= budgetLimit * 0.8 && !isOverBudget
+  const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
+
+  // Conflict detection
+  interface CostumeConflict {
+    id: string
+    type: 'budget-overrun' | 'missing-budget' | 'missing-costume' | 'incomplete-details' | 'no-fabrics' | 'status-delayed'
+    severity: 'high' | 'medium' | 'low'
+    characterId: string
+    characterName: string
+    title: string
+    description: string
+    recommendation: string
+  }
+
+  const conflicts = useMemo((): CostumeConflict[] => {
+    const conflictList: CostumeConflict[] = []
+    
+    characters.forEach((char) => {
+      // Missing budget
+      if (!char.estimatedBudget || char.estimatedBudget === 0) {
+        conflictList.push({
+          id: `no-budget-${char.id}`,
+          type: 'missing-budget',
+          severity: 'medium',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Missing Budget',
+          description: `${char.name} has no costume budget assigned`,
+          recommendation: 'Assign estimated budget for costume design'
+        })
+      }
+      
+      // Missing costume details
+      if (!char.costumeNotes || char.costumeNotes.trim() === '') {
+        conflictList.push({
+          id: `no-costume-${char.id}`,
+          type: 'missing-costume',
+          severity: 'medium',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Missing Costume Details',
+          description: `${char.name} has no costume description`,
+          recommendation: 'Add costume description and style notes'
+        })
+      }
+      
+      // Missing fabrics
+      if (!char.fabrics || char.fabrics.length === 0) {
+        conflictList.push({
+          id: `no-fabrics-${char.id}`,
+          type: 'no-fabrics',
+          severity: 'low',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'No Fabrics Specified',
+          description: `${char.name} has no fabric materials listed`,
+          recommendation: 'Add fabric materials for costume'
+        })
+      }
+      
+      // Incomplete details
+      if (!char.colorPalette || char.colorPalette.length === 0) {
+        conflictList.push({
+          id: `no-colors-${char.id}`,
+          type: 'incomplete-details',
+          severity: 'low',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Missing Color Palette',
+          description: `${char.name} has no color palette defined`,
+          recommendation: 'Define color palette for costume design'
+        })
+      }
+    })
+    
+    // Budget overrun (global check)
+    if (isOverBudget) {
+      conflictList.push({
+        id: 'budget-overrun-global',
+        type: 'budget-overrun',
+        severity: 'high',
+        characterId: 'global',
+        characterName: 'All Characters',
+        title: 'Total Budget Exceeded',
+        description: `Total costume budget (₹${totalEstimatedBudget.toLocaleString('en-IN')}) exceeds limit (₹${budgetLimit.toLocaleString('en-IN')})`,
+        recommendation: 'Review and optimize costume budgets across all characters'
+      })
+    }
+    
+    // Status delayed check
+    characters.forEach((char) => {
+      if (char.status === 'planning') {
+        // Check if this is an old planning item (would need date comparison in real app)
+        conflictList.push({
+          id: `delayed-${char.id}`,
+          type: 'status-delayed',
+          severity: 'low',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Planning Status',
+          description: `${char.name} is still in planning phase`,
+          recommendation: 'Consider moving to in-progress if shoot date is near'
+        })
+      }
+    })
+    
+    return conflictList
+  }, [characters, isOverBudget, totalEstimatedBudget, budgetLimit])
+
+  // Filter conflicts by severity
+  const highSeverityConflicts = conflicts.filter(c => c.severity === 'high')
+  const mediumSeverityConflicts = conflicts.filter(c => c.severity === 'medium')
+  const lowSeverityConflicts = conflicts.filter(c => c.severity === 'low')
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -186,12 +301,26 @@ export default function CharacterCostumePage() {
         return
       }
       
-      switch (e.key.toLowerCase()) {
+      switch (e.key) {
+        case '1':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case 'r':
+        case 'R':
           e.preventDefault()
           fetchDataRef.current?.()
           break
         case 's':
+        case 'S':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
@@ -247,18 +376,12 @@ export default function CharacterCostumePage() {
             setShowExportMenu(prev => !prev)
           }
           break
-        case 'c':
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault()
-            setShowConflicts(prev => !prev)
-          }
-          break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showFilters, filterRole, filterStatus, sortBy, sortOrder, setShowConflicts])
+  }, [showForm, showFilters, filterRole, filterStatus, sortBy, sortOrder])
 
   // Click outside handler for export menu and filter panel
   useEffect(() => {
@@ -711,131 +834,6 @@ export default function CharacterCostumePage() {
   const FABRIC_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#f59e0b']
   const STYLE_COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
-  // Conflict detection
-  const conflicts = useMemo((): CostumeConflict[] => {
-    const result: CostumeConflict[] = []
-    const BUDGET_THRESHOLD = 500000
-    const TOTAL_BUDGET_THRESHOLD = 10000000
-
-    const totalBudget = characters.reduce((sum, c) => sum + (c.estimatedBudget || 0), 0)
-    if (totalBudget > TOTAL_BUDGET_THRESHOLD) {
-      result.push({
-        id: 'budget-total',
-        type: 'budget',
-        severity: 'high',
-        character: 'All Characters',
-        title: 'Total Budget Exceeds Limit',
-        description: `Total costume budget (₹${(totalBudget / 100000).toFixed(1)}L) exceeds ₹1Cr threshold`,
-        recommendation: 'Review costume estimates'
-      })
-    }
-
-    characters.forEach((char) => {
-      if ((char.estimatedBudget || 0) > BUDGET_THRESHOLD) {
-        result.push({
-          id: `budget-${char.id}`,
-          type: 'budget',
-          severity: 'medium',
-          character: char.name,
-          title: 'High Budget Allocation',
-          description: `Budget (₹${((char.estimatedBudget || 0) / 100000).toFixed(1)}L) exceeds ₹5L threshold`,
-          recommendation: 'Consider simplifying costume requirements'
-        })
-      }
-
-      const missingInfo: string[] = []
-      if (!char.appearance?.length) missingInfo.push('appearance')
-      if (!char.personality?.length) missingInfo.push('personality')
-      if (!char.costumeStyle?.length) missingInfo.push('costume style')
-      if (!char.fabrics?.length) missingInfo.push('fabrics')
-      if (!char.colorPalette?.length) missingInfo.push('color palette')
-      if (!char.estimatedBudget) missingInfo.push('budget')
-
-      if (missingInfo.length >= 4) {
-        result.push({
-          id: `missing-${char.id}`,
-          type: 'missing_info',
-          severity: 'high',
-          character: char.name,
-          title: 'Incomplete Character Data',
-          description: `Missing ${missingInfo.length} fields: ${missingInfo.join(', ')}`,
-          recommendation: 'Complete all required fields'
-        })
-      } else if (missingInfo.length >= 2) {
-        result.push({
-          id: `missing-${char.id}`,
-          type: 'missing_info',
-          severity: 'medium',
-          character: char.name,
-          title: 'Missing Character Details',
-          description: `Missing ${missingInfo.length} fields: ${missingInfo.join(', ')}`,
-          recommendation: 'Add remaining details'
-        })
-      }
-
-      if (char.fabrics && char.fabrics.length > 4) {
-        result.push({
-          id: `fabric-${char.id}`,
-          type: 'fabric',
-          severity: 'medium',
-          character: char.name,
-          title: 'Too Many Fabric Types',
-          description: `${char.fabrics.length} fabrics may increase complexity`,
-          recommendation: 'Consolidate fabric choices'
-        })
-      }
-
-      if (char.colorPalette && char.colorPalette.length > 5) {
-        result.push({
-          id: `color-${char.id}`,
-          type: 'color',
-          severity: 'low',
-          character: char.name,
-          title: 'Complex Color Palette',
-          description: `${char.colorPalette.length} colors may be difficult to coordinate`,
-          recommendation: 'Simplify to 3-4 core colors'
-        })
-      }
-    })
-
-    const roleGroups: Record<string, Character[]> = {}
-    characters.forEach(char => {
-      const role = char.role || 'supporting'
-      if (!roleGroups[role]) roleGroups[role] = []
-      roleGroups[role].push(char)
-    })
-
-    Object.entries(roleGroups).forEach(([role, chars]) => {
-      chars.forEach((char1, i) => {
-        chars.slice(i + 1).forEach(char2 => {
-          const styles1 = new Set(char1.costumeStyle || [])
-          const styles2 = new Set(char2.costumeStyle || [])
-          const overlap = [...styles1].filter(s => styles2.has(s))
-          if (overlap.length >= 2) {
-            result.push({
-              id: `style-${char1.id}-${char2.id}`,
-              type: 'similar_style',
-              severity: 'low',
-              character: `${char1.name} & ${char2.name}`,
-              title: 'Similar Costume Styles',
-              description: `Both ${role} characters share ${overlap.join(', ')}`,
-              recommendation: 'Differentiate to avoid confusion'
-            })
-          }
-        })
-      })
-    })
-
-    return result
-  }, [characters])
-
-  const conflictStats = useMemo(() => ({
-    total: conflicts.length,
-    high: conflicts.filter(c => c.severity === 'high').length,
-    medium: conflicts.filter(c => c.severity === 'medium').length,
-    low: conflicts.filter(c => c.severity === 'low').length
-  }), [conflicts])
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
@@ -848,24 +846,56 @@ export default function CharacterCostumePage() {
             </h1>
             <p className="text-slate-400 mt-1">Design and track character costumes for your film</p>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Conflicts Toggle */}
+          
+          {/* View Mode Tabs */}
+          <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-lg">
             <button
-              onClick={() => setShowConflicts(!showConflicts)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                showConflicts ? 'bg-amber-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'list' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
               }`}
-              title="Toggle Conflicts (C)"
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'analytics' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </button>
+            <button
+              onClick={() => setViewMode('conflicts')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'conflicts' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
             >
               <AlertTriangle className="w-4 h-4" />
-              {conflictStats.total > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
-                  conflictStats.high > 0 ? 'bg-red-500' : conflictStats.medium > 0 ? 'bg-amber-400 text-black' : 'bg-slate-500'
+              Conflicts
+              {conflicts.length > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-medium ${
+                  highSeverityConflicts.length > 0 
+                    ? 'bg-red-500 text-white' 
+                    : mediumSeverityConflicts.length > 0 
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-blue-500 text-white'
                 }`}>
-                  {conflictStats.total}
+                  {conflicts.length}
                 </span>
               )}
             </button>
+          </div>
+          
+          <div className="flex items-center gap-3">
             <button
               onClick={() => fetchDataRef.current?.()}
               disabled={refreshing}
@@ -1098,6 +1128,77 @@ export default function CharacterCostumePage() {
           </div>
         )}
 
+        {/* Budget Tracking Card */}
+        <div className={`rounded-xl p-4 border mb-6 ${
+          budgetStatus === 'over' ? 'bg-red-950/30 border-red-800' :
+          budgetStatus === 'warning' ? 'bg-amber-950/30 border-amber-800' :
+          'bg-emerald-950/30 border-emerald-800'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {budgetStatus === 'over' ? (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              ) : budgetStatus === 'warning' ? (
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+              )}
+              <span className={`font-semibold ${
+                budgetStatus === 'over' ? 'text-red-400' :
+                budgetStatus === 'warning' ? 'text-amber-400' :
+                'text-emerald-400'
+              }`}>
+                {budgetStatus === 'over' ? 'Over Budget' : budgetStatus === 'warning' ? 'Budget Warning' : 'Budget On Track'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-sm">Budget Limit:</span>
+              <input
+                type="number"
+                value={budgetLimit}
+                onChange={(e) => setBudgetLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-32 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"
+                placeholder="Enter limit"
+              />
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="mb-3">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-slate-400">₹{(totalEstimatedBudget / 100000).toFixed(1)}L used</span>
+              <span className="text-slate-400">₹{(budgetLimit / 100000).toFixed(1)}L limit</span>
+            </div>
+            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-300 ${
+                  budgetStatus === 'over' ? 'bg-red-500' :
+                  budgetStatus === 'warning' ? 'bg-amber-500' :
+                  'bg-emerald-500'
+                }`}
+                style={{ width: `${budgetUsedPercent}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Status Message */}
+          <div className="text-sm">
+            {budgetStatus === 'over' ? (
+              <span className="text-red-400">
+                ⚠️ Over budget by ₹{Math.abs(budgetRemaining).toLocaleString('en-IN')} ({((totalEstimatedBudget / budgetLimit) * 100).toFixed(1)}% used)
+              </span>
+            ) : budgetStatus === 'warning' ? (
+              <span className="text-amber-400">
+                ⚠️ Approaching budget limit - ₹{budgetRemaining.toLocaleString('en-IN')} remaining ({budgetUsedPercent.toFixed(1)}% used)
+              </span>
+            ) : (
+              <span className="text-emerald-400">
+                ✓ ₹{budgetRemaining.toLocaleString('en-IN')} remaining ({budgetUsedPercent.toFixed(1)}% used)
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Charts */}
         {characters.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -1203,7 +1304,11 @@ export default function CharacterCostumePage() {
           </div>
         )}
 
-        {/* Filters */}
+        {/* List View Content */}
+        {(viewMode === 'list' || viewMode === 'analytics') && (
+        <>
+        {/* Filters - only show in list mode */}
+        {viewMode === 'list' && (
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1284,105 +1389,6 @@ export default function CharacterCostumePage() {
             </div>
           )}
         </div>
-
-        {/* Conflicts Panel */}
-        {showConflicts && (
-          <div className="space-y-6 mb-8">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-8 h-8 text-slate-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{conflictStats.total}</p>
-                    <p className="text-slate-400 text-sm">Total</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/30">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="w-8 h-8 text-red-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-red-400">{conflictStats.high}</p>
-                    <p className="text-red-300 text-sm">High</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-amber-500/10 rounded-xl p-4 border border-amber-500/30">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-8 h-8 text-amber-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-amber-400">{conflictStats.medium}</p>
-                    <p className="text-amber-300 text-sm">Medium</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-slate-500/10 rounded-xl p-4 border border-slate-500/30">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-8 h-8 text-slate-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-slate-400">{conflictStats.low}</p>
-                    <p className="text-slate-400 text-sm">Low</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {conflicts.length === 0 ? (
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-12 text-center">
-                <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">All Clear!</h3>
-                <p className="text-slate-400">No conflicts detected.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {conflicts.map((conflict) => (
-                  <div
-                    key={conflict.id}
-                    className={`rounded-xl border p-4 ${
-                      conflict.severity === 'high' ? 'bg-red-500/10 border-red-500/30' :
-                      conflict.severity === 'medium' ? 'bg-amber-500/10 border-amber-500/30' :
-                      'bg-slate-700/30 border-slate-600/50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {conflict.severity === 'high' ? (
-                        <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                      ) : conflict.severity === 'medium' ? (
-                        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                      ) : (
-                        <AlertTriangle className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className={`font-semibold ${
-                            conflict.severity === 'high' ? 'text-red-400' :
-                            conflict.severity === 'medium' ? 'text-amber-400' : 'text-slate-300'
-                          }`}>
-                            {conflict.title}
-                          </h4>
-                          <span className={`px-2 py-0.5 text-xs rounded-full ${
-                            conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
-                            conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-slate-600 text-slate-300'
-                          }`}>
-                            {conflict.severity}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-300 mb-1">
-                          <span className="text-purple-400 font-medium">{conflict.character}</span>
-                        </p>
-                        <p className="text-sm text-slate-400 mb-2">{conflict.description}</p>
-                        <p className="text-xs text-emerald-400 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          {conflict.recommendation}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         )}
 
         {/* Characters Grid */}
@@ -1867,6 +1873,93 @@ export default function CharacterCostumePage() {
             </div>
           </div>
         )}
+        </>
+        )}
+
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-red-950/30 border border-red-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                  <span className="text-red-400 font-semibold">High Severity</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{highSeverityConflicts.length}</p>
+                <p className="text-slate-400 text-sm">Issues requiring immediate attention</p>
+              </div>
+              <div className="bg-amber-950/30 border border-amber-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <span className="text-amber-400 font-semibold">Medium Severity</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{mediumSeverityConflicts.length}</p>
+                <p className="text-slate-400 text-sm">Issues to address soon</p>
+              </div>
+              <div className="bg-blue-950/30 border border-blue-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-blue-400" />
+                  <span className="text-blue-400 font-semibold">Low Severity</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{lowSeverityConflicts.length}</p>
+                <p className="text-slate-400 text-sm">Minor improvements</p>
+              </div>
+            </div>
+
+            {/* Conflict List */}
+            {conflicts.length === 0 ? (
+              <div className="bg-emerald-950/30 border border-emerald-800 rounded-xl p-8 text-center">
+                <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-emerald-400 mb-2">All Clear!</h3>
+                <p className="text-slate-400">No costume issues detected. Everything looks good.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {conflicts.map((conflict) => (
+                  <div 
+                    key={conflict.id}
+                    className={`rounded-xl p-4 border ${
+                      conflict.severity === 'high' 
+                        ? 'bg-red-950/30 border-red-800' 
+                        : conflict.severity === 'medium'
+                          ? 'bg-amber-950/30 border-amber-800'
+                          : 'bg-blue-950/30 border-blue-800'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {conflict.severity === 'high' ? (
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                        ) : conflict.severity === 'medium' ? (
+                          <AlertTriangle className="w-5 h-5 text-amber-400" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5 text-blue-400" />
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          conflict.severity === 'high' 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : conflict.severity === 'medium'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {conflict.severity.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <h4 className="text-white font-semibold mb-1">{conflict.title}</h4>
+                    <p className="text-slate-400 text-sm mb-3">{conflict.description}</p>
+                    <div className="pt-2 border-t border-slate-700">
+                      <p className="text-purple-400 text-xs">
+                        <span className="text-slate-500">→</span> {conflict.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Keyboard Help Modal */}
         {showKeyboardHelp && (
@@ -1885,6 +1978,19 @@ export default function CharacterCostumePage() {
                 </button>
               </div>
               <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">List view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Analytics view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Conflicts view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
+                </div>
+                <div className="border-t border-slate-700 my-3"></div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
@@ -1924,10 +2030,6 @@ export default function CharacterCostumePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Close modal / Clear</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Toggle conflicts</span>
-                  <kbd className="px-2 py-1 bg-amber-600 text-white rounded text-sm">C</kbd>
                 </div>
               </div>
             </div>

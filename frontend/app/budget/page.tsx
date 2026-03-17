@@ -47,19 +47,7 @@ interface ForecastData {
   categories: { category: string; planned: number; actual: number; forecast: number; status: string }[]
 }
 
-interface BudgetRecommendation {
-  id: string
-  type: 'savings' | 'optimization' | 'risk' | 'opportunity'
-  category: string
-  title: string
-  description: string
-  potentialSavings?: number
-  potentialRisk?: number
-  priority: 'high' | 'medium' | 'low'
-  actionable: boolean
-}
-
-type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast' | 'recommendations'
+type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast'
 
 const REGIONS = ['Tamil Nadu', 'Chennai', 'Madurai', 'Ooty']
 const SCALES = [
@@ -128,7 +116,6 @@ export default function BudgetPage() {
   const [items, setItems] = useState<BudgetItemData[]>([])
   const [expenses, setExpenses] = useState<ExpenseData[]>([])
   const [forecast, setForecast] = useState<ForecastData | null>(null)
-  const [recommendations, setRecommendations] = useState<BudgetRecommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
@@ -158,8 +145,6 @@ export default function BudgetPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleRefreshRef = useRef<() => Promise<void>>()
-  const generateRecommendationsRef = useRef<() => void>()
-  const itemsRef = useRef(items)
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -256,125 +241,6 @@ export default function BudgetPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
-
-  // Markdown export function
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleExportMarkdown = useCallback(() => {
-    const sortedItems = sortItems(items)
-    const totalPlanned = items.reduce((s, i) => s + Number(i.total || 0), 0)
-    const totalSpent = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
-    const totalVariance = totalPlanned - totalSpent
-
-    // Get unique categories
-    const categories = [...new Set(sortedItems.map(item => item.category))]
-    
-    // Category breakdown
-    const categoryTotals: Record<string, number> = {}
-    sortedItems.forEach(item => {
-      categoryTotals[item.category] = (categoryTotals[item.category] || 0) + Number(item.total || 0)
-    })
-
-    // Subcategory breakdown
-    const subcategoryTotals: Record<string, number> = {}
-    sortedItems.forEach(item => {
-      const key = `${item.category} > ${item.subcategory || 'N/A'}`
-      subcategoryTotals[key] = (subcategoryTotals[key] || 0) + Number(item.total || 0)
-    })
-
-    let markdown = `# 💰 CinePilot Budget Report
-
-> Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}
-
-## Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Planned | ₹${totalPlanned.toLocaleString('en-IN')} |
-| Total Spent | ₹${totalSpent.toLocaleString('en-IN')} |
-| Remaining | ₹${totalVariance.toLocaleString('en-IN')} |
-| Budget Used | ${totalPlanned > 0 ? ((totalSpent / totalPlanned) * 100).toFixed(1) : 0}% |
-| Total Items | ${items.length} |
-| Categories | ${categories.length} |
-
-## Budget by Category
-
-| Category | Amount |
-|----------|--------|
-${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLocaleString('en-IN')} |`).join('\n')}
-
-## Budget Items
-
-| # | Category | Subcategory | Description | Quantity | Unit | Total |
-|---|----------|-------------|-------------|----------|------|-------|
-`
-
-    sortedItems.forEach((item, idx) => {
-      markdown += `| ${idx + 1} | ${item.category} | ${item.subcategory || '-'} | ${item.description || '-'} | ${item.quantity || '-'} | ${item.unit || '-'} | ₹${Number(item.total || 0).toLocaleString('en-IN')} |\n`
-    })
-
-    // Add expenses section if available
-    if (expenses.length > 0) {
-      markdown += `
-## Expenses
-
-| Date | Category | Description | Amount | Vendor | Status |
-|------|----------|-------------|--------|--------|--------|
-`
-      expenses.forEach(exp => {
-        markdown += `| ${exp.date} | ${exp.category} | ${exp.description} | ₹${Number(exp.amount).toLocaleString('en-IN')} | ${exp.vendor || '-'} | ${exp.status} |\n`
-      })
-    }
-
-    // Add forecast section if available
-    if (forecast) {
-      markdown += `
-## Forecast
-
-| Metric | Value |
-|--------|-------|
-| Planned | ₹${forecast.planned.toLocaleString('en-IN')} |
-| Actual | ₹${forecast.actual.toLocaleString('en-IN')} |
-| EAC Total | ₹${forecast.eacTotal.toLocaleString('en-IN')} |
-| Variance | ₹${forecast.variance.toLocaleString('en-IN')} |
-| % Spent | ${forecast.percentSpent}% |
-
-### Category Forecast
-
-| Category | Planned | Actual | Forecast | Status |
-|----------|---------|--------|----------|--------|
-`
-      forecast.categories.forEach(cat => {
-        markdown += `| ${cat.category} | ₹${cat.planned.toLocaleString('en-IN')} | ₹${cat.actual.toLocaleString('en-IN')} | ₹${cat.forecast.toLocaleString('en-IN')} | ${cat.status} |\n`
-      })
-    }
-
-    markdown += `
----
-
-* CinePilot - Film Production Management System *
-`
-
-    const blob = new Blob([markdown], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `budget-report-${new Date().toISOString().split('T')[0]}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-    setShowExportMenu(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, expenses, forecast])
-
-  // Ref for markdown export
-  const handleExportMarkdownRef = useRef(handleExportMarkdown)
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
-
-  // Keep itemsRef updated
-  useEffect(() => {
-    itemsRef.current = items
-  }, [items])
 
   const handlePrint = () => {
     // Use sorted items for print output
@@ -588,149 +454,16 @@ ${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLoca
         setExpenses(DEMO_EXPENSES)
         setForecast(DEMO_FORECAST)
       }
-      // Generate recommendations based on budget data
-      generateRecommendationsRef.current?.()
     } catch (e) {
       console.error('Budget fetch error:', e)
       // Fallback to demo data with error logged
       setItems(DEMO_BUDGET_ITEMS)
       setExpenses(DEMO_EXPENSES)
       setForecast(DEMO_FORECAST)
-      generateRecommendationsRef.current?.()
     } finally {
       setLoading(false)
     }
   }, [])
-
-  // Generate budget recommendations based on spending patterns
-  const generateRecommendations = useCallback(() => {
-    const newRecommendations: BudgetRecommendation[] = []
-    const totalPlanned = forecast?.planned || 85000000
-    const totalSpent = forecast?.actual || 4500000
-    const percentSpent = (totalSpent / totalPlanned) * 100
-
-    // Analyze each category in forecast
-    forecast?.categories?.forEach(cat => {
-      const catPercent = (cat.actual / cat.planned) * 100
-      
-      // Over-budget recommendations
-      if (cat.status === 'over' || catPercent > 110) {
-        newRecommendations.push({
-          id: `rec-over-${cat.category}`,
-          type: 'risk',
-          category: cat.category,
-          title: `${cat.category} Over Budget`,
-          description: `This category is ${Math.round(catPercent - 100)}% over planned budget. Consider scope reduction or reallocation from other categories.`,
-          potentialRisk: cat.actual - cat.planned,
-          priority: 'high',
-          actionable: true
-        })
-      }
-      
-      // Under-budget opportunities
-      if (catPercent < 50 && cat.planned > 500000) {
-        newRecommendations.push({
-          id: `rec-under-${cat.category}`,
-          type: 'opportunity',
-          category: cat.category,
-          title: `Surplus in ${cat.category}`,
-          description: `This category has significant surplus (${Math.round(100 - catPercent)}% unspent). Consider reallocating to over-budget categories.`,
-          potentialSavings: cat.planned - cat.actual,
-          priority: 'medium',
-          actionable: true
-        })
-      }
-    })
-
-    // General recommendations
-    if (percentSpent > 60) {
-      newRecommendations.push({
-        id: 'rec-spending-rate',
-        type: 'optimization',
-        category: 'General',
-        title: 'High Spending Rate',
-        description: `You've spent ${Math.round(percentSpent)}% of your budget. Review remaining categories to ensure you don't exceed planned totals.`,
-        priority: 'high',
-        actionable: true
-      })
-    }
-
-    // Contingency check
-    const contingency = forecast?.categories?.find(c => c.category === 'Contingency')
-    if (contingency && contingency.actual > 0) {
-      newRecommendations.push({
-        id: 'rec-contingency',
-        type: 'risk',
-        category: 'Contingency',
-        title: 'Contingency Used Early',
-        description: 'Contingency funds have been accessed. Review if this is planned or if additional buffer is needed.',
-        potentialRisk: contingency.actual,
-        priority: 'medium',
-        actionable: true
-      })
-    }
-
-    // Production-specific recommendations
-    const production = forecast?.categories?.find(c => c.category === 'Production')
-    if (production && production.actual / production.planned > 0.8) {
-      newRecommendations.push({
-        id: 'rec-production',
-        type: 'savings',
-        category: 'Production',
-        title: 'Production Budget Optimization',
-        description: 'Production costs are running high. Consider negotiated rates with vendors or scheduling optimization to reduce daily costs.',
-        potentialSavings: production.planned * 0.1,
-        priority: 'medium',
-        actionable: true
-      })
-    }
-
-    // VFX optimization
-    const vfx = forecast?.categories?.find(c => c.category === 'Post-Production')
-    if (vfx && vfx.forecast > vfx.planned) {
-      newRecommendations.push({
-        id: 'rec-vfx',
-        type: 'optimization',
-        category: 'Post-Production',
-        title: 'VFX Cost Optimization',
-        description: 'Post-production is forecast to exceed budget. Consider reducing VFX scope or exploring alternative VFX vendors.',
-        potentialSavings: vfx.forecast - vfx.planned,
-        priority: 'high',
-        actionable: true
-      })
-    }
-
-    // Set default recommendations if none generated
-    if (newRecommendations.length === 0) {
-      newRecommendations.push(
-        {
-          id: 'rec-healthy',
-          type: 'opportunity',
-          category: 'General',
-          title: 'Budget On Track',
-          description: 'Your budget is currently balanced across all categories. Continue monitoring spending patterns.',
-          priority: 'low',
-          actionable: false
-        },
-        {
-          id: 'rec-review',
-          type: 'optimization',
-          category: 'General',
-          title: 'Regular Review Recommended',
-          description: 'Schedule weekly budget reviews to catch any overruns early and maintain financial control.',
-          priority: 'medium',
-          actionable: true
-        }
-      )
-    }
-
-    setRecommendations(newRecommendations)
-  }, [forecast])
-
-  // Update generateRecommendations ref when function changes
-  useEffect(() => {
-    generateRecommendationsRef.current = generateRecommendations
-  }, [generateRecommendations])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -795,17 +528,9 @@ ${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLoca
           e.preventDefault()
           setActiveTab('forecast')
           break
-        case '5':
-          e.preventDefault()
-          setActiveTab('recommendations')
-          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
-          break
-        case 'm':
-          e.preventDefault()
-          if (itemsRef.current.length > 0) handleExportMarkdownRef.current()
           break
         case 'p':
           e.preventDefault()
@@ -984,28 +709,7 @@ ${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLoca
     { key: 'breakdown', label: `Breakdown (${filteredItems.length})` },
     { key: 'expenses', label: `Expenses (${filteredExpenses.length})` },
     { key: 'forecast', label: 'Forecast' },
-    { key: 'recommendations', label: `Recommendations (${recommendations.length})` },
   ]
-
-  // Get priority color
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-400 bg-red-500/20 border-red-500/30'
-      case 'medium': return 'text-amber-400 bg-amber-500/20 border-amber-500/30'
-      default: return 'text-slate-400 bg-slate-500/20 border-slate-500/30'
-    }
-  }
-
-  // Get type icon and color
-  const getTypeConfig = (type: string) => {
-    switch (type) {
-      case 'savings': return { icon: TrendingDown, color: 'text-emerald-400', bg: 'bg-emerald-500/20' }
-      case 'optimization': return { icon: TrendingUp, color: 'text-cyan-400', bg: 'bg-cyan-500/20' }
-      case 'risk': return { icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/20' }
-      case 'opportunity': return { icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/20' }
-      default: return { icon: CheckCircle, color: 'text-slate-400', bg: 'bg-slate-500/20' }
-    }
-  }
 
   if (loading) {
     return (
@@ -1096,17 +800,10 @@ ${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLoca
                 </button>
                 <button 
                   onClick={handleExportJSON}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg"
                 >
                   <FileJson className="w-4 h-4" />
                   Export JSON
-                </button>
-                <button 
-                  onClick={() => { handleExportMarkdown(); setShowExportMenu(false) }}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg text-cyan-400"
-                >
-                  <FileText className="w-4 h-4" />
-                  Export Markdown
                 </button>
               </div>
             )}
@@ -1697,125 +1394,6 @@ ${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLoca
         </div>
       )}
 
-      {/* Recommendations Tab */}
-      {activeTab === 'recommendations' && (
-        <div className="space-y-6">
-          {/* Recommendations Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Budget Recommendations</h2>
-              <p className="text-slate-400 text-sm mt-1">AI-powered suggestions to optimize your production budget</p>
-            </div>
-            <button 
-              onClick={() => generateRecommendations()}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh Analysis
-            </button>
-          </div>
-
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
-                <span className="text-slate-400 text-sm">Potential Savings</span>
-              </div>
-              <div className="text-2xl font-bold text-emerald-400">
-                {formatINR(recommendations.filter(r => r.type === 'savings' || r.type === 'opportunity').reduce((sum, r) => sum + (r.potentialSavings || 0), 0))}
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-                <span className="text-slate-400 text-sm">Risk Amount</span>
-              </div>
-              <div className="text-2xl font-bold text-red-400">
-                {formatINR(recommendations.filter(r => r.type === 'risk').reduce((sum, r) => sum + (r.potentialRisk || 0), 0))}
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-5 h-5 text-cyan-400" />
-                <span className="text-slate-400 text-sm">Optimizations</span>
-              </div>
-              <div className="text-2xl font-bold text-cyan-400">
-                {recommendations.filter(r => r.type === 'optimization').length}
-              </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="w-5 h-5 text-purple-400" />
-                <span className="text-slate-400 text-sm">Actionable</span>
-              </div>
-              <div className="text-2xl font-bold text-purple-400">
-                {recommendations.filter(r => r.actionable).length} / {recommendations.length}
-              </div>
-            </div>
-          </div>
-
-          {/* Recommendations List */}
-          <div className="grid gap-4">
-            {recommendations.map((rec) => {
-              const typeConfig = getTypeConfig(rec.type)
-              const TypeIcon = typeConfig.icon
-              
-              return (
-                <div 
-                  key={rec.id} 
-                  className={`bg-slate-900 border rounded-xl p-5 hover:border-slate-700 transition-colors ${
-                    rec.priority === 'high' ? 'border-red-500/30' : 
-                    rec.priority === 'medium' ? 'border-amber-500/30' : 
-                    'border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className={`p-2 rounded-lg ${typeConfig.bg}`}>
-                        <TypeIcon className={`w-5 h-5 ${typeConfig.color}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-white font-medium">{rec.title}</h3>
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getPriorityColor(rec.priority)}`}>
-                            {rec.priority.toUpperCase()}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
-                            {rec.type.toUpperCase()}
-                          </span>
-                        </div>
-                        <p className="text-slate-400 text-sm mb-2">{rec.description}</p>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="text-slate-500">Category: <span className="text-slate-300">{rec.category}</span></span>
-                          {rec.potentialSavings && (
-                            <span className="text-emerald-400">Potential Savings: {formatINR(rec.potentialSavings)}</span>
-                          )}
-                          {rec.potentialRisk && (
-                            <span className="text-red-400">Potential Risk: {formatINR(rec.potentialRisk)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {rec.actionable && (
-                      <button className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-sm text-white">
-                        Take Action
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {recommendations.length === 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-8 text-center text-slate-500">
-              Generate a budget first to see personalized recommendations.
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Keyboard Help Modal */}
       {showKeyboardHelp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
@@ -1837,13 +1415,11 @@ ${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLoca
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', action: 'Add new expense' },
                 { key: 'E', action: 'Toggle export menu' },
-                { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print budget report' },
                 { key: '1', action: 'Switch to Overview tab' },
                 { key: '2', action: 'Switch to Breakdown tab' },
                 { key: '3', action: 'Switch to Expenses tab' },
                 { key: '4', action: 'Switch to Forecast tab' },
-                { key: '5', action: 'Switch to Recommendations tab' },
                 { key: '?', action: 'Show this help' },
                 { key: 'Esc', action: 'Close modal / Clear search / Reset filters' },
               ].map(({ key, action }) => (

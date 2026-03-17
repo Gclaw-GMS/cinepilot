@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer, Copy, Check, TrendingUp } from 'lucide-react'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { AlertCircle, Upload, FileText, Search, Filter, Download, Trash2, Eye, Play, CheckCircle, XCircle, Clock, Zap, RefreshCw, Keyboard, ChevronDown, Printer, Copy, Check, BarChart3, PieChart as PieChartIcon } from 'lucide-react'
 import ScriptComparison from '@/components/ScriptComparison'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts'
 
 interface ScriptData {
   id: string
@@ -631,92 +634,6 @@ Warnings: ${allWarnings.length}`
   const summaryAnalysis = analyses.find(a => a.analysisType === 'breakdown_summary')
   const allWarnings = scenes.flatMap(s => s.warnings.map(w => ({ ...w, sceneNumber: s.sceneNumber })))
 
-  // Analytics data computation
-  const analyticsData = useMemo(() => {
-    // INT/EXT Distribution
-    const intExtCount: Record<string, number> = {}
-    scenes.forEach(s => {
-      const key = s.intExt || 'UNKNOWN'
-      intExtCount[key] = (intExtCount[key] || 0) + 1
-    })
-    const intExtData = Object.entries(intExtCount).map(([name, value]) => ({ name, value }))
-
-    // Time of Day Distribution
-    const timeOfDayCount: Record<string, number> = {}
-    scenes.forEach(s => {
-      const key = s.timeOfDay || 'UNKNOWN'
-      timeOfDayCount[key] = (timeOfDayCount[key] || 0) + 1
-    })
-    const timeOfDayData = Object.entries(timeOfDayCount).map(([name, value]) => ({ name, value }))
-
-    // Top Locations
-    const locationCount: Record<string, number> = {}
-    scenes.forEach(s => {
-      const key = s.location || 'UNKNOWN'
-      locationCount[key] = (locationCount[key] || 0) + 1
-    })
-    const locationData = Object.entries(locationCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name, scenes]) => ({ name, scenes }))
-
-    // Character Appearances
-    const charCount: Record<string, number> = {}
-    scenes.forEach(s => {
-      s.sceneCharacters?.forEach(sc => {
-        charCount[sc.character.name] = (charCount[sc.character.name] || 0) + 1
-      })
-    })
-    const characterData = Object.entries(charCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name, appearances]) => ({ name, appearances }))
-
-    // Warning Severity Distribution
-    const warningSeverityCount: Record<string, number> = { High: 0, Medium: 0, Low: 0 }
-    allWarnings.forEach(w => {
-      if (w.severity === 'high') warningSeverityCount.High++
-      else if (w.severity === 'medium') warningSeverityCount.Medium++
-      else warningSeverityCount.Low++
-    })
-    const warningSeverityData = Object.entries(warningSeverityCount)
-      .filter(([_, value]) => value > 0)
-      .map(([name, value]) => ({ name, value }))
-
-    // Confidence Distribution
-    const confidenceCount: Record<string, number> = { High: 0, Medium: 0, Low: 0 }
-    scenes.forEach(s => {
-      if (s.confidence >= 0.8) confidenceCount.High++
-      else if (s.confidence >= 0.5) confidenceCount.Medium++
-      else confidenceCount.Low++
-    })
-    const confidenceData = Object.entries(confidenceCount).map(([name, value]) => ({ name, value }))
-
-    // Summary stats
-    const uniqueLocations = new Set(scenes.map(s => s.location)).size
-    const uniqueCharacters = new Set(scenes.flatMap(s => s.sceneCharacters?.map(sc => sc.character.name) || [])).size
-    const avgConfidence = scenes.length > 0 
-      ? scenes.reduce((sum, s) => sum + (s.confidence || 0), 0) / scenes.length 
-      : 0
-
-    return {
-      totalScenes: scenes.length,
-      totalCharacters: uniqueCharacters,
-      totalWarnings: allWarnings.length,
-      totalLocations: uniqueLocations,
-      avgConfidence,
-      intExtData,
-      timeOfDayData,
-      locationData,
-      characterData,
-      warningSeverityData,
-      confidenceData,
-    }
-  }, [scenes, allWarnings])
-
-  // Chart colors
-  const CHART_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#ef4444', '#84cc16']
-
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -843,6 +760,83 @@ Warnings: ${allWarnings.length}`
     { key: 'compare', label: 'Compare' },
     { key: 'analytics', label: 'Analytics' },
   ]
+
+  // Analytics data for charts
+  const analyticsData = useMemo(() => {
+    // Scene distribution by INT/EXT
+    const intExtData = [
+      { name: 'INT', value: scenes.filter(s => s.intExt === 'INT').length, color: '#3b82f6' },
+      { name: 'EXT', value: scenes.filter(s => s.intExt === 'EXT').length, color: '#f59e0b' },
+      { name: 'INT/EXT', value: scenes.filter(s => s.intExt === 'INT/EXT').length, color: '#8b5cf6' },
+    ].filter(d => d.value > 0)
+
+    // Scene distribution by time of day
+    const timeOfDayData = [
+      { name: 'DAY', value: scenes.filter(s => s.timeOfDay === 'DAY').length, color: '#fbbf24' },
+      { name: 'NIGHT', value: scenes.filter(s => s.timeOfDay === 'NIGHT').length, color: '#6366f1' },
+      { name: 'DAWN', value: scenes.filter(s => s.timeOfDay === 'DAWN').length, color: '#f97316' },
+      { name: 'DUSK', value: scenes.filter(s => s.timeOfDay === 'DUSK').length, color: '#ec4899' },
+      { name: 'CONTINUOUS', value: scenes.filter(s => s.timeOfDay === 'CONTINUOUS').length, color: '#14b8a6' },
+    ].filter(d => d.value > 0)
+
+    // Scenes per location (top 8)
+    const locationCounts: Record<string, number> = {}
+    scenes.forEach(scene => {
+      const loc = scene.location || 'Unknown'
+      locationCounts[loc] = (locationCounts[loc] || 0) + 1
+    })
+    const locationData = Object.entries(locationCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+
+    // Character frequency (top 10)
+    const charCounts: Record<string, number> = {}
+    scenes.forEach(scene => {
+      scene.sceneCharacters.forEach(sc => {
+        const charName = sc.character.name
+        charCounts[charName] = (charCounts[charName] || 0) + 1
+      })
+    })
+    const characterData = Object.entries(charCounts)
+      .map(([name, appearances]) => ({ name, appearances }))
+      .sort((a, b) => b.appearances - a.appearances)
+      .slice(0, 10)
+
+    // Warning distribution by severity
+    const warningSeverityData = [
+      { name: 'High', value: allWarnings.filter(w => w.severity === 'high').length, color: '#ef4444' },
+      { name: 'Medium', value: allWarnings.filter(w => w.severity === 'medium').length, color: '#f59e0b' },
+      { name: 'Low', value: allWarnings.filter(w => w.severity === 'low').length, color: '#64748b' },
+    ].filter(d => d.value > 0)
+
+    // Confidence distribution
+    const highConfidence = scenes.filter(s => (s.confidence || 0) >= 0.9).length
+    const mediumConfidence = scenes.filter(s => (s.confidence || 0) >= 0.7 && (s.confidence || 0) < 0.9).length
+    const lowConfidence = scenes.filter(s => (s.confidence || 0) < 0.7).length
+    const confidenceData = [
+      { name: 'High (90%+)', value: highConfidence, color: '#10b981' },
+      { name: 'Medium (70-89%)', value: mediumConfidence, color: '#f59e0b' },
+      { name: 'Low (<70%)', value: lowConfidence, color: '#ef4444' },
+    ].filter(d => d.value > 0)
+
+    return {
+      intExtData,
+      timeOfDayData,
+      locationData,
+      characterData,
+      warningSeverityData,
+      confidenceData,
+      totalScenes: scenes.length,
+      totalCharacters: Object.keys(charCounts).length,
+      totalWarnings: allWarnings.length,
+      avgConfidence: scenes.length > 0 
+        ? Math.round(scenes.reduce((sum, s) => sum + (s.confidence || 0), 0) / scenes.length * 100) 
+        : 0,
+    }
+  }, [scenes, allWarnings])
+
+  const CHART_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1']
 
   if (loading) {
     return (
@@ -1515,31 +1509,38 @@ Warnings: ${allWarnings.length}`
         <div className="space-y-6">
           {/* Summary Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Total Scenes</div>
-              <div className="text-2xl font-bold text-cinepilot-accent">{analyticsData.totalScenes}</div>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                <FileText className="w-4 h-4" /> Total Scenes
+              </div>
+              <div className="text-2xl font-bold text-white">{analyticsData.totalScenes}</div>
             </div>
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Characters</div>
-              <div className="text-2xl font-bold text-purple-400">{analyticsData.totalCharacters}</div>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                <CheckCircle className="w-4 h-4" /> Characters
+              </div>
+              <div className="text-2xl font-bold text-white">{analyticsData.totalCharacters}</div>
             </div>
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Warnings</div>
-              <div className="text-2xl font-bold text-amber-400">{analyticsData.totalWarnings}</div>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                <AlertCircle className="w-4 h-4" /> Warnings
+              </div>
+              <div className="text-2xl font-bold text-white">{analyticsData.totalWarnings}</div>
             </div>
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Avg Confidence</div>
-              <div className="text-2xl font-bold text-emerald-400">{(analyticsData.avgConfidence * 100).toFixed(0)}%</div>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+                <Zap className="w-4 h-4" /> Avg Confidence
+              </div>
+              <div className="text-2xl font-bold text-white">{analyticsData.avgConfidence}%</div>
             </div>
           </div>
 
           {/* Charts Row 1 */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* INT/EXT Distribution */}
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-indigo-400" />
-                INT/EXT Distribution
+            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-blue-400" /> Scene Type (INT/EXT)
               </h3>
               {analyticsData.intExtData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -1552,13 +1553,17 @@ Warnings: ${allWarnings.length}`
                       outerRadius={90}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      labelLine={false}
                     >
-                      {analyticsData.intExtData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      {analyticsData.intExtData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e5e7eb' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -1567,10 +1572,9 @@ Warnings: ${allWarnings.length}`
             </div>
 
             {/* Time of Day Distribution */}
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-400" />
-                Time of Day
+            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-400" /> Time of Day
               </h3>
               {analyticsData.timeOfDayData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -1583,13 +1587,17 @@ Warnings: ${allWarnings.length}`
                       outerRadius={90}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      labelLine={false}
                     >
-                      {analyticsData.timeOfDayData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />
+                      {analyticsData.timeOfDayData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e5e7eb' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -1600,45 +1608,49 @@ Warnings: ${allWarnings.length}`
 
           {/* Charts Row 2 */}
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Top Locations */}
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-emerald-400" />
-                Top Locations
+            {/* Scenes per Location */}
+            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-purple-400" /> Top Locations
               </h3>
               {analyticsData.locationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.locationData} layout="vertical" margin={{ left: 20 }}>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={analyticsData.locationData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis type="number" stroke="#9ca3af" />
-                    <YAxis dataKey="name" type="category" width={120} stroke="#9ca3af" tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="scenes" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                    <YAxis dataKey="name" type="category" width={120} stroke="#9ca3af" tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e5e7eb' }}
+                    />
+                    <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-500">No location data</div>
+                <div className="h-[250px] flex items-center justify-center text-gray-500">No location data</div>
               )}
             </div>
 
             {/* Character Appearances */}
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Eye className="w-5 h-5 text-pink-400" />
-                Character Appearances
+            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-400" /> Character Appearances
               </h3>
               {analyticsData.characterData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.characterData} layout="vertical" margin={{ left: 20 }}>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={analyticsData.characterData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis type="number" stroke="#9ca3af" />
-                    <YAxis dataKey="name" type="category" width={80} stroke="#9ca3af" tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="appearances" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                    <YAxis dataKey="name" type="category" width={100} stroke="#9ca3af" tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e5e7eb' }}
+                    />
+                    <Bar dataKey="appearances" fill="#10b981" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-500">No character data</div>
+                <div className="h-[250px] flex items-center justify-center text-gray-500">No character data</div>
               )}
             </div>
           </div>
@@ -1646,10 +1658,9 @@ Warnings: ${allWarnings.length}`
           {/* Charts Row 3 */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Warning Severity */}
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-400" />
-                Warnings by Severity
+            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-400" /> Warnings by Severity
               </h3>
               {analyticsData.warningSeverityData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -1662,13 +1673,17 @@ Warnings: ${allWarnings.length}`
                       outerRadius={90}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      labelLine={false}
                     >
-                      {analyticsData.warningSeverityData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? '#ef4444' : index === 1 ? '#f59e0b' : '#6b7280'} />
+                      {analyticsData.warningSeverityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e5e7eb' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -1677,10 +1692,9 @@ Warnings: ${allWarnings.length}`
             </div>
 
             {/* Confidence Distribution */}
-            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-                Confidence Distribution
+            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-cyan-400" /> Confidence Distribution
               </h3>
               {analyticsData.confidenceData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -1693,13 +1707,17 @@ Warnings: ${allWarnings.length}`
                       outerRadius={90}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      labelLine={false}
                     >
-                      {analyticsData.confidenceData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : index === 1 ? '#f59e0b' : '#ef4444'} />
+                      {analyticsData.confidenceData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#e5e7eb' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (

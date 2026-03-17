@@ -114,7 +114,9 @@ export default function SettingsPage() {
   const [local, setLocal] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetting, setResetting] = useState(false);
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -213,6 +215,13 @@ export default function SettingsPage() {
         setShowShortcuts(false);
         setShowPrintMenu(false);
         setShowFilterPanel(false);
+        setShowResetConfirm(false);
+      }
+
+      // X: Reset to defaults (with Ctrl/Cmd for safety)
+      if ((e.key === 'x' || e.key === 'X') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setShowResetConfirm(true);
       }
     };
 
@@ -267,6 +276,34 @@ export default function SettingsPage() {
       setSaving(false);
     }
   }, [local]);
+
+  // Reset to defaults
+  const resetToDefaults = useCallback(async () => {
+    setResetting(true);
+    setShowResetConfirm(false);
+    
+    // Reset to default settings
+    const resetSettings = { ...DEFAULT_SETTINGS };
+    setSettings(resetSettings);
+    saveToStorage(resetSettings);
+    
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk', settings: resetSettings }),
+      });
+      if (res.ok) {
+        setDbConnected(true);
+      }
+    } catch (err) {
+      console.warn('Failed to reset in database, using local storage only');
+    }
+    
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    setResetting(false);
+  }, []);
 
   // Update saveRef when save changes
   useEffect(() => {
@@ -792,6 +829,14 @@ export default function SettingsPage() {
               </>
             )}
           </button>
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resetting}
+            className="flex items-center gap-2 px-4 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-800 disabled:opacity-50 rounded text-sm font-medium text-red-400"
+          >
+            <RefreshCw className={`h-4 w-4 ${resetting ? 'animate-spin' : ''}`} />
+            {resetting ? 'Resetting...' : 'Reset to Defaults'}
+          </button>
           {saved && (
             <span className="text-sm text-green-500 flex items-center gap-1">
               <Check className="h-4 w-4" />
@@ -829,6 +874,7 @@ export default function SettingsPage() {
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
+                { key: 'Ctrl+X', action: 'Reset to defaults' },
                 { key: 'P', action: 'Print settings' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal' },
@@ -844,6 +890,50 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 mt-4 text-center">
               Press Esc or click outside to close
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirm && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-red-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-red-400">
+                <AlertCircle className="w-5 h-5" />
+                Reset Settings
+              </h2>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="text-slate-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to reset all settings to their default values? This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={resetToDefaults}
+                disabled={resetting}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded text-sm font-medium text-white"
+              >
+                {resetting ? 'Resetting...' : 'Reset to Defaults'}
+              </button>
+            </div>
           </div>
         </div>
       )}

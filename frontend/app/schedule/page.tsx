@@ -6,8 +6,8 @@ import {
   PieChart, Pie, Cell
 } from 'recharts'
 import { 
-  Calendar, RefreshCw, AlertTriangle, AlertCircle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer
+  Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer, AlertCircle
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -800,111 +800,139 @@ export default function SchedulePage() {
     }
   }, [shootingDays])
 
-  // Conflict Detection - Detect scheduling issues
-  const conflicts = useMemo(() => {
-    const conflictList: Array<{
-      id: string
-      type: 'overload' | 'light' | 'night_consecutive' | 'location_change' | 'scene_overload'
-      severity: 'high' | 'medium' | 'low'
-      dayNumber: number
-      dayDate: string | null
-      title: string
-      description: string
-    }> = []
+  // Conflict detection logic
+  interface ScheduleConflict {
+    id: string
+    type: 'overtime' | 'location' | 'day_change' | 'scene_gap' | 'late_call' | 'early_call'
+    severity: 'high' | 'medium' | 'low'
+    dayNumber: number
+    title: string
+    description: string
+    recommendation: string
+  }
 
-    shootingDays.forEach((day, idx) => {
+  const scheduleConflicts = useMemo((): ScheduleConflict[] => {
+    const conflicts: ScheduleConflict[] = []
+    
+    shootingDays.forEach(day => {
+      // Overtime detection (>10 hours)
       const hours = Number(day.estimatedHours || 0)
-      const sceneCount = day.dayScenes.length
-      const isNightShoot = day.dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
-      
-      // 1. Overload Days (> 10 hours)
       if (hours > 10) {
-        conflictList.push({
-          id: `overload-${day.id}`,
-          type: 'overload',
+        conflicts.push({
+          id: `overtime-${day.id}`,
+          type: 'overtime',
           severity: hours > 12 ? 'high' : 'medium',
           dayNumber: day.dayNumber,
-          dayDate: day.scheduledDate,
-          title: `Day ${day.dayNumber}: Heavy Schedule`,
-          description: `${hours}h scheduled (${hours - 10}h over 10h limit). Risk of crew fatigue and overtime costs.`
+          title: 'Overtime Scheduled',
+          description: `Day ${day.dayNumber} is scheduled for ${hours} hours, which exceeds the standard 10-hour workday.`,
+          recommendation: 'Consider splitting scenes across multiple days or hiring additional crew for support.'
         })
       }
-      
-      // 2. Light Days (< 6 hours)
-      if (hours > 0 && hours < 6) {
-        conflictList.push({
-          id: `light-${day.id}`,
-          type: 'light',
-          severity: 'low',
-          dayNumber: day.dayNumber,
-          dayDate: day.scheduledDate,
-          title: `Day ${day.dayNumber}: Under-utilized`,
-          description: `Only ${hours}h scheduled. Consider adding scenes or rescheduling for better efficiency.`
-        })
+
+      // Late call time detection (after 10 AM)
+      if (day.callTime) {
+        const [hours] = day.callTime.split(':').map(Number)
+        if (hours >= 14) { // 2 PM or later
+          conflicts.push({
+            id: `late-call-${day.id}`,
+            type: 'late_call',
+            severity: 'low',
+            dayNumber: day.dayNumber,
+            title: 'Late Call Time',
+            description: `Day ${day.dayNumber} call time is ${day.callTime}, which may impact the shooting schedule.`,
+            recommendation: 'Ensure equipment is prepped the night before to maximize shooting time.'
+          })
+        }
+        if (hours < 5) { // Before 5 AM
+          conflicts.push({
+            id: `early-call-${day.id}`,
+            type: 'early_call',
+            severity: hours < 4 ? 'high' : 'medium',
+            dayNumber: day.dayNumber,
+            title: 'Early Morning Call',
+            description: `Day ${day.dayNumber} call time is ${day.callTime}, requiring early crew call.`,
+            recommendation: 'Ensure crew accommodation is close to location or arrange transport.'
+          })
+        }
       }
-      
-      // 3. Scene Overload (> 5 scenes per day)
-      if (sceneCount > 5) {
-        conflictList.push({
-          id: `scene-${day.id}`,
-          type: 'scene_overload',
-          severity: sceneCount > 7 ? 'high' : 'medium',
-          dayNumber: day.dayNumber,
-          dayDate: day.scheduledDate,
-          title: `Day ${day.dayNumber}: Scene Overload`,
-          description: `${sceneCount} scenes scheduled. May impact quality and increase setup time.`
-        })
-      }
-      
-      // 4. Location Changes (multiple different locations in one day)
-      const locations = [...new Set(day.dayScenes.map(ds => ds.scene.location).filter(Boolean))]
-      if (locations.length > 2) {
-        conflictList.push({
+
+      // Location change detection (multiple locations in one day)
+      const locations = new Set(day.dayScenes.map(ds => ds.scene.location).filter(Boolean))
+      if (locations.size > 2) {
+        conflicts.push({
           id: `location-${day.id}`,
-          type: 'location_change',
-          severity: locations.length > 3 ? 'high' : 'medium',
+          type: 'location',
+          severity: locations.size > 3 ? 'high' : 'medium',
           dayNumber: day.dayNumber,
-          dayDate: day.scheduledDate,
-          title: `Day ${day.dayNumber}: Multiple Locations`,
-          description: `${locations.length} different locations: ${locations.slice(0, 3).join(', ')}${locations.length > 3 ? '...' : ''}. Consider splitting days.`
+          title: 'Multiple Location Changes',
+          description: `Day ${day.dayNumber} has scenes at ${locations.size} different locations.`,
+          recommendation: 'Group scenes by location and shoot in geographic order to minimize travel time.'
+        })
+      }
+
+      // Night-to-day transition detection
+      const timeOfDaySet = new Set(day.dayScenes.map(ds => ds.scene.timeOfDay).filter(Boolean))
+      if (timeOfDaySet.has('NIGHT') && timeOfDaySet.has('DAY')) {
+        conflicts.push({
+          id: `day-change-${day.id}`,
+          type: 'day_change',
+          severity: 'medium',
+          dayNumber: day.dayNumber,
+          title: 'Day/Night Transition',
+          description: `Day ${day.dayNumber} has both DAY and NIGHT scenes, requiring lighting changes.`,
+          recommendation: 'Schedule DAY scenes first, then break for NIGHT setup to maximize efficiency.'
+        })
+      }
+
+      // Scene gap detection
+      const totalMinutes = day.dayScenes.reduce((sum, ds) => sum + (ds.estimatedMinutes || 0), 0)
+      if (totalMinutes > hours * 50) { // More scenes than reasonable hours can accommodate
+        conflicts.push({
+          id: `scene-gap-${day.id}`,
+          type: 'scene_gap',
+          severity: 'high',
+          dayNumber: day.dayNumber,
+          title: 'Unrealistic Schedule',
+          description: `Day ${day.dayNumber} has ${day.dayScenes.length} scenes totaling ~${totalMinutes} minutes (${Math.round(totalMinutes/60)} hours), but only ${hours} hours allocated.`,
+          recommendation: 'Reduce scene count or extend the estimated hours for this day.'
         })
       }
     })
 
-    // 5. Consecutive Night Shoots (3+ consecutive nights)
-    let consecutiveNights = 0
-    for (let i = 0; i < shootingDays.length; i++) {
-      const isNight = shootingDays[i].dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
-      if (isNight) {
-        consecutiveNights++
-        if (consecutiveNights >= 3) {
-          conflictList.push({
-            id: `night-consec-${shootingDays[i].id}`,
-            type: 'night_consecutive',
-            severity: consecutiveNights >= 4 ? 'high' : 'medium',
-            dayNumber: shootingDays[i].dayNumber,
-            dayDate: shootingDays[i].scheduledDate,
-            title: `Day ${shootingDays[i].dayNumber}: Consecutive Night Shoots`,
-            description: `${consecutiveNights} consecutive night shoots (Days ${shootingDays[i].dayNumber - consecutiveNights + 1}-${shootingDays[i].dayNumber}). High physical toll on cast & crew.`
+    // Check for consecutive night shoots (crew fatigue)
+    let nightStreak = 0
+    shootingDays.forEach(day => {
+      const hasNight = day.dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
+      if (hasNight) {
+        nightStreak++
+        if (nightStreak >= 3) {
+          conflicts.push({
+            id: `fatigue-${day.id}`,
+            type: 'overtime',
+            severity: 'high',
+            dayNumber: day.dayNumber,
+            title: 'Crew Fatigue Risk',
+            description: `This is the ${nightStreak}th consecutive night shoot, increasing fatigue risk.`,
+            recommendation: 'Consider scheduling a rest day or daytime-only shoot after 3 consecutive night shoots.'
           })
         }
       } else {
-        consecutiveNights = 0
+        nightStreak = 0
       }
-    }
+    })
 
-    // Sort by severity (high first)
-    const severityOrder = { high: 0, medium: 1, low: 2 }
-    return conflictList.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+    return conflicts
   }, [shootingDays])
 
   // Conflict stats
-  const conflictStats = useMemo(() => ({
-    total: conflicts.length,
-    high: conflicts.filter(c => c.severity === 'high').length,
-    medium: conflicts.filter(c => c.severity === 'medium').length,
-    low: conflicts.filter(c => c.severity === 'low').length,
-  }), [conflicts])
+  const conflictStats = useMemo(() => {
+    return {
+      total: scheduleConflicts.length,
+      high: scheduleConflicts.filter(c => c.severity === 'high').length,
+      medium: scheduleConflicts.filter(c => c.severity === 'medium').length,
+      low: scheduleConflicts.filter(c => c.severity === 'low').length,
+    }
+  }, [scheduleConflicts])
 
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -980,21 +1008,17 @@ export default function SchedulePage() {
             </button>
             <button
               onClick={() => setViewMode('conflicts')}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                 viewMode === 'conflicts' 
                   ? 'bg-indigo-600 text-white' 
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              <AlertTriangle className="w-4 h-4" />
+              <AlertCircle className="w-4 h-4 inline-block mr-1.5" />
               Conflicts
-              {conflictStats.total > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
-                  conflictStats.high > 0 ? 'bg-red-500 text-white' : 
-                  conflictStats.medium > 0 ? 'bg-amber-500 text-white' : 
-                  'bg-gray-500 text-white'
-                }`}>
-                  {conflictStats.total}
+              {conflictStats.high > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                  {conflictStats.high}
                 </span>
               )}
             </button>
@@ -1456,139 +1480,105 @@ export default function SchedulePage() {
       {viewMode === 'conflicts' && (
         <div className="space-y-6">
           {/* Conflict Stats */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-indigo-500/20">
-                  <AlertTriangle className="w-5 h-5 text-indigo-400" />
-                </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-4">
+              <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Total Issues</p>
-                  <p className="text-2xl font-bold text-white">{conflictStats.total}</p>
+                  <p className="text-2xl font-semibold text-white mt-1">{conflictStats.total}</p>
                 </div>
+                <AlertTriangle className="w-8 h-8 text-amber-400" />
               </div>
             </div>
-            <div className="bg-gray-800/40 border border-red-900/30 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/20">
-                  <AlertCircle className="w-5 h-5 text-red-400" />
-                </div>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">High Priority</p>
-                  <p className="text-2xl font-bold text-red-400">{conflictStats.high}</p>
+                  <p className="text-xs text-red-400 uppercase tracking-wider">High Priority</p>
+                  <p className="text-2xl font-semibold text-red-400 mt-1">{conflictStats.high}</p>
                 </div>
+                <AlertTriangle className="w-8 h-8 text-red-400" />
               </div>
             </div>
-            <div className="bg-gray-800/40 border border-amber-900/30 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/20">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                </div>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Medium</p>
-                  <p className="text-2xl font-bold text-amber-400">{conflictStats.medium}</p>
+                  <p className="text-xs text-amber-400 uppercase tracking-wider">Medium</p>
+                  <p className="text-2xl font-semibold text-amber-400 mt-1">{conflictStats.medium}</p>
                 </div>
+                <Clock className="w-8 h-8 text-amber-400" />
               </div>
             </div>
-            <div className="bg-gray-800/40 border border-gray-600 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-500/20">
-                  <AlertTriangle className="w-5 h-5 text-gray-400" />
-                </div>
+            <div className="bg-gray-500/10 border border-gray-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Low</p>
-                  <p className="text-2xl font-bold text-gray-400">{conflictStats.low}</p>
+                  <p className="text-2xl font-semibold text-gray-400 mt-1">{conflictStats.low}</p>
                 </div>
+                <CheckCircle className="w-8 h-8 text-gray-400" />
               </div>
             </div>
           </div>
 
-          {/* Conflicts List */}
-          {conflicts.length === 0 ? (
-            <div className="bg-gray-800/40 border border-emerald-900/30 rounded-lg p-8 text-center">
-              <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">Schedule Looks Good!</h3>
-              <p className="text-gray-400">No scheduling conflicts detected. Your schedule is optimized.</p>
+          {/* All Clear State */}
+          {scheduleConflicts.length === 0 ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-8 text-center">
+              <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">All Clear!</h3>
+              <p className="text-gray-400">No scheduling conflicts detected. Your schedule looks good!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {conflicts.map(conflict => (
+            /* Conflict List */
+            <div className="space-y-4">
+              {scheduleConflicts.map((conflict, idx) => (
                 <div 
                   key={conflict.id}
-                  className={`rounded-lg border p-4 transition-all hover:scale-[1.01] ${
+                  className={`rounded-xl border p-4 ${
                     conflict.severity === 'high' 
-                      ? 'bg-red-900/10 border-red-800/50' 
+                      ? 'bg-red-500/10 border-red-500/20' 
                       : conflict.severity === 'medium'
-                      ? 'bg-amber-900/10 border-amber-800/50'
-                      : 'bg-gray-800/30 border-gray-700'
+                        ? 'bg-amber-500/10 border-amber-500/20'
+                        : 'bg-gray-500/10 border-gray-500/20'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-4">
                     <div className={`p-2 rounded-lg ${
                       conflict.severity === 'high' 
                         ? 'bg-red-500/20' 
                         : conflict.severity === 'medium'
-                        ? 'bg-amber-500/20'
-                        : 'bg-gray-500/20'
+                          ? 'bg-amber-500/20'
+                          : 'bg-gray-500/20'
                     }`}>
-                      {conflict.type === 'overload' && <Clock className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
-                      {conflict.type === 'light' && <Clock className="w-4 h-4 text-gray-400" />}
-                      {conflict.type === 'night_consecutive' && <Moon className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
-                      {conflict.type === 'location_change' && <MapPin className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
-                      {conflict.type === 'scene_overload' && <Film className={`w-4 h-4 ${conflict.severity === 'high' ? 'text-red-400' : 'text-amber-400'}`} />}
+                      <AlertTriangle className={`w-5 h-5 ${
+                        conflict.severity === 'high' 
+                          ? 'text-red-400' 
+                          : conflict.severity === 'medium'
+                            ? 'text-amber-400'
+                            : 'text-gray-400'
+                      }`} />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-white">{conflict.title}</h4>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium uppercase ${
                           conflict.severity === 'high' 
                             ? 'bg-red-500/20 text-red-400' 
                             : conflict.severity === 'medium'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-gray-500/20 text-gray-400'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-gray-500/20 text-gray-400'
                         }`}>
                           {conflict.severity}
                         </span>
+                        <span className="text-xs text-gray-500">Day {conflict.dayNumber}</span>
                       </div>
-                      <p className="text-sm text-gray-400">{conflict.description}</p>
-                      {conflict.dayDate && (
-                        <p className="text-xs text-gray-500 mt-2">
-                          {new Date(conflict.dayDate).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </p>
-                      )}
+                      <h4 className="text-white font-medium mb-1">{conflict.title}</h4>
+                      <p className="text-sm text-gray-400 mb-2">{conflict.description}</p>
+                      <div className="bg-gray-800/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 mb-1">Recommendation:</p>
+                        <p className="text-sm text-gray-300">{conflict.recommendation}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Legend */}
-          {conflicts.length > 0 && (
-            <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-300 mb-3">Conflict Types</h4>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-red-400" />
-                  <span className="text-gray-400">Overload (&gt;10h)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-400">Light (&lt;6h)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Moon className="w-4 h-4 text-amber-400" />
-                  <span className="text-gray-400">3+ Night Shoots</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-amber-400" />
-                  <span className="text-gray-400">3+ Locations/Day</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Film className="w-4 h-4 text-amber-400" />
-                  <span className="text-gray-400">5+ Scenes/Day</span>
-                </div>
-              </div>
             </div>
           )}
         </div>

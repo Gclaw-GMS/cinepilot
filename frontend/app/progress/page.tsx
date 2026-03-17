@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
-  Target, Calendar, CheckCircle, CheckCircle2, Clock, AlertTriangle,
+  Target, Calendar, CheckCircle2, Clock, AlertTriangle,
   ChevronRight, Plus, RefreshCw, Loader2, GripVertical,
   MoreHorizontal, Edit2, Trash2, BarChart3, PieChart as PieChartIcon,
   TrendingUp, Activity, Search, X, Keyboard, Download, Printer, Filter
@@ -90,7 +90,7 @@ export default function ProgressPage() {
   const [initializing, setInitializing] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'timeline' | 'kanban' | 'tasks' | 'analytics'>('timeline')
+  const [viewMode, setViewMode] = useState<'timeline' | 'kanban' | 'tasks'>('timeline')
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [showHelp, setShowHelp] = useState(false)
@@ -484,10 +484,6 @@ export default function ProgressPage() {
           e.preventDefault()
           setViewMode('kanban')
           break
-        case '4':
-          e.preventDefault()
-          setViewMode('analytics')
-          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -753,7 +749,7 @@ export default function ProgressPage() {
           </div>
           {/* View Toggle */}
           <div className="flex bg-slate-800 rounded-lg p-1">
-            {(['timeline', 'tasks', 'kanban', 'analytics'] as const).map((mode, idx) => (
+            {(['timeline', 'tasks', 'kanban'] as const).map((mode, idx) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -1361,187 +1357,6 @@ export default function ProgressPage() {
                   </div>
                 )
               })}
-            </div>
-          )}
-
-          {/* Analytics View */}
-          {viewMode === 'analytics' && (
-            <div className="space-y-6">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-4 gap-4">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Target className="w-5 h-5 text-cyan-400" />
-                    <span className="text-sm text-slate-400">Overall Progress</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white">{progress?.overall || 0}%</div>
-                  <div className="w-full bg-slate-700 rounded-full h-2 mt-3">
-                    <div className="bg-cyan-400 h-2 rounded-full" style={{ width: `${progress?.overall || 0}%` }} />
-                  </div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <CheckCircle className="w-5 h-5 text-emerald-400" />
-                    <span className="text-sm text-slate-400">Completed Tasks</span>
-                  </div>
-                  <div className="text-3xl font-bold text-emerald-400">
-                    {progress?.tasks?.filter(t => t.status === 'completed').length || 0}
-                  </div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Clock className="w-5 h-5 text-amber-400" />
-                    <span className="text-sm text-slate-400">In Progress</span>
-                  </div>
-                  <div className="text-3xl font-bold text-amber-400">
-                    {progress?.tasks?.filter(t => t.status === 'in_progress').length || 0}
-                  </div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                    <span className="text-sm text-slate-400">Blocked</span>
-                  </div>
-                  <div className="text-3xl font-bold text-red-400">
-                    {progress?.tasks?.filter(t => t.status === 'blocked').length || 0}
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts Row */}
-              <div className="grid grid-cols-2 gap-6">
-                {/* Task Status Distribution */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <PieChart className="w-5 h-5 text-cyan-400" />
-                    Task Status Distribution
-                  </h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Completed', value: progress?.tasks?.filter(t => t.status === 'completed').length || 0, color: '#10b981' },
-                            { name: 'In Progress', value: progress?.tasks?.filter(t => t.status === 'in_progress').length || 0, color: '#3b82f6' },
-                            { name: 'Pending', value: progress?.tasks?.filter(t => t.status === 'pending').length || 0, color: '#64748b' },
-                            { name: 'Blocked', value: progress?.tasks?.filter(t => t.status === 'blocked').length || 0, color: '#ef4444' },
-                          ].filter(d => d.value > 0)}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {[
-                            { name: 'Completed', value: progress?.tasks?.filter(t => t.status === 'completed').length || 0, color: '#10b981' },
-                            { name: 'In Progress', value: progress?.tasks?.filter(t => t.status === 'in_progress').length || 0, color: '#3b82f6' },
-                            { name: 'Pending', value: progress?.tasks?.filter(t => t.status === 'pending').length || 0, color: '#64748b' },
-                            { name: 'Blocked', value: progress?.tasks?.filter(t => t.status === 'blocked').length || 0, color: '#ef4444' },
-                          ].filter(d => d.value > 0).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                          itemStyle={{ color: '#e2e8f0' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Priority Distribution */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-cyan-400" />
-                    Priority Distribution
-                  </h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={[
-                          { name: 'Critical', value: progress?.tasks?.filter(t => t.priority === 'critical').length || 0, fill: '#ef4444' },
-                          { name: 'High', value: progress?.tasks?.filter(t => t.priority === 'high').length || 0, fill: '#f59e0b' },
-                          { name: 'Medium', value: progress?.tasks?.filter(t => t.priority === 'medium').length || 0, fill: '#eab308' },
-                          { name: 'Low', value: progress?.tasks?.filter(t => t.priority === 'low').length || 0, fill: '#64748b' },
-                        ]}
-                        layout="vertical"
-                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                      >
-                        <XAxis type="number" stroke="#64748b" />
-                        <YAxis dataKey="name" type="category" stroke="#64748b" />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                          itemStyle={{ color: '#e2e8f0' }}
-                        />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* Phase Progress */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-cyan-400" />
-                  Phase Progress
-                </h3>
-                <div className="space-y-4">
-                  {progress?.phases?.map((phase) => (
-                    <div key={phase.name} className="flex items-center gap-4">
-                      <div className="w-32 font-medium text-slate-300">{phase.displayName}</div>
-                      <div className="flex-1 bg-slate-700 rounded-full h-3">
-                        <div
-                          className={`h-3 rounded-full ${
-                            phase.name === 'pre_production' ? 'bg-blue-500' :
-                            phase.name === 'production' ? 'bg-orange-500' :
-                            'bg-purple-500'
-                          }`}
-                          style={{ width: `${phase.progress}%` }}
-                        />
-                      </div>
-                      <div className="w-16 text-right text-slate-400">{phase.progress}%</div>
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        phase.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
-                        phase.status === 'in_progress' ? 'bg-cyan-500/20 text-cyan-400' :
-                        'bg-slate-500/20 text-slate-400'
-                      }`}>
-                        {phase.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Upcoming Deadlines */}
-              {progress?.upcoming_deadlines && progress.upcoming_deadlines.length > 0 && (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-cyan-400" />
-                    Upcoming Deadlines
-                  </h3>
-                  <div className="space-y-3">
-                    {progress.upcoming_deadlines.map((deadline, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                        <div>
-                          <div className="font-medium text-white">{deadline.task}</div>
-                          <div className="text-sm text-slate-400">{deadline.date}</div>
-                        </div>
-                        <span className={`text-sm font-medium px-3 py-1 rounded-full ${
-                          deadline.days_left <= 3 ? 'bg-red-500/20 text-red-400' :
-                          deadline.days_left <= 7 ? 'bg-amber-500/20 text-amber-400' :
-                          'bg-cyan-500/20 text-cyan-400'
-                        }`}>
-                          {deadline.days_left} days left
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </>

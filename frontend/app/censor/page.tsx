@@ -24,10 +24,12 @@ import {
   Search,
   Keyboard,
   FileJson,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PieChart,
+  BarChart3
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell, PieChart as RePieChart, Pie
 } from 'recharts'
 
 interface CensorSceneFlag {
@@ -169,6 +171,9 @@ export default function CensorPage() {
   const [sortBy, setSortBy] = useState<'scene' | 'category' | 'severity'>('severity')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   
+  // View mode state - press 1, 2, 3, 4 to switch views
+  const [viewMode, setViewMode] = useState<'summary' | 'flags' | 'suggestions' | 'analytics'>('summary')
+  
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -190,6 +195,7 @@ export default function CensorPage() {
   const showExportDropdownRef = useRef(showExportDropdown)
   const handlePrintRef = useRef<() => void>(() => {})
   const sortOrderRef = useRef(sortOrder)
+  const viewModeRef = useRef(viewMode)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -203,6 +209,22 @@ export default function CensorPage() {
         case 'r':
           e.preventDefault()
           fetchDataRef.current?.()
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('summary')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('flags')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('suggestions')
+          break
+        case '4':
+          e.preventDefault()
+          setViewMode('analytics')
           break
         case '/':
           e.preventDefault()
@@ -240,6 +262,7 @@ export default function CensorPage() {
           setFilterSeverity('all')
           setSortBy('severity')
           setSortOrder('desc')
+          setViewMode('summary')
           break
       }
     }
@@ -264,6 +287,10 @@ export default function CensorPage() {
   useEffect(() => {
     sortOrderRef.current = sortOrder
   }, [sortOrder])
+
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Click outside handlers
   useEffect(() => {
@@ -871,8 +898,68 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
         </div>
       )}
 
-      {/* Main Certificate Display */}
-      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
+      {/* View Mode Tabs */}
+      <div className="flex items-center gap-2 bg-gray-800/50 p-1 rounded-xl border border-gray-700/50 w-fit">
+        <button
+          onClick={() => setViewMode('summary')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'summary' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Summary
+          <span className="ml-1 text-xs opacity-70">(1)</span>
+        </button>
+        <button
+          onClick={() => setViewMode('flags')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'flags' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" />
+          Scene Flags
+          <span className="ml-1 px-1.5 py-0.5 bg-gray-700 text-white text-xs rounded">
+            {analysis?.sceneFlags?.length || 0}
+          </span>
+          <span className="text-xs opacity-70">(2)</span>
+        </button>
+        <button
+          onClick={() => setViewMode('suggestions')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'suggestions' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <Lightbulb className="w-4 h-4" />
+          Suggestions
+          <span className="ml-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded">
+            {analysis?.suggestions?.length || 0}
+          </span>
+          <span className="text-xs opacity-70">(3)</span>
+        </button>
+        <button
+          onClick={() => setViewMode('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'analytics' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Analytics
+          <span className="text-xs opacity-70">(4)</span>
+        </button>
+      </div>
+
+      {/* Summary & Analytics View - Certificate Display */}
+      {(viewMode === 'summary' || viewMode === 'analytics') && (
+        <>
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className={`px-8 py-6 rounded-2xl border-2 ${certInfo.bg} text-center`}>
@@ -1018,9 +1105,12 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
           </div>
         </div>
       </div>
+        </>
+      )}
 
-      {/* Scene Flags Detail */}
-      <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+      {/* Scene Flags Detail - Only in flags view */}
+      {viewMode === 'flags' && (
+        <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <Eye className="w-5 h-5 text-amber-400" />
@@ -1097,9 +1187,10 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
           </div>
         )}
       </div>
+      )}
 
-      {/* Suggestions */}
-      {analysis?.suggestions && analysis.suggestions.length > 0 && (
+      {/* Suggestions - Only in suggestions view */}
+      {viewMode === 'suggestions' && analysis?.suggestions && analysis.suggestions.length > 0 && (
         <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Lightbulb className="w-5 h-5 text-amber-400" />
@@ -1117,6 +1208,105 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                 <p className="text-xs text-gray-500"><strong>Why:</strong> {suggestion.why}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Analytics View - Detailed Charts */}
+      {viewMode === 'analytics' && (
+        <div className="space-y-6">
+          {/* Analytics Header */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-cyan-400" />
+              Censor Analytics Dashboard
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Detailed breakdown of content sensitivity, risk factors, and certification metrics
+            </p>
+          </div>
+
+          {/* Category Breakdown Chart */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-cyan-400" />
+              Risk by Category
+            </h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categoryData.length > 0 ? categoryData : riskData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={true} vertical={false} />
+                  <XAxis type="number" stroke="#6b7280" fontSize={11} />
+                  <YAxis type="category" dataKey="name" stroke="#6b7280" fontSize={12} width={80} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    labelStyle={{ color: '#fff' }}
+                  />
+                  <Bar dataKey="count" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Severity Distribution */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              Severity Distribution
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-red-400">
+                  {analysis?.sceneFlags?.filter(f => f.severity >= 7).length || 0}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">Critical (7-10)</div>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-amber-400">
+                  {analysis?.sceneFlags?.filter(f => f.severity >= 4 && f.severity < 7).length || 0}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">Medium (4-6)</div>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-blue-400">
+                  {analysis?.sceneFlags?.filter(f => f.severity < 4).length || 0}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">Low (1-3)</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pie Chart - Flag Categories */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <PieChart className="w-5 h-5 text-purple-400" />
+              Flag Category Distribution
+            </h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={categoryData.length > 0 ? categoryData : riskData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="count"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={true}
+                  >
+                    {(categoryData.length > 0 ? categoryData : riskData).map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={Object.values(CATEGORY_COLORS)[index % Object.keys(CATEGORY_COLORS).length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  />
+                </RePieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
@@ -1158,6 +1348,22 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
               </button>
             </div>
             <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Summary view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Scene Flags view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Suggestions view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Analytics view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">4</kbd>
+              </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Refresh analysis</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>

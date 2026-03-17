@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -77,39 +77,6 @@ export default function DubbingPage() {
   const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   
-  // Budget tracking state
-  const [budgetLimit, setBudgetLimit] = useState<number>(500000)
-  const [costPerLanguage, setCostPerLanguage] = useState<Record<string, number>>({
-    telugu: 75000,
-    hindi: 85000,
-    malayalam: 65000,
-    kannada: 60000,
-    english: 100000,
-  })
-  
-  // Budget calculations
-  const budgetCalculations = useMemo(() => {
-    const totalEstimated = dubbedVersions.reduce((sum, dub) => {
-      const cost = costPerLanguage[dub.language] || 50000
-      return sum + cost
-    }, 0)
-    
-    const budgetUsedPercent = budgetLimit > 0 ? (totalEstimated / budgetLimit) * 100 : 0
-    const budgetRemaining = budgetLimit - totalEstimated
-    const isOverBudget = totalEstimated > budgetLimit
-    const isWarning = !isOverBudget && budgetUsedPercent >= 80
-    const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
-    
-    return {
-      totalEstimated,
-      budgetUsedPercent,
-      budgetRemaining,
-      isOverBudget,
-      isWarning,
-      budgetStatus,
-    }
-  }, [dubbedVersions, budgetLimit, costPerLanguage])
-  
   // Computed filtered and sorted versions
   const filteredVersions = useMemo(() => {
     let result = dubbedVersions
@@ -148,6 +115,7 @@ export default function DubbingPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const printDubbingReportRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -178,16 +146,16 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
           break
-        case 'm':
-          e.preventDefault()
-          if (dubbedVersions.length > 0) {
-            handleExportMarkdownRef.current?.()
-          }
-          break
         case 'p':
           e.preventDefault()
           if (dubbedVersions.length > 0) {
             printDubbingReportRef.current?.()
+          }
+          break
+        case 'm':
+          e.preventDefault()
+          if (dubbedVersions.length > 0) {
+            handleExportMarkdownRef.current?.()
           }
           break
         case '?':
@@ -346,87 +314,81 @@ export default function DubbingPage() {
     setShowExportMenu(false)
   }
 
-  // Markdown export ref for keyboard shortcut
-  const handleExportMarkdownRef = useRef<() => void>(() => {})
-  
+  // Markdown Export function
   const handleExportMarkdown = useCallback(() => {
     const dataToExport = filteredVersions.length > 0 ? filteredVersions : dubbedVersions
+    
+    if (dataToExport.length === 0) {
+      setError('No dubbed versions to export')
+      return
+    }
     
     const languageLabels: Record<string, string> = {
       telugu: 'Telugu',
       hindi: 'Hindi',
       malayalam: 'Malayalam',
       kannada: 'Kannada',
-      english: 'English',
+      english: 'English'
     }
     
-    // Build markdown content
-    let markdown = `# CinePilot Dubbing Report
-
-> Generated: ${new Date().toLocaleString()}
-
-## Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Dubbed Versions | ${dataToExport.length} |
-| Preview Scenes | ${preview.length} |
-| Languages | ${new Set(dataToExport.map(d => d.language)).size} |
-
-`
+    // Calculate stats
+    const languages = [...new Set(dataToExport.map(d => d.language))]
+    const byLanguage = languages.map(lang => ({
+      language: lang,
+      label: languageLabels[lang] || lang,
+      count: dataToExport.filter(d => d.language === lang).length
+    }))
     
-    // Add filter info if applied
-    if (languageFilter !== 'all' || sortBy !== 'date') {
-      markdown += `> *Showing filtered/sorted data*\n\n`
+    // Build markdown
+    let md = `# CinePilot - Dubbed Scripts Report\n\n`
+    md += `**Generated:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+    
+    // Summary stats
+    md += `## Summary\n\n`
+    md += `- **Total Dubbed Versions:** ${dataToExport.length}\n`
+    md += `- **Languages:** ${languages.length}\n`
+    md += `- **Preview Scenes:** ${preview.length}\n`
+    if (languageFilter !== 'all') {
+      md += `- **Filter Applied:** ${languageLabels[languageFilter] || languageFilter}\n`
     }
+    
+    // By Language breakdown
+    md += `\n## By Language\n\n`
+    md += `| Language | Versions |\n|----------|----------|\n`
+    byLanguage.forEach(item => {
+      md += `| ${item.label} | ${item.count} |\n`
+    })
     
     // Dubbed versions table
-    if (dataToExport.length > 0) {
-      markdown += `## Dubbed Versions\n\n`
-      markdown += `| # | Title | Language | Created |\n`
-      markdown += `|---|-------|----------|--------|\n`
-      
-      dataToExport.forEach((dub, i) => {
-        const langLabel = languageLabels[dub.language] || dub.language
-        const date = new Date(dub.createdAt).toLocaleDateString()
-        markdown += `| ${i + 1} | ${dub.title} | ${langLabel} | ${date} |\n`
-      })
-      markdown += `\n`
-    }
+    md += `\n## Dubbed Versions\n\n`
+    md += `| # | Title | Language | Created |\n`
+    md += `|---|-------|----------|--------|\n`
+    dataToExport.forEach((d, idx) => {
+      md += `| ${idx + 1} | ${d.title} | ${languageLabels[d.language] || d.language} | ${new Date(d.createdAt).toLocaleDateString()} |\n`
+    })
     
-    // Translation preview
+    // Preview scenes (if any)
     if (preview.length > 0) {
-      markdown += `## Translation Preview\n\n`
-      
-      preview.forEach(p => {
-        markdown += `### Scene ${p.sceneNumber}\n\n`
-        markdown += `\`\`\`\n${p.translatedDialogue}\n\`\`\`\n\n`
-        if (p.notes) {
-          markdown += `> **Note:** ${p.notes}\n\n`
+      md += `\n## Preview Scenes\n\n`
+      preview.forEach(scene => {
+        md += `### Scene ${scene.sceneNumber}\n\n`
+        md += `\`\`\`\n${scene.translatedDialogue}\n\`\`\`\n`
+        if (scene.notes) {
+          md += `*Note: ${scene.notes}*\n`
         }
+        md += `\n`
       })
     }
     
-    // Budget summary if available
-    if (budgetCalculations.totalEstimated > 0) {
-      markdown += `## Budget Summary\n\n`
-      markdown += `| Metric | Amount |\n`
-      markdown += `|--------|--------|\n`
-      markdown += `| Total Estimated Cost | ₹${budgetCalculations.totalEstimated.toLocaleString('en-IN')} |\n`
-      markdown += `| Budget Limit | ₹${budgetLimit.toLocaleString('en-IN')} |\n`
-      markdown += `| Remaining | ₹${budgetCalculations.budgetRemaining.toLocaleString('en-IN')} |\n`
-      markdown += `| Usage | ${budgetCalculations.budgetUsedPercent.toFixed(1)}% |\n`
-    }
-    
-    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const blob = new Blob([md], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `dubbing-report-${new Date().toISOString().split('T')[0]}.md`
+    a.download = `dubbed-scripts-${new Date().toISOString().split('T')[0]}.md`
     a.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
-  }, [filteredVersions, dubbedVersions, preview, languageFilter, sortBy, budgetCalculations, budgetLimit])
+  }, [filteredVersions, dubbedVersions, preview, languageFilter])
 
   // Print function
   const printDubbingReport = useCallback(() => {
@@ -779,8 +741,15 @@ export default function DubbingPage() {
                     Export CSV
                   </button>
                   <button
-                    onClick={handleExportMarkdown}
+                    onClick={handleExportJSON}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export JSON
+                  </button>
+                  <button
+                    onClick={handleExportMarkdown}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-400 hover:bg-slate-700 transition-colors"
                   >
                     <FileText className="w-4 h-4" />
                     Export Markdown
@@ -868,129 +837,6 @@ export default function DubbingPage() {
               <span className="text-sm text-slate-400">Preview Scenes</span>
             </div>
             <p className="text-2xl font-semibold text-white">{preview.length}</p>
-          </div>
-        </div>
-
-        {/* Budget Tracking Card */}
-        <div className={`bg-slate-900 border rounded-xl p-6 ${
-          budgetCalculations.budgetStatus === 'over' ? 'border-red-500/50' :
-          budgetCalculations.budgetStatus === 'warning' ? 'border-amber-500/50' :
-          'border-slate-800'
-        }`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-              Dubbing Budget Tracking
-            </h3>
-            <div className="flex items-center gap-2">
-              {budgetCalculations.budgetStatus === 'over' && (
-                <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
-                  <AlertCircle className="w-3 h-3" /> Over Budget
-                </span>
-              )}
-              {budgetCalculations.budgetStatus === 'warning' && (
-                <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full">
-                  <AlertTriangle className="w-3 h-3" /> Warning
-                </span>
-              )}
-              {budgetCalculations.budgetStatus === 'ok' && (
-                <span className="flex items-center gap-1 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full">
-                  <CheckCircle className="w-3 h-3" /> On Track
-                </span>
-              )}
-            </div>
-          </div>
-          
-          {/* Budget Input */}
-          <div className="flex items-center gap-4 mb-4">
-            <label className="text-sm text-slate-400">Budget Limit (₹):</label>
-            <input
-              type="number"
-              value={budgetLimit}
-              onChange={(e) => setBudgetLimit(Math.max(0, parseInt(e.target.value) || 0))}
-              className={`bg-slate-950 border rounded-lg px-3 py-2 text-white text-sm w-40 focus:outline-none focus:border-indigo-500 ${
-                budgetCalculations.budgetStatus === 'over' ? 'border-red-500/50' :
-                budgetCalculations.budgetStatus === 'warning' ? 'border-amber-500/50' :
-                'border-slate-700'
-              }`}
-              placeholder="500000"
-            />
-            <span className="text-xs text-slate-500">
-              Default: ₹5,00,000
-            </span>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-slate-400">Budget Used</span>
-              <span className={
-                budgetCalculations.budgetStatus === 'over' ? 'text-red-400' :
-                budgetCalculations.budgetStatus === 'warning' ? 'text-amber-400' :
-                'text-emerald-400'
-              }>
-                {budgetCalculations.budgetUsedPercent.toFixed(1)}%
-              </span>
-            </div>
-            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-500 ${
-                  budgetCalculations.budgetStatus === 'over' ? 'bg-gradient-to-r from-red-600 to-red-500' :
-                  budgetCalculations.budgetStatus === 'warning' ? 'bg-gradient-to-r from-amber-600 to-amber-500' :
-                  'bg-gradient-to-r from-emerald-600 to-emerald-500'
-                }`}
-                style={{ width: `${Math.min(100, budgetCalculations.budgetUsedPercent)}%` }}
-              />
-            </div>
-          </div>
-          
-          {/* Budget Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-              <p className="text-xs text-slate-500 mb-1">Estimated Total</p>
-              <p className="text-lg font-semibold text-white">₹{budgetCalculations.totalEstimated.toLocaleString('en-IN')}</p>
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-              <p className="text-xs text-slate-500 mb-1">Budget Limit</p>
-              <p className="text-lg font-semibold text-white">₹{budgetLimit.toLocaleString('en-IN')}</p>
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-              <p className="text-xs text-slate-500 mb-1">
-                {budgetCalculations.budgetRemaining >= 0 ? 'Remaining' : 'Over Budget'}
-              </p>
-              <p className={`text-lg font-semibold ${
-                budgetCalculations.budgetRemaining >= 0 ? 'text-emerald-400' : 'text-red-400'
-              }`}>
-                ₹{Math.abs(budgetCalculations.budgetRemaining).toLocaleString('en-IN')}
-                {budgetCalculations.budgetRemaining < 0 && ' (Over)'}
-              </p>
-            </div>
-          </div>
-          
-          {/* Status Message */}
-          <div className={`mt-4 p-3 rounded-lg text-sm ${
-            budgetCalculations.budgetStatus === 'over' ? 'bg-red-500/10 text-red-400' :
-            budgetCalculations.budgetStatus === 'warning' ? 'bg-amber-500/10 text-amber-400' :
-            'bg-emerald-500/10 text-emerald-400'
-          }`}>
-            {budgetCalculations.budgetStatus === 'over' && (
-              <span className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                Budget exceeded by ₹{Math.abs(budgetCalculations.budgetRemaining).toLocaleString('en-IN')}. Consider reducing dubbing scope or increasing budget.
-              </span>
-            )}
-            {budgetCalculations.budgetStatus === 'warning' && (
-              <span className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Approaching budget limit ({budgetCalculations.budgetUsedPercent.toFixed(1)}% used). {dubbedVersions.length} language{dubbedVersions.length !== 1 ? 's' : ''} currently in progress.
-              </span>
-            )}
-            {budgetCalculations.budgetStatus === 'ok' && (
-              <span className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                Budget is on track. ₹{budgetCalculations.budgetRemaining.toLocaleString('en-IN')} remaining for {TARGET_LANGUAGES.length - dubbedVersions.length} additional language{dubbedVersions.length !== TARGET_LANGUAGES.length - 1 ? 's' : ''}.
-              </span>
-            )}
           </div>
         </div>
 
@@ -1239,8 +1085,8 @@ export default function DubbingPage() {
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                  <span className="text-slate-300">Export Markdown</span>
-                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
+                  <span className="text-cyan-400">Export Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">M</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Print report</span>

@@ -136,6 +136,7 @@ export default function ShotHubPage() {
   const handleGenerateAllRef = useRef<() => Promise<void>>()
   const handleSaveShotsRef = useRef<() => Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
   const printingRef = useRef(printing)
 
   const fetchScriptId = useCallback(async () => {
@@ -224,6 +225,12 @@ export default function ShotHubPage() {
           e.preventDefault()
           if (shots.length > 0) {
             setShowExportMenu(prev => !prev)
+          }
+          break
+        case 'm':
+          e.preventDefault()
+          if (shots.length > 0 && filteredShots.length > 0) {
+            handleExportMarkdownRef.current?.()
           }
           break
         case '?':
@@ -422,6 +429,127 @@ export default function ShotHubPage() {
     setTimeout(() => setSaveMessage(null), 3000)
   }
 
+  // Export to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    // Compute filtered shots locally (same logic as filteredShots useMemo)
+    const activeSceneShots = selectedSceneId
+      ? shots.filter(s => s.scene.id === selectedSceneId)
+      : shots
+    
+    const locallyFiltered = activeSceneShots.filter(shot => {
+      if (filters.sceneId !== 'all' && shot.scene.id !== filters.sceneId) return false
+      if (filters.shotSize !== 'all' && shot.shotSize !== filters.shotSize) return false
+      if (filters.cameraAngle !== 'all' && shot.cameraAngle !== filters.cameraAngle) return false
+      if (filters.cameraMovement !== 'all' && shot.cameraMovement !== filters.cameraMovement) return false
+      return true
+    })
+
+    if (!locallyFiltered.length) return
+    setExporting(true)
+    setShowExportMenu(false)
+
+    const totalDuration = locallyFiltered.reduce((sum, s) => sum + (s.durationEstSec || 0), 0)
+    const avgConfidence = locallyFiltered.length > 0
+      ? locallyFiltered.reduce((sum, s) => {
+          const conf = ((s.confidenceCamera || 0) + (s.confidenceLens || 0) + (s.confidenceLight || 0) + (s.confidenceDuration || 0)) / 4
+          return sum + conf
+        }, 0) / locallyFiltered.length
+      : 0
+
+    const scenesBreakdown = locallyFiltered.reduce((acc, shot) => {
+      const sceneNum = shot.scene.sceneNumber || 'Unknown'
+      if (!acc[sceneNum]) acc[sceneNum] = { count: 0, shots: [] }
+      acc[sceneNum].count++
+      acc[sceneNum].shots.push(shot.shotIndex)
+      return acc
+    }, {} as Record<string, { count: number, shots: number[] }>)
+
+    const shotSizeBreakdown = locallyFiltered.reduce((acc, shot) => {
+      const size = shot.shotSize || 'Unspecified'
+      acc[size] = (acc[size] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const cameraMovementBreakdown = locallyFiltered.reduce((acc, shot) => {
+      const movement = shot.cameraMovement || 'Unspecified'
+      acc[movement] = (acc[movement] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const formatDuration = (sec: number) => {
+      const m = Math.floor(sec / 60)
+      const s = Math.round(sec % 60)
+      return m > 0 ? `${m}m ${s}s` : `${s}s`
+    }
+
+    let markdown = `# Shot List Report - CinePilot
+
+> Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Shots | ${locallyFiltered.length} |
+| Total Scenes | ${Object.keys(scenesBreakdown).length} |
+| Total Duration | ${formatDuration(totalDuration)} |
+| Avg Confidence | ${(avgConfidence * 100).toFixed(1)}% |
+| Locked Shots | ${locallyFiltered.filter(s => s.isLocked).length} |
+
+## Filters Applied
+
+- **Scene Filter:** ${filters.sceneId === 'all' ? 'All Scenes' : scenes.find(s => s.id === filters.sceneId)?.sceneNumber || filters.sceneId}
+- **Shot Size:** ${filters.shotSize === 'all' ? 'All' : filters.shotSize}
+- **Camera Angle:** ${filters.cameraAngle === 'all' ? 'All' : filters.cameraAngle}
+- **Camera Movement:** ${filters.cameraMovement === 'all' ? 'All' : filters.cameraMovement}
+- **Sort By:** ${sortBy} (${sortOrder})
+
+## Shot Size Breakdown
+
+| Shot Size | Count |
+|-----------|-------|
+${Object.entries(shotSizeBreakdown).map(([size, count]) => `| ${size} | ${count} |`).join('\n')}
+
+## Camera Movement Breakdown
+
+| Movement | Count |
+|---------|-------|
+${Object.entries(cameraMovementBreakdown).map(([movement, count]) => `| ${movement} | ${count} |`).join('\n')}
+
+## Scenes Overview
+
+| Scene | Shot Count | Shot Numbers |
+|-------|------------|--------------|
+${Object.entries(scenesBreakdown).map(([scene, data]) => `| ${scene} | ${data.count} | ${data.shots.join(', ')} |`).join('\n')}
+
+## Detailed Shot List
+
+| # | Scene | Shot Size | Angle | Movement | Duration | Confidence | Locked |
+|---|-------|-----------|-------|----------|----------|-------------|--------|
+${locallyFiltered.map(shot => {
+  const confidence = ((shot.confidenceCamera || 0) + (shot.confidenceLens || 0) + (shot.confidenceLight || 0) + (shot.confidenceDuration || 0)) / 4
+  return `| ${shot.shotIndex} | ${shot.scene.sceneNumber || '-'} | ${shot.shotSize || '-'} | ${shot.cameraAngle || '-'} | ${shot.cameraMovement || '-'} | ${shot.durationEstSec ? formatDuration(shot.durationEstSec) : '-'} | ${(confidence * 100).toFixed(0)}% | ${shot.isLocked ? '🔒' : '🔓'} |`
+}).join('\n')}
+
+---
+
+*Report generated by CinePilot - Film Production Management*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const downloadUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = `shot-list-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(downloadUrl)
+    setSaveMessage({ type: 'success', text: `Exported ${locallyFiltered.length} shots to Markdown` })
+    setExporting(false)
+    setTimeout(() => setSaveMessage(null), 3000)
+  }, [shots, filters, sortBy, sortOrder, scenes, selectedSceneId])
+
   // Print shot list
   const handlePrint = useCallback(() => {
     if (!shots.length) return
@@ -548,6 +676,11 @@ export default function ShotHubPage() {
   useEffect(() => {
     handlePrintRef.current = handlePrint
   }, [handlePrint])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   useEffect(() => {
     printingRef.current = printing
@@ -763,7 +896,7 @@ export default function ShotHubPage() {
               <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-36 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+              <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
                 <button
                   onClick={() => { handleExportShots('csv'); setShowExportMenu(false) }}
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
@@ -775,6 +908,12 @@ export default function ShotHubPage() {
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
                 >
                   Export JSON
+                </button>
+                <button
+                  onClick={() => { handleExportMarkdown(); setShowExportMenu(false) }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700 text-cyan-400"
+                >
+                  Export Markdown
                 </button>
               </div>
             )}
@@ -1247,6 +1386,10 @@ export default function ShotHubPage() {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">M</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Print shot list</span>

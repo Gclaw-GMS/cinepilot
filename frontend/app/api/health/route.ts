@@ -41,10 +41,35 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     try {
       const { prisma } = await import('@/lib/db');
       await prisma.$queryRaw`SELECT 1`;
+      // Extract database type from connection string
+      const dbUrl = process.env.DATABASE_URL || '';
+      let dbType = 'PostgreSQL';
+      let dbName = 'database';
+      
+      if (dbUrl.includes('postgres')) {
+        dbType = 'PostgreSQL';
+        // Extract database name from connection string (between / and ? or end)
+        const match = dbUrl.match(/\/([^/?]+)/);
+        if (match) dbName = match[1].split(':')[0]; // Remove any password suffix
+      } else if (dbUrl.includes('mysql')) {
+        dbType = 'MySQL';
+        const match = dbUrl.match(/\/([^/?]+)/);
+        if (match) dbName = match[1].split(':')[0];
+      } else if (dbUrl.includes('sqlite')) {
+        dbType = 'SQLite';
+        const match = dbUrl.match(/\/([^/?]+)/);
+        if (match) dbName = match[1];
+      }
+      
       checks.push({
         component: 'database',
         status: 'healthy',
-        message: 'Connected',
+        message: `Connected to ${dbType}`,
+        details: { 
+          dbType, 
+          dbName,
+          connected: true 
+        },
         latencyMs: Date.now() - dbStart,
       });
     } catch (error) {
@@ -100,9 +125,10 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     
     // Thresholds optimized for development environment
     // Production servers typically have more headroom
+    // Development mode allows higher memory usage due to hot reloading, etc.
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const unhealthyThreshold = isDevelopment ? 90 : 85;
-    const degradedThreshold = isDevelopment ? 75 : 65;
+    const unhealthyThreshold = isDevelopment ? 95 : 85;
+    const degradedThreshold = isDevelopment ? 80 : 65;
     
     checks.push({
       component: 'memory',

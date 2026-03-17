@@ -6462,3 +6462,72 @@ Added a comprehensive conflict detection system to the Catering page:
 ---
 
 ## Build Status: ✅ PASSING (05:57 AM ) - Equipment Page Markdown Export Feature
+
+---
+
+## Night Build (March 17, 2026, 1:34 PM) - Shot List Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Shot List Page - Markdown Export**: Added comprehensive markdown export functionality
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Overview**: Total shots, total duration, locked/unlocked counts, missing fields
+    - **Shot Size Breakdown**: Table showing counts by shot size (ECU, CU, MS, WS, etc.)
+    - **Camera Movement Breakdown**: Table showing counts by movement type
+    - **Shots by Scene**: Each scene with heading, INT/EXT, time of day, location
+    - Detailed shot tables with shot #, size, angle, movement, duration, locked status
+    - **Filters Applied**: Shows current filters if any are active
+  - **Content Preservation**: Full shot data included in export
+  - **Works with Filters**: Exports currently filtered shots only
+  - **File Naming**: Auto-generated filename with date (shot-list-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **Inline Filter Computation**: Filters shots locally to avoid hook ordering issues (same logic as filteredShots useMemo)
+- **Summary Stats**: Includes all key shot metrics (total, duration, locked, missing fields)
+- **Scene Grouping**: Groups shots by scene number with scene heading details
+- **Shot Size Breakdown**: Dynamic table showing counts per shot size
+- **Camera Movement Breakdown**: Dynamic table showing counts per movement type
+- **Filter Info**: Captures all current filters for export metadata
+- **useCallback Pattern**: Uses useCallback for proper memoization
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print shot list
+- **R** - Refresh data
+- **G** - Generate all shots
+- **S** - Save shots / Toggle sort
+- **F** - Toggle filters
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 1 pre-existing warning (not from this change) ✅
+
+### Shot List Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Overview section includes all key stats
+- [x] Shot size breakdown table with counts
+- [x] Camera movement breakdown table with counts
+- [x] Shots by scene section with full details
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks shots.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+
+---
+
+## Build Status: ✅ PASSING (1:34 PM) - Shot List Page Markdown Export

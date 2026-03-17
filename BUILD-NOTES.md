@@ -1,3 +1,44 @@
+# CinePilot Night Build Notes - March 17, 2026
+
+## Build Status: ✅ PASSING (11:34 PM)
+
+### 36. React Lint Warnings Fix (March 17, 2026 11:34 PM)
+Fixed React Hook lint warnings across three pages to ensure clean lint output and proper React patterns:
+
+- **Continuity Page**: 
+  - Removed unnecessary `severityCounts` dependency from useMemo (computed from warnings)
+  - Added missing `showResolved` dependency to filteredWarnings useMemo
+- **Storyboard Page**: 
+  - Added `handleExportMarkdownRef` for proper keyboard shortcut handling
+  - Updated keyboard handler to use ref pattern (consistent with other pages)
+  - Added useEffect to update ref when function changes
+- **Timeline Page**: 
+  - Wrapped `handleExport` in useCallback with proper dependencies
+  - Added missing `isDemoMode` dependency
+
+### Lint Fix Details
+1. **Continuity Page**: Fixed 2 lint warnings (unnecessary dependency + missing dependency)
+2. **Storyboard Page**: Fixed 1 lint warning (missing dependency in useEffect)
+3. **Timeline Page**: Fixed 2 lint warnings (missing useCallback wrapper + missing dependency)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing ✅
+
+### React Lint Fix Checklist
+- [x] Continuity page lint warnings resolved
+- [x] Storyboard page lint warnings resolved
+- [x] Timeline page lint warnings resolved
+- [x] All keyboard shortcuts work correctly via ref pattern
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
 # CinePilot Night Build Notes - March 15, 2026
 
 ## Build Status: ✅ PASSING (11:58 PM)

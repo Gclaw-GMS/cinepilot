@@ -1,6 +1,74 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (10:34 AM) - Reports Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (10:54 AM) - Scripts Page Markdown Export IMPLEMENTED
+
+---
+
+## 10:54 AM - Scripts Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Scripts Page - Markdown Export**: Added ability to export script data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Script Overview**: Title, version, created date, total scenes, characters, locations, props, VFX notes, warnings
+    - **Scene Summary**: Table with INT/EXT and Day/Night counts
+    - **Scenes Detail**: Full table with scene number, type, time, location, characters, props, VFX notes, warnings
+    - **VFX Notes Section**: Table with scene, description, type (if available)
+    - **Warnings Section**: Table with scene, type, description, severity (if available)
+    - **Filters Applied**: Shows current filters (type filter, sort, search)
+  - **Content Preservation**: Full script data included in export
+  - **Works with Filters**: Exports currently filtered scenes only
+  - **File Naming**: Auto-generated filename with date (script-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown wrapped in useCallback
+- **Local Filter Computation**: Filters scenes locally to avoid hook ordering issues
+- **Summary Stats**: Includes all key script metrics (INT/EXT, Day/Night, characters, locations, props)
+- **Emoji Support**: Not used in this export (plain text tables)
+- **Filtered Export**: Uses locally computed filtered scenes for export content
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print script
+- **R** - Refresh scripts
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **1-7** - Switch tabs (Upload/Scenes/Characters/Quality/Warnings/Compare/Analytics)
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 1 pre-existing warning (not from this change) ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Scripts Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Script overview section includes all key stats
+- [x] Scene summary table with INT/EXT and Day/Night counts
+- [x] Scenes detail table with all fields
+- [x] VFX notes section (if available)
+- [x] Warnings section (if available)
+- [x] Filters applied section shows current filters
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks activeScript and scenes)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
 
 ---
 

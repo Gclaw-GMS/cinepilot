@@ -212,6 +212,142 @@ export default function CateringPage() {
     setShowExportMenu(false)
   }
 
+  // Markdown export function
+  const handleExportMarkdown = useCallback(() => {
+    const currentPlan = planRef.current
+    if (!currentPlan) return
+
+    // Apply same filtering as the view
+    let days = currentPlan.shootDays.filter(sd => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const dateMatch = new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).toLowerCase().includes(query)
+        const mealMatch = sd.meals.some(m => 
+          m.menu.some(item => item.toLowerCase().includes(query)) ||
+          m.type.toLowerCase().includes(query) ||
+          m.dietary.some(d => d.toLowerCase().includes(query))
+        )
+        if (!dateMatch && !mealMatch) return false
+      }
+      if (filters.mealType !== 'all') {
+        const hasMealType = sd.meals.some(m => m.type === filters.mealType)
+        if (!hasMealType) return false
+      }
+      if (filters.dietary !== 'all') {
+        const hasDietary = sd.meals.some(m => m.dietary.includes(filters.dietary))
+        if (!hasDietary) return false
+      }
+      return true
+    })
+
+    // Apply sorting
+    days = [...days].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+          break
+        case 'budget':
+          const budgetA = a.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+          const budgetB = b.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+          comparison = budgetA - budgetB
+          break
+        case 'mealType':
+          const typesA = a.meals.map(m => m.type).join(',')
+          const typesB = b.meals.map(m => m.type).join(',')
+          comparison = typesA.localeCompare(typesB)
+          break
+        case 'people':
+          comparison = (a.totalCrew + a.totalCast) - (b.totalCrew + b.totalCast)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+    const totalSpent = days.reduce((sum: number, sd: ShootDayMeal) => 
+      sum + sd.meals.reduce((s: number, m: Meal) => s + (m.actualCost || m.budget), 0), 0)
+
+    const totalBudget = currentPlan.totalBudget
+    const totalMeals = days.reduce((sum: number, sd: ShootDayMeal) => sum + sd.meals.length, 0)
+    const totalPeople = days.reduce((sum: number, sd: ShootDayMeal) => sum + sd.totalCast + sd.totalCrew, 0)
+
+    // Group meals by type
+    const mealsByType = days.flatMap((sd: ShootDayMeal) => sd.meals).reduce((acc: Record<string, number>, meal: Meal) => {
+      acc[meal.type] = (acc[meal.type] || 0) + 1
+      return acc
+    }, {})
+
+    // Group by dietary
+    const dietaryCounts = days.flatMap((sd: ShootDayMeal) => sd.meals).flatMap((m: Meal) => m.dietary).reduce((acc: Record<string, number>, d: string) => {
+      acc[d] = (acc[d] || 0) + 1
+      return acc
+    }, {})
+
+    let markdown = `# 🍽️ CinePilot Catering Report
+
+> Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Budget | ₹${totalBudget.toLocaleString('en-IN')} |
+| Total Spent | ₹${totalSpent.toLocaleString('en-IN')} |
+| Remaining | ₹${(totalBudget - totalSpent).toLocaleString('en-IN')} |
+| Budget Used | ${((totalSpent / totalBudget) * 100).toFixed(1)}% |
+| Shoot Days | ${days.length} |
+| Total Meals | ${totalMeals} |
+| Total People | ${totalPeople} |
+
+## Meals by Type
+
+| Meal Type | Count |
+|-----------|-------|
+${Object.entries(mealsByType).map(([type, count]) => `| ${type.charAt(0).toUpperCase() + type.slice(1)} | ${count} |`).join('\n')}
+
+## Dietary Requirements
+
+| Dietary Option | Count |
+|----------------|-------|
+${Object.entries(dietaryCounts).map(([diet, count]) => `| ${diet} | ${count} |`).join('\n')}
+
+## Meal Schedule
+
+| Date | People | Meals | Budget | Actual |
+|------|--------|-------|--------|--------|
+`
+
+    days.forEach((sd: ShootDayMeal) => {
+      const dateStr = new Date(sd.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+      const people = sd.totalCrew + sd.totalCast
+      const meals = sd.meals.map((m: Meal) => `${m.type}: ${m.menu.slice(0, 2).join(', ')}${m.menu.length > 2 ? '...' : ''}`).join('; ')
+      const budget = sd.meals.reduce((sum: number, m: Meal) => sum + m.budget, 0)
+      const actual = sd.meals.reduce((sum: number, m: Meal) => sum + (m.actualCost || m.budget), 0)
+      markdown += `| ${dateStr} | ${people} | ${meals} | ₹${budget.toLocaleString('en-IN')} | ₹${actual.toLocaleString('en-IN')} |\n`
+    })
+
+    markdown += `
+---
+
+* CinePilot - Film Production Management System *
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `catering-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [searchQuery, filters, sortBy, sortOrder])
+
+  // Ref for markdown export
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
   // Print function
   const handlePrint = () => {
     if (!plan) return
@@ -353,6 +489,10 @@ export default function CateringPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          if (planRef.current) handleExportMarkdownRef.current()
           break
         case 'p':
           e.preventDefault()
@@ -610,6 +750,7 @@ export default function CateringPage() {
               <ShortcutRow keys={['S']} description="Toggle sort order" />
               <ShortcutRow keys={['N']} description="Add new shoot day" />
               <ShortcutRow keys={['E']} description="Export menu" />
+              <ShortcutRow keys={['M']} description="Export Markdown" />
               <ShortcutRow keys={['P']} description="Print catering report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
@@ -776,6 +917,13 @@ export default function CateringPage() {
                     >
                       <FileText className="w-4 h-4 text-slate-400" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={() => { handleExportMarkdown(); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
                     </button>
                   </div>
                 )}

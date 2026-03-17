@@ -159,6 +159,7 @@ export default function BudgetPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleRefreshRef = useRef<() => Promise<void>>()
   const generateRecommendationsRef = useRef<() => void>()
+  const itemsRef = useRef(items)
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -255,6 +256,125 @@ export default function BudgetPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
+
+  // Markdown export function
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleExportMarkdown = useCallback(() => {
+    const sortedItems = sortItems(items)
+    const totalPlanned = items.reduce((s, i) => s + Number(i.total || 0), 0)
+    const totalSpent = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+    const totalVariance = totalPlanned - totalSpent
+
+    // Get unique categories
+    const categories = [...new Set(sortedItems.map(item => item.category))]
+    
+    // Category breakdown
+    const categoryTotals: Record<string, number> = {}
+    sortedItems.forEach(item => {
+      categoryTotals[item.category] = (categoryTotals[item.category] || 0) + Number(item.total || 0)
+    })
+
+    // Subcategory breakdown
+    const subcategoryTotals: Record<string, number> = {}
+    sortedItems.forEach(item => {
+      const key = `${item.category} > ${item.subcategory || 'N/A'}`
+      subcategoryTotals[key] = (subcategoryTotals[key] || 0) + Number(item.total || 0)
+    })
+
+    let markdown = `# 💰 CinePilot Budget Report
+
+> Generated on ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Planned | ₹${totalPlanned.toLocaleString('en-IN')} |
+| Total Spent | ₹${totalSpent.toLocaleString('en-IN')} |
+| Remaining | ₹${totalVariance.toLocaleString('en-IN')} |
+| Budget Used | ${totalPlanned > 0 ? ((totalSpent / totalPlanned) * 100).toFixed(1) : 0}% |
+| Total Items | ${items.length} |
+| Categories | ${categories.length} |
+
+## Budget by Category
+
+| Category | Amount |
+|----------|--------|
+${Object.entries(categoryTotals).map(([cat, amt]) => `| ${cat} | ₹${amt.toLocaleString('en-IN')} |`).join('\n')}
+
+## Budget Items
+
+| # | Category | Subcategory | Description | Quantity | Unit | Total |
+|---|----------|-------------|-------------|----------|------|-------|
+`
+
+    sortedItems.forEach((item, idx) => {
+      markdown += `| ${idx + 1} | ${item.category} | ${item.subcategory || '-'} | ${item.description || '-'} | ${item.quantity || '-'} | ${item.unit || '-'} | ₹${Number(item.total || 0).toLocaleString('en-IN')} |\n`
+    })
+
+    // Add expenses section if available
+    if (expenses.length > 0) {
+      markdown += `
+## Expenses
+
+| Date | Category | Description | Amount | Vendor | Status |
+|------|----------|-------------|--------|--------|--------|
+`
+      expenses.forEach(exp => {
+        markdown += `| ${exp.date} | ${exp.category} | ${exp.description} | ₹${Number(exp.amount).toLocaleString('en-IN')} | ${exp.vendor || '-'} | ${exp.status} |\n`
+      })
+    }
+
+    // Add forecast section if available
+    if (forecast) {
+      markdown += `
+## Forecast
+
+| Metric | Value |
+|--------|-------|
+| Planned | ₹${forecast.planned.toLocaleString('en-IN')} |
+| Actual | ₹${forecast.actual.toLocaleString('en-IN')} |
+| EAC Total | ₹${forecast.eacTotal.toLocaleString('en-IN')} |
+| Variance | ₹${forecast.variance.toLocaleString('en-IN')} |
+| % Spent | ${forecast.percentSpent}% |
+
+### Category Forecast
+
+| Category | Planned | Actual | Forecast | Status |
+|----------|---------|--------|----------|--------|
+`
+      forecast.categories.forEach(cat => {
+        markdown += `| ${cat.category} | ₹${cat.planned.toLocaleString('en-IN')} | ₹${cat.actual.toLocaleString('en-IN')} | ₹${cat.forecast.toLocaleString('en-IN')} | ${cat.status} |\n`
+      })
+    }
+
+    markdown += `
+---
+
+* CinePilot - Film Production Management System *
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budget-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, expenses, forecast])
+
+  // Ref for markdown export
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
+  // Keep itemsRef updated
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
 
   const handlePrint = () => {
     // Use sorted items for print output
@@ -683,6 +803,10 @@ export default function BudgetPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          if (itemsRef.current.length > 0) handleExportMarkdownRef.current()
+          break
         case 'p':
           e.preventDefault()
           setShowPrintMenu(prev => !prev)
@@ -972,10 +1096,17 @@ export default function BudgetPage() {
                 </button>
                 <button 
                   onClick={handleExportJSON}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
                 >
                   <FileJson className="w-4 h-4" />
                   Export JSON
+                </button>
+                <button 
+                  onClick={() => { handleExportMarkdown(); setShowExportMenu(false) }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg text-cyan-400"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export Markdown
                 </button>
               </div>
             )}
@@ -1706,6 +1837,7 @@ export default function BudgetPage() {
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', action: 'Add new expense' },
                 { key: 'E', action: 'Toggle export menu' },
+                { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print budget report' },
                 { key: '1', action: 'Switch to Overview tab' },
                 { key: '2', action: 'Switch to Breakdown tab' },

@@ -101,6 +101,7 @@ export default function ReportsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const fetchReportRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -183,6 +184,10 @@ export default function ReportsPage() {
         case 'p':
           e.preventDefault()
           if (reportData) handlePrintRef.current?.()
+          break
+        case 'm':
+          e.preventDefault()
+          if (reportData) handleExportMarkdownRef.current?.()
           break
         case 'g':
           e.preventDefault()
@@ -317,6 +322,155 @@ export default function ReportsPage() {
     a.click()
     setExporting(false)
   }
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!reportData) return
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    const formatCurrency = (amount: number) => {
+      if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`
+      if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)}L`
+      if (amount >= 1000) return `₹${(amount / 1000).toFixed(2)}K`
+      return `₹${amount}`
+    }
+
+    const markdown = `# CinePilot Production Report
+Generated: ${new Date().toLocaleDateString('en-IN', { 
+  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+})}
+
+---
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Scenes | ${reportData.production.totalScenes} |
+| Total Characters | ${reportData.production.totalCharacters} |
+| Total Locations | ${reportData.production.totalLocations} |
+| Shooting Days | ${reportData.production.shootingDays} |
+| Total Budget | ${formatCurrency(reportData.production.budget)} |
+| Total Spent | ${formatCurrency(reportData.production.spent)} |
+| Remaining | ${formatCurrency(reportData.production.budget - reportData.production.spent)} |
+| Budget Used | ${((reportData.production.spent / reportData.production.budget) * 100).toFixed(1)}% |
+
+---
+
+## Production Details
+
+### Overview
+- **Total Scenes:** ${reportData.production.totalScenes}
+- **Total Characters:** ${reportData.production.totalCharacters}
+- **Total Locations:** ${reportData.production.totalLocations}
+- **Shooting Days:** ${reportData.production.shootingDays}
+${reportData.production.vfxShots ? `- **VFX Shots:** ${reportData.production.vfxShots}` : ''}
+${reportData.production.totalShots ? `- **Total Shots:** ${reportData.production.totalShots}` : ''}
+
+---
+
+## Schedule Status
+
+| Metric | Value |
+|--------|-------|
+| Completed Days | ${reportData.schedule.completedDays} |
+| Total Days | ${reportData.schedule.totalDays} |
+| Scenes Shot | ${reportData.schedule.scenesShot} |
+| Total Scenes | ${reportData.schedule.totalScenes} |
+| Progress | ${((reportData.schedule.completedDays / reportData.schedule.totalDays) * 100).toFixed(1)}% |
+
+---
+
+## Crew Overview
+
+| Metric | Value |
+|--------|-------|
+| Total Members | ${reportData.crew.totalMembers} |
+| Departments | ${reportData.crew.departments} |
+| Total Daily Rate | ${formatCurrency(reportData.crew.totalDailyRate)} |
+
+${reportData.crew.departmentBreakdown ? `### Department Breakdown
+
+| Department | Members | Daily Rate |
+|------------|---------|------------|
+${reportData.crew.departmentBreakdown.map(d => `| ${d.name} | ${d.count} | ${formatCurrency(d.dailyRate)} |`).join('\n')}
+
+` : ''}---
+
+## Censor Certification
+
+| Metric | Value |
+|--------|-------|
+| Certificate | ${reportData.censor.certificate} |
+| Score | ${reportData.censor.score}/100 |
+| Issues | ${reportData.censor.issues} |
+
+${reportData.censor.flags ? `### Issue Breakdown
+
+| Category | Count |
+|----------|-------|
+${reportData.censor.flags.map(f => `| ${f.category} | ${f.count} |`).join('\n')}
+
+` : ''}---
+
+## Budget Summary
+
+| Category | Budget | Spent | Remaining |
+|----------|--------|-------|-----------|
+| Production | ${formatCurrency(reportData.production.budget)} | ${formatCurrency(reportData.production.spent)} | ${formatCurrency(reportData.production.budget - reportData.production.spent)} |
+
+---
+
+## VFX Status
+
+${reportData.vfx ? `| Metric | Value |
+|--------|-------|
+| Total Shots | ${reportData.vfx.totalShots} |
+| Completed | ${reportData.vfx.completed} |
+| Pending | ${reportData.vfx.pending} |
+
+### Complexity Breakdown
+
+| Level | Count |
+|-------|-------|
+${reportData.vfx.complexityBreakdown.map(c => `| ${c.level} | ${c.count} |`).join('\n')}
+
+` : '*No VFX data available*'}
+
+---
+
+## Locations Summary
+
+${reportData.locations ? `| Metric | Value |
+|--------|-------|
+| Total | ${reportData.locations.total} |
+| Indoor | ${reportData.locations.indoor} |
+| Outdoor | ${reportData.locations.outdoor} |
+
+### By Type
+
+| Type | Count |
+|------|-------|
+${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
+
+` : '*No location data available*'}
+
+---
+
+*Report generated by CinePilot*`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `production-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    setExporting(false)
+  }, [reportData])
+
+  // Update refs for keyboard shortcuts after function is defined
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown;
+  }, [handleExportMarkdown]);
 
   const handlePrint = useCallback(() => {
     if (!reportData) return
@@ -563,6 +717,13 @@ export default function ReportsPage() {
                 >
                   <Download className="w-4 h-4 text-green-400" />
                   Export as CSV
+                </button>
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  Export as Markdown
                 </button>
               </div>
             )}
@@ -1001,6 +1162,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Print report</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">P</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Export Markdown</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">M</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Generate report</span>

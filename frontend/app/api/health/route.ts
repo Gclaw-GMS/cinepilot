@@ -83,6 +83,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   }
 
   // Check memory (Node process)
+  // Use RSS (Resident Set Size) for more accurate memory monitoring in development
   const memStart = Date.now();
   try {
     const used = process.memoryUsage();
@@ -90,11 +91,31 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     const heapTotalMB = used.heapTotal / (1024 * 1024);
     const heapPercent = (heapUsedMB / heapTotalMB) * 100;
     
+    // Use RSS for actual memory usage - more accurate for Node.js
+    const rssMB = used.rss / (1024 * 1024);
+    const rssPercent = (rssMB / (2048)) * 100; // Assume 2GB available
+    
+    // Use the higher of heap or RSS for status determination
+    const memoryPercent = Math.max(heapPercent, rssPercent);
+    
+    // Thresholds optimized for development environment
+    // Production servers typically have more headroom
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const unhealthyThreshold = isDevelopment ? 90 : 85;
+    const degradedThreshold = isDevelopment ? 75 : 65;
+    
     checks.push({
       component: 'memory',
-      status: heapPercent > 90 ? 'unhealthy' : heapPercent > 75 ? 'degraded' : 'healthy',
-      message: `${heapUsedMB.toFixed(1)}MB heap used of ${heapTotalMB.toFixed(1)}MB`,
-      details: { heapUsedMB: Math.round(heapUsedMB), heapTotalMB: Math.round(heapTotalMB), heapPercent: Math.round(heapPercent) },
+      status: memoryPercent > unhealthyThreshold ? 'unhealthy' : memoryPercent > degradedThreshold ? 'degraded' : 'healthy',
+      message: `${heapUsedMB.toFixed(1)}MB heap used of ${heapTotalMB.toFixed(1)}MB (RSS: ${rssMB.toFixed(1)}MB)`,
+      details: { 
+        heapUsedMB: Math.round(heapUsedMB), 
+        heapTotalMB: Math.round(heapTotalMB), 
+        heapPercent: Math.round(heapPercent),
+        rssMB: Math.round(rssMB),
+        rssPercent: Math.round(rssPercent),
+        environment: isDevelopment ? 'development' : 'production'
+      },
       latencyMs: Date.now() - memStart,
     });
   } catch (error) {

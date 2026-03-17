@@ -1,4 +1,33 @@
-# CinePilot Night Build Notes - March 15, 2026
+# CinePilot Night Build Notes - March 17, 2026
+
+## Build Status: ✅ PASSING (8:34 AM)
+
+### 36. DOOD Page - Markdown Export Feature (March 17, 2026 8:34 AM)
+Added Markdown export capability to the Day Out of Days (DOOD) page:
+
+- **Export Option**: New "Markdown" button in the export dropdown (cyan colored icon)
+- **Professional Format**: Clean Markdown with proper formatting:
+  - Summary statistics table with all key metrics
+  - Main Cast breakdown table with character, Tamil name, actor, days, percentage
+  - Supporting Cast breakdown table with same fields
+  - Filters Applied section showing current filter/sort state
+- **Content Preservation**: Full DOOD data included (uses filteredReport)
+- **Works with Filters**: Exports currently filtered report only
+- **File Naming**: Auto-generated (dood-report-YYYY-MM-DD.md)
+- **Consistent UI**: Matches existing CSV/JSON buttons style
+- **Keyboard Shortcut**: 'M' key for direct Markdown export
+- **Keyboard Help**: Added 'M' to shortcuts modal
+- **useCallback**: exportToMarkdown properly memoized
+- **useRef Pattern**: Uses exportToMarkdownRef for keyboard accessibility
+- **Error Handling**: Uses filteredReport which handles empty data
+
+- **Build**: Clean build with 82 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors  
+- **Lint:** Passes (no warnings or errors)
+- **Tests:** 803 passing
+
+---
 
 ## Build Status: ✅ PASSING (11:58 PM)
 

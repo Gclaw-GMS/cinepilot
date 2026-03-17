@@ -1,6 +1,70 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (8:14 AM) - Weather Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (8:34 AM) - DOOD Page Markdown Export IMPLEMENTED
+
+---
+
+## 8:34 AM - DOOD Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **DOOD Page - Markdown Export**: Added ability to export Day Out of Days reports in Markdown format
+  - **Export Option**: New "Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics table (total characters, shooting days, total calls, avg days/actor, main/supporting cast days)
+    - Main Cast breakdown table with character, Tamil name, actor, total days, % of shoot, days list
+    - Supporting Cast breakdown table with same fields
+    - Filters Applied section showing role filter, search query, and sort options
+  - **Content Preservation**: Full DOOD data included in export
+  - **Works with Filters**: Exports currently filtered report only
+  - **File Naming**: Auto-generated filename with date (dood-report-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: exportToMarkdown wrapped in useCallback for proper memoization
+- **Summary Stats**: Includes total characters, shooting days, total calls, avg days/actor
+- **Cast Breakdown**: Separates main cast and supporting cast with detailed tables
+- **Days List**: Shows comma-separated list of shooting days for each character
+- **useRef Pattern**: Uses exportToMarkdownRef for keyboard shortcut accessibility
+- **useEffect Assignment**: Updates ref when exportToMarkdown function changes
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print report
+- **R** - Refresh data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **1-4** - Switch view modes (analytics/calendar/list/workload)
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/feature/continuity-sorting ✅
+
+### DOOD Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Main cast breakdown table with all fields
+- [x] Supporting cast breakdown table with all fields
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
 
 ---
 

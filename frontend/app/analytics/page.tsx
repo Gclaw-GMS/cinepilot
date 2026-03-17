@@ -342,6 +342,11 @@ export default function AnalyticsPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          // Use ref to avoid dependency issues - refs are always available
+          handleExportMarkdownRef.current?.()
+          break
         case 'p':
           e.preventDefault()
           setShowPrintMenu(prev => !prev)
@@ -360,6 +365,7 @@ export default function AnalyticsPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Click outside to close menus
@@ -449,6 +455,180 @@ export default function AnalyticsPage() {
     a.click()
     setExporting(false)
   }
+
+  // Markdown export function
+  const handleExportMarkdown = useCallback(() => {
+    if (!dashboard || !metrics) return
+    setExporting(true)
+    setShowExportMenu(false)
+
+    const overview = dashboard.overview
+    const timeline = metrics.timeline
+    const performance = metrics.performance
+    const predictions = metrics.predictions
+
+    // Build Markdown content
+    let markdown = `# CinePilot Analytics Report
+
+> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 📊 Production Overview
+
+| Metric | Value |
+|--------|-------|
+| Total Scenes | ${overview.total_scenes} |
+| Completed Scenes | ${overview.completed_scenes} |
+| Completion | ${((overview.completed_scenes / overview.total_scenes) * 100).toFixed(1)}% |
+| Total Locations | ${overview.total_locations} |
+| Total Characters | ${overview.total_characters} |
+| Shooting Days | ${overview.shooting_days_completed} / ${overview.shooting_days_total} |
+| Crew Members | ${overview.crew_members} |
+
+---
+
+## 💰 Budget Summary
+
+| Metric | Amount |
+|--------|--------|
+| Total Budget | ₹${(overview.budget_total / 10000000).toFixed(2)} Cr |
+| Spent | ₹${(overview.budget_spent / 10000000).toFixed(2)} Cr |
+| Remaining | ₹${(overview.budget_remaining / 10000000).toFixed(2)} Cr |
+| Utilization | ${overview.budget_total > 0 ? ((overview.budget_spent / overview.budget_total) * 100).toFixed(1) : 0}% |
+
+### Budget Breakdown
+
+| Category | Allocated | Spent | Remaining |
+|----------|-----------|-------|-----------|
+`
+
+    sortedBudgetData.forEach(b => {
+      const remaining = b.allocated - b.spent
+      markdown += `| ${b.category} | ₹${(b.allocated / 100000).toFixed(1)}L | ₹${(b.spent / 100000).toFixed(1)}L | ₹${(remaining / 100000).toFixed(1)}L |\n`
+    })
+
+    markdown += `
+
+---
+
+## 🎬 Shot & VFX Progress
+
+| Metric | Total | Completed | Remaining |
+|--------|-------|----------|-----------|
+| Total Shots | ${overview.total_shots} | ${overview.completed_shots} | ${overview.total_shots - overview.completed_shots} |
+| VFX Shots | ${overview.vfx_shots} | ${overview.completed_vfx} | ${overview.vfx_shots - overview.completed_vfx} |
+
+---
+
+## 📈 Timeline Metrics
+
+| Metric | Value |
+|--------|-------|
+| Overall Progress | ${timeline.overall_progress}% |
+| Days Remaining | ${timeline.days_remaining} |
+| Scenes Remaining | ${timeline.scenes_remaining} |
+| Budget Utilization | ${timeline.budget_utilization.toFixed(1)}% |
+
+---
+
+## ⚡ Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| Avg Scenes/Day | ${performance.avg_scenes_per_day.toFixed(1)} |
+| Avg Shots/Scene | ${performance.avg_shots_per_scene.toFixed(1)} |
+| Budget Burn Rate | ₹${(performance.budget_burn_rate / 100000).toFixed(1)}L/day |
+| Efficiency Score | ${performance.efficiency_score}% |
+
+---
+
+## 🔮 Predictions
+
+| Metric | Value |
+|--------|-------|
+| Projected Completion | ${new Date(predictions.projected_completion).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} |
+| Projected Budget Overrun | ₹${(predictions.projected_budget_overrun / 100000).toFixed(1)}L |
+| Risk Level | ${predictions.risk_level.charAt(0).toUpperCase() + predictions.risk_level.slice(1)} |
+
+---
+
+## 👥 Department Efficiency
+
+| Department | Efficiency | Utilization |
+|------------|------------|-------------|
+`
+
+    sortedDepartmentData.forEach(d => {
+      markdown += `| ${d.name} | ${d.efficiency}% | ${d.utilization}% |\n`
+    })
+
+    markdown += `
+
+---
+
+## 📅 Upcoming Shoots
+
+| Date | Location | Scenes | Call Time |
+|------|----------|--------|-----------|
+`
+
+    dashboard.upcoming_shoots.forEach(shoot => {
+      markdown += `| ${new Date(shoot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} | ${shoot.location} | ${shoot.scenes.join(', ')} | ${shoot.call_time} |\n`
+    })
+
+    markdown += `
+
+---
+
+## 🔄 Recent Activities
+
+| Time | User | Activity |
+|------|------|----------|
+`
+
+    sortedActivitiesData.slice(0, 10).forEach(activity => {
+      const time = new Date(activity.timestamp).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      let activityDesc = ''
+      switch (activity.type) {
+        case 'scene_shot': activityDesc = `Shot scene ${activity.scene}`; break;
+        case 'schedule_updated': activityDesc = 'Updated schedule'; break;
+        case 'budget_approved': activityDesc = `Approved budget: ₹${(activity.amount! / 100000).toFixed(1)}L`; break;
+        case 'location_added': activityDesc = `Added location: ${activity.location}`; break;
+        case 'crew_assigned': activityDesc = `Assigned crew: ${activity.crew}`; break;
+        default: activityDesc = activity.type;
+      }
+      markdown += `| ${time} | ${activity.user} | ${activityDesc} |\n`
+    })
+
+    markdown += `
+
+---
+
+## 📋 Filters Applied
+
+- **Time Period**: ${filters.timePeriod === 'all' ? 'All Time' : filters.timePeriod}
+- **Department**: ${filters.department === 'all' ? 'All Departments' : filters.department}
+- **Sort By**: ${sortBy} (${sortOrder})
+
+---
+
+*Report generated by CinePilot - Film Production Management*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    setExporting(false)
+  }, [dashboard, metrics, sortedBudgetData, sortedDepartmentData, sortedActivitiesData, filters, sortBy, sortOrder])
+
+  // Ref for keyboard shortcut
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -893,6 +1073,13 @@ export default function AnalyticsPage() {
             </button>
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  Export as Markdown
+                </button>
                 <button
                   onClick={handleExportJSON}
                   className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
@@ -1414,6 +1601,7 @@ export default function AnalyticsPage() {
                 { key: 'F', description: 'Toggle filter & sort panel' },
                 { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'E', description: 'Toggle export dropdown' },
+                { key: 'M', description: 'Export as Markdown' },
                 { key: 'P', description: 'Print analytics report' },
                 { key: '/', description: 'Focus search input' },
                 { key: '1', description: 'Switch to Overview view' },

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, CheckCircle, X,
-  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, FileJson, Printer, Filter
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, Printer, Filter
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -91,6 +91,20 @@ export default function CateringPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Update refs when data changes
+  useEffect(() => {
+    planRef.current = plan
+  }, [plan])
+  
+  // Refs for export function data (to avoid dependency issues)
+  const sortedShootDaysRef = useRef<ShootDayMeal[]>([])
+  const caterersRef = useRef<Caterer[]>([])
+  
+  // Update caterers ref when data changes
+  useEffect(() => {
+    caterersRef.current = caterers
+  }, [caterers])
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -191,46 +205,46 @@ export default function CateringPage() {
     setShowExportMenu(false)
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const exportToMarkdown = () => {
-    if (!plan) return
-
+  // Markdown Export function
+  const exportToMarkdown = useCallback(() => {
+    const currentPlan = planRef.current
+    const currentSortedDays = sortedShootDaysRef.current
+    const currentCaterers = caterersRef.current
+    
+    if (!currentPlan) return
+    
     // Calculate summary stats
-    const totalMeals = sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => sum + sd.meals.length, 0)
-    const totalSpent = sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => 
+    const totalShootDays = currentSortedDays.length
+    const totalMeals = currentSortedDays.reduce((sum: number, sd: ShootDayMeal) => sum + sd.meals.length, 0)
+    const totalBudget = currentPlan.totalBudget
+    const totalSpent = currentSortedDays.reduce((sum: number, sd: ShootDayMeal) => 
       sum + sd.meals.reduce((s: number, m: Meal) => s + (m.actualCost || m.budget), 0), 0)
-    const budgetRemaining = plan.totalBudget - totalSpent
-
-    // Calculate meal type breakdown
-    const mealTypeBreakdown: Record<string, { count: number; budget: number; spent: number }> = {}
-    sortedShootDays.forEach((sd: ShootDayMeal) => {
-      sd.meals.forEach((m: Meal) => {
-        if (!mealTypeBreakdown[m.type]) {
-          mealTypeBreakdown[m.type] = { count: 0, budget: 0, spent: 0 }
-        }
-        mealTypeBreakdown[m.type].count++
-        mealTypeBreakdown[m.type].budget += m.budget
-        mealTypeBreakdown[m.type].spent += (m.actualCost || m.budget)
+    const totalCrew = currentSortedDays.reduce((sum: number, sd: ShootDayMeal) => sum + sd.totalCrew, 0)
+    const totalCast = currentSortedDays.reduce((sum: number, sd: ShootDayMeal) => sum + sd.totalCast, 0)
+    
+    // Meal type breakdown
+    const mealTypeBreakdown: Record<string, number> = {}
+    const mealTypeCosts: Record<string, number> = {}
+    currentSortedDays.forEach((sd: ShootDayMeal) => {
+      sd.meals.forEach((meal: Meal) => {
+        mealTypeBreakdown[meal.type] = (mealTypeBreakdown[meal.type] || 0) + 1
+        mealTypeCosts[meal.type] = (mealTypeCosts[meal.type] || 0) + (meal.actualCost || meal.budget)
       })
     })
-
-    // Calculate dietary breakdown
+    
+    // Dietary breakdown
     const dietaryBreakdown: Record<string, number> = {}
-    sortedShootDays.forEach((sd: ShootDayMeal) => {
-      sd.meals.forEach((m: Meal) => {
-        m.dietary.forEach(d => {
-          dietaryBreakdown[d] = (dietaryBreakdown[d] || 0) + 1
-        })
-      })
+    Object.entries(currentPlan.dietaryRestrictions).forEach(([diet, count]) => {
+      dietaryBreakdown[diet] = count
     })
+    
+    // Get caterer info
+    const selectedCaterer = currentCaterers.find(c => c.id === currentPlan.catererId)
+    
+    let markdown = `# Catering Plan Report - CinePilot
 
-    // Get caterer info if available
-    const selectedCaterer = caterers.find(c => c.id === plan.catererId)
-
-    // Generate Markdown
-    let markdown = `# CinePilot - Catering Report
-
-**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+**Generated:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+**Project:** ${currentPlan.projectId}
 
 ---
 
@@ -238,83 +252,80 @@ export default function CateringPage() {
 
 | Metric | Value |
 |--------|-------|
-| Total Shoot Days | ${sortedShootDays.length} |
-| Total Meals | ${totalMeals} |
-| Total Budget | ₹${plan.totalBudget.toLocaleString('en-IN')} |
+| Total Shoot Days | ${totalShootDays} |
+| Total Meals Served | ${totalMeals} |
+| Total Crew Meals | ${totalCrew} |
+| Total Cast Meals | ${totalCast} |
+| Total Budget | ₹${totalBudget.toLocaleString('en-IN')} |
 | Total Spent | ₹${totalSpent.toLocaleString('en-IN')} |
-| Budget Remaining | ₹${budgetRemaining.toLocaleString('en-IN')} |
-| Budget Used | ${((totalSpent / plan.totalBudget) * 100).toFixed(1)}% |
+| Budget Remaining | ₹${(totalBudget - totalSpent).toLocaleString('en-IN')} |
+
+${selectedCaterer ? `### Caterer Information
+
+| Field | Value |
+|-------|-------|
+| Name | ${selectedCaterer.name} |
+| Contact | ${selectedCaterer.contactPerson} |
+| Phone | ${selectedCaterer.phone} |
+| Email | ${selectedCaterer.email} |
+| Specialty | ${selectedCaterer.specialty} |
+| Rating | ${'⭐'.repeat(selectedCaterer.rating)}` : ''}
+
+---
+
+## By Meal Type
 
 `
-
-    // Meal Type Breakdown
-    markdown += `## Meal Type Breakdown
-
-| Meal Type | Count | Budget | Spent |
-|-----------|-------|--------|-------|
-`
-    Object.entries(mealTypeBreakdown).forEach(([type, data]) => {
-      markdown += `| ${type.charAt(0).toUpperCase() + type.slice(1)} | ${data.count} | ₹${data.budget.toLocaleString('en-IN')} | ₹${data.spent.toLocaleString('en-IN')} |\n`
+    
+    Object.entries(mealTypeBreakdown).forEach(([mealType, count]) => {
+      const cost = mealTypeCosts[mealType] || 0
+      const emoji: Record<string, string> = {
+        breakfast: '☀️',
+        lunch: '🌞',
+        snacks: '🍿',
+        dinner: '🌙'
+      }
+      markdown += `- **${emoji[mealType] || '🍽️'} ${mealType.charAt(0).toUpperCase() + mealType.slice(1)}**: ${count} meals (₹${cost.toLocaleString('en-IN')})\n`
     })
-    markdown += `\n`
+    
+    markdown += `\n## Dietary Restrictions Summary
 
-    // Dietary Restrictions
+`
     if (Object.keys(dietaryBreakdown).length > 0) {
-      markdown += `## Dietary Restrictions
-
-`
-      Object.entries(dietaryBreakdown)
-        .sort(([, a], [, b]) => b - a)
-        .forEach(([diet, count]) => {
-          markdown += `- **${diet}:** ${count} meals\n`
-        })
-      markdown += `\n`
-    }
-
-    // Caterer Info
-    if (selectedCaterer) {
-      markdown += `## Caterer Information
-
-- **Name:** ${selectedCaterer.name}
-- **Contact:** ${selectedCaterer.contactPerson}
-- **Phone:** ${selectedCaterer.phone}
-- **Email:** ${selectedCaterer.email}
-- **Specialty:** ${selectedCaterer.specialty}
-- **Rating:** ${'★'.repeat(selectedCaterer.rating)}${'☆'.repeat(5 - selectedCaterer.rating)}
-
-`
-    }
-
-    // Daily Breakdown
-    markdown += `---
-
-## Daily Meal Plan
-
-`
-    sortedShootDays.forEach((sd: ShootDayMeal, idx: number) => {
-      const dayTotal = sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0)
-      markdown += `### Day ${idx + 1}: ${new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-
-- **Total Crew:** ${sd.totalCrew}
-- **Total Cast:** ${sd.totalCast}
-- **Total People:** ${sd.totalCrew + sd.totalCast}
-- **Day Total:** ₹${dayTotal.toLocaleString('en-IN')}
-
-| Meal | Menu | Dietary | Budget | Actual |
-|------|------|---------|--------|--------|
-`
-      sd.meals.forEach((m: Meal) => {
-        markdown += `| ${m.type.charAt(0).toUpperCase() + m.type.slice(1)} | ${m.menu.join(', ')} | ${m.dietary.join(', ') || '-'} | ₹${m.budget.toLocaleString('en-IN')} | ₹${(m.actualCost || m.budget).toLocaleString('en-IN')} |\n`
+      Object.entries(dietaryBreakdown).forEach(([diet, count]) => {
+        markdown += `- **${diet}**: ${count} people\n`
       })
-      markdown += `\n`
+    } else {
+      markdown += '_No dietary restrictions recorded_\n'
+    }
+    
+    markdown += `\n## Daily Breakdown\n\n`
+    markdown += `| Date | Meals | Crew | Cast | Total People | Budget | Actual |\n`
+    markdown += `|------|-------|------|------|--------------|--------|--------|\n`
+    
+    currentSortedDays.forEach((sd: ShootDayMeal) => {
+      const dayBudget = sd.meals.reduce((s, m) => s + m.budget, 0)
+      const dayActual = sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0)
+      const mealsList = sd.meals.map(m => m.type).join(', ')
+      markdown += `| ${sd.date} | ${mealsList} | ${sd.totalCrew} | ${sd.totalCast} | ${sd.totalCrew + sd.totalCast} | ₹${dayBudget.toLocaleString('en-IN')} | ₹${dayActual.toLocaleString('en-IN')} |\n`
     })
-
-    // Footer
-    markdown += `---
-
-*Report generated by CinePilot - Film Production Management*
-`
-
+    
+    markdown += `\n## Meal Details\n\n`
+    
+    currentSortedDays.forEach((sd: ShootDayMeal) => {
+      if (sd.meals.length > 0) {
+        markdown += `### ${sd.date} (${sd.totalCrew + sd.totalCast} people)\n\n`
+        markdown += `| Meal | Menu | Dietary | Budget | Actual |\n`
+        markdown += `|------|------|---------|--------|--------|\n`
+        sd.meals.forEach((meal: Meal) => {
+          markdown += `| ${meal.type.charAt(0).toUpperCase() + meal.type.slice(1)} | ${meal.menu.join(', ')} | ${meal.dietary.join(', ') || '-'} | ₹${meal.budget.toLocaleString('en-IN')} | ₹${(meal.actualCost || meal.budget).toLocaleString('en-IN')} |\n`
+        })
+        markdown += `\n`
+      }
+    })
+    
+    markdown += `---\n\n*Generated by CinePilot - Film Production Management*`
+    
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -323,7 +334,13 @@ export default function CateringPage() {
     a.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
-  }
+  }, [])
+
+  // Ref for keyboard shortcut accessibility
+  const exportToMarkdownRef = useRef(exportToMarkdown)
+  useEffect(() => {
+    exportToMarkdownRef.current = exportToMarkdown
+  }, [exportToMarkdown])
 
   // Print function
   const handlePrint = () => {
@@ -469,7 +486,7 @@ export default function CateringPage() {
           break
         case 'm':
           e.preventDefault()
-          if (planRef.current) exportToMarkdown()
+          if (planRef.current) exportToMarkdownRef.current()
           break
         case 'p':
           e.preventDefault()
@@ -496,7 +513,7 @@ export default function CateringPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, exportToMarkdown])
+  }, [handleRefresh])
 
   // Filter shoot days by search query and filters
   const filteredShootDays = useMemo(() => {
@@ -556,6 +573,11 @@ export default function CateringPage() {
       return sortOrder === 'asc' ? comparison : -comparison
     })
   }, [filteredShootDays, sortBy, sortOrder])
+  
+  // Update export refs when sorted data changes
+  useEffect(() => {
+    sortedShootDaysRef.current = sortedShootDays
+  }, [sortedShootDays])
   
   // Count active filters (including sort state)
   const activeFilterCount = (filters.mealType !== 'all' ? 1 : 0) + (filters.dietary !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
@@ -1075,7 +1097,7 @@ export default function CateringPage() {
                       onClick={() => { exportToJSON(); setShowExportMenu(false) }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
                     >
-                      <FileJson className="w-4 h-4 text-slate-400" />
+                      <FileText className="w-4 h-4 text-slate-400" />
                       Export JSON
                     </button>
                     <button

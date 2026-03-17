@@ -500,6 +500,78 @@ export default function AIToolsPage() {
     setExporting(false)
   }
 
+  // Markdown Export
+  const handleExportMarkdown = useCallback(() => {
+    const currentFilteredTools = filteredToolsRef.current
+    const currentAllCategories = allCategoriesRef.current
+    const currentSearchQuery = searchQueryRef.current
+    const currentCategoryFilter = categoryFilterRef.current
+    const currentSortBy = sortByRef.current
+    const currentSortOrder = sortOrderRef.current
+    
+    if (currentFilteredTools.length === 0) return
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    // Group tools by category
+    const toolsByCategory: Record<string, typeof currentFilteredTools> = {}
+    currentFilteredTools.forEach(tool => {
+      if (!toolsByCategory[tool.category]) {
+        toolsByCategory[tool.category] = []
+      }
+      toolsByCategory[tool.category].push(tool)
+    })
+    
+    // Build markdown
+    let markdown = `# CinePilot AI Tools Report
+
+> Generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+
+---
+
+## Summary
+
+- **Total Tools**: ${currentFilteredTools.length}
+- **Categories**: ${currentAllCategories.length}
+- **Search**: ${currentSearchQuery || 'None'}
+- **Category Filter**: ${currentCategoryFilter !== 'all' ? currentCategoryFilter : 'All'}
+- **Sort By**: ${currentSortBy} (${currentSortOrder})
+
+---
+
+## Categories Overview
+
+`
+    
+    // Add category counts
+    currentAllCategories.forEach(cat => {
+      const count = currentFilteredTools.filter(t => t.category === cat).length
+      markdown += `- **${cat}**: ${count} tool${count !== 1 ? 's' : ''}\n`
+    })
+    
+    markdown += `\n---\n\n## Tools by Category\n\n`
+    
+    // Add tools grouped by category
+    Object.entries(toolsByCategory).forEach(([category, tools]) => {
+      markdown += `### ${category}\n\n`
+      markdown += `| Name | Description | Endpoint |\n`
+      markdown += `|------|-------------|----------|\n`
+      tools.forEach(tool => {
+        markdown += `| **${tool.name}** | ${tool.desc} | \`${tool.endpoint}\` |\n`
+      })
+      markdown += `\n`
+    })
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ai-tools-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExporting(false)
+  }, [])
+
   // Print functionality
   // Print functionality - uses refs to avoid dependency issues
   const handlePrint = useCallback(() => {
@@ -684,6 +756,9 @@ export default function AIToolsPage() {
       } else if (e.key === 'e' || e.key === 'E') {
         e.preventDefault()
         setShowExportMenu(prev => !prev)
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault()
+        handleExportMarkdown()
       } else if (e.key === 'p' || e.key === 'P') {
         e.preventDefault()
         handlePrintRef.current?.()
@@ -704,7 +779,7 @@ export default function AIToolsPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, showFilterPanel, sortOrder])
+  }, [handleRefresh, handleExportMarkdown, showFilterPanel, sortOrder])
 
   // Active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -989,6 +1064,14 @@ export default function AIToolsPage() {
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      disabled={exporting}
+                      className="w-full px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -1346,6 +1429,10 @@ export default function AIToolsPage() {
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Export menu</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">E</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-slate-400">Export Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">M</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Print report</span>

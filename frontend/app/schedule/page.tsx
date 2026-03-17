@@ -265,9 +265,9 @@ export default function SchedulePage() {
   const handlePrintRef = useRef<() => void>(() => {})
   const handleOptimizeRef = useRef<() => void>(() => {})
   const fetchDataRef = useRef<() => void>(() => {})
-  const handleExportMarkdownRef = useRef<() => void>(() => {})
   const shootingDaysRef = useRef<ShootingDayData[]>([])
   const filteredShootingDaysRef = useRef<ShootingDayData[]>([])
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -377,6 +377,11 @@ export default function SchedulePage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+        case 'M':
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
+          break
         case 'p':
           e.preventDefault()
           handlePrintRef.current?.()
@@ -388,10 +393,6 @@ export default function SchedulePage() {
         case 's':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-          break
-        case 'm':
-          e.preventDefault()
-          handleExportMarkdownRef.current?.()
           break
       }
     }
@@ -496,127 +497,101 @@ export default function SchedulePage() {
 
   // Markdown export function
   const handleExportMarkdown = useCallback(() => {
+    const currentShootingDays = shootingDaysRef.current
     const currentFilteredDays = filteredShootingDaysRef.current
     
-    // Calculate stats
-    const totalDays = currentFilteredDays.length
-    const totalScenes = currentFilteredDays.reduce((acc, day) => acc + day.dayScenes.length, 0)
-    const totalHours = currentFilteredDays.reduce((acc, day) => acc + parseFloat(day.estimatedHours || '0'), 0)
-    const totalMinutes = currentFilteredDays.reduce((acc, day) => acc + day.dayScenes.reduce((a, ds) => a + (ds.estimatedMinutes || 0), 0), 0)
+    if (currentFilteredDays.length === 0) return
+
+    // Build summary statistics
+    const byStatus: Record<string, number> = {}
+    const byLocation: Record<string, number> = {}
+    const totalScenes = currentFilteredDays.reduce((sum, d) => sum + d.dayScenes.length, 0)
+    const totalHours = currentFilteredDays.reduce((sum, d) => sum + parseFloat(d.estimatedHours || '0'), 0)
     
-    // Status breakdown
-    const statusCounts: Record<string, number> = {}
     currentFilteredDays.forEach(day => {
-      statusCounts[day.status] = (statusCounts[day.status] || 0) + 1
-    })
-    
-    // Location breakdown
-    const locationCounts: Record<string, number> = {}
-    currentFilteredDays.forEach(day => {
+      byStatus[day.status] = (byStatus[day.status] || 0) + 1
       const loc = day.location?.name || 'TBD'
-      locationCounts[loc] = (locationCounts[loc] || 0) + 1
+      byLocation[loc] = (byLocation[loc] || 0) + 1
     })
-    
+
     // Build markdown content
-    let markdown = `# CinePilot Shooting Schedule Report
+    let markdown = `# CinePilot Schedule Report
 
-**Generated:** ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+**Generated:** ${new Date().toISOString().split('T')[0]}
 
----
+## Summary
 
-## Executive Summary
+- **Total Shooting Days:** ${currentShootingDays.length}
+- **Filtered Days:** ${currentFilteredDays.length}
+- **Total Scenes:** ${totalScenes}
+- **Total Estimated Hours:** ${totalHours}
+- **Completed:** ${byStatus.completed || 0}
+- **In Progress:** ${byStatus.in_progress || 0}
+- **Scheduled:** ${byStatus.scheduled || 0}
+- **Delayed:** ${byStatus.delayed || 0}
 
-| Metric | Value |
-|--------|-------|
-| Total Shooting Days | ${totalDays} |
-| Total Scenes | ${totalScenes} |
-| Total Estimated Hours | ${totalHours} |
-| Total Scene Minutes | ${totalMinutes} |
-| Average Hours/Day | ${totalDays > 0 ? (totalHours / totalDays).toFixed(1) : '0'} |
-| Average Scenes/Day | ${totalDays > 0 ? (totalScenes / totalDays).toFixed(1) : '0'} |
-
----
-
-## Status Breakdown
+### By Status
 
 | Status | Count |
 |--------|-------|
 `
-    
-    Object.entries(statusCounts).forEach(([status, count]) => {
-      const emoji = status === 'completed' ? '✅' : status === 'in-progress' ? '🔄' : status === 'delayed' ? '⚠️' : '📅'
-      markdown += `| ${emoji} ${status.charAt(0).toUpperCase() + status.slice(1)} | ${count} |\n`
+    Object.entries(byStatus).forEach(([status, count]) => {
+      const emoji = status === 'completed' ? '✅' : status === 'in_progress' ? '🔄' : status === 'delayed' ? '⚠️' : '📅'
+      markdown += `| ${emoji} ${status.replace('_', ' ')} | ${count} |\n`
     })
-    
-    markdown += `
----
 
-## Location Breakdown
+    markdown += `
+### By Location
 
 | Location | Days |
 |----------|------|
 `
-    
-    Object.entries(locationCounts).sort((a, b) => b[1] - a[1]).forEach(([location, count]) => {
+    Object.entries(byLocation).forEach(([location, count]) => {
       markdown += `| ${location} | ${count} |\n`
     })
-    
+
     markdown += `
 ---
 
-## Shooting Schedule
+## Shooting Days Detail
 
-| Day | Date | Location | Status | Scenes | Call Time | Hours | Notes |
-|-----|------|----------|--------|--------|-----------|-------|-------|
+| Day | Date | Location | Call Time | Hours | Status | Scenes |
+|-----|------|----------|-----------|-------|--------|--------|
 `
-    
     currentFilteredDays.forEach(day => {
-      const date = day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN') : 'TBD'
-      const location = day.location?.name || 'TBD'
-      const scenes = day.dayScenes.map(ds => ds.scene.sceneNumber).join(', ')
-      const callTime = day.callTime || '-'
-      const hours = day.estimatedHours || '-'
-      const notes = day.notes || '-'
-      const emoji = day.status === 'completed' ? '✅' : day.status === 'in-progress' ? '🔄' : day.status === 'delayed' ? '⚠️' : '📅'
-      
-      markdown += `| ${day.dayNumber} | ${date} | ${location} | ${emoji} ${day.status} | ${scenes} | ${callTime} | ${hours} | ${notes} |\n`
+      const statusEmoji = day.status === 'completed' ? '✅' : day.status === 'in_progress' ? '🔄' : day.status === 'delayed' ? '⚠️' : '📅'
+      const sceneNumbers = day.dayScenes.map(ds => ds.scene.sceneNumber).join(', ')
+      markdown += `| ${day.dayNumber} | ${day.scheduledDate || '-'} | ${day.location?.name || 'TBD'} | ${day.callTime || '-'} | ${day.estimatedHours || '-'} | ${statusEmoji} ${day.status.replace('_', ' ')} | ${sceneNumbers} |\n`
     })
-    
+
     markdown += `
 ---
 
-## Detailed Scene Breakdown
+## Scene Details
 
 `
-    
     currentFilteredDays.forEach(day => {
-      const date = day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN') : 'Day ' + day.dayNumber
-      markdown += `### ${date} - ${day.location?.name || 'Location TBD'}\n\n`
-      markdown += `| # | Scene | INT/EXT | Time | Duration | Location |\n`
-      markdown += `|---|-------|---------|------|----------|----------|\n`
-      
-      day.dayScenes.forEach((ds, idx) => {
-        markdown += `| ${idx + 1} | ${ds.scene.sceneNumber} | ${ds.scene.intExt || '-'} | ${ds.scene.timeOfDay || '-'} | ${ds.estimatedMinutes || '-'} min | ${ds.scene.location || '-'} |\n`
-      })
-      
-      markdown += '\n'
+      if (day.dayScenes.length > 0) {
+        markdown += `### Day ${day.dayNumber} - ${day.location?.name || 'TBD'} (${day.scheduledDate || 'TBD'})\n\n`
+        markdown += `| Scene | Heading | INT/EXT | Time | Duration |\n`
+        markdown += `|-------|---------|---------|------|----------|\n`
+        day.dayScenes.forEach(ds => {
+          const duration = ds.estimatedMinutes ? `${ds.estimatedMinutes} min` : '-'
+          markdown += `| ${ds.scene.sceneNumber} | ${ds.scene.headingRaw || '-'} | ${ds.scene.intExt || '-'} | ${ds.scene.timeOfDay || '-'} | ${duration} |\n`
+        })
+        markdown += '\n'
+      }
     })
-    
-    markdown += `---\n\n*Generated by CinePilot - Production Management System*\n`
-    
+
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `schedule-${new Date().toISOString().split('T')[0]}.md`
-    a.click()
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `schedule-${new Date().toISOString().split('T')[0]}.md`
+    link.click()
     URL.revokeObjectURL(url)
+    setShowExportMenu(false)
   }, [])
-
-  // Update ref
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
 
   const handlePrint = useCallback(() => {
     const currentShootingDays = shootingDaysRef.current
@@ -748,6 +723,10 @@ export default function SchedulePage() {
   useEffect(() => {
     handleOptimizeRef.current = handleOptimize
   }, [handleOptimize])
+
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   // Copy schedule to clipboard
   const handleCopyToClipboard = async () => {
@@ -1226,8 +1205,8 @@ export default function SchedulePage() {
                   Export JSON
                 </button>
                 <button
-                  onClick={() => { handleExportMarkdown(); setShowExportMenu(false); }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                  onClick={handleExportMarkdownRef.current}
+                  className="w-full px-4 py-2 text-left text-sm text-cyan-400 hover:bg-gray-700 flex items-center gap-2 transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   Export Markdown
@@ -1916,8 +1895,8 @@ export default function SchedulePage() {
                 { key: '2', desc: 'Switch to Analytics view' },
                 { key: '3', desc: 'Switch to Conflicts view' },
                 { key: 'O', desc: 'Open optimize schedule' },
-                { key: 'E', desc: 'Export schedule (CSV/JSON/Markdown)' },
-                { key: 'M', desc: 'Export as Markdown' },
+                { key: 'E', desc: 'Open export menu (CSV/JSON/Markdown)' },
+                { key: 'M', desc: 'Direct export to Markdown' },
                 { key: 'P', desc: 'Print schedule report' },
                 { key: '?', desc: 'Show this help modal' },
                 { key: 'Esc', desc: 'Close modal / Clear search / Close filters' },

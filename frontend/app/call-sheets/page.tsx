@@ -83,7 +83,7 @@ export default function CallSheetsPage() {
   const deleteSheetRef = useRef<(id: string) => Promise<void>>()
   const startEditingRef = useRef<() => void>()
   const cancelEditingRef = useRef<() => void>()
-  const handleExportMarkdownRef = useRef<() => void>()
+  const exportMarkdownRef = useRef<() => void>(() => {})
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -191,7 +191,7 @@ export default function CallSheetsPage() {
         case 'm':
           e.preventDefault()
           if (selected && !isEditing) {
-            handleExportMarkdownRef.current?.()
+            exportMarkdownRef.current()
           }
           break
         case 'd':
@@ -675,99 +675,102 @@ export default function CallSheetsPage() {
   }
 
   // Export to Markdown
-  const handleExportMarkdown = useCallback(() => {
+  const handleExportMarkdown = () => {
     if (!selected) return
     
-    const crewCalls = selected.content?.crewCalls || []
-    const scenes = selected.content?.scenes || []
+    const callSheet = selected
+    const crew = callSheet.content?.crewCalls || []
+    const scenes = callSheet.content?.scenes || []
     
     // Calculate summary stats
-    const departments = [...new Set(crewCalls.map(c => c.department).filter(Boolean))]
-    const crewByDept: Record<string, number> = {}
-    crewCalls.forEach(c => {
+    const totalCrew = crew.length
+    const departments = [...new Set(crew.map(c => c.department).filter(Boolean))]
+    const departmentCounts: Record<string, number> = {}
+    crew.forEach(c => {
       const dept = c.department || 'Other'
-      crewByDept[dept] = (crewByDept[dept] || 0) + 1
+      departmentCounts[dept] = (departmentCounts[dept] || 0) + 1
     })
     
-    let markdown = `# Call Sheet: ${selected.title}\n\n`
-    markdown += `**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
-    
-    // Executive Summary
-    markdown += `## Executive Summary\n\n`
-    markdown += `| Metric | Value |\n`
-    markdown += `|--------|-------|\n`
-    markdown += `| **Date** | ${selected.date || 'TBD'} |\n`
-    markdown += `| **Call Time** | ${selected.content?.callTime || 'TBD'} |\n`
-    markdown += `| **Wrap Time** | ${selected.content?.wrapTime || 'TBD'} |\n`
-    markdown += `| **Location** | ${selected.content?.location || 'TBD'} |\n`
-    markdown += `| **Total Crew** | ${crewCalls.length} |\n`
-    markdown += `| **Departments** | ${departments.length} |\n`
-    markdown += `| **Scenes** | ${scenes.length} |\n\n`
-    
-    // Weather Info
-    if (selected.content?.weather) {
-      markdown += `## Weather\n\n`
-      markdown += `- **Conditions:** ${selected.content.weather || 'N/A'}\n\n`
+    // Build markdown content
+    let markdown = `# 📋 ${callSheet.title || 'Call Sheet'}
+
+**Generated:** ${new Date().toISOString().split('T')[0]}
+**Mode:** ${isDemoMode ? 'Demo' : 'Production'}
+
+---
+
+## Summary
+
+- **Total Crew Members:** ${totalCrew}
+- **Departments:** ${departments.length}
+- **Scenes:** ${scenes.length}
+- **Date:** ${callSheet.date || 'N/A'}
+- **Call Time:** ${callSheet.content?.callTime || 'N/A'}
+- **Wrap Time:** ${callSheet.content?.wrapTime || 'N/A'}
+- **Location:** ${callSheet.content?.location || 'N/A'}
+
+---
+
+## Scene Information
+
+| # | Scene |
+|---|-------|
+`
+    scenes.forEach((scene, idx) => {
+      markdown += `| ${idx + 1} | ${scene || '-'} |\n`
+    })
+
+    markdown += `
+---
+
+## Crew Call List
+
+### By Department
+
+`
+    Object.entries(departmentCounts).forEach(([dept, count]) => {
+      markdown += `- **${dept}:** ${count} members\n`
+    })
+
+    markdown += `
+
+### Crew Detail
+
+| Role | Name | Department | Call Time |
+|------|------|------------|-----------|
+`
+    crew.forEach(c => {
+      markdown += `| ${c.role || '-'} | ${c.name || '-'} | ${c.department || '-'} | ${c.callTime || callSheet.content?.callTime || '-'} |\n`
+    })
+
+    if (callSheet.notes) {
+      markdown += `
+---
+
+## Notes
+
+${callSheet.notes}
+`
     }
-    
-    // Department Breakdown
-    if (Object.keys(crewByDept).length > 0) {
-      markdown += `## Department Breakdown\n\n`
-      markdown += `| Department | Count |\n`
-      markdown += `|------------|-------|\n`
-      Object.entries(crewByDept).sort(([,a], [,b]) => b - a).forEach(([dept, count]) => {
-        markdown += `| ${dept} | ${count} |\n`
-      })
-      markdown += `\n`
-    }
-    
-    // Scenes
-    if (scenes.length > 0) {
-      markdown += `## Scheduled Scenes\n\n`
-      markdown += `| # |\n`
-      markdown += `|----|\n`
-      scenes.forEach(scene => {
-        markdown += `| ${scene} |\n`
-      })
-      markdown += `\n`
-    }
-    
-    // Crew Call List
-    if (crewCalls.length > 0) {
-      markdown += `## Crew Call List\n\n`
-      markdown += `| Role | Name | Department | Call Time |\n`
-      markdown += `|------|------|------------|----------|\n`
-      crewCalls.forEach(crew => {
-        markdown += `| ${crew.role || '-'} | ${crew.name || '-'} | ${crew.department || '-'} | ${crew.callTime || selected.content?.callTime || '-'} |\n`
-      })
-      markdown += `\n`
-    }
-    
-    // Notes
-    if (selected.notes) {
-      markdown += `## Notes\n\n`
-      markdown += `${selected.notes}\n\n`
-    }
-    
-    // Footer
-    markdown += `---\n\n`
-    markdown += `*Generated by CinePilot - Call Sheet Export*\n`
+
+    markdown += `
+---
+
+*Generated by CinePilot - Film Production Management*
+`
     
     const blob = new Blob([markdown], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const exportDate = new Date().toISOString().split('T')[0]
-    a.download = `callsheet-${exportDate}.md`
-    a.click()
-    URL.revokeObjectURL(url)
+    const blobUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = `callsheet-${new Date().toISOString().split('T')[0]}.md`
+    link.click()
+    URL.revokeObjectURL(blobUrl)
     setShowExportMenu(false)
-  }, [selected])
-
-  // Store handleExportMarkdown in ref for keyboard shortcuts
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
+  }
+  
+  // Assign to ref for keyboard shortcuts
+  exportMarkdownRef.current = handleExportMarkdown
 
   // Group crew by department for display
   const crewByDepartment = useMemo(() => {
@@ -1174,7 +1177,7 @@ export default function CallSheetsPage() {
                           <Download className="w-4 h-4" />
                         </button>
                         {showExportMenu && (
-                          <div className="absolute right-0 top-full mt-2 w-44 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                          <div className="absolute right-0 top-full mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                             <button
                               onClick={handleExportCSV}
                               className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
@@ -1191,7 +1194,7 @@ export default function CallSheetsPage() {
                             </button>
                             <button
                               onClick={handleExportMarkdown}
-                              className="w-full px-3 py-2 text-left text-sm text-cyan-300 hover:bg-slate-700 hover:text-cyan-200 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-sm text-cyan-400 hover:bg-slate-700 hover:text-cyan-300 flex items-center gap-2"
                             >
                               <FileText className="w-4 h-4" />
                               Export Markdown
@@ -1603,7 +1606,7 @@ export default function CallSheetsPage() {
                 { key: 'N', description: 'New call sheet' },
                 { key: 'E', description: 'Edit selected sheet' },
                 { key: 'X', description: 'Export dropdown menu' },
-                { key: 'M', description: 'Export as Markdown' },
+                { key: 'M', description: 'Export Markdown' },
                 { key: 'D', description: 'Delete selected sheet' },
                 { key: 'P', description: 'Print selected sheet' },
                 { key: '?', description: 'Show keyboard shortcuts' },

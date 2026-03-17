@@ -145,7 +145,7 @@ export default function BudgetPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleRefreshRef = useRef<() => Promise<void>>()
-  const handleExportMarkdownRef = useRef<() => void>(() => {})
+  const handleExportMarkdownRef = useRef<() => void>()
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -155,7 +155,7 @@ export default function BudgetPage() {
   // Count active filters
   const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
 
-  // Helper to sort items (used by exports) - wrapped in useCallback to fix dependency warning
+  // Helper to sort items (used by exports)
   const sortItems = useCallback((itemsToSort: BudgetItemData[]) => {
     return [...itemsToSort].sort((a, b) => {
       let comparison = 0
@@ -244,154 +244,95 @@ export default function BudgetPage() {
   }
 
   const handleExportMarkdown = useCallback(() => {
-    // Filter items based on current filters
-    const sortedItems = sortItems(items.filter(item => {
-      // Search filter
-      if (searchQuery && 
-          !item.category.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !(item.subcategory?.toLowerCase() || '').includes(searchQuery.toLowerCase()) &&
-          !(item.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-      ) return false
-      // Category filter
-      if (categoryFilter !== 'all' && item.category !== categoryFilter) return false
-      // Subcategory filter
-      if (subcategoryFilter !== 'all' && item.subcategory !== subcategoryFilter) return false
-      // Source filter
-      if (sourceFilter !== 'all' && item.source !== sourceFilter) return false
-      return true
-    }))
-
-    // Filter expenses based on current filters
-    const sortedExpenses = expenses.filter(exp => {
-      // Search filter
-      if (searchQuery && 
-          !exp.category.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !exp.description.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !(exp.vendor?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-      ) return false
-      // Category filter for expenses
-      if (categoryFilter !== 'all' && exp.category !== categoryFilter) return false
-      return true
-    }).sort((a, b) => {
-      let comparison = 0
-      switch (sortBy) {
-        case 'category':
-          comparison = (a.category || '').localeCompare(b.category || '')
-          break
-        case 'description':
-          comparison = (a.description || '').localeCompare(b.description || '')
-          break
-        case 'amount':
-          comparison = Number(a.amount || 0) - Number(b.amount || 0)
-          break
-        case 'date':
-          comparison = (a.date || '').localeCompare(b.date || '')
-          break
-        case 'vendor':
-          comparison = (a.vendor || '').localeCompare(b.vendor || '')
-          break
-        default:
-          comparison = (a.date || '').localeCompare(b.date || '')
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-
-    // Build filter info for export metadata
+    const sortedItems = sortItems(items)
+    const sortedExpenses = [...expenses].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    
+    // Build filter info
     const filterInfo: string[] = []
     if (categoryFilter !== 'all') filterInfo.push(`Category: ${categoryFilter}`)
     if (subcategoryFilter !== 'all') filterInfo.push(`Subcategory: ${subcategoryFilter}`)
     if (sourceFilter !== 'all') filterInfo.push(`Source: ${sourceFilter}`)
-    if (searchQuery) filterInfo.push(`Search: ${searchQuery}`)
-
-    // Calculate totals from sortedItems
+    if (sortBy !== 'category' || sortOrder !== 'asc') filterInfo.push(`Sort: ${sortBy} (${sortOrder})`)
+    
     const totalPlanned = sortedItems.reduce((s, i) => s + Number(i.total || 0), 0)
-    const totalActual = sortedExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
-    const variance = totalPlanned - totalActual
-
-    // Calculate category totals
+    const totalSpent = sortedExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+    
+    // Category breakdown
     const categoryTotals: Record<string, number> = {}
     sortedItems.forEach(item => {
       const cat = item.category
       categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.total || 0)
     })
-
-    // Calculate expense totals by category
-    const expenseByCategory: Record<string, number> = {}
+    
+    // By Status breakdown for expenses
+    const statusTotals: Record<string, number> = {}
     sortedExpenses.forEach(exp => {
-      expenseByCategory[exp.category] = (expenseByCategory[exp.category] || 0) + Number(exp.amount)
+      const status = exp.status || 'pending'
+      statusTotals[status] = (statusTotals[status] || 0) + Number(exp.amount || 0)
     })
-
-    let markdown = `# 🎬 CinePilot Budget Report
-
-> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-
----
-
-## 📊 Executive Summary
-
-| Metric | Value |
-|--------|-------|
-| **Total Planned Budget** | ₹${totalPlanned.toLocaleString('en-IN')} |
-| **Total Actual Spend** | ₹${totalActual.toLocaleString('en-IN')} |
-| **Budget Variance** | ${variance >= 0 ? '+' : '-'}₹${Math.abs(variance).toLocaleString('en-IN')} |
-| **Budget Used** | ${totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0}% |
-| **Forecast (EAC)** | ₹${forecast?.eacTotal.toLocaleString('en-IN') || '—'} |
-| **Items Count** | ${sortedItems.length} |
-| **Expenses Count** | ${sortedExpenses.length} |
-
-${filterInfo.length > 0 ? `### 🔍 Filters Applied\n${filterInfo.map(f => `- ${f}`).join('\n')}\n` : ''}
----
-
-## 📁 Budget Breakdown by Category
-
-| Category | Planned | Expenses | Remaining |
-|----------|---------|----------|-----------|
-${Object.entries(categoryTotals).map(([cat, planned]) => {
-  const expenses = expenseByCategory[cat] || 0
-  const remaining = planned - expenses
-  return `| ${cat} | ₹${Number(planned).toLocaleString('en-IN')} | ₹${expenses.toLocaleString('en-IN')} | ₹${remaining.toLocaleString('en-IN')} |`
-}).join('\n')}
-
-**Total Planned:** ₹${totalPlanned.toLocaleString('en-IN')} | **Total Expenses:** ₹${totalActual.toLocaleString('en-IN')} | **Remaining:** ₹${(totalPlanned - totalActual).toLocaleString('en-IN')}
-
----
-
-## 💰 Detailed Budget Items
-
-| Category | Subcategory | Description | Quantity | Unit | Rate | Total |
-|----------|-------------|-------------|----------|------|------|-------|
-${sortedItems.map(item => `| ${item.category} | ${item.subcategory || '-'} | ${item.description || '-'} | ${item.quantity || '-'} | ${item.unit || '-'} | ₹${Number(item.rate || 0).toLocaleString('en-IN')} | ₹${Number(item.total || 0).toLocaleString('en-IN')} |`).join('\n')}
-
----
-
-## 🧾 Recent Expenses
-
-| Date | Category | Description | Vendor | Amount | Status |
-|------|----------|-------------|--------|--------|--------|
-${sortedExpenses.length > 0 ? sortedExpenses.map(exp => `| ${exp.date || '-'} | ${exp.category} | ${exp.description} | ${exp.vendor || '-'} | ₹${Number(exp.amount).toLocaleString('en-IN')} | ${exp.status} |`).join('\n') : '| - | - | No expenses recorded | - | - | - |'}
-
----
-
-## 📈 Forecast Analysis
-
-${forecast ? `| Category | Planned | Actual | Forecast | Status |
-|----------|---------|--------|----------|--------|
-${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleString('en-IN')} | ₹${cat.actual.toLocaleString('en-IN')} | ₹${cat.forecast.toLocaleString('en-IN')} | ${cat.status === 'on_track' ? '✅ On Track' : cat.status === 'warning' ? '⚠️ Warning' : '❌ Over'} |`).join('\n')}
-
-### Forecast Summary
-- **Planned Total:** ₹${forecast.planned.toLocaleString('en-IN')}
-- **Actual Spent:** ₹${forecast.actual.toLocaleString('en-IN')}
-- **Forecast Total (EAC):** ₹${forecast.eacTotal.toLocaleString('en-IN')}
-- **Variance:** ${forecast.variance >= 0 ? '+' : '-'}₹${Math.abs(forecast.variance).toLocaleString('en-IN')}
-- **Percent Spent:** ${forecast.percentSpent}%
-` : '*No forecast data available*'}
-
----
-
-*Report generated by CinePilot - Film Production Management System*
-`
-
-    const blob = new Blob([markdown], { type: 'text/markdown' })
+    
+    // Build markdown
+    let md = `# CinePilot Budget Report\n\n`
+    md += `**Generated:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+    
+    // Summary
+    md += `## Summary\n\n`
+    md += `- **Total Planned:** ₹${totalPlanned.toLocaleString('en-IN')}\n`
+    md += `- **Total Spent:** ₹${totalSpent.toLocaleString('en-IN')}\n`
+    md += `- **Items:** ${sortedItems.length}\n`
+    md += `- **Expenses:** ${sortedExpenses.length}\n`
+    if (filterInfo.length > 0) {
+      md += `- **Filters:** ${filterInfo.join(', ')}\n`
+    }
+    md += `\n`
+    
+    // By Category
+    md += `## By Category\n\n`
+    md += `| Category | Amount |\n|----------|--------|\n`
+    Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).forEach(([cat, amt]) => {
+      md += `| ${cat} | ₹${amt.toLocaleString('en-IN')} |\n`
+    })
+    md += `| **Total** | **₹${totalPlanned.toLocaleString('en-IN')}** |\n`
+    md += `\n`
+    
+    // Expenses Summary
+    if (sortedExpenses.length > 0) {
+      md += `## Expenses Summary\n\n`
+      md += `| Status | Amount |\n|--------|--------|\n`
+      Object.entries(statusTotals).sort((a, b) => b[1] - a[1]).forEach(([status, amt]) => {
+        const statusIcon = status === 'approved' ? '✅' : status === 'pending' ? '⏳' : '❌'
+        md += `| ${statusIcon} ${status.charAt(0).toUpperCase() + status.slice(1)} | ₹${amt.toLocaleString('en-IN')} |\n`
+      })
+      md += `| **Total** | **₹${totalSpent.toLocaleString('en-IN')}** |\n`
+      md += `\n`
+    }
+    
+    // Items Detail
+    md += `## Budget Items\n\n`
+    md += `| Category | Subcategory | Description | Quantity | Unit | Total |\n|----------|-------------|-------------|----------|------|-------|\n`
+    sortedItems.forEach(item => {
+      md += `| ${item.category} | ${item.subcategory || '-'} | ${item.description || '-'} | ${item.quantity || '-'} | ${item.unit || '-'} | ₹${Number(item.total || 0).toLocaleString('en-IN')} |\n`
+    })
+    md += `\n`
+    
+    // Forecast (if available)
+    if (forecast) {
+      md += `## Forecast\n\n`
+      md += `- **Planned:** ₹${forecast.planned.toLocaleString('en-IN')}\n`
+      md += `- **Actual:** ₹${forecast.actual.toLocaleString('en-IN')}\n`
+      md += `- **EAC Total:** ₹${forecast.eacTotal.toLocaleString('en-IN')}\n`
+      md += `- **Variance:** ₹${forecast.variance.toLocaleString('en-IN')} (${forecast.percentSpent}% spent)\n`
+      md += `\n`
+      
+      md += `### Category Forecast\n\n`
+      md += `| Category | Planned | Actual | Forecast | Status |\n|---------|---------|--------|----------|--------|\n`
+      forecast.categories.forEach(cat => {
+        const statusIcon = cat.status === 'on_track' ? '✅' : cat.status === 'warning' ? '⚠️' : '❌'
+        md += `| ${cat.category} | ₹${cat.planned.toLocaleString('en-IN')} | ₹${cat.actual.toLocaleString('en-IN')} | ₹${cat.forecast.toLocaleString('en-IN')} | ${statusIcon} |\n`
+      })
+    }
+    
+    const blob = new Blob([md], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -399,12 +340,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
     a.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
-  }, [items, expenses, sortItems, sortBy, sortOrder, categoryFilter, subcategoryFilter, sourceFilter, searchQuery, forecast])
-
-  // Update ref when function changes
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown
-  }, [handleExportMarkdown])
+  }, [items, expenses, forecast, categoryFilter, subcategoryFilter, sourceFilter, sortBy, sortOrder, sortItems])
 
   const handlePrint = () => {
     // Use sorted items for print output
@@ -692,13 +628,13 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
           e.preventDefault()
           setActiveTab('forecast')
           break
-        case 'm':
-          e.preventDefault()
-          handleExportMarkdownRef.current()
-          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
           break
         case 'p':
           e.preventDefault()
@@ -760,6 +696,11 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
   useEffect(() => {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
+
+  // Update handleExportMarkdown ref when function changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handleAddExpense = async () => {
     if (!newExpense.description || !newExpense.amount) {
@@ -958,27 +899,27 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
               Export
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                <button 
-                  onClick={handleExportMarkdown}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-t-lg"
-                >
-                  <FileText className="w-4 h-4 text-cyan-400" />
-                  Export Markdown
-                </button>
+              <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
                 <button 
                   onClick={handleExportCSV}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-t-lg"
                 >
                   <FileText className="w-4 h-4" />
                   Export CSV
                 </button>
                 <button 
                   onClick={handleExportJSON}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
                 >
                   <FileJson className="w-4 h-4" />
                   Export JSON
+                </button>
+                <button 
+                  onClick={handleExportMarkdown}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-b-lg"
+                >
+                  <FileJson className="w-4 h-4 text-cyan-400" />
+                  Export Markdown
                 </button>
               </div>
             )}
@@ -1589,8 +1530,8 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', action: 'Add new expense' },
-                { key: 'M', action: 'Export as Markdown' },
                 { key: 'E', action: 'Toggle export menu' },
+                { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print budget report' },
                 { key: '1', action: 'Switch to Overview tab' },
                 { key: '2', action: 'Switch to Breakdown tab' },

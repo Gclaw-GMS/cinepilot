@@ -429,14 +429,14 @@ export default function ShotHubPage() {
     setTimeout(() => setSaveMessage(null), 3000)
   }
 
-  // Export to Markdown
+  // Markdown Export function (uses sorted/filtered data)
   const handleExportMarkdown = useCallback(() => {
-    // Compute filtered shots locally (same logic as filteredShots useMemo)
+    // Compute filtered shots inline to avoid hook ordering issues
     const activeSceneShots = selectedSceneId
       ? shots.filter(s => s.scene.id === selectedSceneId)
       : shots
     
-    const locallyFiltered = activeSceneShots.filter(shot => {
+    const filtered = activeSceneShots.filter(shot => {
       if (filters.sceneId !== 'all' && shot.scene.id !== filters.sceneId) return false
       if (filters.shotSize !== 'all' && shot.shotSize !== filters.shotSize) return false
       if (filters.cameraAngle !== 'all' && shot.cameraAngle !== filters.cameraAngle) return false
@@ -444,111 +444,121 @@ export default function ShotHubPage() {
       return true
     })
 
-    if (!locallyFiltered.length) return
+    if (!filtered.length) {
+      setSaveMessage({ type: 'error', text: 'No shots to export' })
+      return
+    }
     setExporting(true)
     setShowExportMenu(false)
 
-    const totalDuration = locallyFiltered.reduce((sum, s) => sum + (s.durationEstSec || 0), 0)
-    const avgConfidence = locallyFiltered.length > 0
-      ? locallyFiltered.reduce((sum, s) => {
-          const conf = ((s.confidenceCamera || 0) + (s.confidenceLens || 0) + (s.confidenceLight || 0) + (s.confidenceDuration || 0)) / 4
-          return sum + conf
-        }, 0) / locallyFiltered.length
-      : 0
+    try {
+      // Get filtered shots for export
+      const activeShots = filtered
 
-    const scenesBreakdown = locallyFiltered.reduce((acc, shot) => {
-      const sceneNum = shot.scene.sceneNumber || 'Unknown'
-      if (!acc[sceneNum]) acc[sceneNum] = { count: 0, shots: [] }
-      acc[sceneNum].count++
-      acc[sceneNum].shots.push(shot.shotIndex)
-      return acc
-    }, {} as Record<string, { count: number, shots: number[] }>)
+      // Calculate stats
+      const totalShots = activeShots.length
+      const totalDuration = activeShots.reduce((sum, s) => sum + (s.durationEstSec || 0), 0)
+      const lockedCount = activeShots.filter(s => s.isLocked).length
+      const missingFields = activeShots.filter(s => !s.shotSize || !s.cameraAngle || !s.cameraMovement).length
 
-    const shotSizeBreakdown = locallyFiltered.reduce((acc, shot) => {
-      const size = shot.shotSize || 'Unspecified'
-      acc[size] = (acc[size] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+      // Group by scene
+      const shotsByScene = activeShots.reduce((acc, shot) => {
+        const sceneNum = shot.scene.sceneNumber || 'Unknown'
+        if (!acc[sceneNum]) acc[sceneNum] = []
+        acc[sceneNum].push(shot)
+        return acc
+      }, {} as Record<string, typeof activeShots>)
 
-    const cameraMovementBreakdown = locallyFiltered.reduce((acc, shot) => {
-      const movement = shot.cameraMovement || 'Unspecified'
-      acc[movement] = (acc[movement] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+      // Shot size breakdown
+      const shotSizeCounts = activeShots.reduce((acc, s) => {
+        const size = s.shotSize || 'Not set'
+        acc[size] = (acc[size] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
 
-    const formatDuration = (sec: number) => {
-      const m = Math.floor(sec / 60)
-      const s = Math.round(sec % 60)
-      return m > 0 ? `${m}m ${s}s` : `${s}s`
-    }
+      // Camera movement breakdown
+      const movementCounts = activeShots.reduce((acc, s) => {
+        const movement = s.cameraMovement || 'Not set'
+        acc[movement] = (acc[movement] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
 
-    let markdown = `# Shot List Report - CinePilot
+      // Build markdown content
+      let markdown = `# CinePilot Shot List Report
+Generated: ${new Date().toLocaleString()}
 
-> Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-
-## Executive Summary
+## Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Shots | ${locallyFiltered.length} |
-| Total Scenes | ${Object.keys(scenesBreakdown).length} |
-| Total Duration | ${formatDuration(totalDuration)} |
-| Avg Confidence | ${(avgConfidence * 100).toFixed(1)}% |
-| Locked Shots | ${locallyFiltered.filter(s => s.isLocked).length} |
-
-## Filters Applied
-
-- **Scene Filter:** ${filters.sceneId === 'all' ? 'All Scenes' : scenes.find(s => s.id === filters.sceneId)?.sceneNumber || filters.sceneId}
-- **Shot Size:** ${filters.shotSize === 'all' ? 'All' : filters.shotSize}
-- **Camera Angle:** ${filters.cameraAngle === 'all' ? 'All' : filters.cameraAngle}
-- **Camera Movement:** ${filters.cameraMovement === 'all' ? 'All' : filters.cameraMovement}
-- **Sort By:** ${sortBy} (${sortOrder})
+| Total Shots | ${totalShots} |
+| Total Duration | ${Math.floor(totalDuration / 60)}m ${totalDuration % 60}s |
+| Locked Shots | ${lockedCount} |
+| Unlocked Shots | ${totalShots - lockedCount} |
+| Missing Fields | ${missingFields} |
 
 ## Shot Size Breakdown
 
 | Shot Size | Count |
 |-----------|-------|
-${Object.entries(shotSizeBreakdown).map(([size, count]) => `| ${size} | ${count} |`).join('\n')}
+${Object.entries(shotSizeCounts).map(([size, count]) => `| ${size} | ${count} |`).join('\n')}
 
 ## Camera Movement Breakdown
 
 | Movement | Count |
-|---------|-------|
-${Object.entries(cameraMovementBreakdown).map(([movement, count]) => `| ${movement} | ${count} |`).join('\n')}
+|----------|-------|
+${Object.entries(movementCounts).map(([movement, count]) => `| ${movement} | ${count} |`).join('\n')}
 
-## Scenes Overview
+## Shots by Scene
 
-| Scene | Shot Count | Shot Numbers |
-|-------|------------|--------------|
-${Object.entries(scenesBreakdown).map(([scene, data]) => `| ${scene} | ${data.count} | ${data.shots.join(', ')} |`).join('\n')}
-
-## Detailed Shot List
-
-| # | Scene | Shot Size | Angle | Movement | Duration | Confidence | Locked |
-|---|-------|-----------|-------|----------|----------|-------------|--------|
-${locallyFiltered.map(shot => {
-  const confidence = ((shot.confidenceCamera || 0) + (shot.confidenceLens || 0) + (shot.confidenceLight || 0) + (shot.confidenceDuration || 0)) / 4
-  return `| ${shot.shotIndex} | ${shot.scene.sceneNumber || '-'} | ${shot.shotSize || '-'} | ${shot.cameraAngle || '-'} | ${shot.cameraMovement || '-'} | ${shot.durationEstSec ? formatDuration(shot.durationEstSec) : '-'} | ${(confidence * 100).toFixed(0)}% | ${shot.isLocked ? '🔒' : '🔓'} |`
-}).join('\n')}
-
----
-
-*Report generated by CinePilot - Film Production Management*
 `
+      // Add shots grouped by scene
+      Object.entries(shotsByScene).forEach(([sceneNum, sceneShots]) => {
+        const firstShot = sceneShots[0]
+        markdown += `### Scene ${sceneNum}
+${firstShot.scene.headingRaw || ''}
+${firstShot.scene.intExt || ''} ${firstShot.scene.timeOfDay || ''} - ${firstShot.scene.location || ''}
 
-    const blob = new Blob([markdown], { type: 'text/markdown' })
-    const downloadUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = downloadUrl
-    a.download = `shot-list-${new Date().toISOString().split('T')[0]}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(downloadUrl)
-    setSaveMessage({ type: 'success', text: `Exported ${locallyFiltered.length} shots to Markdown` })
+| Shot # | Size | Angle | Movement | Duration | Locked |
+|--------|------|-------|----------|----------|--------|
+${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle || '-'} | ${s.cameraMovement || '-'} | ${s.durationEstSec ? `${s.durationEstSec}s` : '-'} | ${s.isLocked ? '✓' : '-'} |`).join('\n')}
+
+`
+      })
+
+      // Add filters info if any
+      if (filters.sceneId !== 'all' || filters.shotSize !== 'all' || filters.cameraAngle !== 'all' || filters.cameraMovement !== 'all') {
+        markdown += `## Filters Applied
+
+| Filter | Value |
+|--------|-------|
+| Scene | ${filters.sceneId === 'all' ? 'All' : filters.sceneId} |
+| Shot Size | ${filters.shotSize === 'all' ? 'All' : filters.shotSize} |
+| Camera Angle | ${filters.cameraAngle === 'all' ? 'All' : filters.cameraAngle} |
+| Camera Movement | ${filters.cameraMovement === 'all' ? 'All' : filters.cameraMovement} |
+
+`
+      }
+
+      markdown += `---
+*CinePilot - Professional Film Production Management*`
+
+      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const downloadUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `shot-list-${new Date().toISOString().split('T')[0]}.md`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(downloadUrl)
+      setSaveMessage({ type: 'success', text: `Exported ${totalShots} shots to Markdown` })
+    } catch (e) {
+      setSaveMessage({ type: 'error', text: 'Failed to export markdown' })
+    }
     setExporting(false)
     setTimeout(() => setSaveMessage(null), 3000)
-  }, [shots, filters, sortBy, sortOrder, scenes, selectedSceneId])
+  }, [shots, selectedSceneId, filters])
 
   // Print shot list
   const handlePrint = useCallback(() => {
@@ -677,7 +687,6 @@ ${locallyFiltered.map(shot => {
     handlePrintRef.current = handlePrint
   }, [handlePrint])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     handleExportMarkdownRef.current = handleExportMarkdown
   }, [handleExportMarkdown])

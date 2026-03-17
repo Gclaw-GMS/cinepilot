@@ -217,7 +217,7 @@ export default function ScriptsPage() {
   const filterMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => Promise<void>>()
   const handlePrintRef = useRef<() => void>()
-  const handleExportMarkdownRef = useRef<() => void>(() => {})
+  const handleExportMarkdownRef = useRef<() => void>()
 
   // Active script
   const activeScript = scripts[0]
@@ -245,7 +245,9 @@ export default function ScriptsPage() {
           break
         case 'm':
           e.preventDefault()
-          handleExportMarkdownRef.current?.()
+          if (activeScript && scenes.length > 0) {
+            handleExportMarkdownRef.current?.()
+          }
           break
         case 'p':
           e.preventDefault()
@@ -310,7 +312,7 @@ export default function ScriptsPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [activeScript, scenes.length])
 
   // Click outside to close export menu
   useEffect(() => {
@@ -469,162 +471,154 @@ export default function ScriptsPage() {
     setExporting(false)
   }
 
-  // Markdown export function
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleExportMarkdown = () => {
+  const handleExportMarkdown = useCallback(() => {
     if (!activeScript || scenes.length === 0) return
+    setExporting(true)
 
-    // Compute filtered scenes inline (same logic as filteredScenes useMemo)
-    let filtered = scenes.filter(s => {
-      const matchesSearch = !sceneFilter ||
-        s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
-        (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
-        (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
-      const matchesIntExt = intExtFilter === 'all' || s.intExt === intExtFilter
-      return matchesSearch && matchesIntExt
-    })
-    
-    // Apply sorting
-    filtered = [...filtered].sort((a, b) => {
-      let comparison = 0
-      switch (sortBy) {
-        case 'sceneNumber':
-          const numA = parseInt(a.sceneNumber.replace(/\D/g, '')) || 0
-          const numB = parseInt(b.sceneNumber.replace(/\D/g, '')) || 0
-          comparison = numA - numB
-          break
-        case 'location':
-          comparison = (a.location || '').localeCompare(b.location || '')
-          break
-        case 'timeOfDay':
-          comparison = (a.timeOfDay || '').localeCompare(b.timeOfDay || '')
-          break
-        case 'characters':
-          comparison = a.sceneCharacters.length - b.sceneCharacters.length
-          break
-        case 'confidence':
-          comparison = a.confidence - b.confidence
-          break
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
+    // Compute filtered scenes locally
+    const computeFilteredScenes = () => {
+      let result = scenes.filter(s => {
+        const matchesSearch = !sceneFilter ||
+          s.sceneNumber.toLowerCase().includes(sceneFilter.toLowerCase()) ||
+          (s.headingRaw || '').toLowerCase().includes(sceneFilter.toLowerCase()) ||
+          (s.location || '').toLowerCase().includes(sceneFilter.toLowerCase())
+        const matchesIntExt = intExtFilter === 'all' || s.intExt === intExtFilter
+        return matchesSearch && matchesIntExt
+      })
+      
+      // Apply sorting
+      const sorted = [...result].sort((a, b) => {
+        let comparison = 0
+        switch (sortBy) {
+          case 'sceneNumber':
+            const numA = parseInt(a.sceneNumber.replace(/\D/g, '')) || 0
+            const numB = parseInt(b.sceneNumber.replace(/\D/g, '')) || 0
+            comparison = numA - numB
+            break
+          case 'location':
+            comparison = (a.location || '').localeCompare(b.location || '')
+            break
+          case 'timeOfDay':
+            comparison = (a.timeOfDay || '').localeCompare(b.timeOfDay || '')
+            break
+          case 'characters':
+            comparison = a.sceneCharacters.length - b.sceneCharacters.length
+            break
+        }
+        return sortOrder === 'asc' ? comparison : -comparison
+      })
+      return sorted
+    }
 
-    if (filtered.length === 0) return
+    const filteredScenesToExport = computeFilteredScenes()
 
     // Calculate summary stats
-    const totalScenes = scenes.length
     const intScenes = scenes.filter(s => s.intExt === 'INT').length
     const extScenes = scenes.filter(s => s.intExt === 'EXT').length
     const dayScenes = scenes.filter(s => s.timeOfDay === 'DAY').length
     const nightScenes = scenes.filter(s => s.timeOfDay === 'NIGHT').length
-    const totalCharacters = characters.length
+    const totalCharacters = new Set(scenes.flatMap(s => s.sceneCharacters.map(c => c.character.name))).size
     const totalLocations = new Set(scenes.map(s => s.location)).size
     const totalProps = new Set(scenes.flatMap(s => s.sceneProps.map(p => p.prop.name))).size
-    const totalVfxNotes = allVfx.length
-    const totalWarnings = allWarnings.length
+    const totalVfx = allVfx.length
+    const totalWarnings = scenes.flatMap(s => s.warnings).length
 
-    // Build Markdown content
-    let markdown = `# ${activeScript.title}
+    // Build markdown
+    let markdown = `# CinePilot Script Report
+Generated: ${new Date().toLocaleString()}
 
-*Generated by CinePilot on ${new Date().toISOString().split('T')[0]}*
+---
 
 ## Script Overview
 
-| Field | Value |
-|-------|-------|
+| Property | Value |
+|----------|-------|
 | Title | ${activeScript.title} |
 | Version | ${activeScript.version} |
-| Created | ${activeScript.createdAt.split('T')[0]} |
-| Total Scenes | ${totalScenes} |
+| Created | ${new Date(activeScript.createdAt).toLocaleDateString()} |
+| Total Scenes | ${scenes.length} |
 | Characters | ${totalCharacters} |
 | Locations | ${totalLocations} |
 | Props | ${totalProps} |
-| VFX Notes | ${totalVfxNotes} |
+| VFX Notes | ${totalVfx} |
 | Warnings | ${totalWarnings} |
+
+---
 
 ## Scene Summary
 
-| Type | Count |
-|------|-------|
-| INT | ${intScenes} |
-| EXT | ${extScenes} |
-| DAY | ${dayScenes} |
-| NIGHT | ${nightScenes} |
-
-## Filters Applied
-
-| Filter | Value |
+| Metric | Count |
 |--------|-------|
-| Type | ${intExtFilter === 'all' ? 'All' : intExtFilter} |
-| Sort | ${sortBy} (${sortOrder}) |
-| Search | ${sceneFilter || 'None'} |
+| INT Scenes | ${intScenes} |
+| EXT Scenes | ${extScenes} |
+| Day Scenes | ${dayScenes} |
+| Night Scenes | ${nightScenes} |
+
+---
 
 ## Scenes Detail
 
+| # | Type | Time | Location | Characters | Props | VFX | Warnings |
+|---|------|------|----------|------------|-------|-----|----------|
 `
 
-    filtered.forEach((scene, idx) => {
-      const sceneChars = scene.sceneCharacters.map(c => c.character.name).join(', ')
-      const sceneProps = scene.sceneProps.map(p => p.prop.name).join(', ')
-      const sceneVfx = scene.vfxNotes.map(v => v.description).join('; ')
-      const sceneWarnings = scene.warnings.map(w => w.description).join('; ')
-
-      markdown += `### Scene ${scene.sceneNumber}: ${scene.headingRaw || 'Untitled'}
-
-| Field | Value |
-|-------|-------|
-| Scene # | ${scene.sceneNumber} |
-| Type | ${scene.intExt || '-'} |
-| Time | ${scene.timeOfDay || '-'} |
-| Location | ${scene.location || '-'} |
-| Confidence | ${scene.confidence ? (scene.confidence * 100).toFixed(0) + '%' : '-'} |
-| Characters | ${sceneChars || '-'} |
-| Props | ${sceneProps || '-'} |
-| VFX Notes | ${sceneVfx || '-'} |
-| Warnings | ${sceneWarnings || '-'} |
-
-`
+    filteredScenesToExport.forEach(scene => {
+      const characters = scene.sceneCharacters.map(c => c.character.name).join(', ')
+      const props = scene.sceneProps.map(p => p.prop.name).join(', ')
+      const vfx = scene.vfxNotes.map(v => v.description).join(', ')
+      const warnings = scene.warnings.map(w => w.description).join(', ')
+      markdown += `| ${scene.sceneNumber} | ${scene.intExt || '-'} | ${scene.timeOfDay || '-'} | ${scene.location || '-'} | ${characters || '-'} | ${props || '-'} | ${vfx || '-'} | ${warnings || '-'} |\n`
     })
 
-    // Characters section
-    if (characters.length > 0) {
-      markdown += `## Characters
-
-| Name | Aliases | Role Hint | Scenes |
-|------|---------|-----------|--------|
-`
-      characters.forEach(c => {
-        markdown += `| ${c.name} | ${c.aliases?.join(', ') || '-'} | ${c.roleHint || '-'} | ${c.sceneCharacters.length} |\n`
-      })
-      markdown += '\n'
-    }
-
-    // VFX Notes section
+    // Add VFX Notes section if there are any
     if (allVfx.length > 0) {
-      markdown += `## VFX Notes
+      markdown += `
+---
+
+## VFX Notes
 
 | Scene | Description | Type |
-|-------|------------|------|
+|-------|-------------|------|
 `
-      allVfx.forEach(v => {
-        markdown += `| ${v.sceneNumber} | ${v.description} | ${v.vfxType || '-'} |\n`
+      allVfx.forEach(vfx => {
+        markdown += `| ${vfx.sceneNumber} | ${vfx.description} | ${vfx.vfxType || 'standard'} |\n`
       })
-      markdown += '\n'
     }
 
-    // Warnings section
+    // Add Warnings section if there are any
+    const allWarnings = scenes.flatMap(s => s.warnings)
     if (allWarnings.length > 0) {
-      markdown += `## Warnings
+      markdown += `
+---
+
+## Warnings
 
 | Scene | Type | Description | Severity |
 |-------|------|-------------|----------|
 `
-      allWarnings.forEach(w => {
-        markdown += `| ${w.sceneNumber || '-'} | ${w.warningType || '-'} | ${w.description} | ${w.severity || '-'} |\n`
+      scenes.forEach(scene => {
+        scene.warnings.forEach(w => {
+          markdown += `| ${scene.sceneNumber} | ${w.warningType || 'General'} | ${w.description} | ${w.severity || 'medium'} |\n`
+        })
       })
     }
 
-    // Create and download the file
+    // Add filter info
+    if (intExtFilter !== 'all' || sortBy !== 'sceneNumber' || sortOrder !== 'asc' || sceneFilter) {
+      markdown += `
+---
+
+## Filters Applied
+
+`
+      if (intExtFilter !== 'all') markdown += `- Type Filter: ${intExtFilter}\n`
+      if (sortBy !== 'sceneNumber' || sortOrder !== 'asc') markdown += `- Sort: ${sortBy} (${sortOrder})\n`
+      if (sceneFilter) markdown += `- Search: "${sceneFilter}"\n`
+    }
+
+    markdown += `\n---\n*Exported from CinePilot Script Management*`
+
+    // Create and download file
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -632,7 +626,14 @@ export default function ScriptsPage() {
     a.download = `script-${new Date().toISOString().split('T')[0]}.md`
     a.click()
     URL.revokeObjectURL(url)
-  }
+    setShowExportMenu(false)
+    setExporting(false)
+  }, [activeScript, scenes, allVfx, intExtFilter, sortBy, sortOrder, sceneFilter])
+
+  // Update ref when function changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   // Print functionality
   const handlePrint = useCallback(() => {
@@ -755,11 +756,6 @@ export default function ScriptsPage() {
   useEffect(() => {
     handlePrintRef.current = handlePrint;
   }, [handlePrint]);
-
-  // Update ref for markdown export
-  useEffect(() => {
-    handleExportMarkdownRef.current = handleExportMarkdown;
-  }, [handleExportMarkdown]);
 
   // Copy scene to clipboard
   const handleCopyScene = async (scene: SceneData) => {
@@ -1095,10 +1091,10 @@ Warnings: ${allWarnings.length}`
                   </button>
                   <button
                     onClick={handleExportMarkdown}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-left text-sm text-cyan-400 hover:bg-gray-800 flex items-center gap-2"
                   >
-                    <FileText className="w-4 h-4 text-cyan-400" />
-                    <span className="text-gray-300">Export Markdown</span>
+                    <FileText className="w-4 h-4" />
+                    Export Markdown
                   </button>
                 </div>
               )}

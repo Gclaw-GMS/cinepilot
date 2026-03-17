@@ -665,8 +665,7 @@ export default function EquipmentPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalOpen, editModalOpen, showExportMenu])
+  }, [modalOpen, editModalOpen, showExportMenu, equipment.length, filtered.length])
 
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedEquipment)

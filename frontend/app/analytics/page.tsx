@@ -344,7 +344,6 @@ export default function AnalyticsPage() {
           break
         case 'm':
           e.preventDefault()
-          // Use ref to avoid dependency issues - refs are always available
           handleExportMarkdownRef.current?.()
           break
         case 'p':
@@ -365,7 +364,6 @@ export default function AnalyticsPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Click outside to close menus
@@ -456,21 +454,17 @@ export default function AnalyticsPage() {
     setExporting(false)
   }
 
-  // Markdown export function
+  // Markdown Export function
   const handleExportMarkdown = useCallback(() => {
     if (!dashboard || !metrics) return
     setExporting(true)
     setShowExportMenu(false)
 
-    const overview = dashboard.overview
-    const timeline = metrics.timeline
-    const performance = metrics.performance
-    const predictions = metrics.predictions
-
-    // Build Markdown content
+    // Build markdown content
     let markdown = `# CinePilot Analytics Report
 
-> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+**Generated:** ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+**Mode:** ${isDemoMode ? 'Demo Data' : 'Production Data'}
 
 ---
 
@@ -478,46 +472,55 @@ export default function AnalyticsPage() {
 
 | Metric | Value |
 |--------|-------|
-| Total Scenes | ${overview.total_scenes} |
-| Completed Scenes | ${overview.completed_scenes} |
-| Completion | ${((overview.completed_scenes / overview.total_scenes) * 100).toFixed(1)}% |
-| Total Locations | ${overview.total_locations} |
-| Total Characters | ${overview.total_characters} |
-| Shooting Days | ${overview.shooting_days_completed} / ${overview.shooting_days_total} |
-| Crew Members | ${overview.crew_members} |
+| Total Scenes | ${dashboard.overview.total_scenes} |
+| Completed Scenes | ${dashboard.overview.completed_scenes} (${Math.round(dashboard.overview.completed_scenes / dashboard.overview.total_scenes * 100)}%) |
+| Total Locations | ${dashboard.overview.total_locations} |
+| Total Characters | ${dashboard.overview.total_characters} |
+| Shooting Days | ${dashboard.overview.shooting_days_completed} / ${dashboard.overview.shooting_days_total} |
+| Crew Members | ${dashboard.overview.crew_members} |
+| Total Shots | ${dashboard.overview.total_shots} |
+| Completed Shots | ${dashboard.overview.completed_shots} (${Math.round(dashboard.overview.completed_shots / dashboard.overview.total_shots * 100)}%) |
+| VFX Shots | ${dashboard.overview.vfx_shots} |
+| Completed VFX | ${dashboard.overview.completed_vfx} (${Math.round(dashboard.overview.completed_vfx / dashboard.overview.vfx_shots * 100)}%) |
 
 ---
 
-## 💰 Budget Summary
+## 💰 Budget Overview
 
-| Metric | Amount |
-|--------|--------|
-| Total Budget | ₹${(overview.budget_total / 10000000).toFixed(2)} Cr |
-| Spent | ₹${(overview.budget_spent / 10000000).toFixed(2)} Cr |
-| Remaining | ₹${(overview.budget_remaining / 10000000).toFixed(2)} Cr |
-| Utilization | ${overview.budget_total > 0 ? ((overview.budget_spent / overview.budget_total) * 100).toFixed(1) : 0}% |
+| Metric | Value |
+|--------|-------|
+| Total Budget | ₹${dashboard.overview.budget_total.toLocaleString('en-IN')} |
+| Budget Spent | ₹${dashboard.overview.budget_spent.toLocaleString('en-IN')} |
+| Budget Remaining | ₹${dashboard.overview.budget_remaining.toLocaleString('en-IN')} |
+| Utilization | ${Math.round(dashboard.overview.budget_spent / dashboard.overview.budget_total * 100)}% |
 
 ### Budget Breakdown
 
 | Category | Allocated | Spent | Remaining |
 |----------|-----------|-------|-----------|
-`
-
-    sortedBudgetData.forEach(b => {
-      const remaining = b.allocated - b.spent
-      markdown += `| ${b.category} | ₹${(b.allocated / 100000).toFixed(1)}L | ₹${(b.spent / 100000).toFixed(1)}L | ₹${(remaining / 100000).toFixed(1)}L |\n`
-    })
-
-    markdown += `
+${sortedBudgetData.map(b => {
+  const remaining = b.allocated - b.spent
+  return `| ${b.category} | ₹${b.allocated.toLocaleString('en-IN')} | ₹${b.spent.toLocaleString('en-IN')} | ₹${remaining.toLocaleString('en-IN')} |`
+}).join('\n')}
 
 ---
 
-## 🎬 Shot & VFX Progress
+## 📅 Schedule Progress
 
-| Metric | Total | Completed | Remaining |
-|--------|-------|----------|-----------|
-| Total Shots | ${overview.total_shots} | ${overview.completed_shots} | ${overview.total_shots - overview.completed_shots} |
-| VFX Shots | ${overview.vfx_shots} | ${overview.completed_vfx} | ${overview.vfx_shots - overview.completed_vfx} |
+| Day | Scenes | Status |
+|-----|--------|--------|
+${dashboard.schedule_progress.slice(0, 15).map(s => {
+  const statusEmoji = s.status === 'completed' ? '✅' : s.status === 'in_progress' ? '🔄' : '📅'
+  return `| Day ${s.day} | ${s.scenes} | ${statusEmoji} ${s.status.replace('_', ' ')} |`
+}).join('\n')}
+
+---
+
+## 👥 Department Performance
+
+| Department | Efficiency | Utilization |
+|------------|------------|-------------|
+${sortedDepartmentData.map(d => `| ${d.name} | ${d.efficiency}% | ${d.utilization}% |`).join('\n')}
 
 ---
 
@@ -525,10 +528,10 @@ export default function AnalyticsPage() {
 
 | Metric | Value |
 |--------|-------|
-| Overall Progress | ${timeline.overall_progress}% |
-| Days Remaining | ${timeline.days_remaining} |
-| Scenes Remaining | ${timeline.scenes_remaining} |
-| Budget Utilization | ${timeline.budget_utilization.toFixed(1)}% |
+| Overall Progress | ${metrics.timeline.overall_progress}% |
+| Days Remaining | ${metrics.timeline.days_remaining} |
+| Scenes Remaining | ${metrics.timeline.scenes_remaining} |
+| Budget Utilization | ${metrics.timeline.budget_utilization}% |
 
 ---
 
@@ -536,10 +539,10 @@ export default function AnalyticsPage() {
 
 | Metric | Value |
 |--------|-------|
-| Avg Scenes/Day | ${performance.avg_scenes_per_day.toFixed(1)} |
-| Avg Shots/Scene | ${performance.avg_shots_per_scene.toFixed(1)} |
-| Budget Burn Rate | ₹${(performance.budget_burn_rate / 100000).toFixed(1)}L/day |
-| Efficiency Score | ${performance.efficiency_score}% |
+| Avg Scenes/Day | ${metrics.performance.avg_scenes_per_day} |
+| Avg Shots/Scene | ${metrics.performance.avg_shots_per_scene} |
+| Budget Burn Rate | ₹${metrics.performance.budget_burn_rate.toLocaleString('en-IN')}/day |
+| Efficiency Score | ${metrics.performance.efficiency_score}% |
 
 ---
 
@@ -547,84 +550,43 @@ export default function AnalyticsPage() {
 
 | Metric | Value |
 |--------|-------|
-| Projected Completion | ${new Date(predictions.projected_completion).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} |
-| Projected Budget Overrun | ₹${(predictions.projected_budget_overrun / 100000).toFixed(1)}L |
-| Risk Level | ${predictions.risk_level.charAt(0).toUpperCase() + predictions.risk_level.slice(1)} |
+| Projected Completion | ${new Date(metrics.predictions.projected_completion).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} |
+| Projected Budget Overrun | ₹${metrics.predictions.projected_budget_overrun.toLocaleString('en-IN')} |
+| Risk Level | ${metrics.predictions.risk_level === 'high' ? '🔴 High' : metrics.predictions.risk_level === 'medium' ? '🟡 Medium' : '🟢 Low'} |
 
 ---
 
-## 👥 Department Efficiency
+## 📝 Recent Activities
 
-| Department | Efficiency | Utilization |
-|------------|------------|-------------|
-`
-
-    sortedDepartmentData.forEach(d => {
-      markdown += `| ${d.name} | ${d.efficiency}% | ${d.utilization}% |\n`
-    })
-
-    markdown += `
+| Type | User | Timestamp |
+|------|------|-----------|
+${sortedActivitiesData.map(a => {
+  const typeEmoji = a.type === 'scene_shot' ? '🎬' : a.type === 'schedule_updated' ? '📅' : a.type === 'budget_approved' ? '💰' : a.type === 'location_added' ? '📍' : '👤'
+  return `| ${typeEmoji} ${a.type.replace('_', ' ')} | ${a.user} | ${new Date(a.timestamp).toLocaleDateString('en-IN')} |`
+}).join('\n')}
 
 ---
 
-## 📅 Upcoming Shoots
+## 🎯 Upcoming Shoots
 
-| Date | Location | Scenes | Call Time |
-|------|----------|--------|-----------|
-`
-
-    dashboard.upcoming_shoots.forEach(shoot => {
-      markdown += `| ${new Date(shoot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} | ${shoot.location} | ${shoot.scenes.join(', ')} | ${shoot.call_time} |\n`
-    })
-
-    markdown += `
+| Date | Location | Call Time | Scenes |
+|------|----------|-----------|--------|
+${dashboard.upcoming_shoots.map(s => `| ${new Date(s.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} | ${s.location} | ${s.call_time} | ${s.scenes.join(', ')} |`).join('\n')}
 
 ---
 
-## 🔄 Recent Activities
-
-| Time | User | Activity |
-|------|------|----------|
-`
-
-    sortedActivitiesData.slice(0, 10).forEach(activity => {
-      const time = new Date(activity.timestamp).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-      let activityDesc = ''
-      switch (activity.type) {
-        case 'scene_shot': activityDesc = `Shot scene ${activity.scene}`; break;
-        case 'schedule_updated': activityDesc = 'Updated schedule'; break;
-        case 'budget_approved': activityDesc = `Approved budget: ₹${(activity.amount! / 100000).toFixed(1)}L`; break;
-        case 'location_added': activityDesc = `Added location: ${activity.location}`; break;
-        case 'crew_assigned': activityDesc = `Assigned crew: ${activity.crew}`; break;
-        default: activityDesc = activity.type;
-      }
-      markdown += `| ${time} | ${activity.user} | ${activityDesc} |\n`
-    })
-
-    markdown += `
-
----
-
-## 📋 Filters Applied
-
-- **Time Period**: ${filters.timePeriod === 'all' ? 'All Time' : filters.timePeriod}
-- **Department**: ${filters.department === 'all' ? 'All Departments' : filters.department}
-- **Sort By**: ${sortBy} (${sortOrder})
-
----
-
-*Report generated by CinePilot - Film Production Management*
+*Generated by CinePilot - Film Production Management*
 `
 
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.md`
+    a.download = `analytics-${new Date().toISOString().split('T')[0]}.md`
     a.click()
     setExporting(false)
-  }, [dashboard, metrics, sortedBudgetData, sortedDepartmentData, sortedActivitiesData, filters, sortBy, sortOrder])
+  }, [dashboard, metrics, sortedBudgetData, sortedDepartmentData, sortedActivitiesData, isDemoMode])
 
-  // Ref for keyboard shortcut
+  // Store handleExportMarkdown in ref for keyboard shortcut
   const handleExportMarkdownRef = useRef(handleExportMarkdown)
   useEffect(() => {
     handleExportMarkdownRef.current = handleExportMarkdown
@@ -1074,18 +1036,18 @@ export default function AnalyticsPage() {
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <button
-                  onClick={handleExportMarkdown}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
-                >
-                  <Download className="w-4 h-4 text-cyan-400" />
-                  Export as Markdown
-                </button>
-                <button
                   onClick={handleExportJSON}
                   className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
                 >
                   <Download className="w-4 h-4 text-indigo-400" />
                   Export as JSON
+                </button>
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  Export Markdown
                 </button>
                 <button
                   onClick={handleExportCSV}

@@ -646,6 +646,12 @@ export default function WeatherPage() {
             setShowExportMenu(prev => !prev)
           }
           break
+        case 'm':
+          e.preventDefault()
+          if (weatherData?.forecast?.length) {
+            exportToMarkdownRef.current()
+          }
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -669,12 +675,6 @@ export default function WeatherPage() {
           e.preventDefault()
           if (weatherData?.forecast?.length && !printingRef.current) {
             handlePrintRef.current()
-          }
-          break
-        case 'm':
-          e.preventDefault()
-          if (weatherData?.forecast?.length) {
-            exportToMarkdownRef.current()
           }
           break
       }
@@ -797,104 +797,79 @@ export default function WeatherPage() {
     URL.revokeObjectURL(url);
   }, [filteredForecast, weatherData, filters, sortBy, sortOrder]);
 
-  // Export forecast to Markdown (uses filtered/sorted data)
+  // Export forecast to Markdown
   const exportToMarkdown = useCallback(() => {
     if (!filteredForecast.length) return;
     
-    const forecast = filteredForecast;
-    const avgScore = Math.round(forecast.reduce((sum, d) => sum + d.productionScore, 0) / forecast.length);
-    const bestDay = forecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, forecast[0]);
-    const worstDay = forecast.reduce((worst, d) => d.productionScore < worst.productionScore ? d : worst, forecast[0]);
-    const totalPrecip = forecast.reduce((sum, d) => sum + d.precipitation, 0);
+    const avgScore = Math.round(filteredForecast.reduce((sum, d) => sum + d.productionScore, 0) / filteredForecast.length);
+    const bestDay = filteredForecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, filteredForecast[0]);
+    const worstDay = filteredForecast.reduce((worst, d) => d.productionScore < worst.productionScore ? d : worst, filteredForecast[0]);
+    const totalPrecip = filteredForecast.reduce((sum, d) => sum + d.precipitation, 0);
+    const excellentDays = filteredForecast.filter(d => d.productionScore >= 80).length;
+    const goodDays = filteredForecast.filter(d => d.productionScore >= 60 && d.productionScore < 80).length;
+    const moderateDays = filteredForecast.filter(d => d.productionScore >= 40 && d.productionScore < 60).length;
+    const poorDays = filteredForecast.filter(d => d.productionScore < 40).length;
     
-    // Calculate condition breakdown
-    const conditions = forecast.reduce((acc, day) => {
-      const cond = day.condition;
+    // Group by condition
+    const conditionCounts = filteredForecast.reduce<Record<string, number>>((acc, d) => {
+      const cond = d.condition || 'Unknown';
       acc[cond] = (acc[cond] || 0) + 1;
       return acc;
-    }, {} as Record<string, number>);
+    }, {});
     
-    // Get score distribution
-    const goodDays = forecast.filter(d => d.productionScore >= 80).length;
-    const moderateDays = forecast.filter(d => d.productionScore >= 60 && d.productionScore < 80).length;
-    const badDays = forecast.filter(d => d.productionScore < 60).length;
-    
-    const getScoreLabel = (score: number) => {
-      if (score >= 80) return '🟢 Excellent';
-      if (score >= 60) return '🟡 Good';
-      return '🔴 Poor';
-    };
-    
-    const getConditionEmoji = (condition: string) => {
-      const c = condition.toLowerCase();
-      if (c.includes('rain')) return '🌧️';
-      if (c.includes('cloud')) return '☁️';
-      if (c.includes('thunder')) return '⛈️';
-      if (c.includes('clear') || c.includes('sun')) return '☀️';
-      return '🌤️';
-    };
-    
-    let markdown = `# Weather Forecast - CinePilot
+    let markdown = `# CinePilot Weather Forecast
 
-## Executive Summary
+**Location:** ${weatherData?.location || 'Unknown'}
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+**Coordinates:** ${weatherData?.lat || 0}°N, ${weatherData?.lng || 0}°E
+
+---
+
+## Summary
 
 | Metric | Value |
 |--------|-------|
-| **Location** | ${weatherData?.location || 'Unknown'} |
-| **Coordinates** | ${weatherData?.lat?.toFixed(2) || '0'}, ${weatherData?.lng?.toFixed(2) || '0'} |
-| **Total Days** | ${forecast.length} |
-| **Average Score** | ${avgScore}/100 |
-| **Best Day** | ${bestDay.date} (${bestDay.productionScore}/100) |
-| **Worst Day** | ${worstDay.date} (${worstDay.productionScore}/100) |
-| **Total Precipitation** | ${totalPrecip.toFixed(1)} mm |
+| Total Days | ${filteredForecast.length} |
+| Average Score | ${avgScore}/100 |
+| Best Day | ${bestDay?.date} (${bestDay?.productionScore}/100) |
+| Worst Day | ${worstDay?.date} (${worstDay?.productionScore}/100) |
+| Total Precipitation | ${totalPrecip.toFixed(1)} mm |
 
-## Production Score Distribution
+## Production Suitability
 
-| Rating | Days | Percentage |
-|--------|------|------------|
-| 🟢 Excellent (80-100) | ${goodDays} | ${Math.round((goodDays / forecast.length) * 100)}% |
-| 🟡 Good (60-79) | ${moderateDays} | ${Math.round((moderateDays / forecast.length) * 100)}% |
-| 🔴 Poor (<60) | ${badDays} | ${Math.round((badDays / forecast.length) * 100)}% |
+| Category | Days |
+|----------|------|
+| Excellent (80+) | ${excellentDays} |
+| Good (60-79) | ${goodDays} |
+| Moderate (40-59) | ${moderateDays} |
+| Poor (<40) | ${poorDays} |
 
-## Condition Breakdown
+## Weather Conditions
 
 `;
     
-    // Add condition breakdown table
-    markdown += `| Condition | Days | Percentage |\n|------------|------|------------|\n`;
-    Object.entries(conditions).forEach(([cond, count]) => {
-      markdown += `| ${getConditionEmoji(cond)} ${cond} | ${count} | ${Math.round((count / forecast.length) * 100)}% |\n`;
+    // Add condition breakdown
+    Object.entries(conditionCounts).forEach(([condition, count]) => {
+      markdown += `- **${condition}:** ${count} day${count > 1 ? 's' : ''}\n`;
     });
-    
-    markdown += `
-## Daily Forecast
-
-| Date | Condition | Temp (°C) | Humidity | Wind | Precip | Score | Recommendation |
-|------|-----------|-----------|----------|------|--------|-------|----------------|
-`;
-    
-    forecast.forEach(day => {
-      markdown += `| ${day.date} | ${getConditionEmoji(day.condition)} ${day.condition} | ${day.tempHigh}°/${day.tempLow}° | ${day.humidity}% | ${day.windSpeed} km/h | ${day.precipitation} mm | ${getScoreLabel(day.productionScore)} | ${day.recommendation} |\n`;
-    });
-    
-    // Add filters info if active
-    const activeFilters = [];
-    if (filters.condition !== 'all') activeFilters.push(`Condition: ${filters.condition}`);
-    if (filters.dateRange !== 'all') activeFilters.push(`Date Range: ${filters.dateRange}`);
-    if (sortBy !== 'date' || sortOrder !== 'asc') activeFilters.push(`Sort: ${sortBy} (${sortOrder})`);
-    
-    if (activeFilters.length > 0) {
-      markdown += `
-## Filters Applied
-
-- ${activeFilters.join('\n- ')}
-
-`;
-    }
     
     markdown += `
 ---
-*Generated by CinePilot on ${new Date().toLocaleString()}*
+
+## Detailed Forecast
+
+| Date | Condition | High | Low | Humidity | Wind | Precip | Score | Recommendation |
+|------|-----------|------|-----|----------|------|--------|-------|----------------|
+`;
+    
+    filteredForecast.forEach(day => {
+      markdown += `| ${day.date} | ${day.condition} | ${day.tempHigh}°C | ${day.tempLow}°C | ${day.humidity}% | ${day.windSpeed} km/h | ${day.precipitation} mm | ${day.productionScore} | ${day.recommendation} |\n`;
+    });
+    
+    markdown += `
+---
+
+*Generated by CinePilot - Production Weather Planning*
 `;
     
     const blob = new Blob([markdown], { type: 'text/markdown' });
@@ -904,7 +879,7 @@ export default function WeatherPage() {
     a.download = `weather-forecast-${weatherData?.location || 'forecast'}-${new Date().toISOString().split('T')[0]}.md`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [filteredForecast, weatherData, filters, sortBy, sortOrder]);
+  }, [filteredForecast, weatherData]);
 
   // Set up export ref for keyboard shortcuts
   useEffect(() => {
@@ -1208,7 +1183,7 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['F']} description="Toggle filters" />
                 <ShortcutRow keys={['S']} description="Toggle sort order" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
-                <ShortcutRow keys={['M']} description="Export Markdown" />
+                <ShortcutRow keys={['M']} description="Export as Markdown" />
                 <ShortcutRow keys={['P']} description="Print forecast report" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
                 <ShortcutRow keys={['Esc']} description="Close modal" />
@@ -1382,8 +1357,8 @@ export default function WeatherPage() {
                       >
                         <FileText className="w-4 h-4 text-cyan-400" />
                         <div>
-                          <div className="font-medium">Export as Markdown</div>
-                          <div className="text-xs text-slate-500">Formatted report</div>
+                          <div className="font-medium">Export Markdown</div>
+                          <div className="text-xs text-slate-500">Human-readable report</div>
                         </div>
                       </button>
                     </div>

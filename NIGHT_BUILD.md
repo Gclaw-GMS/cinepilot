@@ -1,6 +1,219 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (10:54 AM) - Scripts Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (12:54 PM) - Scripts Page Markdown Export IMPLEMENTED
+
+---
+
+## 12:54 PM - Scripts Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Scripts Page - Markdown Export**: Added ability to export script data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Script Overview**: Title, version, created date, total scenes, characters, locations, props, VFX notes, warnings
+    - **Scene Summary**: Table with INT/EXT and Day/Night counts
+    - **Filters Applied**: Shows current filters (type, sort, search)
+    - **Scenes Detail**: Full table with scene number, type, time, location, confidence, characters, props, VFX notes, warnings
+    - **Characters Section**: Table with name, aliases, role hint, scenes appeared
+    - **VFX Notes Section**: Table with scene, description, type
+    - **Warnings Section**: Table with scene, type, description, severity
+  - **Content Preservation**: Full script data included in export
+  - **Works with Filters**: Exports currently filtered scenes only
+  - **File Naming**: Auto-generated filename with date (script-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **Inline Filter Computation**: Filters scenes locally to avoid hook ordering issues (same logic as filteredScenes useMemo)
+- **Summary Stats**: Includes all key script metrics (INT/EXT, Day/Night, characters, locations, props, VFX, warnings)
+- **Filter Info**: Captures all current filters for export metadata
+- **Character Section**: Full character list with aliases and scenes
+- **VFX Notes Section**: All VFX notes organized by scene
+- **Warnings Section**: All warnings with severity levels
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print script
+- **R** - Refresh scripts
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **1-7** - Switch tabs (Upload/Scenes/Characters/Quality/Warnings/Compare/Analytics)
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 1 pre-existing warning (not from this change) ✅
+
+### Scripts Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Script overview section includes all key stats
+- [x] Scene summary table with INT/EXT and Day/Night counts
+- [x] Filters applied section shows current filters
+- [x] Scenes detail table with all fields
+- [x] Characters section with all details
+- [x] VFX notes section (if available)
+- [x] Warnings section (if available)
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks activeScript and scenes)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+
+---
+
+## 12:34 PM - Audience Sentiment Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Audience Sentiment Page - Markdown Export**: Added ability to export audience sentiment analysis data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Overview**: Total analyses, total comments, positive/negative/neutral counts, average sentiment
+    - **Platform Breakdown**: Table showing analyses count and comments per platform (YouTube, Instagram, Twitter)
+    - **Filter Summary**: Shows current filters (platform, status, regional cinema, sort)
+    - **Detailed Analyses**: Each analysis with comprehensive data:
+      - Platform, total comments, positive/negative/neutral percentages
+      - Average sentiment score, status, creation date
+      - Regional cinema (if applicable), video URL (if available)
+      - Key takeaways, poster tips, top positive/negative comments
+  - **Content Preservation**: Full sentiment analysis data included in export
+  - **Works with Filters**: Exports currently filtered analyses only
+  - **File Naming**: Auto-generated filename with date (audience-sentiment-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown wrapped in useCallback
+- **Filter Integration**: Uses filteredAnalyses for export content
+- **Summary Stats**: Includes all key sentiment metrics (total comments, positive, negative, neutral, average sentiment)
+- **Platform Breakdown**: Dynamic table showing platform-wise counts
+- **Filter Info**: Captures all current filters for export metadata
+- **Detailed Sections**: Per-analysis data including takeaways, poster tips, and top comments
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **useEffect Assignment**: Updates ref when handleExportMarkdown function changes
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print report
+- **R** - Refresh data
+- **N** - New analysis
+- **1-4** - Filter by platform (All/YouTube/Instagram/Twitter)
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 1 pre-existing warning (not from this change) ✅
+
+### Audience Sentiment Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Overview section includes all key stats
+- [x] Platform breakdown table with counts and comments
+- [x] Filter summary shows current filters
+- [x] Detailed analyses with all information
+- [x] Key takeaways section (if available)
+- [x] Poster tips section (if available)
+- [x] Top positive/negative comments (if available)
+- [x] Regional cinema info (if available)
+- [x] Video URL (if available)
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks filteredAnalyses.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+
+---
+
+### Features Perfected This Build
+- **Storyboard Page - Markdown Export**: Added ability to export storyboard data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Overview**: Script title, total scenes, total frames, approved/pending/generating/failed counts
+    - **Filters Applied**: Shows current filters (search, status, scene, sort, style)
+    - **Style Section**: Shows current drawing style (Clean Line Art, Pencil Sketch, Marker & Ink, Blueprint)
+    - **Scene Breakdown**: Each scene with table of shots, frame IDs, status, approval, style, prompts
+    - **Scene Summary**: Per-scene counts of approved, pending, generating, failed frames
+    - **Director Notes**: All director notes extracted and organized by scene/shot
+    - **Frame Details**: Comprehensive frame info including status, approval, style, prompt, director notes, shot text, shot size, characters, scene info
+  - **Content Preservation**: Full storyboard data included in export
+  - **Works with Filters**: Exports currently filtered scenes only
+  - **File Naming**: Auto-generated filename with date (storyboard-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown wrapped in useCallback
+- **Local Filter Computation**: Filters scenes locally to avoid hook ordering issues (same logic as filteredScenes useMemo)
+- **Summary Stats**: Includes all key storyboard metrics (approved, pending, generating, failed)
+- **Filter Info**: Captures all current filters for export metadata
+- **Style Display**: Shows current drawing style with label
+- **Director Notes Extraction**: Gathers all director notes organized by scene and shot
+- **Frame Details Section**: Comprehensive information for each frame
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print storyboard
+- **R** - Refresh storyboard
+- **F** - Toggle filters & sort
+- **S** - Toggle sort order
+- **/** - Focus search
+- **1-4** - Switch styles (Clean Line Art/Pencil Sketch/Marker & Ink/Blueprint)
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** 1 pre-existing warning (not from this change) ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Storyboard Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Overview section includes all key stats
+- [x] Filters applied section shows current filters
+- [x] Style section shows current drawing style
+- [x] Scene breakdown table with all frame details
+- [x] Scene summary with approved/pending/generating/failed counts
+- [x] Director notes section organized by scene/shot
+- [x] Frame details section with comprehensive info
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks filtered.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
 
 ---
 

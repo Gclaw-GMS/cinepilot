@@ -1,5 +1,81 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (8:34 PM) - Audience Sentiment Page Markdown Export IMPLEMENTED
+
+### Features Perfected This Build
+- **Audience Sentiment Page - Markdown Export**: Added comprehensive Markdown export functionality
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total analyses, total comments, positive/negative/neutral counts with percentages, average sentiment)
+    - **Active Filters**: Shows currently applied filters (platform, status, regional cinema, search)
+    - **Platform Breakdown**: Table showing counts and comment stats per platform (YouTube, Instagram, Twitter)
+    - **Sentiment Analyses**: Detailed sections for each analysis with:
+      - Platform, status, total comments, positive/negative/neutral counts with percentages
+      - Average sentiment score
+      - Created date and video URL (if available)
+      - Regional cinema info (if available)
+      - Key takeaways (bulleted list)
+      - Poster tips (bulleted list)
+      - Top positive and negative comments (quoted)
+  - **Content Preservation**: Full sentiment analysis data included in export
+  - **Works with Filters**: Exports currently filtered analyses only
+  - **File Naming**: Auto-generated filename with date (audience-sentiment-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown for Markdown export
+- **Ref Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **Summary Stats**: Includes all key sentiment metrics (analyses, comments, sentiment scores)
+- **Platform Breakdown**: Table with per-platform statistics
+- **Analysis Details**: Full breakdown for each sentiment analysis
+- **Emoji Indicators**: Uses emojis for sentiment (😊 😐 😔) and status (✅ 🔄 ❌)
+- **useEffect Pattern**: Updates ref when handleExportMarkdown function changes
+- **INR/Indian Formatting**: Uses toLocaleString('en-IN') for number formatting
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print report
+- **R** - Refresh data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search input
+- **1-4** - Filter by platform (All/YouTube/Instagram/Twitter)
+- **N** - New analysis
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors (pre-existing warnings in continuity page) ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/feature/continuity-sorting ✅
+
+### Audience Sentiment Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats (analyses, comments, sentiment)
+- [x] Platform breakdown table with counts and percentages
+- [x] Sentiment analyses detail with all fields
+- [x] Key takeaways and poster tips included when available
+- [x] Top comments included (positive and negative)
+- [x] Filters applied to export (uses filteredAnalyses)
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks filteredAnalyses.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
 ## Build Status: ✅ PASSING (7:14 PM) - VFX Page Markdown Export IMPLEMENTED
 
 ### Features Perfected This Build

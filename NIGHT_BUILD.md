@@ -6879,3 +6879,74 @@ Added a comprehensive conflict detection system to the Catering page:
 ---
 
 ## Build Status: ✅ PASSING (3:54 PM) - Catering Page Markdown Export Feature
+
+---
+
+## Night Build (March 17, 2026, 5:14 PM) - Travel Expenses Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Travel Expenses Page - Markdown Export**: Added comprehensive markdown export functionality
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Executive Summary**: Table with total expenses, pending, approved, reimbursed amounts, budget limit, budget remaining
+    - **Category Breakdown**: Table showing counts and totals per category (flight, train, bus, taxi, auto, hotel, stay, per_diem, daily_allowance)
+    - **Status Breakdown**: Table showing counts and totals per status (pending, approved, rejected, reimbursed)
+    - **Expense Details**: Table with date, category, person, description, amount, status for all filtered expenses
+    - **Filters Applied**: Shows current filters if any are active
+  - **Content Preservation**: Full travel expenses data included in export
+  - **Works with Filters**: Exports currently filtered expenses only
+  - **File Naming**: Auto-generated filename with date (travel-expenses-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **useCallback**: handleExportMarkdown wrapped in useCallback for proper memoization
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **Summary Stats**: Includes all key travel expense metrics (totals by status and category)
+- **Filter Info**: Captures all current filters for export metadata
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **R** - Refresh data
+- **Ctrl+N** - Add new expense
+- **Ctrl+E** - Export menu
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear
+
+### Bug Fixes
+- **Call Sheets Page**: Fixed lint warning by using ref pattern for handleExportMarkdown (temporal dead zone issue)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Travel Expenses Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Executive summary section includes all key stats
+- [x] Category breakdown table with counts and totals
+- [x] Status breakdown table with counts and totals
+- [x] Expense details table with all fields
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'Ctrl+E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks filteredExpenses.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## Build Status: ✅ PASSING (5:14 PM) - Travel Expenses Page Markdown Export Feature

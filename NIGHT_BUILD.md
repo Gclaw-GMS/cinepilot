@@ -1,6 +1,141 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (4:34 PM) - Call Sheets Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (5:54 PM) - DOOD Page Markdown Export IMPLEMENTED
+
+---
+
+## 5:54 PM - DOOD Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **DOOD Page - Markdown Export**: Added ability to export DOOD (Deadly Objects on Set) data in Markdown format
+  - **Export Option**: New "Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Summary Section**: Table with total characters, shooting days, total calls, avg days/actor, main cast days, supporting cast days
+    - **Role Distribution**: Table showing main cast and supporting character counts
+    - **Cast Schedule Table**: Full table with character name, Tamil name, actor, total days, percentage, role, and working days
+    - **Day Distribution**: Shows which characters are working on each shooting day
+    - **Percentage Labels**: Includes High/Medium/Low/Minimal labels for percentages
+  - **Content Preservation**: Full DOOD data included in export
+  - **Works with Filters**: Exports currently filtered data only
+  - **File Naming**: Auto-generated filename with date (dood-report-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **useCallback**: handleExportMarkdown wrapped in useCallback for stable reference
+- **Summary Stats**: Calculates all key DOOD metrics (characters, days, calls, avg)
+- **Role Distribution**: Shows main cast vs supporting breakdown
+- **Day Distribution**: Generates table showing who works each day
+- **Percentage Labels**: Adds High/Medium/Low/Minimal labels to percentages
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
+- **useEffect Assignment**: Updates ref when handleExportMarkdown function changes
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print DOOD report
+- **R** - Refresh DOOD data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **1** - Analytics view
+- **2** - Calendar view
+- **3** - List view
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search / Close filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### DOOD Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Role distribution table shows main vs supporting
+- [x] Cast schedule table with all fields
+- [x] Day distribution table shows who works each day
+- [x] Percentage labels (High/Medium/Low/Minimal)
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Works with filters (exports filtered data)
+- [x] Error handling complete (checks filteredReport)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed: origin/master ✅
+
+---
+
+## 5:34 PM - Health Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Health Page - Markdown Export**: Added ability to export health check data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation timestamp
+    - **Executive Summary**: Table with overall status, timestamp, version, uptime, total components, healthy/degraded/unhealthy counts, average latency
+    - **Component Status Table**: Full table with component name, status (with emoji icons), latency, and message
+    - **Filters Applied Section**: Shows current filters when active (status filter, search query, sort by, sort order, filtered count)
+    - **Footer**: CinePilot branding with generation timestamp
+  - **Content Preservation**: Full health check data included in export
+  - **Works with Filters**: Exports currently filtered data only
+  - **File Naming**: Auto-generated filename with date (health-report-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **useCallback**: exportToMarkdown wrapped in useCallback for stable reference
+- **Summary Stats**: Calculates healthy, degraded, unhealthy counts and average latency
+- **Uptime Formatting**: Shows uptime in human-readable format (days/hours/minutes)
+- **Filter Metadata**: Includes filter info when filters are active
+- **useRef Pattern**: Uses exportToMarkdownRef for keyboard shortcut accessibility
+- **useEffect Assignment**: Updates ref when exportToMarkdown function changes
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print health report
+- **R** - Refresh health data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search / Reset filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Pushed:** origin/feature/continuity-sorting ✅
+
+### Health Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Executive summary section includes all key stats
+- [x] Component status table with status icons
+- [x] Average latency calculation and display
+- [x] Uptime formatted in human-readable format
+- [x] Filters applied section when filters are active
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Works with filters (exports filtered data)
+- [x] Error handling complete (checks healthData)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Pushed: origin/feature/continuity-sorting ✅
 
 ---
 

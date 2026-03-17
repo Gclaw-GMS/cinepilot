@@ -6346,3 +6346,48 @@ All features verified working:
 ---
 
 ## Build Status: ✅ PASSING (7:45 PM) - Locations Page Lint Fix
+
+---
+
+## Build Status: ✅ PASSING (1:53 AM) - DOOD Page Markdown Export Feature
+
+### 1:53 AM - DOOD Page Markdown Export Feature (IMPLEMENTED)
+
+### Features Perfected This Build
+- **DOOD Page - Markdown Export**: Added comprehensive markdown export functionality
+  - **Export Format**: Generates formatted Markdown table report
+  - **Summary Section**: Includes total characters, shooting days, calls, avg days/actor
+  - **Main Cast Table**: Organized table with character, Tamil name, actor, days, percentage
+  - **Supporting Cast Table**: Separate table for supporting cast members
+  - **Professional Format**: Clean markdown with proper formatting and separators
+  - **File Download**: Downloads as `.md` file with date stamp
+  - **Export Menu**: Added Markdown option to export dropdown
+
+### Technical Implementation
+- **Export Function**: Extended `handleExport` to support 'markdown' format
+- **Markdown Generation**: Creates comprehensive markdown with:
+  - Summary metrics in table format
+  - Main cast breakdown
+  - Supporting cast breakdown
+  - Generation timestamp
+- **Menu Integration**: Added button in export dropdown with FileText icon
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+
+### DOOD Page Markdown Export Feature Checklist
+- [x] Feature works 100% (markdown export functional)
+- [x] UI professional & visual (dropdown menu with icon)
+- [x] Export includes summary statistics
+- [x] Main cast and supporting cast separated in export
+- [x] File downloads with proper naming (dood-report-YYYY-MM-DD.md)
+- [x] Error handling complete (uses existing error handling)
+- [x] Build passes
+- [x] Lint passes
+
+---
+
+## Build Status: ✅ PASSING (1:53 AM) - DOOD Page Markdown Export Feature

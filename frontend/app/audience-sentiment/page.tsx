@@ -28,6 +28,7 @@ import {
   Download,
   Printer,
   Filter,
+  FileText,
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -143,6 +144,7 @@ export default function AudienceSentimentPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const printSentimentReportRef = useRef<() => void>(() => {})
+  const handleExportMarkdownRef = useRef<() => void>()
 
   // Filter and sort analyses by platform, status, search query, regional cinema, and sort options
   const filteredAnalyses = useMemo(() => {
@@ -253,6 +255,10 @@ export default function AudienceSentimentPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
           break
         case 'p':
           e.preventDefault()
@@ -410,6 +416,123 @@ export default function AudienceSentimentPage() {
     setShowExportMenu(false)
   }
 
+  // Markdown export function
+  function handleExportMarkdown() {
+    if (filteredAnalyses.length === 0) return
+
+    const totalComments = filteredAnalyses.reduce((sum, a) => sum + a.totalComments, 0)
+    const totalPositive = filteredAnalyses.reduce((sum, a) => sum + a.positiveCount, 0)
+    const totalNegative = filteredAnalyses.reduce((sum, a) => sum + a.negativeCount, 0)
+    const totalNeutral = filteredAnalyses.reduce((sum, a) => sum + a.neutralCount, 0)
+    const avgSentiment = filteredAnalyses.length > 0 
+      ? (filteredAnalyses.reduce((sum, a) => sum + a.avgSentiment, 0) / filteredAnalyses.length).toFixed(2)
+      : '0'
+
+    let md = `# CinePilot Audience Sentiment Report
+
+## Summary
+- **Exported**: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+- **Total Analyses**: ${filteredAnalyses.length}
+- **Total Comments**: ${totalComments.toLocaleString('en-IN')}
+- **Positive**: ${totalPositive.toLocaleString('en-IN')} (${totalComments > 0 ? ((totalPositive / totalComments) * 100).toFixed(1) : 0}%)
+- **Negative**: ${totalNegative.toLocaleString('en-IN')} (${totalComments > 0 ? ((totalNegative / totalComments) * 100).toFixed(1) : 0}%)
+- **Neutral**: ${totalNeutral.toLocaleString('en-IN')} (${totalComments > 0 ? ((totalNeutral / totalComments) * 100).toFixed(1) : 0}%)
+- **Average Sentiment**: ${avgSentiment}/100
+
+${platformFilter !== 'all' || statusFilter !== 'all' || regionalFilter !== 'all' || searchQuery ? `## Active Filters
+${platformFilter !== 'all' ? `- Platform: ${platformFilter}` : ''}
+${statusFilter !== 'all' ? `- Status: ${statusFilter}` : ''}
+${regionalFilter !== 'all' ? `- Regional Cinema: ${regionalFilter}` : ''}
+${searchQuery ? `- Search: "${searchQuery}"` : ''}
+` : ''}
+## Platform Breakdown
+| Platform | Analyses | Comments | Positive | Negative | Neutral |
+|----------|----------|----------|----------|----------|---------|
+`
+    
+    for (const platform of PLATFORMS) {
+      const platformAnalyses = filteredAnalyses.filter(a => a.platform === platform.key)
+      if (platformAnalyses.length > 0) {
+        const pComments = platformAnalyses.reduce((sum, a) => sum + a.totalComments, 0)
+        const pPositive = platformAnalyses.reduce((sum, a) => sum + a.positiveCount, 0)
+        const pNegative = platformAnalyses.reduce((sum, a) => sum + a.negativeCount, 0)
+        const pNeutral = platformAnalyses.reduce((sum, a) => sum + a.neutralCount, 0)
+        md += `| ${platform.label} | ${platformAnalyses.length} | ${pComments.toLocaleString('en-IN')} | ${pPositive.toLocaleString('en-IN')} | ${pNegative.toLocaleString('en-IN')} | ${pNeutral.toLocaleString('en-IN')} |\n`
+      }
+    }
+
+    md += `
+## Sentiment Analyses
+
+`
+    
+    for (const analysis of filteredAnalyses) {
+      const statusEmoji = analysis.status === 'completed' ? '✅' : analysis.status === 'analyzing' ? '🔄' : '❌'
+      const sentimentEmoji = analysis.avgSentiment >= 70 ? '😊' : analysis.avgSentiment >= 40 ? '😐' : '😔'
+      
+      md += `### ${analysis.title} ${sentimentEmoji}
+
+| Field | Value |
+|-------|-------|
+| Platform | ${analysis.platform} |
+| Status | ${statusEmoji} ${analysis.status} |
+| Total Comments | ${analysis.totalComments.toLocaleString('en-IN')} |
+| Analyzed | ${analysis.analyzedCount.toLocaleString('en-IN')} |
+| Positive | ${analysis.positiveCount.toLocaleString('en-IN')} (${analysis.totalComments > 0 ? ((analysis.positiveCount / analysis.totalComments) * 100).toFixed(1) : 0}%) |
+| Negative | ${analysis.negativeCount.toLocaleString('en-IN')} (${analysis.totalComments > 0 ? ((analysis.negativeCount / analysis.totalComments) * 100).toFixed(1) : 0}%) |
+| Neutral | ${analysis.neutralCount.toLocaleString('en-IN')} (${analysis.totalComments > 0 ? ((analysis.neutralCount / analysis.totalComments) * 100).toFixed(1) : 0}%) |
+| Avg Sentiment | ${analysis.avgSentiment}/100 |
+| Created | ${new Date(analysis.createdAt).toLocaleDateString('en-IN')} |
+${analysis.videoUrl ? `| Video URL | ${analysis.videoUrl} |` : ''}
+${analysis.regionalCinema ? `| Regional Cinema | ${analysis.regionalCinema} |` : ''}
+
+`
+      
+      if (analysis.takeaways && analysis.takeaways.length > 0) {
+        md += `**Key Takeaways:**\n`
+        for (const takeaway of analysis.takeaways) {
+          md += `- ${takeaway}\n`
+        }
+        md += '\n'
+      }
+      
+      if (analysis.posterTips && analysis.posterTips.length > 0) {
+        md += `**Poster Tips:**\n`
+        for (const tip of analysis.posterTips) {
+          md += `- ${tip}\n`
+        }
+        md += '\n'
+      }
+      
+      if (analysis.topPositive && analysis.topPositive.length > 0) {
+        md += `**Top Positive Comments:**\n`
+        for (const comment of analysis.topPositive.slice(0, 3)) {
+          md += `> ${comment.text.slice(0, 100)}${comment.text.length > 100 ? '...' : ''} (${comment.likes} likes)\n`
+        }
+        md += '\n'
+      }
+      
+      if (analysis.topNegative && analysis.topNegative.length > 0) {
+        md += `**Top Negative Comments:**\n`
+        for (const comment of analysis.topNegative.slice(0, 3)) {
+          md += `> ${comment.text.slice(0, 100)}${comment.text.length > 100 ? '...' : ''} (${comment.likes} likes)\n`
+        }
+        md += '\n'
+      }
+      
+      md += `---\n\n`
+    }
+
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audience-sentiment-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
   // Print function
   const printSentimentReport = useCallback(() => {
     const printWindow = window.open('', '_blank')
@@ -538,6 +661,11 @@ export default function AudienceSentimentPage() {
   useEffect(() => {
     printSentimentReportRef.current = printSentimentReport
   }, [printSentimentReport])
+
+  // Update ref when handleExportMarkdown changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  })
 
   // Click outside handler
   useEffect(() => {
@@ -700,6 +828,13 @@ export default function AudienceSentimentPage() {
                     >
                       <Download className="w-4 h-4 text-violet-400" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -1365,6 +1500,10 @@ export default function AudienceSentimentPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Print report</span>

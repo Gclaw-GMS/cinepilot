@@ -123,9 +123,12 @@ export default function SettingsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const printMenuRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -163,6 +166,7 @@ export default function SettingsPage() {
   // Refs for keyboard shortcuts
   const saveRef = useRef<() => void>(() => {});
   const handlePrintRef = useRef<() => void>(() => {});
+  const handleExportMarkdownRef = useRef<() => void>(() => {});
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -204,6 +208,18 @@ export default function SettingsPage() {
         handlePrintRef.current?.();
       }
 
+      // E: Export menu
+      if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        setShowExportMenu(!showExportMenu);
+      }
+
+      // M: Direct Markdown export
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        handleExportMarkdownRef.current?.();
+      }
+
       // F: Toggle filters
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
@@ -214,6 +230,7 @@ export default function SettingsPage() {
       if (e.key === 'Escape') {
         setShowShortcuts(false);
         setShowPrintMenu(false);
+        setShowExportMenu(false);
         setShowFilterPanel(false);
         setShowResetConfirm(false);
       }
@@ -227,7 +244,7 @@ export default function SettingsPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchSettings, showFilterPanel]);
+  }, [fetchSettings, showFilterPanel, showExportMenu]);
 
   const set = useCallback((key: string, value: unknown) => {
     setLocal((prev) => ({ ...prev, [key]: value }))
@@ -401,11 +418,116 @@ export default function SettingsPage() {
     handlePrintRef.current = handlePrint;
   }, [handlePrint]);
 
-  // Click outside to close print menu and filter panel
+  // Export settings to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    setExporting(true);
+    setShowExportMenu(false);
+    
+    // Capture current settings values
+    const currentSettings = { ...settings, ...local };
+    const currentGet = (key: string): unknown => currentSettings[key];
+    
+    const formatValue = (value: unknown): string => {
+      if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
+      if (value === null || value === undefined) return '-';
+      return String(value);
+    };
+    
+    const markdown = `# ⚙️ CinePilot Settings Report
+
+**Generated:** ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 🌐 Language & Region
+
+| Setting | Value |
+|---------|-------|
+| Language | ${formatValue(currentGet('language'))} |
+| Default Currency | ${formatValue(currentGet('defaultCurrency'))} |
+
+---
+
+## 🤖 AI Settings
+
+| Setting | Value |
+|---------|-------|
+| Tamil Cinema Features | ${formatValue(currentGet('tamilCinemaEnabled'))} |
+| AI Model | ${formatValue(currentGet('aiModel'))} |
+
+---
+
+## 🎨 Appearance
+
+| Setting | Value |
+|---------|-------|
+| Theme | ${formatValue(currentGet('theme'))} |
+
+---
+
+## 🔔 Notifications
+
+| Setting | Value |
+|---------|-------|
+| Push Notifications | ${formatValue(currentGet('notificationsPush'))} |
+| Email Alerts | ${formatValue(currentGet('notificationsEmail'))} |
+| Budget Alerts | ${formatValue(currentGet('budgetAlerts'))} |
+| Schedule Reminders | ${formatValue(currentGet('scheduleReminders'))} |
+
+---
+
+## 📊 Data & Privacy
+
+| Setting | Value |
+|---------|-------|
+| Analytics | ${formatValue(currentGet('analyticsEnabled'))} |
+
+---
+
+## 🎬 Production
+
+| Setting | Value |
+|---------|-------|
+| Censor Mode | ${formatValue(currentGet('censorMode'))} |
+| Auto-Save | ${formatValue(currentGet('autoSave'))} |
+| Auto-Save Interval | ${formatValue(currentGet('autoSaveInterval'))} seconds |
+
+---
+
+## Summary
+
+- **Total Settings:** 13
+- **Database:** ${dbConnected === true ? 'Connected' : dbConnected === false ? 'Local Mode' : 'Unknown'}
+- **Last Updated:** ${localStorage ? new Date().toLocaleDateString() : '-'}
+
+---
+
+*CinePilot — AI Pre-Production Assistant for South Indian Cinema*
+`;
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cinepilot-settings-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExporting(false);
+  }, [local, settings, dbConnected]);
+
+  // Update handleExportMarkdownRef when handleExportMarkdown changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown;
+  }, [handleExportMarkdown]);
+
+  // Click outside to close print menu, export menu, and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false);
+      }
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
       }
       if (showFilterPanel && filterRef.current && !filterRef.current.contains(e.target as Node)) {
         setShowFilterPanel(false);
@@ -413,7 +535,7 @@ export default function SettingsPage() {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPrintMenu, showFilterPanel]);
+  }, [showPrintMenu, showExportMenu, showFilterPanel]);
 
   if (loading) {
     return (
@@ -558,6 +680,29 @@ export default function SettingsPage() {
             >
               <Keyboard className="w-5 h-5" />
             </button>
+            {/* Export Button */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-indigo-900/30 border border-slate-700 hover:border-indigo-700/50 rounded-lg text-sm text-slate-400 hover:text-indigo-400 transition-colors"
+                title="Export settings (E)"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportMarkdown}
+                    disabled={exporting}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    {exporting ? 'Exporting...' : 'Export Markdown'}
+                  </button>
+                </div>
+              )}
+            </div>
             {/* Print Button */}
             <div className="relative" ref={printMenuRef}>
               <button
@@ -875,6 +1020,8 @@ export default function SettingsPage() {
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
                 { key: 'Ctrl+X', action: 'Reset to defaults' },
+                { key: 'E', action: 'Export menu' },
+                { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print settings' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal' },

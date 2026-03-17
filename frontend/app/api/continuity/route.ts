@@ -10,6 +10,10 @@ const DEMO_CONTINUITY_WARNINGS = [
     description: 'Ravi\'s shirt color changes from blue to white between Scene 3 and Scene 5',
     severity: 'medium',
     scene: { sceneNumber: '5', headingRaw: 'INT. RAVI\'S HOUSE - DAY' },
+    resolved: true,
+    resolvedAt: '2026-03-15T10:30:00Z',
+    resolvedBy: 'Director',
+    resolutionNotes: 'Confirmed this is intentional - costume change represents character arc',
   },
   {
     id: 'demo-cw-2',
@@ -42,6 +46,9 @@ const DEMO_CONTINUITY_WARNINGS = [
     description: 'Sarath\'s watch changes from analog to digital between Scene 4 and Scene 6',
     severity: 'low',
     scene: { sceneNumber: '6', headingRaw: 'EXT. BEACH - EVENING' },
+    resolved: true,
+    resolvedAt: '2026-03-14T16:00:00Z',
+    resolvedBy: 'Script Supervisor',
   },
   {
     id: 'demo-cw-6',
@@ -69,6 +76,10 @@ const DEMO_PLOT_HOLES = [
     description: 'Ravi mentions having "never been to Chennai before" in Scene 2, but later references childhood memories from Marina Beach in Scene 18',
     severity: 'critical',
     scene: { sceneNumber: '2', headingRaw: 'INT. COURTROOM - DAY' },
+    resolved: true,
+    resolvedAt: '2026-03-16T09:00:00Z',
+    resolvedBy: 'Writer',
+    resolutionNotes: 'Added flashback scene showing childhood at Marina Beach in Scene 18',
   },
   {
     id: 'demo-ph-2',

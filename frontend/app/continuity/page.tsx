@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard, FileJson, FileText } from 'lucide-react';
+import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard, FileJson, FileText, CheckCircle } from 'lucide-react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -16,6 +16,10 @@ type Warning = {
   description: string;
   severity: string;
   scene: { sceneNumber: string; headingRaw: string | null };
+  resolved?: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNotes?: string;
 };
 
 type Summary = {
@@ -98,6 +102,27 @@ export default function ContinuityPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'scene' | 'severity' | 'type' | 'description'>('severity');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showResolved, setShowResolved] = useState<boolean | 'all'>('all');
+  const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  
+  // Handler to resolve/unresolve a warning
+  const handleResolveWarning = useCallback((warningId: string, resolved: boolean) => {
+    setWarnings(prev => prev.map(w => {
+      if (w.id === warningId) {
+        return {
+          ...w,
+          resolved,
+          resolvedAt: resolved ? new Date().toISOString() : undefined,
+          resolvedBy: resolved ? 'User' : undefined,
+          resolutionNotes: resolved ? resolutionNotes : undefined,
+        };
+      }
+      return w;
+    }));
+    setResolutionNotes('');
+    setResolutionModalOpen(false);
+  }, [resolutionNotes]);
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -126,11 +151,13 @@ export default function ContinuityPage() {
   // Computed statistics
   const stats = useMemo(() => {
     const total = warnings.length;
-    const continuityCount = warnings.filter(w => w.warningType === 'continuity').length;
-    const plotHoleCount = warnings.filter(w => w.warningType === 'plot_hole').length;
-    const characterCount = warnings.filter(w => w.warningType === 'character').length;
-    const timelineCount = warnings.filter(w => w.warningType === 'timeline').length;
-    const dialogueCount = warnings.filter(w => w.warningType === 'dialogue').length;
+    const activeTotal = warnings.filter(w => !w.resolved).length;
+    const resolvedCount = warnings.filter(w => w.resolved).length;
+    const continuityCount = warnings.filter(w => w.warningType === 'continuity' && !w.resolved).length;
+    const plotHoleCount = warnings.filter(w => w.warningType === 'plot_hole' && !w.resolved).length;
+    const characterCount = warnings.filter(w => w.warningType === 'character' && !w.resolved).length;
+    const timelineCount = warnings.filter(w => w.warningType === 'timeline' && !w.resolved).length;
+    const dialogueCount = warnings.filter(w => w.warningType === 'dialogue' && !w.resolved).length;
     
     const byType = {
       continuity: continuityCount,
@@ -140,29 +167,34 @@ export default function ContinuityPage() {
       dialogue: dialogueCount,
     };
     
-    const criticalCount = severityCounts.critical || 0;
-    const highCount = severityCounts.high || 0;
-    const mediumCount = severityCounts.medium || 0;
-    const lowCount = severityCounts.low || 0;
+    // Only count unresolved for severity
+    const activeSeverityCounts = warnings.filter(w => !w.resolved).reduce((acc, w) => {
+      acc[w.severity] = (acc[w.severity] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
     
-    // Health score (inverse of issues weighted by severity)
-    const healthScore = total > 0 
+    const criticalCount = activeSeverityCounts.critical || 0;
+    const highCount = activeSeverityCounts.high || 0;
+    const mediumCount = activeSeverityCounts.medium || 0;
+    const lowCount = activeSeverityCounts.low || 0;
+    
+    // Health score (inverse of active issues weighted by severity)
+    const healthScore = activeTotal > 0 
       ? Math.max(0, 100 - (criticalCount * 15 + highCount * 8 + mediumCount * 4 + lowCount * 1))
       : 100;
     
-    // Resolution rate (mock - would be tracked in real app)
-    const resolvedCount = 0;
     const resolutionRate = total > 0 ? (resolvedCount / total) * 100 : 0;
     
     return {
       total,
+      activeTotal,
+      resolvedCount,
       byType,
       criticalCount,
       highCount,
       mediumCount,
       lowCount,
       healthScore,
-      resolvedCount,
       resolutionRate,
     };
   }, [warnings, severityCounts]);
@@ -403,6 +435,15 @@ export default function ContinuityPage() {
   // Filter warnings by type, severity, and search
   const filteredWarnings = useMemo(() => {
     let filtered = warnings;
+    
+    // Filter by resolved status
+    if (showResolved === true) {
+      filtered = filtered.filter(w => w.resolved);
+    } else if (showResolved === false) {
+      filtered = filtered.filter(w => !w.resolved);
+    }
+    // 'all' shows everything
+    
     if (typeFilter !== 'all') {
       filtered = filtered.filter(w => w.warningType === typeFilter);
     }
@@ -763,16 +804,16 @@ ${data.map(d => `| ${d.scene} | ${getTypeLabel(d.type)} | ${getSeverityEmoji(d.s
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  showFilters || severityFilter !== 'all' || typeFilter !== 'all' || sortBy !== 'severity' || sortOrder !== 'desc'
+                  showFilters || severityFilter !== 'all' || typeFilter !== 'all' || sortBy !== 'severity' || sortOrder !== 'desc' || showResolved !== 'all'
                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
                 }`}
               >
                 <Filter className="w-4 h-4" />
                 Filter & Sort
-                {((severityFilter !== 'all' || typeFilter !== 'all') || (sortBy !== 'severity' || sortOrder !== 'desc')) && (
+                {((severityFilter !== 'all' || typeFilter !== 'all') || (sortBy !== 'severity' || sortOrder !== 'desc') || showResolved !== 'all') && (
                   <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs font-medium rounded">
-                    {([severityFilter !== 'all', typeFilter !== 'all', sortBy !== 'severity' || sortOrder !== 'desc'].filter(Boolean)).length}
+                    {([severityFilter !== 'all', typeFilter !== 'all', sortBy !== 'severity' || sortOrder !== 'desc', showResolved !== 'all'].filter(Boolean)).length}
                   </span>
                 )}
               </button>
@@ -828,8 +869,20 @@ ${data.map(d => `| ${d.scene} | ${getTypeLabel(d.type)} | ${getSeverityEmoji(d.s
                         <option value="low">Low</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-2 block">Status</label>
+                      <select
+                        value={showResolved === true ? 'resolved' : showResolved === false ? 'active' : 'all'}
+                        onChange={(e) => setShowResolved(e.target.value === 'all' ? 'all' : e.target.value === 'resolved')}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
+                      >
+                        <option value="all">All Issues</option>
+                        <option value="active">Active Only</option>
+                        <option value="resolved">Resolved Only</option>
+                      </select>
+                    </div>
                     <button
-                      onClick={() => { setTypeFilter('all'); setSeverityFilter('all'); setSortBy('severity'); setSortOrder('desc'); }}
+                      onClick={() => { setTypeFilter('all'); setSeverityFilter('all'); setSortBy('severity'); setSortOrder('desc'); setShowResolved('all'); }}
                       className="w-full py-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                     >
                       Clear Filters & Sort
@@ -1366,10 +1419,14 @@ ${data.map(d => `| ${d.scene} | ${getTypeLabel(d.type)} | ${getSeverityEmoji(d.s
                 return (
                   <div
                     key={w.id}
-                    className={`${style.bg} border ${style.border} rounded-xl p-4 flex items-start gap-4 ${viewMode === 'grid' ? 'flex-col' : ''}`}
+                    className={`${style.bg} border ${style.border} rounded-xl p-4 flex items-start gap-4 ${viewMode === 'grid' ? 'flex-col' : ''} ${w.resolved ? 'opacity-60' : ''}`}
                   >
                     <div className="shrink-0 mt-0.5">
-                      <Eye className="w-5 h-5 text-indigo-400" />
+                      {w.resolved ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                      ) : (
+                        <Eye className="w-5 h-5 text-indigo-400" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -1381,14 +1438,32 @@ ${data.map(d => `| ${d.scene} | ${getTypeLabel(d.type)} | ${getSeverityEmoji(d.s
                             {w.scene.headingRaw}
                           </span>
                         )}
+                        {w.resolved && (
+                          <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
+                            ✓ Resolved
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-slate-200">{w.description}</p>
                     </div>
-                    <span
-                      className={`shrink-0 text-xs px-3 py-1 rounded-full font-medium ${style.bg} ${style.text} border ${style.border}`}
-                    >
-                      {w.severity}
-                    </span>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <button
+                        onClick={() => handleResolveWarning(w.id, !w.resolved)}
+                        className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                          w.resolved 
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        }`}
+                        title={w.resolved ? 'Mark as unresolved' : 'Mark as resolved'}
+                      >
+                        {w.resolved ? 'Reopen' : 'Resolve'}
+                      </button>
+                      <span
+                        className={`text-xs px-3 py-1 rounded-full font-medium ${style.bg} ${style.text} border ${style.border}`}
+                      >
+                        {w.severity}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
@@ -1412,10 +1487,14 @@ ${data.map(d => `| ${d.scene} | ${getTypeLabel(d.type)} | ${getSeverityEmoji(d.s
                 return (
                   <div
                     key={w.id}
-                    className={`${style.bg} border ${style.border} rounded-xl p-4 flex items-start gap-4 ${viewMode === 'grid' ? 'flex-col' : ''}`}
+                    className={`${style.bg} border ${style.border} rounded-xl p-4 flex items-start gap-4 ${viewMode === 'grid' ? 'flex-col' : ''} ${w.resolved ? 'opacity-60' : ''}`}
                   >
                     <div className="shrink-0 mt-0.5">
-                      <AlertTriangle className="w-5 h-5 text-amber-400" />
+                      {w.resolved ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                      ) : (
+                        <AlertTriangle className="w-5 h-5 text-amber-400" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -1427,14 +1506,32 @@ ${data.map(d => `| ${d.scene} | ${getTypeLabel(d.type)} | ${getSeverityEmoji(d.s
                             {w.scene.headingRaw}
                           </span>
                         )}
+                        {w.resolved && (
+                          <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
+                            ✓ Resolved
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-slate-200">{w.description}</p>
                     </div>
-                    <span
-                      className={`shrink-0 text-xs px-3 py-1 rounded-full font-medium ${style.bg} ${style.text} border ${style.border}`}
-                    >
-                      {w.severity}
-                    </span>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <button
+                        onClick={() => handleResolveWarning(w.id, !w.resolved)}
+                        className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                          w.resolved 
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        }`}
+                        title={w.resolved ? 'Mark as unresolved' : 'Mark as resolved'}
+                      >
+                        {w.resolved ? 'Reopen' : 'Resolve'}
+                      </button>
+                      <span
+                        className={`shrink-0 text-xs px-3 py-1 rounded-full font-medium ${style.bg} ${style.text} border ${style.border}`}
+                      >
+                        {w.severity}
+                      </span>
+                    </div>
                   </div>
                 );
               })}

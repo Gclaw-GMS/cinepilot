@@ -1,6 +1,76 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (4:14 PM) - Settings Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (4:34 PM) - Call Sheets Page Markdown Export IMPLEMENTED
+
+---
+
+## 4:34 PM - Call Sheets Page Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Call Sheets Page - Markdown Export**: Added ability to export call sheet data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with call sheet title and generation timestamp
+    - **Executive Summary**: Table with date, call time, wrap time, location, total crew, departments, scenes
+    - **Weather Info**: Conditions section showing weather details
+    - **Department Breakdown**: Table with department names and crew counts (sorted by count)
+    - **Scheduled Scenes**: Table with scene numbers
+    - **Crew Call List**: Table with role, name, department, call time for each crew member
+    - **Notes**: Full notes section
+    - **Footer**: CinePilot branding
+  - **Content Preservation**: Full call sheet data included in export
+  - **File Naming**: Auto-generated filename with date (callsheet-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **useCallback**: handleExportMarkdown wrapped in useCallback for stable reference
+- **Type Handling**: Fixed weather (string) and scenes (string array) type handling
+- **Summary Stats**: Includes all key call sheet metrics
+- **Department Breakdown**: Sorted by count, shows department distribution
+- **Crew List**: All crew calls with role, name, department, call time
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **X** - Export dropdown menu
+- **R** - Refresh call sheets
+- **N** - New call sheet
+- **E** - Edit selected sheet
+- **D** - Delete selected sheet
+- **P** - Print selected sheet
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / filters / Cancel editing
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Call Sheets Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Executive summary section includes all key stats
+- [x] Weather info section shows conditions
+- [x] Department breakdown table with counts (sorted)
+- [x] Scheduled scenes table
+- [x] Crew call list table with all fields
+- [x] Notes section included
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'X' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Click outside closes export menu
+- [x] Error handling complete
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed: origin/feature/continuity-sorting
 
 ---
 

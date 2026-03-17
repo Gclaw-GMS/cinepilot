@@ -155,8 +155,8 @@ export default function BudgetPage() {
   // Count active filters
   const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
 
-  // Helper to sort items (used by exports)
-  const sortItems = (itemsToSort: BudgetItemData[]) => {
+  // Helper to sort items (used by exports) - wrapped in useCallback to fix dependency warning
+  const sortItems = useCallback((itemsToSort: BudgetItemData[]) => {
     return [...itemsToSort].sort((a, b) => {
       let comparison = 0
       switch (sortBy) {
@@ -180,7 +180,7 @@ export default function BudgetPage() {
       }
       return sortOrder === 'asc' ? comparison : -comparison
     })
-  }
+  }, [sortBy, sortOrder])
 
   // Export functions
   const handleExportCSV = () => {

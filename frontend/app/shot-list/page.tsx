@@ -229,7 +229,7 @@ export default function ShotHubPage() {
           break
         case 'm':
           e.preventDefault()
-          if (shots.length > 0 && filteredShots.length > 0) {
+          if (shots.length > 0) {
             handleExportMarkdownRef.current?.()
           }
           break

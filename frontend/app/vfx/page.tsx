@@ -224,6 +224,7 @@ export default function VfxPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
+  const handleExportMarkdownRef = useRef<() => void>();
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -287,6 +288,12 @@ export default function VfxPage() {
           if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
             e.preventDefault()
             setShowExportMenu(prev => !prev)
+          }
+          break
+        case 'm':
+          if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
+            e.preventDefault()
+            handleExportMarkdownRef.current?.()
           }
           break
         case 'p':
@@ -855,6 +862,119 @@ export default function VfxPage() {
     setShowExportMenu(false);
   }
 
+  // Export VFX data to Markdown
+  function handleExportMarkdown() {
+    const notesToExport = filteredNotes;
+    const scriptTitle = scripts.find(s => s.id === selectedScript)?.title || 'Unknown Script';
+    
+    // Build markdown content
+    let md = `# CinePilot VFX Breakdown Report
+
+## Summary
+- **Script**: ${scriptTitle}
+- **Exported**: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+- **Mode**: ${isUsingDemo ? 'Demo' : 'Production'}
+${summary ? `
+- **Total Scenes**: ${summary.totalScenes}
+- **Total VFX Shots**: ${summary.totalNotes}
+- **Total Warnings**: ${summary.totalWarnings}
+- **Estimated Cost**: ${formatCurrency(summary.estimatedTotalCost)}
+- **Estimated Duration**: ${formatDuration(summary.estimatedTotalDuration)}
+- **Budget Limit**: ${formatCurrency(budgetLimit)}
+- **Budget Used**: ${budgetUsedPercent}%
+` : ''}
+
+## Complexity Breakdown
+| Complexity | Count |
+|------------|-------|
+| Simple | ${summary?.complexityBreakdown.simple || 0} |
+| Moderate | ${summary?.complexityBreakdown.moderate || 0} |
+| Complex | ${summary?.complexityBreakdown.complex || 0} |
+
+## VFX Shots by Scene
+
+`;
+    // Group notes by scene
+    const sceneGroupsMap = new Map<string, { notes: VfxNote[]; warnings: VfxWarning[]; heading: string }>();
+    for (const note of notesToExport) {
+      const sceneNum = note.scene.sceneNumber;
+      if (!sceneGroupsMap.has(sceneNum)) {
+        sceneGroupsMap.set(sceneNum, { notes: [], warnings: [], heading: note.scene.headingRaw || '' });
+      }
+      sceneGroupsMap.get(sceneNum)!.notes.push(note);
+    }
+    for (const warning of vfxWarnings) {
+      const sceneNum = warning.scene.sceneNumber;
+      if (!sceneGroupsMap.has(sceneNum)) {
+        sceneGroupsMap.set(sceneNum, { notes: [], warnings: [], heading: warning.scene.headingRaw || '' });
+      }
+      sceneGroupsMap.get(sceneNum)!.warnings.push(warning);
+    }
+    
+    // Sort scenes by scene index
+    const sortedScenes = [...sceneGroupsMap.entries()].sort((a, b) => {
+      const aIdx = vfxNotes.find(n => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
+      const bIdx = vfxNotes.find(n => n.scene.sceneNumber === b[0])?.scene.sceneIndex ?? 0;
+      return aIdx - bIdx;
+    });
+    
+    for (const [sceneNum, group] of sortedScenes) {
+      md += `### Scene ${sceneNum}: ${group.heading || 'N/A'}\n\n`;
+      
+      if (group.notes.length > 0) {
+        md += `| Type | Description | Confidence | Duration |\n`;
+        md += `|------|-------------|-------------|----------|\n`;
+        for (const note of group.notes) {
+          const complexity = getComplexity(note.confidence);
+          const complexityEmoji = complexity === 'complex' ? '🔴' : complexity === 'moderate' ? '🟡' : '🟢';
+          md += `| ${complexityEmoji} ${note.vfxType} | ${note.description} | ${Math.round(note.confidence * 100)}% | ${note.estimatedDuration ? formatDuration(note.estimatedDuration) : '-'} |\n`;
+        }
+        md += '\n';
+      }
+      
+      if (group.warnings.length > 0) {
+        md += `**Warnings:**\n`;
+        for (const warning of group.warnings) {
+          const severityEmoji = warning.severity === 'high' ? '🔴' : warning.severity === 'medium' ? '🟡' : '🟢';
+          md += `- ${severityEmoji} [${warning.severity.toUpperCase()}] ${warning.description}\n`;
+        }
+        md += '\n';
+      }
+    }
+    
+    // Add VFX Props section if exists
+    if (vfxProps.length > 0) {
+      md += `## VFX Props\n\n`;
+      md += `| Scene | Heading | Prop | Description |\n`;
+      md += `|-------|---------|------|-------------|\n`;
+      for (const prop of vfxProps) {
+        md += `| ${prop.scene.sceneNumber} | ${prop.scene.headingRaw || '-'} | ${prop.prop.name} | ${prop.prop.description || '-'} |\n`;
+      }
+      md += '\n';
+    }
+    
+    // Add filters info if active
+    if (searchQuery || typeFilter !== 'all' || complexityFilter !== 'all' || sortBy !== 'scene' || sortOrder !== 'asc') {
+      md += `---\n*Exported with filters: search="${searchQuery}", type=${typeFilter}, complexity=${complexityFilter}, sort=${sortBy} (${sortOrder})*\n`;
+    }
+    
+    md += `\n---\n*Exported from CinePilot Production Management System*\n`;
+    
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vfx-breakdown-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  }
+
+  // Assign handleExportMarkdown to ref for keyboard shortcuts
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown;
+  });
+
   // Print VFX Report
   function printVfxReport() {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
@@ -1122,6 +1242,13 @@ export default function VfxPage() {
                       >
                         <FileJson className="w-4 h-4 text-purple-400" />
                         Export JSON
+                      </button>
+                      <button
+                        onClick={handleExportMarkdown}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-cyan-400" />
+                        Export Markdown
                       </button>
                     </div>
                   )}
@@ -2031,6 +2158,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export data</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Export Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Print VFX report</span>

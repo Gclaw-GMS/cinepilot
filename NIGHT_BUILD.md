@@ -1,10 +1,276 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (10:33 PM) - Dubbing Budget Tracking IMPLEMENTED
+## Build Status: ✅ PASSING (12:53 AM) - Audience Sentiment Markdown Export IMPLEMENTED
 
 ---
 
-## 10:33 PM - Dubbing Budget Tracking (IMPLEMENTED - CODE PUSHED)
+## 12:53 AM - Audience Sentiment Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Audience Sentiment Page - Markdown Export**: Added ability to export sentiment analysis data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan icon)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total analyses, total comments, positive/negative/neutral counts, average sentiment)
+    - By Platform breakdown showing analysis counts per platform
+    - Analysis Details table with all sentiment data including sentiment labels
+    - Key Takeaways section from the analysis
+    - Poster Improvement Tips section
+  - **Content Preservation**: Full sentiment data included in export
+  - **Works with Filters**: Exports currently filtered analyses only
+  - **File Naming**: Auto-generated filename with date (audience-sentiment-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown() generates formatted markdown
+- **Summary Stats**: Includes total analyses, total comments, positive/negative/neutral counts, average sentiment
+- **Platform Breakdown**: Groups and counts analyses by platform
+- **Details Table**: Markdown table showing all analyses with sentiment labels
+- **Insights Section**: Includes key takeaways and poster tips when available
+- **Blob Creation**: Creates downloadable text/markdown blob
+- **useCallback Pattern**: Uses useCallback for proper memoization
+- **useRef Pattern**: Uses useRef for keyboard shortcut to avoid dependency issues
+
+### Keyboard Shortcuts
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print report
+- **R** - Refresh data
+- **N** - New analysis
+- **1** - Filter: All
+- **2** - Filter: YouTube
+- **3** - Filter: Instagram
+- **4** - Filter: Twitter
+- **S** - Toggle sort order
+- **F** - Toggle filters
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+
+### Audience Sentiment Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Platform breakdown shows counts
+- [x] Analysis details in table format with sentiment labels
+- [x] Key takeaways included when available
+- [x] Poster tips included when available
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (empty check)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+
+---
+
+## Build Status: ✅ PASSING (12:33 AM) - Equipment Markdown Export IMPLEMENTED
+
+---
+
+## 12:33 AM - Equipment Markdown Export (IMPLEMENTED - CODE PUSHED)
+
+### Features Perfected This Build
+- **Equipment Page - Markdown Export**: Added ability to export equipment rental data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan icon)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total items, total daily rate, by status counts)
+    - By Category breakdown with counts
+    - Equipment Details table with all rental information
+    - Budget Overview showing total daily rate, budget limit, remaining, and usage percentage
+  - **Content Preservation**: Full equipment data included in export
+  - **Works with Filters**: Exports currently filtered equipment only
+  - **File Naming**: Auto-generated filename with date (equipment-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown() generates formatted markdown
+- **Summary Stats**: Includes total items, total daily rate, status counts
+- **Category Breakdown**: Groups and counts equipment by category
+- **Details Table**: Markdown table showing all equipment with full details
+- **Budget Overview**: Shows total daily rate, budget limit, remaining, and usage %
+- **Blob Creation**: Creates downloadable text/markdown blob
+- **Ref Pattern**: Uses useRef for keyboard shortcut to avoid dependency issues
+- **useEffect Assignment**: Updates ref when handleExportMarkdown function changes
+
+### Keyboard Shortcuts
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print report
+- **1** - Switch to List view
+- **2** - Switch to Analytics view
+- **3** - Switch to Conflicts view
+- **R** - Refresh data
+- **F** - Toggle filters
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Equipment Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Category breakdown shows counts
+- [x] Equipment details in table format
+- [x] Budget overview with usage percentage
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (empty check)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## 11:53 PM - Dubbing Markdown Export (IMPLEMENTED - CODE PUSHED)
+
+### Features Perfected This Build
+- **Dubbing Page - Markdown Export**: Added ability to export dubbing data in Markdown format
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan icon)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - Summary statistics (total dubbed versions, preview scenes, languages count)
+    - Dubbed Versions table with columns: #, Title, Language, Created Date
+    - Translation Preview section with scene numbers and dialogue in code blocks
+    - Notes displayed as blockquotes where available
+    - Budget Summary section showing total cost, budget limit, remaining, and usage percentage
+  - **Content Preservation**: Full dubbing data included in export
+  - **Works with Filters**: Exports currently filtered versions only
+  - **File Naming**: Auto-generated filename with date (dubbing-report-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown() generates formatted markdown
+- **Summary Stats**: Includes total dubbed versions, preview scenes count, languages count
+- **Versions Table**: Markdown table showing all dubbed versions with title, language, date
+- **Preview Section**: Scene-by-scene translation preview with dialogue in code blocks
+- **Budget Summary**: Includes budget calculations when costs are available
+- **Blob Creation**: Creates downloadable text/markdown blob
+- **Ref Pattern**: Uses useRef for keyboard shortcut to avoid dependency issues
+- **useEffect Assignment**: Updates ref when handleExportMarkdown function changes
+
+### Keyboard Shortcuts
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **R** - Refresh data
+- **P** - Print report
+- **S** - Toggle sort order
+- **F** - Toggle filters
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Dubbing Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option
+- [x] UI professional & visual (cyan icon, matches existing buttons)
+- [x] Summary section includes all key stats
+- [x] Dubbed versions in table format
+- [x] Translation preview with scene numbers and dialogue
+- [x] Notes displayed as blockquotes
+- [x] Budget summary included when available
+- [x] Filters applied to export
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (empty check)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## 10:53 PM - DOOD Workload Analysis (IMPLEMENTED - CODE PUSHED)
+
+### Features Perfected This Build
+- **DOOD Page - Workload Analysis**: Added comprehensive actor workload tracking
+  - **New View Mode**: Added 'Workload' tab (press '4' to access)
+  - **Workload Summary Cards**:
+    - Overworked Actors: Count of actors with 5+ consecutive shooting days
+    - Insufficient Rest: Actors with less than 2 days between calls
+    - Max Consecutive Days: Longest continuous shoot streak
+    - Avg Rest Days: Average gap between calls
+  - **Workload Analysis Table**:
+    - Actor name and character with Tamil transliteration
+    - Total shooting days with percentage
+    - Max consecutive days with color-coded indicator
+    - Average rest days between calls
+    - Status badges: Overworked (red), Needs Rest (amber), Light (gray), Normal (green)
+    - Specific warnings for each actor showing exact issues
+  - **Rest Days Distribution Chart**: Bar chart showing how often each rest day count occurs
+  - **Workload Balance Chart**: Dual-axis chart comparing shooting days vs percentage
+  - **Keyboard Shortcuts**:
+    - **1** - Switch to Analytics view
+    - **2** - Switch to Calendar view
+    - **3** - Switch to List view
+    - **4** - Switch to Workload view (NEW)
+  - **Professional UI**: Consistent with DOOD page theme (cyan/amber colors)
+
+### Technical Implementation
+- **View Modes**: Added 'workload' to viewMode type
+- **Workload Calculations**: useMemo computes maxConsecutive, avgGap, hasOverwork, hasInsufficientRest
+- **Chart Components**: Using Recharts (BarChart with dual Y-axis)
+- **Color Coding**: Red for overwork (5+ days), amber for insufficient rest (<2 days), green for normal
+- **Icons Added**: Activity, Zap, Moon, Battery, AlertOctagon, Target, Gauge from lucide-react
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### DOOD Workload Analysis Feature Checklist
+- [x] Feature works 100% (workload analysis view functional)
+- [x] UI professional & visual (charts, color-coded stats, status badges)
+- [x] Summary cards showing key workload metrics
+- [x] Detailed table with per-actor analysis
+- [x] Rest days distribution chart implemented
+- [x] Workload balance chart with dual axis
+- [x] Status indicators (Overworked/Needs Rest/Light/Normal)
+- [x] Warnings showing specific issues per actor
+- [x] Keyboard shortcut '4' working
+- [x] Tab in view switcher (Analytics/Calendar/List/Workload)
+- [x] Error handling complete (empty states handled)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## Build Status: ✅ PASSING (10:33 PM) - Dubbing Budget Tracking IMPLEMENTED
 
 ### Features Perfected This Build
 - **Dubbing Page - Budget Tracking**: Added comprehensive budget monitoring for dubbing operations

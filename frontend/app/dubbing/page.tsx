@@ -178,6 +178,12 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
           break
+        case 'm':
+          e.preventDefault()
+          if (dubbedVersions.length > 0) {
+            handleExportMarkdownRef.current?.()
+          }
+          break
         case 'p':
           e.preventDefault()
           if (dubbedVersions.length > 0) {
@@ -340,6 +346,88 @@ export default function DubbingPage() {
     setShowExportMenu(false)
   }
 
+  // Markdown export ref for keyboard shortcut
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
+  
+  const handleExportMarkdown = useCallback(() => {
+    const dataToExport = filteredVersions.length > 0 ? filteredVersions : dubbedVersions
+    
+    const languageLabels: Record<string, string> = {
+      telugu: 'Telugu',
+      hindi: 'Hindi',
+      malayalam: 'Malayalam',
+      kannada: 'Kannada',
+      english: 'English',
+    }
+    
+    // Build markdown content
+    let markdown = `# CinePilot Dubbing Report
+
+> Generated: ${new Date().toLocaleString()}
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Dubbed Versions | ${dataToExport.length} |
+| Preview Scenes | ${preview.length} |
+| Languages | ${new Set(dataToExport.map(d => d.language)).size} |
+
+`
+    
+    // Add filter info if applied
+    if (languageFilter !== 'all' || sortBy !== 'date') {
+      markdown += `> *Showing filtered/sorted data*\n\n`
+    }
+    
+    // Dubbed versions table
+    if (dataToExport.length > 0) {
+      markdown += `## Dubbed Versions\n\n`
+      markdown += `| # | Title | Language | Created |\n`
+      markdown += `|---|-------|----------|--------|\n`
+      
+      dataToExport.forEach((dub, i) => {
+        const langLabel = languageLabels[dub.language] || dub.language
+        const date = new Date(dub.createdAt).toLocaleDateString()
+        markdown += `| ${i + 1} | ${dub.title} | ${langLabel} | ${date} |\n`
+      })
+      markdown += `\n`
+    }
+    
+    // Translation preview
+    if (preview.length > 0) {
+      markdown += `## Translation Preview\n\n`
+      
+      preview.forEach(p => {
+        markdown += `### Scene ${p.sceneNumber}\n\n`
+        markdown += `\`\`\`\n${p.translatedDialogue}\n\`\`\`\n\n`
+        if (p.notes) {
+          markdown += `> **Note:** ${p.notes}\n\n`
+        }
+      })
+    }
+    
+    // Budget summary if available
+    if (budgetCalculations.totalEstimated > 0) {
+      markdown += `## Budget Summary\n\n`
+      markdown += `| Metric | Amount |\n`
+      markdown += `|--------|--------|\n`
+      markdown += `| Total Estimated Cost | ₹${budgetCalculations.totalEstimated.toLocaleString('en-IN')} |\n`
+      markdown += `| Budget Limit | ₹${budgetLimit.toLocaleString('en-IN')} |\n`
+      markdown += `| Remaining | ₹${budgetCalculations.budgetRemaining.toLocaleString('en-IN')} |\n`
+      markdown += `| Usage | ${budgetCalculations.budgetUsedPercent.toFixed(1)}% |\n`
+    }
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dubbing-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [filteredVersions, dubbedVersions, preview, languageFilter, sortBy, budgetCalculations, budgetLimit])
+
   // Print function
   const printDubbingReport = useCallback(() => {
     if (dubbedVersions.length === 0) return
@@ -476,6 +564,10 @@ export default function DubbingPage() {
   useEffect(() => {
     printDubbingReportRef.current = printDubbingReport
   }, [printDubbingReport])
+
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   useEffect(() => {
     if (selectedScriptId) {
@@ -687,11 +779,11 @@ export default function DubbingPage() {
                     Export CSV
                   </button>
                   <button
-                    onClick={handleExportJSON}
+                    onClick={handleExportMarkdown}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
                   >
-                    <Download className="w-4 h-4" />
-                    Export JSON
+                    <FileText className="w-4 h-4" />
+                    Export Markdown
                   </button>
                 </div>
               )}
@@ -1145,6 +1237,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Export Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Print report</span>

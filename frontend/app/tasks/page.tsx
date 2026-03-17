@@ -282,6 +282,13 @@ export default function TasksPage() {
           setShowExportMenu(prev => !prev)
         }
         break
+      case 'm':
+      case 'M':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
+        }
+        break
       case 'p':
       case 'P':
         if (!e.ctrlKey && !e.metaKey) {
@@ -689,6 +696,88 @@ export default function TasksPage() {
     setShowExportMenu(false)
   }
 
+  // Export tasks to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    if (filteredTasks.length === 0) return
+
+    const formatDate = (dateStr?: string) => {
+      if (!dateStr) return '-'
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+
+    const getPriorityIcon = (p: string) => {
+      if (p === 'high') return '🔴'
+      if (p === 'medium') return '🟡'
+      return '⚪'
+    }
+
+    const getStatusIcon = (s: string) => {
+      if (s === 'completed') return '✅'
+      if (s === 'in_progress') return '🔄'
+      if (s === 'blocked') return '🚫'
+      if (s === 'pending') return '⏳'
+      return '📋'
+    }
+
+    // Summary statistics
+    const totalBudget = filteredTasks.reduce((sum, t) => sum + (t.budgetAmount || 0), 0)
+    const highPriorityTasks = filteredTasks.filter(t => t.priority === 'high').length
+    const overdueTasks = filteredTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed').length
+
+    let markdown = `# CinePilot Tasks Report
+
+**Generated:** ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | ${filteredTasks.length} |
+| Completed | ${stats.completed} |
+| In Progress | ${stats.inProgress} |
+| Pending | ${stats.pending} |
+| Blocked | ${stats.blocked} |
+| Overdue | ${overdueTasks} |
+| High Priority | ${highPriorityTasks} |
+| Completion Rate | ${stats.completionPercent}% |
+| Total Budget | ₹${(totalBudget / 100000).toFixed(2)}L |
+
+## By Status
+
+| Status | Count |
+|--------|-------|
+| ✅ Completed | ${stats.completed} |
+| 🔄 In Progress | ${stats.inProgress} |
+| ⏳ Pending | ${stats.pending} |
+| 🚫 Blocked | ${stats.blocked} |
+
+## Tasks Detail
+
+| # | Title | Status | Priority | Assignee | Due Date |
+|---|-------|--------|----------|----------|----------|
+${filteredTasks.map((t, i) => `| ${i + 1} | ${t.title} | ${getStatusIcon(t.status)} ${t.status.replace('_', ' ')} | ${getPriorityIcon(t.priority)} ${t.priority} | ${t.assignee || '-'} | ${formatDate(t.dueDate)} |`).join('\n')}
+
+---
+
+*Exported from CinePilot - Production Management System*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `tasks-report-${new Date().toISOString().split('T')[0]}.md`
+    link.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [filteredTasks, stats])
+
+  // Ref for keyboard shortcut
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
   // Print tasks report
   const handlePrint = () => {
     const printWindow = window.open('', '_blank')
@@ -924,6 +1013,14 @@ export default function TasksPage() {
                   >
                     <FileText className="w-4 h-4" />
                     Export JSON
+                  </button>
+                  <button
+                    onClick={handleExportMarkdown}
+                    disabled={filteredTasks.length === 0}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-cyan-900/30 hover:text-cyan-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export Markdown
                   </button>
                 </div>
               )}
@@ -1639,6 +1736,7 @@ export default function TasksPage() {
                   { keys: ['S'], desc: 'Toggle sort order', category: 'Actions' },
                   { keys: ['/'], desc: 'Focus search', category: 'Actions' },
                   { keys: ['E'], desc: 'Export dropdown', category: 'Actions' },
+                  { keys: ['M'], desc: 'Export Markdown', category: 'Actions' },
                   { keys: ['P'], desc: 'Print tasks', category: 'Actions' },
                   { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
                   { keys: ['Ctrl', 'A'], desc: 'Select all tasks', category: 'Selection' },

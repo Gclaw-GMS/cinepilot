@@ -1,5 +1,72 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (11:14 PM) - Storyboard Page Markdown Export IMPLEMENTED
+
+### Features Perfected This Build
+- **Storyboard Page - Markdown Export**: Added comprehensive Markdown export functionality
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - **Summary Section**: Total scenes, frames, approved, pending, in-progress, failed counts, approval rate
+    - **By Status Breakdown**: Emoji indicators (✅ approved, 🔄 in-progress, ⏳ pending, ❌ failed)
+    - **By Style Breakdown**: Frame counts per style (Clean Line Art, Pencil Sketch, Marker & Ink, Blueprint)
+    - **Scene Breakdown Table**: Scene number, heading, frames, approved, pending
+    - **Frame Details Table**: Scene, shot, status, style, notes for all frames
+  - **Content Preservation**: Full storyboard data included in export
+  - **Works with Filters**: Exports currently filtered scenes/frames
+  - **File Naming**: Auto-generated filename with date (storyboard-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown wrapped in useCallback for proper memoization
+- **Summary Stats**: Includes all key storyboard metrics (scenes, frames, approval stats)
+- **Emoji Support**: Uses emojis for status indicators (✅❌🔄⏳)
+- **Style Labels**: Proper labels for style keys (cleanLineArt → Clean Line Art)
+- **Filtered Export**: Uses filteredScenes for export content
+- **Flat Map**: Uses flatMap for detailed frame listing
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **R** - Refresh storyboard data
+- **F** - Toggle filters & sort
+- **S** - Toggle sort order (asc/desc)
+- **P** - Print storyboard report
+- **/** - Focus search input
+- **1-4** - Switch style views
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors (pre-existing warnings) ✅
+- **Lint:** No new warnings ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/feature/continuity-sorting ✅
+
+### Storyboard Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats (scenes, frames, approval rate)
+- [x] By Status breakdown shows counts with emojis
+- [x] By Style breakdown shows frame counts per style
+- [x] Scene Breakdown table with all fields
+- [x] Frame Details table with all fields
+- [x] Filters applied to export (uses filteredScenes)
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks filteredScenes.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
 ## Build Status: ✅ PASSING (10:54 PM) - Progress Page Markdown Export IMPLEMENTED
 
 ### Features Perfected This Build

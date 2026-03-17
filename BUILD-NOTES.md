@@ -1,6 +1,33 @@
 # CinePilot Night Build Notes - March 17, 2026
 
-## Build Status: ✅ PASSING (9:14 AM)
+## Build Status: ✅ PASSING (3:34 PM)
+
+### 38. Schedule Page - Markdown Export Feature (March 17, 2026 3:34 PM)
+Added Markdown export capability to the Schedule page:
+
+- **Export Option**: New "Export Markdown" button in the export dropdown (emerald colored icon)
+- **Professional Format**: Clean Markdown with comprehensive formatting:
+  - **Executive Summary**: Total shooting days, scenes, hours, minutes, avg hours/day, avg scenes/day
+  - **Status Breakdown**: Table with status (scheduled, in-progress, completed, delayed) and counts
+  - **Location Breakdown**: Table with locations sorted by day count
+  - **Shooting Schedule**: Full table with day, date, location, status, scenes, call time, hours, notes
+  - **Detailed Scene Breakdown**: Organized by day with scene number, INT/EXT, time, duration, location
+- **Content Preservation**: Full schedule data included in export
+- **Works with Filters**: Exports currently filtered schedule only
+- **File Naming**: Auto-generated (schedule-YYYY-MM-DD.md)
+- **Consistent UI**: Matches existing CSV/JSON buttons style
+- **Keyboard Shortcut**: 'M' key for direct Markdown export
+- **Keyboard Help**: Added 'M' to shortcuts modal
+- **useCallback**: handleExportMarkdown properly memoized
+- **useRef Pattern**: Uses handleExportMarkdownRef for keyboard accessibility
+
+- **Build**: Clean build with 82 routes
+- **Next.js Build:** Successful
+- **TypeScript:** No errors  
+- **Lint:** Passes (no warnings or errors)
+- **Tests:** 803 passing
+
+---
 
 ### 37. Analytics Page - Markdown Export Feature (March 17, 2026 9:14 AM)
 Added Markdown export capability to the Analytics page:

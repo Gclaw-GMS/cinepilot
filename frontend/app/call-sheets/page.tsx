@@ -83,6 +83,7 @@ export default function CallSheetsPage() {
   const deleteSheetRef = useRef<(id: string) => Promise<void>>()
   const startEditingRef = useRef<() => void>()
   const cancelEditingRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -190,7 +191,7 @@ export default function CallSheetsPage() {
         case 'm':
           e.preventDefault()
           if (selected && !isEditing) {
-            handleExportMarkdown()
+            handleExportMarkdownRef.current?.()
           }
           break
         case 'd':
@@ -230,7 +231,7 @@ export default function CallSheetsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets, toggleSortOrder, handleExportMarkdown])
+  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets, toggleSortOrder])
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -762,6 +763,11 @@ export default function CallSheetsPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }, [selected])
+
+  // Store handleExportMarkdown in ref for keyboard shortcuts
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   // Group crew by department for display
   const crewByDepartment = useMemo(() => {

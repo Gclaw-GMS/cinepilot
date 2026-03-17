@@ -76,6 +76,7 @@ export default function StoryboardPage() {
   const selectedScriptRef = useRef(selectedScript)
   const scenesLengthRef = useRef(scenes.length)
   const handleRefreshRef = useRef<() => void>(() => {})
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
@@ -428,7 +429,7 @@ export default function StoryboardPage() {
           break
         case 'm':
           e.preventDefault()
-          handleExportMarkdown()
+          handleExportMarkdownRef.current?.()
           break
         case 'p':
           e.preventDefault()
@@ -649,6 +650,11 @@ ${filteredScenes.flatMap(scene =>
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }, [filteredScenes, selectedScript])
+
+  // Update refs when functions change
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   // Calculate active filter count (includes sort state)
   const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (sceneFilter !== 'all' ? 1 : 0) + (sortBy !== 'scene' || sortOrder !== 'asc' ? 1 : 0)

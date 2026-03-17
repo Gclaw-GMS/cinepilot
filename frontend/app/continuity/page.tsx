@@ -197,7 +197,7 @@ export default function ContinuityPage() {
       healthScore,
       resolutionRate,
     };
-  }, [warnings, severityCounts]);
+  }, [warnings]);
 
   // Chart data for type distribution
   const typeDistributionData = useMemo(() => {
@@ -479,7 +479,7 @@ export default function ContinuityPage() {
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [warnings, typeFilter, severityFilter, searchQuery, filter, sortBy, sortOrder]);
+  }, [warnings, typeFilter, severityFilter, searchQuery, filter, sortBy, sortOrder, showResolved]);
 
   // Export handlers
   const handleExport = (format: 'csv' | 'json' | 'pdf' | 'markdown') => {

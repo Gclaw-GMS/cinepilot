@@ -193,7 +193,7 @@ export default function TimelinePage() {
   const handleExportMarkdownRef = useRef<() => void>(() => {});
 
   // Export handlers
-  const handleExport = async (format: 'csv' | 'json' | 'markdown') => {
+  const handleExport = useCallback(async (format: 'csv' | 'json' | 'markdown') => {
     setExporting(true);
     setShowExportMenu(false);
     
@@ -379,7 +379,7 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
     }
     
     setExporting(false);
-  };
+  }, [filterType, searchQuery, selectedProject, sortBy, sortOrder, isDemoMode]);
 
   // Print function
   const handlePrint = useCallback(() => {

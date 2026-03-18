@@ -111,6 +111,19 @@ export default function TravelExpensesPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
+  // Refs for keyboard shortcut access to current filter state
+  const categoryFilterRef = useRef(categoryFilter)
+  const statusFilterRef = useRef(statusFilter)
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    categoryFilterRef.current = categoryFilter
+  }, [categoryFilter])
+  
+  useEffect(() => {
+    statusFilterRef.current = statusFilter
+  }, [statusFilter])
+
   const [formData, setFormData] = useState({
     category: 'flight',
     description: '',
@@ -706,10 +719,82 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         handleRefreshRef.current?.()
       }
+      
+      // Number keys 0-4 for status filtering
+      if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        switch (e.key) {
+          case '0':
+            e.preventDefault()
+            setStatusFilter('all')
+            break
+          case '1':
+            e.preventDefault()
+            setStatusFilter(statusFilterRef.current === 'pending' ? 'all' : 'pending')
+            break
+          case '2':
+            e.preventDefault()
+            setStatusFilter(statusFilterRef.current === 'approved' ? 'all' : 'approved')
+            break
+          case '3':
+            e.preventDefault()
+            setStatusFilter(statusFilterRef.current === 'rejected' ? 'all' : 'rejected')
+            break
+          case '4':
+            e.preventDefault()
+            setStatusFilter(statusFilterRef.current === 'reimbursed' ? 'all' : 'reimbursed')
+            break
+        }
+      }
+      
+      // Shift+number keys 0-9 for category filtering
+      if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        switch (e.key) {
+          case '0':
+            e.preventDefault()
+            setCategoryFilter('all')
+            break
+          case '1':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'flight' ? 'all' : 'flight')
+            break
+          case '2':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'train' ? 'all' : 'train')
+            break
+          case '3':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'bus' ? 'all' : 'bus')
+            break
+          case '4':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'taxi' ? 'all' : 'taxi')
+            break
+          case '5':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'auto' ? 'all' : 'auto')
+            break
+          case '6':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'hotel' ? 'all' : 'hotel')
+            break
+          case '7':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'stay' ? 'all' : 'stay')
+            break
+          case '8':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'per_diem' ? 'all' : 'per_diem')
+            break
+          case '9':
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'daily_allowance' ? 'all' : 'daily_allowance')
+            break
+        }
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters, sortOrder])
+  }, [showForm, showExportMenu, showPrintMenu, showHelp, showFilters, sortOrder, categoryFilter, statusFilter])
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
   const getCategoryInfo = (category: string) => EXPENSE_CATEGORIES.find(c => c.key === category) || { key: category, label: category, icon: DollarSign, color: '#6b7280' }
@@ -990,16 +1075,19 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
                 onChange={(e) => setCategoryFilter(e.target.value)} 
                 className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
               >
-                <option value="all">All Categories</option>
-                {EXPENSE_CATEGORIES.map(cat => <option key={cat.key} value={cat.key}>{cat.label}</option>)}
+                <option value="all">All Categories (⇧0)</option>
+                {EXPENSE_CATEGORIES.map((cat, idx) => <option key={cat.key} value={cat.key}>{cat.label} (⇧{idx + 1})</option>)}
               </select>
               <select 
                 value={statusFilter} 
                 onChange={(e) => setStatusFilter(e.target.value)} 
                 className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
               >
-                <option value="all">All Status</option>
-                {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                <option value="all">All Status (0)</option>
+                <option value="pending">Pending (1)</option>
+                <option value="approved">Approved (2)</option>
+                <option value="rejected">Rejected (3)</option>
+                <option value="reimbursed">Reimbursed (4)</option>
               </select>
               <div className="h-6 w-px bg-slate-600" />
               <div className="flex items-center gap-2">
@@ -1259,6 +1347,24 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
+              <div className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-2">Status Filter</div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">All Status</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">0</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Pending</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Approved</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Rejected</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">3</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Reimbursed</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">4</kbd></div>
+              <div className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-2 mt-4">Category Filter</div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">All Categories</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧0</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Flight</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Train</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Bus</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧3</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Taxi</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧4</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Auto</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧5</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Hotel</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧6</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Stay</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧7</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Per Diem</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧8</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Daily Allowance</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">⇧9</kbd></div>
+              <div className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-2 mt-4">General</div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle sort order</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">S</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>

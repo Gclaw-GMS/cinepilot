@@ -138,6 +138,14 @@ export default function ShotHubPage() {
   const handlePrintRef = useRef<() => void>()
   const handleExportMarkdownRef = useRef<() => void>()
   const printingRef = useRef(printing)
+  
+  // Filter refs for keyboard shortcuts
+  const filtersRef = useRef(filters)
+  
+  // Keep filter refs in sync
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
 
   const fetchScriptId = useCallback(async () => {
     try {
@@ -257,6 +265,43 @@ export default function ShotHubPage() {
           if (shots.length > 0 && !printingRef.current) {
             handlePrintRef.current?.()
           }
+          break
+        // Number keys for Shot Size filter (1-8)
+        case '1':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'ECU' ? 'all' : 'ECU' }))
+          break
+        case '2':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'CU' ? 'all' : 'CU' }))
+          break
+        case '3':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'MCU' ? 'all' : 'MCU' }))
+          break
+        case '4':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'MS' ? 'all' : 'MS' }))
+          break
+        case '5':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'MWS' ? 'all' : 'MWS' }))
+          break
+        case '6':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'WS' ? 'all' : 'WS' }))
+          break
+        case '7':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'VWS' ? 'all' : 'VWS' }))
+          break
+        case '8':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'EWS' ? 'all' : 'EWS' }))
+          break
+        case '0':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, shotSize: 'all' }))
           break
       }
     }
@@ -1037,9 +1082,9 @@ ${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle
                     onChange={e => setFilters(prev => ({ ...prev, shotSize: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white"
                   >
-                    <option value="all">All Sizes</option>
-                    {SHOT_SIZES.map(size => (
-                      <option key={size} value={size}>{size}</option>
+                    <option value="all">All Sizes (0)</option>
+                    {SHOT_SIZES.map((size, index) => (
+                      <option key={size} value={size}>{size} ({index + 1})</option>
                     ))}
                   </select>
                 </div>
@@ -1403,6 +1448,42 @@ ${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Print shot list</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">P</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: ECU shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: CU shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: MCU shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: MS shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: MWS shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">5</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: WS shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">6</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: VWS shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">7</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: EWS shot</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">8</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Clear shot size filter</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">0</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Show shortcuts</span>

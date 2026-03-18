@@ -72,6 +72,7 @@ export default function DubbingPage() {
   // Filter state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [languageFilter, setLanguageFilter] = useState('all')
+  const languageFilterRef = useRef(languageFilter)
   
   // Sort state
   const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
@@ -110,6 +111,11 @@ export default function DubbingPage() {
   
   // Active filter count (includes sort as active filter)
   const activeFilterCount = (languageFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
+  
+  // Sync languageFilterRef when languageFilter changes
+  useEffect(() => {
+    languageFilterRef.current = languageFilter
+  }, [languageFilter])
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -162,6 +168,30 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case '0':
+          e.preventDefault()
+          setLanguageFilter('all')
+          break
+        case '1':
+          e.preventDefault()
+          setLanguageFilter(languageFilterRef.current === 'telugu' ? 'all' : 'telugu')
+          break
+        case '2':
+          e.preventDefault()
+          setLanguageFilter(languageFilterRef.current === 'hindi' ? 'all' : 'hindi')
+          break
+        case '3':
+          e.preventDefault()
+          setLanguageFilter(languageFilterRef.current === 'malayalam' ? 'all' : 'malayalam')
+          break
+        case '4':
+          e.preventDefault()
+          setLanguageFilter(languageFilterRef.current === 'kannada' ? 'all' : 'kannada')
+          break
+        case '5':
+          e.preventDefault()
+          setLanguageFilter(languageFilterRef.current === 'english' ? 'all' : 'english')
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -175,7 +205,7 @@ export default function DubbingPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length, sortOrder])
+  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length, sortOrder, languageFilter])
 
   // Click outside handler for export menu
   useEffect(() => {
@@ -674,10 +704,12 @@ export default function DubbingPage() {
                         onChange={(e) => setLanguageFilter(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                       >
-                        <option value="all">All Languages</option>
-                        {TARGET_LANGUAGES.map(lang => (
-                          <option key={lang.value} value={lang.value}>{lang.label}</option>
-                        ))}
+                        <option value="all">All Languages (0)</option>
+                        <option value="telugu">Telugu (1)</option>
+                        <option value="hindi">Hindi (2)</option>
+                        <option value="malayalam">Malayalam (3)</option>
+                        <option value="kannada">Kannada (4)</option>
+                        <option value="english">English (5)</option>
                       </select>
                     </div>
                     
@@ -1096,9 +1128,29 @@ export default function DubbingPage() {
                   <span className="text-slate-300">Show shortcuts</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
                 </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-indigo-400">Filter: Telugu (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">1</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-indigo-400">Filter: Hindi (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">2</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-indigo-400">Filter: Malayalam (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-indigo-400">Filter: Kannada (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">4</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-indigo-400">Filter: English (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">5</kbd>
+                </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-slate-300">Close modal</span>
-                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+                  <span className="text-indigo-400">Clear language filter</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">0</kbd>
                 </div>
               </div>
             </div>

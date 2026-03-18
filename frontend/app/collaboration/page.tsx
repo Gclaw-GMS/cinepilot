@@ -104,6 +104,22 @@ export default function CollaborationPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const filteredMembersRef = useRef<TeamMember[]>([])
+  const filtersRef = useRef(filters)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+
+  useEffect(() => {
+    sortByRef.current = sortBy
+  }, [sortBy])
+
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
 
   // Calculate active filter count (including sort)
   const hasActiveSort = sortBy !== 'name' || sortOrder !== 'asc'
@@ -215,6 +231,83 @@ export default function CollaborationPage() {
           if (filteredMembersRef.current.length > 0) {
             handlePrintRef.current?.()
           }
+          break
+        // Number keys 1-9 for department filtering (toggle), Shift+1-3 for status
+        case '1':
+          e.preventDefault()
+          if (e.shiftKey) {
+            const status = filtersRef.current.status
+            setFilters(prev => ({ ...prev, status: status === 'active' ? 'all' : 'active' }))
+          } else {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Camera' ? 'all' : 'Camera' }))
+          }
+          break
+        case '2':
+          e.preventDefault()
+          if (e.shiftKey) {
+            const status = filtersRef.current.status
+            setFilters(prev => ({ ...prev, status: status === 'busy' ? 'all' : 'busy' }))
+          } else {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Lighting' ? 'all' : 'Lighting' }))
+          }
+          break
+        case '3':
+          e.preventDefault()
+          if (e.shiftKey) {
+            const status = filtersRef.current.status
+            setFilters(prev => ({ ...prev, status: status === 'offline' ? 'all' : 'offline' }))
+          } else {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Sound' ? 'all' : 'Sound' }))
+          }
+          break
+        case '4':
+          e.preventDefault()
+          {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Art' ? 'all' : 'Art' }))
+          }
+          break
+        case '5':
+          e.preventDefault()
+          {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Makeup' ? 'all' : 'Makeup' }))
+          }
+          break
+        case '6':
+          e.preventDefault()
+          {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Costume' ? 'all' : 'Costume' }))
+          }
+          break
+        case '7':
+          e.preventDefault()
+          {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Direction' ? 'all' : 'Direction' }))
+          }
+          break
+        case '8':
+          e.preventDefault()
+          {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'Production' ? 'all' : 'Production' }))
+          }
+          break
+        case '9':
+          e.preventDefault()
+          {
+            const dept = filtersRef.current.department
+            setFilters(prev => ({ ...prev, department: dept === 'VFX' ? 'all' : 'VFX' }))
+          }
+          break
+        case '0':
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, department: 'all', status: 'all' }))
           break
       }
     }
@@ -822,10 +915,18 @@ export default function CollaborationPage() {
                       onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="all">All Departments</option>
-                      {DEPARTMENTS.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
+                      <option value="all">All Departments (0)</option>
+                      <option value="Camera">Camera (1)</option>
+                      <option value="Lighting">Lighting (2)</option>
+                      <option value="Sound">Sound (3)</option>
+                      <option value="Art">Art (4)</option>
+                      <option value="Makeup">Makeup (5)</option>
+                      <option value="Costume">Costume (6)</option>
+                      <option value="Direction">Direction (7)</option>
+                      <option value="Production">Production (8)</option>
+                      <option value="VFX">VFX (9)</option>
+                      {DEPARTMENTS.includes('Stunts') && <option value="Stunts">Stunts</option>}
+                      {DEPARTMENTS.includes('Post-Production') && <option value="Post-Production">Post-Production</option>}
                     </select>
                   </div>
                   
@@ -837,10 +938,10 @@ export default function CollaborationPage() {
                       onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="all">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="busy">Busy</option>
-                      <option value="offline">Offline</option>
+                      <option value="all">All Status (0)</option>
+                      <option value="active">Active (⇧1)</option>
+                      <option value="busy">Busy (⇧2)</option>
+                      <option value="offline">Offline (⇧3)</option>
                     </select>
                   </div>
                   
@@ -1339,6 +1440,66 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle sort order</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">S</kbd>
+              </div>
+              {/* Number Key Shortcuts - Department Filter */}
+              <div className="mt-3 mb-2">
+                <span className="text-xs font-medium text-indigo-400 uppercase tracking-wider">Department Filter</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Camera</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">1</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Lighting</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">2</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Sound</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">3</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Art</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">4</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Makeup</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">5</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Costume</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">6</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Direction</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">7</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Production</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">8</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">VFX</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">9</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Clear filters</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">0</kbd>
+              </div>
+              {/* Status Filter Shortcuts */}
+              <div className="mt-3 mb-2">
+                <span className="text-xs font-medium text-indigo-400 uppercase tracking-wider">Status Filter</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Active</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">⇧1</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Busy</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">⇧2</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 text-sm">Offline</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400">⇧3</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Export team data</span>

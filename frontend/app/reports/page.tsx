@@ -101,6 +101,19 @@ export default function ReportsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const fetchReportRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  
+  // Refs for keyboard shortcuts
+  const tabFilterRef = useRef(tabFilter)
+  const activeTabRef = useRef(activeTab)
+  
+  // Keep refs in sync
+  useEffect(() => {
+    tabFilterRef.current = tabFilter
+  }, [tabFilter])
+  
+  useEffect(() => {
+    activeTabRef.current = activeTab
+  }, [activeTab])
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -156,25 +169,51 @@ export default function ReportsPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
-        case '1':
+        // Letter keys for tab switching
+        case 'o':
           e.preventDefault()
           setActiveTab('overview')
           break
-        case '2':
+        case 'd':
           e.preventDefault()
           setActiveTab('production')
           break
-        case '3':
+        case 'k':
           e.preventDefault()
           setActiveTab('schedule')
           break
-        case '4':
+        case 'c':
           e.preventDefault()
           setActiveTab('crew')
           break
-        case '5':
+        case 'z':
           e.preventDefault()
           setActiveTab('censor')
+          break
+        // Number keys for tab filter (1-5)
+        case '1':
+          e.preventDefault()
+          setTabFilter(prev => prev === 'overview' ? 'all' : 'overview')
+          break
+        case '2':
+          e.preventDefault()
+          setTabFilter(prev => prev === 'production' ? 'all' : 'production')
+          break
+        case '3':
+          e.preventDefault()
+          setTabFilter(prev => prev === 'schedule' ? 'all' : 'schedule')
+          break
+        case '4':
+          e.preventDefault()
+          setTabFilter(prev => prev === 'crew' ? 'all' : 'crew')
+          break
+        case '5':
+          e.preventDefault()
+          setTabFilter(prev => prev === 'censor' ? 'all' : 'censor')
+          break
+        case '0':
+          e.preventDefault()
+          setTabFilter('all')
           break
         case 'e':
           e.preventDefault()
@@ -635,13 +674,18 @@ ${rd.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
   const productionPercentage = reportData ? Math.round((reportData.production.spent / reportData.production.budget) * 100) : 0
   const schedulePercentage = reportData ? Math.round((reportData.schedule.completedDays / reportData.schedule.totalDays) * 100) : 0
 
-  const tabs: { key: ReportTab; label: string; icon: typeof FileText }[] = [
-    { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'production', label: 'Production', icon: Film },
-    { key: 'schedule', label: 'Schedule', icon: Calendar },
-    { key: 'crew', label: 'Crew', icon: Users },
-    { key: 'censor', label: 'Censor', icon: Shield },
-  ]
+  // Filter tabs based on tabFilter
+  const filteredTabs = useMemo(() => {
+    const tabs: { key: ReportTab; label: string; icon: typeof FileText }[] = [
+      { key: 'overview', label: 'Overview', icon: FileText },
+      { key: 'production', label: 'Production', icon: Film },
+      { key: 'schedule', label: 'Schedule', icon: Calendar },
+      { key: 'crew', label: 'Crew', icon: Users },
+      { key: 'censor', label: 'Censor', icon: Shield },
+    ]
+    if (tabFilter === 'all') return tabs
+    return tabs.filter(tab => tab.key === tabFilter)
+  }, [tabFilter])
 
   if (loading) {
     return (
@@ -811,12 +855,12 @@ ${rd.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
                 onChange={(e) => setTabFilter(e.target.value)}
                 className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
               >
-                <option value="all">All Tabs</option>
-                <option value="overview">Overview</option>
-                <option value="production">Production</option>
-                <option value="schedule">Schedule</option>
-                <option value="crew">Crew</option>
-                <option value="censor">Censor</option>
+                <option value="all">All Tabs (0)</option>
+                <option value="overview">Overview (1)</option>
+                <option value="production">Production (2)</option>
+                <option value="schedule">Schedule (3)</option>
+                <option value="crew">Crew (4)</option>
+                <option value="censor">Censor (5)</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -857,7 +901,7 @@ ${rd.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
       )}
 
       <div className="flex gap-2 border-b border-gray-800 pb-2">
-        {tabs.map(tab => (
+        {filteredTabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -1198,24 +1242,48 @@ ${rd.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">G</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Overview tab</span>
+                <span className="text-gray-300">Switch to Overview tab</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">O</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Production tab</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">D</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Schedule tab</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">K</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Crew tab</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">C</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Censor tab</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">Z</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Filter by Overview (toggle)</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">1</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Production tab</span>
+                <span className="text-gray-300">Filter by Production (toggle)</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">2</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Schedule tab</span>
+                <span className="text-gray-300">Filter by Schedule (toggle)</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">3</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Crew tab</span>
+                <span className="text-gray-300">Filter by Crew (toggle)</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">4</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Censor tab</span>
+                <span className="text-gray-300">Filter by Censor (toggle)</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">5</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Clear tab filter (show all)</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">0</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Show shortcuts</span>

@@ -735,13 +735,35 @@ export default function AIToolsPage() {
 
   // Keyboard shortcuts handler
   useEffect(() => {
+    // Category mapping for number key shortcuts
+    const CATEGORY_KEY_MAP: Record<string, string> = {
+      '1': 'Script',
+      '2': 'Finance',
+      '3': 'Production',
+      '4': 'Planning',
+      '5': 'Risk',
+    }
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return
       }
       
-      if (e.key === 'f' || e.key === 'F') {
+      // Number keys for category filtering (toggle behavior)
+      if (CATEGORY_KEY_MAP[e.key]) {
+        e.preventDefault()
+        const targetCategory = CATEGORY_KEY_MAP[e.key]
+        // Toggle: if same category selected, clear filter; otherwise set filter
+        if (categoryFilterRef.current === targetCategory) {
+          setCategoryFilter('all')
+        } else {
+          setCategoryFilter(targetCategory)
+        }
+      } else if (e.key === '0') {
+        e.preventDefault()
+        setCategoryFilter('all')
+      } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
         setShowFilterPanel(!showFilterPanel)
       } else if (e.key === 's' || e.key === 'S') {
@@ -774,12 +796,13 @@ export default function AIToolsPage() {
         setSearchQuery('')
         setSortBy('name')
         setSortOrder('asc')
+        setCategoryFilter('all')
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, handleExportMarkdown, showFilterPanel, sortOrder])
+  }, [handleRefresh, handleExportMarkdown, showFilterPanel, sortOrder, categoryFilter])
 
   // Active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -934,16 +957,16 @@ export default function AIToolsPage() {
                             onChange={(e) => setCategoryFilter(e.target.value)}
                             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                         >
-                          <option value="all">All Categories</option>
-                          {categories.length > 0 ? categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
+                          <option value="all">All Categories (0)</option>
+                          {categories.length > 0 ? categories.map((cat, idx) => (
+                            <option key={cat} value={cat}>{cat} ({idx + 1})</option>
                           )) : (
                             <>
-                              <option value="Script">Script</option>
-                              <option value="Finance">Finance</option>
-                              <option value="Production">Production</option>
-                              <option value="Planning">Planning</option>
-                              <option value="Risk">Risk</option>
+                              <option value="Script">Script (1)</option>
+                              <option value="Finance">Finance (2)</option>
+                              <option value="Production">Production (3)</option>
+                              <option value="Planning">Planning (4)</option>
+                              <option value="Risk">Risk (5)</option>
                             </>
                           )}
                         </select>
@@ -1410,39 +1433,72 @@ export default function AIToolsPage() {
               </div>
               
               <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                {/* Category Filter Shortcuts */}
+                <div className="pb-2 border-b border-slate-800">
+                  <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Category Filter</h3>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">All Categories</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">0</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Script</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">1</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Finance</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">2</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Production</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">3</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Planning</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">4</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Risk</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">5</kbd>
+                </div>
+                
+                {/* Other Shortcuts */}
+                <div className="pt-2 pb-2 border-b border-slate-800">
+                  <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Other Shortcuts</h3>
+                </div>
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">F</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Toggle sort order</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">S</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Refresh tools</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">R</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Focus search</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">/</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Export menu</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">E</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Export Markdown</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">M</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Print report</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">P</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Show shortcuts</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">?</kbd>
                 </div>
-                <div className="flex items-center justify-between py-2">
+                <div className="flex items-center justify-between py-1">
                   <span className="text-slate-400">Close / Clear</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">Esc</kbd>
                 </div>

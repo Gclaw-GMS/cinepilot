@@ -18,12 +18,18 @@ import {
   DollarSign,
   MapPin,
   RefreshCw,
+  TrendingUp,
+  BarChart3,
+  PieChart as PieChartIcon,
   Keyboard,
   Download,
   ChevronDown,
   Filter,
   Printer
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from 'recharts'
 
 interface Project {
   id: string
@@ -132,6 +138,7 @@ export default function ProjectsPage() {
   })
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'startDate' | 'budget' | 'createdAt'>('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -239,6 +246,16 @@ export default function ProjectsPage() {
     else if (e.key.toLowerCase() === 's') {
       e.preventDefault()
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+    }
+    // 1: Switch to List view
+    else if (e.key === '1') {
+      e.preventDefault()
+      setViewMode('list')
+    }
+    // 2: Switch to Analytics view
+    else if (e.key === '2') {
+      e.preventDefault()
+      setViewMode('analytics')
     }
     // Escape: Close modal / Clear search / Close export / Close filters
     else if (e.key === 'Escape') {
@@ -735,6 +752,80 @@ ${p.description ? `**Description:** ${p.description}\n` : ''}
     return result
   }, [projects, search, filters, sortBy, sortOrder])
 
+  // Analytics data computations
+  const analyticsData = useMemo(() => {
+    const byStatus = filtered.reduce((acc, p) => {
+      const status = p.status.replace('_', ' ')
+      acc[status] = (acc[status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const byLanguage = filtered.reduce((acc, p) => {
+      if (p.language) {
+        acc[p.language] = (acc[p.language] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+    
+    const byGenre = filtered.reduce((acc, p) => {
+      if (p.genre) {
+        // Split genres (e.g., "Drama/Political" -> Drama, Political)
+        const genres = p.genre.split('/')
+        genres.forEach(g => {
+          acc[g.trim()] = (acc[g.trim()] || 0) + 1
+        })
+      }
+      return acc
+    }, {} as Record<string, number>)
+
+    // Budget ranges
+    const budgetRanges = filtered.reduce((acc, p) => {
+      const budget = parseInt(p.budget || '0')
+      if (budget === 0) {
+        acc['No Budget'] = (acc['No Budget'] || 0) + 1
+      } else if (budget < 25000000) {
+        acc['< 2.5Cr'] = (acc['< 2.5Cr'] || 0) + 1
+      } else if (budget < 50000000) {
+        acc['2.5-5Cr'] = (acc['2.5-5Cr'] || 0) + 1
+      } else if (budget < 100000000) {
+        acc['5-10Cr'] = (acc['5-10Cr'] || 0) + 1
+      } else {
+        acc['> 10Cr'] = (acc['> 10Cr'] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+
+    // Projects by month (for timeline)
+    const byMonth = filtered.reduce((acc, p) => {
+      if (p.startDate) {
+        const month = new Date(p.startDate).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
+        acc[month] = (acc[month] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+
+    const statusData = Object.entries(byStatus).map(([name, value]) => ({ name, value }))
+    const languageData = Object.entries(byLanguage).map(([name, value]) => ({ name, value }))
+    const genreData = Object.entries(byGenre).map(([name, value]) => ({ name, value }))
+    const budgetData = Object.entries(budgetRanges).map(([name, value]) => ({ name, value }))
+    const timelineData = Object.entries(byMonth).map(([name, value]) => ({ name, value }))
+
+    const totalBudget = filtered.reduce((sum, p) => sum + (parseInt(p.budget || '0') || 0), 0)
+    const avgBudget = filtered.length > 0 ? totalBudget / filtered.length : 0
+
+    return {
+      statusData,
+      languageData,
+      genreData,
+      budgetData,
+      timelineData,
+      totalBudget,
+      avgBudget,
+      totalProjects: filtered.length,
+      activeProjects: filtered.filter(p => p.status === 'active' || p.status === 'production').length,
+    }
+  }, [filtered])
+
   // Update refs when filtered/filter state changes
   useEffect(() => {
     filteredLengthRef.current = filtered.length
@@ -1051,8 +1142,195 @@ ${p.description ? `**Description:** ${p.description}\n` : ''}
         </div>
       </div>
 
-      {/* Projects Grid */}
-      {loading ? (
+      {/* View Mode Tabs */}
+      <div className="flex items-center gap-2 mb-6">
+        <button
+          onClick={() => setViewMode('list')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            viewMode === 'list'
+              ? 'bg-amber-600 text-white'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+          }`}
+        >
+          <Folder className="w-4 h-4" />
+          List
+        </button>
+        <button
+          onClick={() => setViewMode('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            viewMode === 'analytics'
+              ? 'bg-amber-600 text-white'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Analytics
+        </button>
+      </div>
+
+      {/* View Content */}
+      {viewMode === 'analytics' ? (
+        /* Analytics View */
+        <div className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-amber-500/20">
+                  <Folder className="w-4 h-4 text-amber-400" />
+                </div>
+                <span className="text-slate-500 text-sm">Total Projects</span>
+              </div>
+              <p className="text-2xl font-bold">{analyticsData.totalProjects}</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-emerald-500/20">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                </div>
+                <span className="text-slate-500 text-sm">Active</span>
+              </div>
+              <p className="text-2xl font-bold">{analyticsData.activeProjects}</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-blue-500/20">
+                  <DollarSign className="w-4 h-4 text-blue-400" />
+                </div>
+                <span className="text-slate-500 text-sm">Total Budget</span>
+              </div>
+              <p className="text-2xl font-bold">₹{(analyticsData.totalBudget / 10000000).toFixed(1)}Cr</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-purple-500/20">
+                  <BarChart3 className="w-4 h-4 text-purple-400" />
+                </div>
+                <span className="text-slate-500 text-sm">Avg Budget</span>
+              </div>
+              <p className="text-2xl font-bold">₹{(analyticsData.avgBudget / 10000000).toFixed(1)}Cr</p>
+            </div>
+          </div>
+
+          {/* Charts Row 1 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Status Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-amber-400" />
+                Projects by Status
+              </h3>
+              <div className="h-64">
+                {analyticsData.statusData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analyticsData.statusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {analyticsData.statusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#64748b'][index % 5]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500">No data</div>
+                )}
+              </div>
+            </div>
+
+            {/* Language Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Film className="w-5 h-5 text-blue-400" />
+                Projects by Language
+              </h3>
+              <div className="h-64">
+                {analyticsData.languageData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.languageData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500">No data</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Charts Row 2 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Genre Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-purple-400" />
+                Projects by Genre
+              </h3>
+              <div className="h-64">
+                {analyticsData.genreData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.genreData.slice(0, 8)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500">No data</div>
+                )}
+              </div>
+            </div>
+
+            {/* Budget Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+                Projects by Budget Range
+              </h3>
+              <div className="h-64">
+                {analyticsData.budgetData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analyticsData.budgetData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {analyticsData.budgetData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#64748b'][index % 5]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500">No data</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
           <span className="ml-3 text-slate-400">Loading projects...</span>
@@ -1368,6 +1646,8 @@ ${p.description ? `**Description:** ${p.description}\n` : ''}
 
             <div className="space-y-3">
               {[
+                { key: '1', description: 'Switch to List view' },
+                { key: '2', description: 'Switch to Analytics view' },
                 { key: 'R', description: 'Refresh projects' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters' },

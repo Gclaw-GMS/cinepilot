@@ -168,11 +168,67 @@ export default function TravelExpensesPage() {
     expensesLengthRef.current = expenses.length
   }, [expenses.length])
 
+  // Refs for keyboard shortcuts - keep in sync with state
+  const filterCategoryRef = useRef(filterCategory)
+  const filterStatusRef = useRef(filterStatus)
+  
+  useEffect(() => {
+    filterCategoryRef.current = filterCategory
+  }, [filterCategory])
+  
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea/select
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      // Number keys for category filtering (1-9)
+      if (e.key >= '1' && e.key <= '9') {
+        const categoryIndex = parseInt(e.key) - 1
+        if (categoryIndex < CATEGORIES.length) {
+          e.preventDefault()
+          const category = CATEGORIES[categoryIndex].key
+          // Toggle: if same category selected, clear it
+          if (filterCategoryRef.current === category) {
+            setFilterCategory('all')
+          } else {
+            setFilterCategory(category)
+          }
+          return
+        }
+      }
+      
+      // Number key 0 to clear category filter
+      if (e.key === '0') {
+        e.preventDefault()
+        setFilterCategory('all')
+        return
+      }
+      
+      // Shift+Number for status filtering
+      if (e.shiftKey && e.key >= '1' && e.key <= '4') {
+        e.preventDefault()
+        const statusOptions = ['pending', 'approved', 'rejected', 'reimbursed']
+        const statusIndex = parseInt(e.key) - 1
+        const status = statusOptions[statusIndex]
+        if (filterStatusRef.current === status) {
+          setFilterStatus('all')
+        } else {
+          setFilterStatus(status)
+        }
+        return
+      }
+      
+      // Shift+0 to clear status filter
+      if (e.shiftKey && e.key === '0') {
+        e.preventDefault()
+        setFilterStatus('all')
         return
       }
       
@@ -227,16 +283,23 @@ export default function TravelExpensesPage() {
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case '1':
-          e.preventDefault()
-          setViewMode('list')
+          // Only switch view if not filtering by category
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setViewMode('list')
+          }
           break
         case '2':
-          e.preventDefault()
-          setViewMode('analytics')
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setViewMode('analytics')
+          }
           break
         case '3':
-          e.preventDefault()
-          setViewMode('conflicts')
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setViewMode('conflicts')
+          }
           break
       }
     }
@@ -900,9 +963,9 @@ export default function TravelExpensesPage() {
                   onChange={(e) => setFilterCategory(e.target.value)}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="all">All Categories</option>
-                  {CATEGORIES.map(cat => (
-                    <option key={cat.key} value={cat.key}>{cat.label}</option>
+                  <option value="all">All Categories (0)</option>
+                  {CATEGORIES.map((cat, idx) => (
+                    <option key={cat.key} value={cat.key}>{cat.label} ({idx + 1})</option>
                   ))}
                 </select>
               </div>
@@ -913,11 +976,11 @@ export default function TravelExpensesPage() {
                   onChange={(e) => setFilterStatus(e.target.value)}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="reimbursed">Reimbursed</option>
+                  <option value="all">All Status (⇧0)</option>
+                  <option value="pending">Pending (⇧1)</option>
+                  <option value="approved">Approved (⇧2)</option>
+                  <option value="rejected">Rejected (⇧3)</option>
+                  <option value="reimbursed">Reimbursed (⇧4)</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
@@ -1201,9 +1264,9 @@ export default function TravelExpensesPage() {
               onChange={(e) => setFilterCategory(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="all">All Categories</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.key} value={c.key}>{c.label}</option>
+              <option value="all">All Categories (0)</option>
+              {CATEGORIES.map((c, idx) => (
+                <option key={c.key} value={c.key}>{c.label} ({idx + 1})</option>
               ))}
             </select>
             <select
@@ -1211,11 +1274,11 @@ export default function TravelExpensesPage() {
               onChange={(e) => setFilterStatus(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="reimbursed">Reimbursed</option>
+              <option value="all">All Status (⇧0)</option>
+              <option value="pending">Pending (⇧1)</option>
+              <option value="approved">Approved (⇧2)</option>
+              <option value="rejected">Rejected (⇧3)</option>
+              <option value="reimbursed">Reimbursed (⇧4)</option>
             </select>
             <button
               onClick={() => setShowDateFilter(!showDateFilter)}
@@ -1716,17 +1779,65 @@ export default function TravelExpensesPage() {
                 <span className="text-slate-300">Show shortcuts</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Switch to List view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">1</kbd>
+              {/* Category Filter Shortcuts */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <h3 className="text-sm font-medium text-slate-400 mb-2">Category Filter (1-9)</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {CATEGORIES.slice(0, 9).map((cat, idx) => (
+                    <div key={cat.key} className="flex justify-between items-center py-1">
+                      <span className="text-slate-300 text-sm">{cat.label}</span>
+                      <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-amber-400">{idx + 1}</kbd>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-300 text-sm">Clear filter</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-slate-400">0</kbd>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Switch to Analytics view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">2</kbd>
+              
+              {/* Status Filter Shortcuts */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <h3 className="text-sm font-medium text-slate-400 mb-2">Status Filter (⇧1-4)</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-300 text-sm">Pending</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-amber-400">⇧1</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-300 text-sm">Approved</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-amber-400">⇧2</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-300 text-sm">Rejected</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-amber-400">⇧3</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-300 text-sm">Reimbursed</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-amber-400">⇧4</kbd>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-300 text-sm">Clear status</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-slate-400">⇧0</kbd>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-slate-300">Switch to Conflicts view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">3</kbd>
+              
+              {/* View Mode Shortcuts */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <h3 className="text-sm font-medium text-slate-400 mb-2">View Mode</h3>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">List view</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">1</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Analytics view</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">2</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-slate-300">Conflicts view</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">3</kbd>
+                </div>
               </div>
             </div>
           </div>

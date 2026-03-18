@@ -1,5 +1,47 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (1:54 AM) - DOOD Page Markdown Export Enhanced
+
+### Features Perfected This Build
+- **DOOD Page - Enhanced Markdown Export**: Improved the Markdown export functionality with comprehensive production data
+  - **Call Frequency Groups Section**: Added breakdown showing Heavy Call (70%+), Moderate Call (40-70%), Light Call (<40%), and Unassigned cast members
+  - **Workload Warnings Section**: Automatically detects and reports:
+    - Overwork risk (5+ consecutive shooting days)
+    - Insufficient rest days between calls
+  - **Production Notes Section**: Includes:
+    - Heavy shoot days count (days with 3+ cast members)
+    - Highest demand day with actor count
+    - Lightest day with actor count
+  - **Enhanced Day Distribution Table**: Now includes actor count per day for quick reference
+  - **Uses Filtered Data**: Export respects current filters for targeted reports
+
+### Technical Implementation
+- **Call Frequency Calculation**: Groups actors by percentage thresholds
+- **Workload Analysis**: Iterates through cast to detect consecutive days and rest gaps
+- **Daily Cast Counting**: Tracks actor requirements per shooting day
+- **Production Insights**: Calculates min/max cast requirements for scheduling
+
+### Build Verification
+- **Build:** Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+
+### DOOD Markdown Export Enhancement Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Call Frequency Groups section shows Heavy/Moderate/Light/Unassigned breakdown
+- [x] Workload Warnings automatically detect overwork and insufficient rest
+- [x] Production Notes show heavy shoot days, highest demand day, lightest day
+- [x] Day Distribution table includes actor count
+- [x] Export uses filtered data (filteredReport)
+- [x] UI professional & visual (maintains existing export UI)
+- [x] Error handling complete (shows ✅ when no warnings)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Pushed to origin/feature/continuity-sorting ✅
+
+---
+
 ## Build Status: ✅ PASSING (1:34 AM) - Travel-Expenses Page Markdown Export IMPLEMENTED
 
 ### Features Perfected This Build

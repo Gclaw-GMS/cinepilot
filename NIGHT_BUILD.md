@@ -1,5 +1,68 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (12:34 AM) - Character-Costume Page Markdown Export IMPLEMENTED
+
+### Features Perfected This Build
+- **Character-Costume Page - Markdown Export**: Added comprehensive Markdown export functionality
+  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - **Summary Section**: Total characters, total budget, by role breakdown
+    - **Characters Table**: Name, Age, Gender, Role, Status, Budget
+    - **Character Details Section**: Full details for each character including appearance, personality, costume style, fabrics, color palette, and notes
+  - **Content Preservation**: Full character and costume data included in export
+  - **Works with Filters**: Exports currently filtered characters
+  - **File Naming**: Auto-generated filename with date (character-costumes-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **New Function**: handleExportMarkdown wrapped in useCallback for proper memoization
+- **Summary Stats**: Includes all key character metrics (total, budget, by role)
+- **Character Details**: Full details with appearance, personality, costume style, fabrics, color palette
+- **Filtered Export**: Uses filteredCharacters for export content
+- **Ref Pattern**: Uses filteredCharactersRef and handleExportMarkdownRef for keyboard shortcut accessibility
+- **Blob Creation**: Creates downloadable text/markdown blob
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print character report
+- **R** - Refresh character data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **/** - Focus search input
+- **N** - Add new character
+- **1/2/3** - Switch view modes
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Character-Costume Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats (total, budget, by role)
+- [x] Characters table with all fields
+- [x] Character Details section with full info
+- [x] Filters applied to export (uses filteredCharacters)
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks filteredCharacters.length)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
 ## Build Status: ✅ PASSING (12:14 AM) - Continuity Page Markdown Export IMPLEMENTED
 
 ### Features Perfected This Build

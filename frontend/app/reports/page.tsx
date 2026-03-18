@@ -180,6 +180,10 @@ export default function ReportsPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          if (reportData) handleExportMarkdownRef.current?.()
+          break
         case 'p':
           e.preventDefault()
           if (reportData) handlePrintRef.current?.()
@@ -317,6 +321,181 @@ export default function ReportsPage() {
     a.click()
     setExporting(false)
   }
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!reportData) return
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    const rd = reportData
+    const timestamp = new Date().toISOString().split('T')[0]
+    
+    // Format currency in INR
+    const formatINR = (amount: number) => {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+    }
+    
+    // Calculate percentages
+    const scheduleProgress = rd.schedule.totalDays > 0 
+      ? Math.round((rd.schedule.completedDays / rd.schedule.totalDays) * 100) 
+      : 0
+    const budgetUsed = rd.production.budget > 0 
+      ? Math.round((rd.production.spent / rd.production.budget) * 100) 
+      : 0
+    
+    let markdown = `# CinePilot Production Report
+
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+---
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Scenes** | ${rd.production.totalScenes} |
+| **Total Characters** | ${rd.production.totalCharacters} |
+| **Total Locations** | ${rd.production.totalLocations} |
+| **Shooting Days** | ${rd.production.shootingDays} |
+| **Total Budget** | ${formatINR(rd.production.budget)} |
+| **Spent** | ${formatINR(rd.production.spent)} |
+| **Remaining** | ${formatINR(rd.production.budget - rd.production.spent)} |
+
+---
+
+## Production Overview
+
+### Scene & Location Breakdown
+
+| Metric | Count |
+|--------|-------|
+| Total Scenes | ${rd.production.totalScenes} |
+| Total Characters | ${rd.production.totalCharacters} |
+| Total Locations | ${rd.production.totalLocations} |
+| Shooting Days | ${rd.production.shootingDays} |
+${rd.production.vfxShots !== undefined ? `| VFX Shots | ${rd.production.vfxShots} |` : ''}
+${rd.production.totalShots !== undefined ? `| Total Shots | ${rd.production.totalShots} |` : ''}
+
+### Budget Summary
+
+| Category | Amount |
+|----------|--------|
+| Total Budget | ${formatINR(rd.production.budget)} |
+| Spent | ${formatINR(rd.production.spent)} |
+| Remaining | ${formatINR(rd.production.budget - rd.production.spent)} |
+| Budget Used | ${budgetUsed}% |
+
+${rd.budget && rd.budget.categories && rd.budget.categories.length > 0 ? `### Budget by Category
+
+| Category | Budget | Spent | Remaining |
+|----------|--------|-------|------------|
+${rd.budget.categories.map(cat => `| ${cat.name} | ${formatINR(cat.budget)} | ${formatINR(cat.spent)} | ${formatINR(cat.budget - cat.spent)} |`).join('\n')}
+
+` : ''}
+---
+
+## Schedule Progress
+
+| Metric | Value |
+|--------|-------|
+| Completed Days | ${rd.schedule.completedDays} |
+| Total Days | ${rd.schedule.totalDays} |
+| Progress | ${scheduleProgress}% |
+| Scenes Shot | ${rd.schedule.scenesShot} |
+| Total Scenes | ${rd.schedule.totalScenes} |
+
+${rd.schedule.dailyProgress && rd.schedule.dailyProgress.length > 0 ? `### Daily Progress
+
+| Day | Scenes | Budget Spent |
+|-----|--------|--------------|
+${rd.schedule.dailyProgress.slice(0, 10).map(d => `| Day ${d.day} | ${d.scenes} | ${formatINR(d.budget)} |`).join('\n')}
+${rd.schedule.dailyProgress.length > 10 ? `\n*...and ${rd.schedule.dailyProgress.length - 10} more days*\n` : ''}
+` : ''}
+---
+
+## Crew Overview
+
+| Metric | Value |
+|--------|-------|
+| Total Members | ${rd.crew.totalMembers} |
+| Departments | ${rd.crew.departments} |
+| Total Daily Rate | ${formatINR(rd.crew.totalDailyRate)} |
+
+${rd.crew.departmentBreakdown && rd.crew.departmentBreakdown.length > 0 ? `### Department Breakdown
+
+| Department | Members | Daily Rate |
+|------------|---------|------------|
+${rd.crew.departmentBreakdown.map(dept => `| ${dept.name} | ${dept.count} | ${formatINR(dept.dailyRate)} |`).join('\n')}
+
+` : ''}
+---
+
+## Censor Analysis
+
+| Metric | Value |
+|--------|-------|
+| Certificate | ${rd.censor.certificate} |
+| Sensitivity Score | ${rd.censor.score} |
+| Risk Issues | ${rd.censor.issues} |
+
+${rd.censor.flags && rd.censor.flags.length > 0 ? `### Risk Flags by Category
+
+| Category | Count |
+|----------|-------|
+${rd.censor.flags.map(flag => `| ${flag.category} | ${flag.count} |`).join('\n')}
+
+` : ''}
+${rd.vfx ? `---
+
+## VFX Status
+
+| Metric | Value |
+|--------|-------|
+| Total Shots | ${rd.vfx.totalShots} |
+| Completed | ${rd.vfx.completed} |
+| Pending | ${rd.vfx.pending} |
+
+${rd.vfx.complexityBreakdown && rd.vfx.complexityBreakdown.length > 0 ? `### Complexity Breakdown
+
+| Complexity Level | Count |
+|------------------|-------|
+${rd.vfx.complexityBreakdown.map(c => `| ${c.level} | ${c.count} |`).join('\n')}
+
+` : ''}` : ''}
+${rd.locations ? `---
+
+## Locations Summary
+
+| Metric | Value |
+|--------|-------|
+| Total | ${rd.locations.total} |
+| Indoor | ${rd.locations.indoor} |
+| Outdoor | ${rd.locations.outdoor} |
+
+${rd.locations.byType && rd.locations.byType.length > 0 ? `### By Type
+
+| Type | Count |
+|------|-------|
+${rd.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
+
+` : ''}` : ''}
+---
+
+*Generated by CinePilot on ${new Date().toLocaleString('en-IN')}*`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `production-report-${timestamp}.md`
+    a.click()
+    setExporting(false)
+  }, [reportData])
+
+  // Ref for keyboard shortcut
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handlePrint = useCallback(() => {
     if (!reportData) return
@@ -563,6 +742,14 @@ export default function ReportsPage() {
                 >
                   <Download className="w-4 h-4 text-green-400" />
                   Export as CSV
+                </button>
+                <button
+                  onClick={handleExportMarkdown}
+                  disabled={!reportData}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <FileText className="w-4 h-4 text-cyan-400" />
+                  Export as Markdown
                 </button>
               </div>
             )}
@@ -997,6 +1184,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle export menu</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Export as Markdown</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">M</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Print report</span>

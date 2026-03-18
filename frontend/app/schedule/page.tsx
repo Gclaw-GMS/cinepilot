@@ -268,6 +268,9 @@ export default function SchedulePage() {
   const shootingDaysRef = useRef<ShootingDayData[]>([])
   const filteredShootingDaysRef = useRef<ShootingDayData[]>([])
   const handleExportMarkdownRef = useRef<() => void>(() => {})
+  const filterStatusRef = useRef<string>('all')
+  const filterLocationRef = useRef<string>('all')
+  const uniqueLocationsRef = useRef<string[]>([])
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -328,6 +331,15 @@ export default function SchedulePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shootingDays])
 
+  // Keep filter refs in sync with state for keyboard shortcuts
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
+
+  useEffect(() => {
+    filterLocationRef.current = filterLocation
+  }, [filterLocation])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -345,15 +357,37 @@ export default function SchedulePage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        case '0':
+          e.preventDefault()
+          setFilterStatus('all')
+          break
         case '1':
           e.preventDefault()
-          setViewMode('timeline')
+          setFilterStatus(filterStatusRef.current === 'scheduled' ? 'all' : 'scheduled')
           break
         case '2':
           e.preventDefault()
-          setViewMode('chart')
+          setFilterStatus(filterStatusRef.current === 'in-progress' ? 'all' : 'in-progress')
           break
         case '3':
+          e.preventDefault()
+          setFilterStatus(filterStatusRef.current === 'completed' ? 'all' : 'completed')
+          break
+        case '4':
+          e.preventDefault()
+          setFilterStatus(filterStatusRef.current === 'delayed' ? 'all' : 'delayed')
+          break
+        case 't':
+          e.preventDefault()
+          setViewMode('timeline')
+          break
+        case 'c':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setViewMode('chart')
+          }
+          break
+        case 'k':
           e.preventDefault()
           setViewMode('conflicts')
           break
@@ -394,6 +428,21 @@ export default function SchedulePage() {
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
+      }
+      
+      // Shift + number keys for location filter
+      if (e.shiftKey) {
+        const locationIndex = parseInt(e.key) - 1
+        if (locationIndex >= 0 && locationIndex <= 9) {
+          e.preventDefault()
+          const locations = uniqueLocationsRef.current
+          if (locations && locations.length > locationIndex) {
+            const selectedLocation = locations[locationIndex]
+            setFilterLocation(filterLocationRef.current === selectedLocation ? 'all' : selectedLocation)
+          } else if (locationIndex === 0) {
+            setFilterLocation('all')
+          }
+        }
       }
     }
     
@@ -809,6 +858,11 @@ export default function SchedulePage() {
     })
     return Array.from(locations).sort()
   }, [shootingDays])
+
+  // Keep unique locations ref in sync for keyboard shortcuts
+  useEffect(() => {
+    uniqueLocationsRef.current = uniqueLocations
+  }, [uniqueLocations])
 
   // Filter shooting days by search query and filters
   const filteredShootingDays = useMemo(() => {
@@ -1292,11 +1346,11 @@ export default function SchedulePage() {
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="all">All Status</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="delayed">Delayed</option>
+                <option value="all">All Status (0)</option>
+                <option value="scheduled">Scheduled (1)</option>
+                <option value="in-progress">In Progress (2)</option>
+                <option value="completed">Completed (3)</option>
+                <option value="delayed">Delayed (4)</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -1306,9 +1360,9 @@ export default function SchedulePage() {
                 onChange={(e) => setFilterLocation(e.target.value)}
                 className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="all">All Locations</option>
-                {uniqueLocations.map(loc => (
-                  <option key={loc} value={loc}>{loc}</option>
+                <option value="all">All Locations (⇧0)</option>
+                {uniqueLocations.map((loc, idx) => (
+                  <option key={loc} value={loc}>{loc} (⇧{idx + 1})</option>
                 ))}
               </select>
             </div>
@@ -1891,9 +1945,16 @@ export default function SchedulePage() {
                 { key: '/', desc: 'Focus search input' },
                 { key: 'F', desc: 'Toggle filters & sort panel' },
                 { key: 'S', desc: 'Toggle sort order (asc/desc)' },
-                { key: '1', desc: 'Switch to Timeline view' },
-                { key: '2', desc: 'Switch to Analytics view' },
-                { key: '3', desc: 'Switch to Conflicts view' },
+                { key: '0', desc: 'Clear status filter (show all)' },
+                { key: '1', desc: 'Filter by Scheduled status (toggle)' },
+                { key: '2', desc: 'Filter by In Progress status (toggle)' },
+                { key: '3', desc: 'Filter by Completed status (toggle)' },
+                { key: '4', desc: 'Filter by Delayed status (toggle)' },
+                { key: '⇧0', desc: 'Clear location filter (show all)' },
+                { key: '⇧1-9', desc: 'Filter by location (toggle)' },
+                { key: 'T', desc: 'Switch to Timeline view' },
+                { key: 'C', desc: 'Switch to Analytics view' },
+                { key: 'K', desc: 'Switch to Conflicts view' },
                 { key: 'O', desc: 'Open optimize schedule' },
                 { key: 'E', desc: 'Open export menu (CSV/JSON/Markdown)' },
                 { key: 'M', desc: 'Direct export to Markdown' },

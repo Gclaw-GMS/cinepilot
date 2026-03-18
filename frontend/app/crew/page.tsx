@@ -24,6 +24,10 @@ import {
   ChevronDown,
   FileText,
   Printer,
+  PieChart as PieChartIcon,
+  TrendingDown,
+  Award,
+  Clock,
 } from 'lucide-react';
 import {
   BarChart,
@@ -141,7 +145,15 @@ export default function CrewPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'skills'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'skills' | 'analytics'>('list');
+  
+  // View mode ref for keyboard shortcuts
+  const viewModeRef = useRef(viewMode);
+  
+  // Keep viewMode ref in sync
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
 
   // Sort options for UI
   const sortOptions = [
@@ -155,6 +167,7 @@ export default function CrewPage() {
   const viewModeOptions = [
     { key: 'list', label: 'List View', icon: Users },
     { key: 'skills', label: 'Skills Matrix', icon: Briefcase },
+    { key: 'analytics', label: 'Analytics', icon: PieChartIcon },
   ];
 
   const fetchCrew = useCallback(async () => {
@@ -259,6 +272,10 @@ export default function CrewPage() {
         case '2':
           e.preventDefault()
           setViewMode('skills')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('analytics')
           break
       }
     }
@@ -368,6 +385,86 @@ export default function CrewPage() {
     }));
     
     return { skills: sortedSkills, matrix };
+  }, [crew]);
+
+  // Analytics data computation
+  const analyticsData = useMemo(() => {
+    // Summary stats
+    const totalCrew = crew.length;
+    const totalDailyRate = crew.reduce((sum, c) => sum + (Number(c.dailyRate) || 0), 0);
+    const avgDailyRate = totalCrew > 0 ? totalDailyRate / totalCrew : 0;
+    const highestRate = crew.reduce((max, c) => Math.max(max, Number(c.dailyRate) || 0), 0);
+    const lowestRate = crew.reduce((min, c) => Math.min(min, Number(c.dailyRate) || Infinity), Infinity);
+    
+    // Department breakdown
+    const deptBreakdown: Record<string, { count: number; totalRate: number }> = {};
+    crew.forEach(c => {
+      const dept = c.department || 'Unassigned';
+      if (!deptBreakdown[dept]) {
+        deptBreakdown[dept] = { count: 0, totalRate: 0 };
+      }
+      deptBreakdown[dept].count++;
+      deptBreakdown[dept].totalRate += Number(c.dailyRate) || 0;
+    });
+    
+    // Department chart data
+    const deptChartData = Object.entries(deptBreakdown).map(([name, data]) => ({
+      name,
+      count: data.count,
+      totalRate: data.totalRate,
+      avgRate: data.count > 0 ? data.totalRate / data.count : 0,
+    })).sort((a, b) => b.count - a.count);
+    
+    // Role breakdown (top 10)
+    const roleBreakdown: Record<string, number> = {};
+    crew.forEach(c => {
+      const role = c.role || 'Unknown';
+      roleBreakdown[role] = (roleBreakdown[role] || 0) + 1;
+    });
+    const roleChartData = Object.entries(roleBreakdown)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    // Daily rate distribution
+    const rateRanges = [
+      { range: '₹0-5K', min: 0, max: 5000, count: 0 },
+      { range: '₹5K-10K', min: 5000, max: 10000, count: 0 },
+      { range: '₹10K-20K', min: 10000, max: 20000, count: 0 },
+      { range: '₹20K-30K', min: 20000, max: 30000, count: 0 },
+      { range: '₹30K+', min: 30000, max: Infinity, count: 0 },
+    ];
+    crew.forEach(c => {
+      const rate = Number(c.dailyRate) || 0;
+      const range = rateRanges.find(r => rate >= r.min && rate < r.max);
+      if (range) range.count++;
+    });
+    const rateDistributionData = rateRanges.map(r => ({ name: r.range, count: r.count }));
+    
+    // Top earning crew
+    const topEarners = [...crew]
+      .sort((a, b) => (Number(b.dailyRate) || 0) - (Number(a.dailyRate) || 0))
+      .slice(0, 5)
+      .map(c => ({ name: c.name, role: c.role, department: c.department, dailyRate: Number(c.dailyRate) || 0 }));
+    
+    // Department cost pie chart data
+    const deptCostData = deptChartData.map(d => ({
+      name: d.name,
+      value: d.totalRate,
+    }));
+    
+    return {
+      totalCrew,
+      totalDailyRate,
+      avgDailyRate: Math.round(avgDailyRate),
+      highestRate,
+      lowestRate: lowestRate === Infinity ? 0 : lowestRate,
+      deptChartData,
+      roleChartData,
+      rateDistributionData,
+      topEarners,
+      deptCostData,
+    };
   }, [crew]);
 
   const openAddModal = () => {
@@ -1234,6 +1331,204 @@ export default function CrewPage() {
           </div>
         )}
 
+        {/* Analytics View */}
+        {viewMode === 'analytics' && (
+          <div className="space-y-6">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-5 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs text-slate-500 uppercase">Total Crew</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{analyticsData.totalCrew}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs text-slate-500 uppercase">Total Daily</span>
+                </div>
+                <p className="text-2xl font-bold text-white">₹{(analyticsData.totalDailyRate / 1000).toFixed(1)}K</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs text-slate-500 uppercase">Avg Daily Rate</span>
+                </div>
+                <p className="text-2xl font-bold text-white">₹{(analyticsData.avgDailyRate / 1000).toFixed(1)}K</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Award className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs text-slate-500 uppercase">Highest Rate</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-400">₹{(analyticsData.highestRate / 1000).toFixed(1)}K</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingDown className="w-4 h-4 text-red-400" />
+                  <span className="text-xs text-slate-500 uppercase">Lowest Rate</span>
+                </div>
+                <p className="text-2xl font-bold text-white">₹{(analyticsData.lowestRate / 1000).toFixed(1)}K</p>
+              </div>
+            </div>
+
+            {/* Charts Row 1 */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Department Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-400" />
+                  Crew by Department
+                </h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.deptChartData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis type="number" stroke="#64748b" fontSize={11} />
+                      <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={11} width={80} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#fff' }}
+                      />
+                      <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} name="Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Department Cost Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-amber-400" />
+                  Cost by Department
+                </h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analyticsData.deptCostData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {analyticsData.deptCostData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={DEPT_COLORS[entry.name] || '#64748b'} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        formatter={(value: number) => [`₹${(value / 1000).toFixed(1)}K`, 'Total']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Charts Row 2 */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Role Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-blue-400" />
+                  Top Roles
+                </h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.roleChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={10} angle={-45} textAnchor="end" height={80} />
+                      <YAxis stroke="#64748b" fontSize={11} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#fff' }}
+                      />
+                      <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Rate Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-purple-400" />
+                  Daily Rate Distribution
+                </h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.rateDistributionData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
+                      <YAxis stroke="#64748b" fontSize={11} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#fff' }}
+                      />
+                      <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Crew Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Earners Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="p-4 border-b border-slate-800">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-400" />
+                  Top Earners
+                </h3>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase">Rank</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase">Name</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase">Role</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase">Department</th>
+                    <th className="text-right px-6 py-3 text-xs font-medium text-slate-500 uppercase">Daily Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analyticsData.topEarners.map((earner, idx) => (
+                    <tr key={earner.name} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                      <td className="px-6 py-3">
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                          idx === 0 ? 'bg-amber-500/20 text-amber-400' :
+                          idx === 1 ? 'bg-slate-400/20 text-slate-300' :
+                          idx === 2 ? 'bg-amber-700/20 text-amber-600' :
+                          'bg-slate-700 text-slate-400'
+                        }`}>
+                          {idx + 1}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 font-medium text-white">{earner.name}</td>
+                      <td className="px-6 py-3 text-slate-400">{earner.role}</td>
+                      <td className="px-6 py-3">
+                        {earner.department ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${DEPT_COLORS[earner.department] || '#64748b'}20`, color: DEPT_COLORS[earner.department] || '#94a3b8' }}>
+                            {earner.department}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-right font-medium text-emerald-400">₹{earner.dailyRate.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Crew Table */}
         {viewMode === 'list' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -1478,6 +1773,10 @@ export default function CrewPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Skills matrix view</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Analytics view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

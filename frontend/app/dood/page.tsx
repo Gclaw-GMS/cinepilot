@@ -152,6 +152,10 @@ export default function DOODPage() {
   const handlePrintRef = useRef<() => void>()
   const handleExportMarkdownRef = useRef<() => void>()
   const showKeyboardHelpRef = useRef(showKeyboardHelp)
+  const filterRoleRef = useRef(filterRole)
+  const filterSearchRef = useRef(filterSearch)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
   
   // Active filter count for badge (includes sort as active filter)
   const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterSearch.trim() ? 1 : 0) + (sortBy !== 'character' || sortOrder !== 'asc' ? 1 : 0)
@@ -160,6 +164,23 @@ export default function DOODPage() {
   useEffect(() => {
     showKeyboardHelpRef.current = showKeyboardHelp
   }, [showKeyboardHelp])
+
+  // Keep filter refs in sync
+  useEffect(() => {
+    filterRoleRef.current = filterRole
+  }, [filterRole])
+
+  useEffect(() => {
+    filterSearchRef.current = filterSearch
+  }, [filterSearch])
+
+  useEffect(() => {
+    sortByRef.current = sortBy
+  }, [sortBy])
+
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
 
   const loadDOOD = useCallback(async () => {
     setLoading(true)
@@ -248,17 +269,32 @@ export default function DOODPage() {
           break
         case '1':
           e.preventDefault()
-          setViewMode('analytics')
+          // Filter by Main Cast (toggle)
+          setFilterRole(filterRoleRef.current === 'main' ? 'all' : 'main')
           break
         case '2':
           e.preventDefault()
+          // Filter by Supporting Cast (toggle)
+          setFilterRole(filterRoleRef.current === 'supporting' ? 'all' : 'supporting')
+          break
+        case '0':
+          e.preventDefault()
+          // Clear role filter
+          setFilterRole('all')
+          break
+        case 'a':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case 'c':
+          e.preventDefault()
           setViewMode('calendar')
           break
-        case '3':
+        case 'l':
           e.preventDefault()
           setViewMode('list')
           break
-        case '4':
+        case 'w':
           e.preventDefault()
           setViewMode('workload')
           break
@@ -292,14 +328,14 @@ export default function DOODPage() {
           break
         case 's':
           e.preventDefault()
-          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+          setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc')
           break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [sortOrder])
+  }, [])
 
   // Filter and sort report based on role, search, and sort options
   const filteredReport = useMemo(() => {
@@ -1054,9 +1090,10 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                   ? 'bg-cyan-400 text-black' 
                   : 'text-gray-400 hover:text-white'
               }`}
+              title="Press A for Analytics view"
             >
               <BarChart3 className="w-4 h-4" />
-              Analytics
+              Analytics <span className="text-xs opacity-60">(A)</span>
             </button>
             <button
               onClick={() => setViewMode('calendar')}
@@ -1065,9 +1102,10 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                   ? 'bg-cyan-400 text-black' 
                   : 'text-gray-400 hover:text-white'
               }`}
+              title="Press C for Calendar view"
             >
               <Calendar className="w-4 h-4" />
-              Calendar
+              Calendar <span className="text-xs opacity-60">(C)</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -1076,9 +1114,10 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                   ? 'bg-cyan-400 text-black' 
                   : 'text-gray-400 hover:text-white'
               }`}
+              title="Press L for List view"
             >
               <List className="w-4 h-4" />
-              List
+              List <span className="text-xs opacity-60">(L)</span>
             </button>
             <button
               onClick={() => setViewMode('workload')}
@@ -1087,9 +1126,10 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                   ? 'bg-cyan-400 text-black' 
                   : 'text-gray-400 hover:text-white'
               }`}
+              title="Press W for Workload view"
             >
               <Gauge className="w-4 h-4" />
-              Workload
+              Workload <span className="text-xs opacity-60">(W)</span>
             </button>
           </div>
 
@@ -1132,9 +1172,9 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                   onChange={(e) => setFilterRole(e.target.value as 'all' | 'main' | 'supporting')}
                   className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
                 >
-                  <option value="all">All Cast</option>
-                  <option value="main">Main Cast</option>
-                  <option value="supporting">Supporting</option>
+                  <option value="all">All Cast (0)</option>
+                  <option value="main">Main Cast (1)</option>
+                  <option value="supporting">Supporting (2)</option>
                 </select>
               </div>
               {/* Search Filter */}
@@ -2028,17 +2068,37 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                 <span className="text-gray-400">Toggle sort order</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">S</kbd>
               </div>
+              <div className="border-t border-slate-700 my-2"></div>
+              <div className="text-xs text-cyan-400 mb-1">Role Filter</div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Analytics view</span>
+                <span className="text-gray-400">Filter Main Cast</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">1</kbd>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Calendar view</span>
+                <span className="text-gray-400">Filter Supporting</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">2</kbd>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-gray-400">Clear filter</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">0</kbd>
+              </div>
+              <div className="border-t border-slate-700 my-2"></div>
+              <div className="text-xs text-cyan-400 mb-1">View Modes</div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Analytics view</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">A</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Calendar view</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">C</kbd>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-gray-400">List view</span>
-                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">3</kbd>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">L</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Workload view</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">W</kbd>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Show help</span>

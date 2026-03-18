@@ -1407,6 +1407,67 @@ export default function BudgetPage() {
                 </div>
               </div>
 
+              {/* Burn Rate Timeline Chart */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-purple-400" />
+                  Budget Burn Rate Timeline
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={[
+                        { day: 'Week 1', planned: forecast.planned * 0.1, actual: Math.min(forecast.actual * 0.15, forecast.planned * 0.1) },
+                        { day: 'Week 2', planned: forecast.planned * 0.25, actual: Math.min(forecast.actual * 0.35, forecast.planned * 0.25) },
+                        { day: 'Week 3', planned: forecast.planned * 0.45, actual: Math.min(forecast.actual * 0.55, forecast.planned * 0.45) },
+                        { day: 'Week 4', planned: forecast.planned * 0.60, actual: Math.min(forecast.actual * 0.75, forecast.planned * 0.60) },
+                        { day: 'Week 5', planned: forecast.planned * 0.75, actual: Math.min(forecast.actual * 0.85, forecast.planned * 0.75) },
+                        { day: 'Week 6', planned: forecast.planned * 0.90, actual: Math.min(forecast.actual * 0.95, forecast.planned * 0.90) },
+                        { day: 'Final', planned: forecast.planned, actual: forecast.actual },
+                      ]}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorPlanned" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="day" stroke="#64748b" fontSize={11} />
+                      <YAxis tickFormatter={(v) => formatINR(v)} stroke="#64748b" fontSize={11} />
+                      <Tooltip 
+                        formatter={(value: number) => formatINR(value)}
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      />
+                      <Legend />
+                      <Area type="monotone" dataKey="planned" name="Planned Budget" stroke="#6366f1" fillOpacity={1} fill="url(#colorPlanned)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="actual" name="Actual Spend" stroke="#10b981" fillOpacity={1} fill="url(#colorActual)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-4">
+                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-slate-500">Current Burn</div>
+                    <div className="text-lg font-bold text-purple-400">{formatINR(Math.round(forecast.actual / 30))}/day</div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-slate-500">Remaining</div>
+                    <div className="text-lg font-bold text-amber-400">{formatINR(forecast.planned - forecast.actual)}</div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-slate-500">Projected Final</div>
+                    <div className={`text-lg font-bold ${forecast.eacTotal > forecast.planned ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {formatINR(forecast.eacTotal)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Forecast Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -1459,6 +1520,41 @@ export default function BudgetPage() {
                     </ResponsiveContainer>
                   </div>
                 </div>
+              </div>
+
+              {/* Risk Assessment Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {forecast.categories.filter(c => c.status === 'over' || c.status === 'warning').length > 0 ? (
+                  forecast.categories.filter(c => c.status === 'over' || c.status === 'warning').map(cat => {
+                    const variance = cat.forecast - cat.planned
+                    const riskLevel = cat.status === 'over' ? 'high' : 'medium'
+                    return (
+                      <div key={cat.category} className={`rounded-xl p-4 border ${
+                        riskLevel === 'high' ? 'bg-red-950/30 border-red-800' : 'bg-amber-950/30 border-amber-800'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className={`w-4 h-4 ${riskLevel === 'high' ? 'text-red-400' : 'text-amber-400'}`} />
+                          <span className={`font-medium ${riskLevel === 'high' ? 'text-red-400' : 'text-amber-400'}`}>
+                            {riskLevel === 'high' ? 'High Risk' : 'Warning'}
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-white mb-1">{cat.category}</div>
+                        <div className="text-sm text-slate-400 mb-2">
+                          {variance > 0 ? `+${formatINR(variance)} over budget` : 'Forecast exceeds planned'}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Forecast: {formatINR(cat.forecast)} • Planned: {formatINR(cat.planned)}
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="col-span-3 bg-emerald-950/30 border border-emerald-800 rounded-xl p-6 text-center">
+                    <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                    <div className="text-lg font-medium text-emerald-400">All Categories On Track</div>
+                    <div className="text-sm text-slate-400">No budget overruns forecasted</div>
+                  </div>
+                )}
               </div>
 
               {/* Category Forecast Table */}

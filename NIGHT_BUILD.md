@@ -1,46 +1,244 @@
 # CinePilot Night Build Verification
 
-## Build Status: ✅ PASSING (5:54 AM) - WhatsApp Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (7:54 AM) - Notes Page Number Key Shortcuts IMPLEMENTED
+
+### 7:54 AM - Notes Page Number Key Shortcuts (IMPLEMENTED)
 
 ### Features Perfected This Build
-- **WhatsApp Page - Markdown Export**: Added comprehensive Markdown export functionality
+- **Notes Page - Number Key Shortcuts for Category Filtering**: Added quick category filter shortcuts using number keys 1-6
+
+### Feature Details
+- **Number Keys 1-6**: Press 1-6 to quickly filter notes by category
+  - 1 = General
+  - 2 = Production
+  - 3 = Creative
+  - 4 = Technical
+  - 5 = Logistics
+  - 6 = Budget
+- **Key 0**: Clears category filter to show all
+- **Toggle Behavior**: Press the same number again to clear that category filter
+- **Visual Enhancement**: Added keyboard shortcut hints in dropdowns (e.g., "All Categories (0)", "General (1)")
+- **Keyboard Help Updated**: Added new shortcuts to the shortcuts modal
+
+### Technical Implementation
+- Added filterCategoryRef using useRef pattern to avoid dependency issues in useEffect
+- Added useEffect to keep filterCategoryRef in sync with filterCategory state
+- Toggle behavior: If the same category is already selected, it clears the filter (sets to 'all')
+- Updated dropdown options to show shortcut hints in both filter panels
+- Updated keyboard shortcuts help modal with new shortcuts (1-6 for category, 0 for all)
+
+### Keyboard Shortcuts Updated
+- **1** - Filter by General category (toggle)
+- **2** - Filter by Production category (toggle)
+- **3** - Filter by Creative category (toggle)
+- **4** - Filter by Technical category (toggle)
+- **5** - Filter by Logistics category (toggle)
+- **6** - Filter by Budget category (toggle)
+- **0** - Clear category filter (show all)
+- **R** - Refresh notes
+- **/** - Focus search
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **N** - Create new note
+- **P** - Pin/unpin selected note
+- **D** - Duplicate selected note
+- **E** - Export notes
+- **O** - Print notes report
+- **?** - Show keyboard shortcuts
+- **Ctrl+A** - Select all notes
+- **Ctrl+D** - Delete selected notes
+- **Esc** - Close modal / Clear selection
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Feature Checklist
+- [x] Number keys 1-6 filter by category
+- [x] Number key 0 clears filter
+- [x] Toggle behavior (press again to clear)
+- [x] Visual shortcut hints in dropdowns
+- [x] Keyboard help modal updated
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## Build Status: ✅ PASSING (6:34 AM) - Travel Page Number Key Shortcuts IMPLEMENTED
+
+### 6:34 AM - Travel Page Number Key Shortcuts (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Travel Page - Number Key Shortcuts for Category Filtering**: Added quick category filter shortcuts using number keys 1-9
+
+### Feature Details
+- **Number Keys 1-9**: Press 1-9 to quickly filter travel expenses by category
+  - 1 = Flight
+  - 2 = Train
+  - 3 = Bus
+  - 4 = Taxi
+  - 5 = Auto
+  - 6 = Hotel
+  - 7 = Stay
+  - 8 = Per Diem
+  - 9 = Daily Allowance
+- **Key 0**: Clears category filter to show all
+- **Toggle Behavior**: Press the same number again to clear that category filter
+- **View Mode Changed**: Switched from 1,2,3 to L, A, C for view mode (List, Analytics, Conflicts)
+- **Visual Enhancement**: Added keyboard shortcut hints in dropdowns (e.g., "Flight (1)", "All Categories (0)")
+- **Keyboard Help Updated**: Added new shortcuts to the shortcuts modal
+
+### Technical Implementation
+- Added filterCategoryRef using useRef pattern to avoid dependency issues in useEffect
+- Added useEffect to keep filterCategoryRef in sync with filterCategory state
+- Changed view mode shortcuts from number keys (1,2,3) to letter keys (L,A,C) to free up numbers for category filtering
+- Toggle behavior: If the same category is already selected, it clears the filter (sets to 'all')
+- Updated dropdown options to show shortcut hints in both filter panels
+- Updated keyboard shortcuts help modal with new shortcuts
+
+### Keyboard Shortcuts Updated
+- **L** - Switch to List view (was 1)
+- **A** - Switch to Analytics view (was 2)
+- **C** - Switch to Conflicts view (was 3)
+- **1-9** - Filter by category (toggle)
+- **0** - Clear category filter (show all)
+- **R** - Refresh data
+- **/** - Focus search
+- **N** - Add new expense
+- **F** - Toggle filters
+- **E** - Export dropdown menu
+- **M** - Direct Markdown export
+- **P** - Print report
+- **S** - Toggle sort order
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Feature Checklist
+- [x] Number keys 1-9 filter by category
+- [x] Number key 0 clears filter
+- [x] Toggle behavior (press again to clear)
+- [x] View mode changed to L, A, C
+- [x] Visual shortcut hints in dropdowns
+- [x] Keyboard help modal updated
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+
+---
+
+## Build Status: ✅ PASSING (4:14 AM) - AI Tools Number Key Shortcuts IMPLEMENTED
+
+### 4:14 AM - AI Tools Number Key Shortcuts (IMPLEMENTED)
+
+### Features Perfected This Build
+- **AI Tools Page - Number Key Shortcuts for Category Filtering**: Added quick category filter shortcuts using number keys 1-5 (or 1-6)
+
+### Feature Details
+- **Number Keys 1-5**: Press 1-5 to quickly filter AI tools by category
+  - 1 = Script (or first category alphabetically)
+  - 2 = Finance (or second category)
+  - 3 = Production (or third category)
+  - 4 = Planning (or fourth category)
+  - 5 = Risk (or fifth category)
+- **Key 6**: Clears filter to show all categories
+- **Toggle Behavior**: Press the same number again to clear that category filter
+- **Visual Enhancement**: Added keyboard shortcut hints (1, 2, 3...) next to each category in dropdowns
+- **Keyboard Help Updated**: Added number key shortcuts to the shortcuts modal with labels
+
+### Technical Implementation
+- Added toolCategories useMemo to extract unique categories from tools
+- Added case handlers for keys '1' through '6' in the keyboard event handler
+- Uses setCategoryFilterRef to avoid dependency issues in useEffect
+- Toggle behavior: If the same category is already selected, it clears the filter (sets to 'all')
+- Updated dropdown options to show shortcut hints: "Category (1)", "Script (1)", etc.
+- Updated keyboard shortcuts help modal with number key shortcuts
+
+### Keyboard Shortcuts Updated
+- **1-5** - Filter by category (toggle)
+- **6** - Clear filter (show all)
+- **F** - Toggle filters panel
+- **S** - Toggle sort order
+- **R** - Refresh tools
+- **/** - Focus search
+- **E** - Export dropdown menu
+- **M** - Direct Markdown export
+- **P** - Print report
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+
+### Feature Checklist
+- [x] Number keys 1-5 filter by category
+- [x] Number key 6 clears filter
+- [x] Toggle behavior (press again to clear)
+- [x] Visual shortcut hints in dropdowns
+- [x] Keyboard help modal updated
+- [x] Build passes ✅
+- [x] Lint passes ✅
+
+---
+
+## Build Status: ✅ PASSING (3:14 AM) - Mission Control Markdown Export IMPLEMENTED
+
+### 3:14 AM - Mission Control Markdown Export (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Mission Control Page - Markdown Export**: Added comprehensive Markdown export functionality
   - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
   - **Professional Format**: Clean Markdown with proper formatting:
     - Header with CinePilot branding and generation date
-    - **Summary Section**: Total messages, templates, contacts, demo mode indicator
-    - **Templates Overview**: Table with name, category, variables, creation date for all templates
-    - **Contacts**: Table with name, phone, role for all contacts
-    - **Message History**: Table with recipient, message preview, status emoji, timestamp for all messages
-    - **Export Details**: Exported from, date, total records count
-  - **Content Preservation**: Full data included in export (messages, templates, contacts)
-  - **Status Emojis**: Uses emojis for message status indicators (✅ delivered, 👁️ read, 📤 sent, ⏳ pending, ❌ failed)
-  - **File Naming**: Auto-generated filename with date (whatsapp-broadcast-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (JSON, CSV)
+    - **Production Health Overview**: Overall health percentage, production day info
+    - **Scene Progress**: Completed, remaining, total counts
+    - **Budget Overview**: Total, spent, remaining, projected with currency formatting
+    - **Today's Pulse**: Scenes shot, crew present, hours remaining
+    - **Departments Table**: Name, health with emoji indicators, members, daily rate
+    - **Risk Alerts**: Level with emoji (🔴🟠🟢), title, days left
+    - **Locations**: Name, scenes, progress percentage
+    - **Weekly Performance**: Day-by-day budget and scenes
+    - **Production Summary**: Scripts, characters, crew, locations, shooting days
+    - **Filter & Sort Settings**: Current search, sort, and filter state
+  - **Content Preservation**: Full mission control data included in export
+  - **Works with Filters**: Exports currently filtered and sorted data
+  - **File Naming**: Auto-generated filename with date (mission-control-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
   - **Keyboard Shortcut**: Press 'M' for direct Markdown export
   - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
 
 ### Technical Implementation
-- **handleExportMarkdown Function**: Uses useCallback with messages, templates, contacts, isDemoMode dependencies
-- **getStatusEmoji Helper**: Returns appropriate emoji for message status
-- **formatTimestamp Helper**: Formats timestamps in Indian locale format
-- **Markdown Tables**: Proper markdown tables for templates, contacts, and message history
-- **Ref Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
-- **useEffect**: Updates ref when handleExportMarkdown changes
+- **New Function**: handleExportMarkdown wrapped in useCallback
+- **Ref Pattern**: Uses refs (dataRef, sortedDepartmentsRef, etc.) for keyboard shortcut accessibility
+- **Currency Formatting**: Proper Indian currency format (₹X.X Cr, ₹X.X L, ₹X K)
+- **Emoji Indicators**: Uses emojis for health (🟢🟡🔴) and risk levels (🔴🟠🟢)
+- **Tables**: Markdown tables for all data sections
+- **Filtering**: Respects current filters (search, department, risk level, location) and sort settings
+- **Empty Dependencies**: useCallback with empty deps [] since refs are used
+- **Refs Update Effects**: useEffect hooks to keep refs in sync with state
 
 ### Keyboard Shortcuts Updated
 - **M** - Direct Markdown export (NEW)
 - **E** - Export dropdown menu
-- **R** - Refresh data
-- **S** - Toggle sort order
-- **F** - Toggle filter panel
-- **C** - Switch to Compose tab
-- **T** - Switch to Templates tab
-- **H** - Switch to History tab
-- **O** - Switch to Contacts tab
-- **N** - Create new template
-- **P** - Toggle print menu
+- **P** - Print mission report
+- **R** - Refresh mission data
+- **F** - Toggle filters panel
+- **S** - Toggle sort order (asc/desc)
 - **/** - Focus search input
-- **?** - Show keyboard shortcuts
+- **?** - Show this help modal
 - **Esc** - Close modal / Clear search
 
 ### Build Verification
@@ -48,452 +246,72 @@
 - **Next.js Build:** Successful ✅
 - **TypeScript:** No errors ✅
 - **Lint:** No warnings or errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
 
-### WhatsApp Page Markdown Export Feature Checklist
+### Mission Control Markdown Export Feature Checklist
 - [x] Feature works 100% (Markdown export functional)
 - [x] Export dropdown shows Markdown option (cyan icon)
 - [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (messages, templates, contacts, demo mode)
-- [x] Templates Overview shows table with all template details
-- [x] Contacts section shows table with all contact info
-- [x] Message History shows table with all message data
-- [x] Status emoji indicators (delivered, read, sent, pending, failed)
-- [x] Timestamps formatted correctly in Indian locale
-- [x] File naming with date stamp
+- [x] Production Health section with overall % and production day
+- [x] Scene Progress section with completed/remaining/total
+- [x] Budget Overview with currency formatting (₹X.X Cr, ₹X.X L)
+- [x] Today's Pulse metrics (scenes, crew, hours)
+- [x] Departments table with health emoji and daily rate
+- [x] Risk Alerts with level emoji and days left
+- [x] Locations with scenes and progress %
+- [x] Weekly Performance data
+- [x] Production Summary (scripts, characters, crew, locations, days)
+- [x] Filter & Sort Settings section
 - [x] Keyboard shortcut 'M' for direct Markdown export
 - [x] Keyboard shortcut 'E' opens export menu
 - [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (function wrapped in useCallback)
+- [x] Error handling complete (checks data existence)
 - [x] Build passes ✅
 - [x] Lint passes ✅
-- [x] Tests pass (803) ✅
 
 ---
 
-## Build Status: ✅ PASSING (5:34 AM) - Reports Page Markdown Export IMPLEMENTED
+## Build Status: ✅ PASSING (12:54 AM) - Projects Page Markdown Export IMPLEMENTED
 
-### Features Perfected This Build
-- **Reports Page - Markdown Export**: Added comprehensive Markdown export functionality
-  - **Export Option**: New "Export as Markdown" button in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding and generation date
-    - **Executive Summary**: Total scenes, characters, locations, shooting days, budget, spent, remaining
-    - **Production Overview**: Scene & location breakdown, budget summary, budget by category
-    - **Schedule Progress**: Completed/total days, progress percentage, scenes shot, daily progress table
-    - **Crew Overview**: Total members, departments, total daily rate, department breakdown table
-    - **Censor Analysis**: Certificate, sensitivity score, risk issues, risk flags by category
-    - **VFX Status**: Total/completed/pending shots, complexity breakdown (when available)
-    - **Locations Summary**: Total indoor/outdoor, by type breakdown (when available)
-  - **Content Preservation**: Full report data included in export
-  - **Conditional Sections**: VFX and locations sections only shown when data available
-  - **File Naming**: Auto-generated filename with date (production-report-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (JSON, CSV)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **handleExportMarkdown Function**: Uses useCallback with reportData dependency
-- **formatINR Helper**: Consistent Indian Rupee formatting for all currency values
-- **Conditional Sections**: Uses ternary operators to include VFX/locations only when present
-- **Ref Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
-- **useEffect**: Updates ref when handleExportMarkdown changes
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **R** - Refresh/regenerate report
-- **P** - Print report
-- **G** - Generate report
-- **F** - Toggle filters
-- **S** - Toggle sort order
-- **1-5** - Tab navigation (Overview/Production/Schedule/Crew/Censor)
-- **/** - Focus search
-- **?** - Show keyboard shortcuts
-- **Esc** - Close modal / Clear search / Close export / Close filters
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
-
-### Reports Page Markdown Export Feature Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Export dropdown shows Markdown option (cyan icon)
-- [x] UI professional & visual (matches existing buttons)
-- [x] Executive Summary includes all key stats (scenes, characters, locations, budget)
-- [x] Production section shows scene/location breakdown, budget summary, budget by category
-- [x] Schedule section shows progress, completed days, daily progress table
-- [x] Crew section shows total members, departments, daily rate, department breakdown
-- [x] Censor section shows certificate, sensitivity score, issues, risk flags
-- [x] VFX section shows shots, completed, pending, complexity (when available)
-- [x] Locations section shows totals, indoor/outdoor, by type (when available)
-- [x] INR currency formatting for all amounts
-- [x] Keyboard shortcut 'M' for direct Markdown export
-- [x] Keyboard shortcut 'E' opens export menu
-- [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (checks reportData existence)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Tests pass (803) ✅
-
----
-
-## Build Status: ✅ PASSING (4:54 AM) - Projects Page Markdown Export IMPLEMENTED
+### 12:54 AM - Projects Page Markdown Export (IMPLEMENTED)
 
 ### Features Perfected This Build
 - **Projects Page - Markdown Export**: Added comprehensive Markdown export functionality
   - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
   - **Professional Format**: Clean Markdown with proper formatting:
     - Header with CinePilot branding and generation date
-    - **Summary Section**: Total projects, total budget, active/on hold/completed/archived counts
-    - **By Status Breakdown**: Table showing counts per status
-    - **By Language Breakdown**: Table showing counts per language
-    - **By Genre Breakdown**: Table showing counts per genre
-    - **Projects Detail Section**: Full details for each project with status emoji indicators
-    - **Active Filters Section**: Shows currently applied filters in export
-  - **Content Preservation**: Full project data included in export (name, description, status, language, genre, budget, dates, counts)
-  - **Works with Filters**: Exports currently filtered projects
+    - **Summary Section**: Total projects, total budget, average budget, active production, planning, completed counts
+    - **By Status Breakdown**: Table with emoji indicators (📋 planning, ✅ active, 🎬 production, 🎞️ post_production, 🏁 completed)
+    - **By Language Breakdown**: Table with language counts
+    - **By Genre Breakdown**: Table with primary genre counts
+    - **Projects Detail Table**: Name, status, language, genre, budget, start/end dates
+    - **Individual Project Sections**: Detailed view for each project with all metadata
+  - **Content Preservation**: Full project data included in export
+  - **Works with Filters**: Exports currently filtered projects only
   - **File Naming**: Auto-generated filename with date (projects-YYYY-MM-DD.md)
   - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
   - **Keyboard Shortcut**: Press 'M' for direct Markdown export
   - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
 
 ### Technical Implementation
-- **handleExportMarkdown Function**: Uses refs pattern (filteredDataRef, filtersRef, etc.) for proper React hooks
-- **Summary Stats**: Includes all key project metrics (total, budget, by status/language/genre)
-- **INR Formatting**: Uses Indian Rupee format for budget amounts
-- **Status Emojis**: Uses emojis for status indicators (🟢 active, ✅ completed, ⏸️ on_hold, 📦 archived)
-- **Refs Pattern**: Uses useRef to avoid dependency issues with useCallback
-- **useEffect**: Updates refs when filter/sort state changes
+- **New Function**: handleExportMarkdown with comprehensive stats
+- **Summary Stats**: Total budget in Crores, averages, status/language/genre breakdowns
+- **Emoji Indicators**: Uses emojis for status (📋✅🎬🎞️🏁)
+- **Tables**: Markdown tables for status, language, genre breakdowns, and projects detail
+- **Filtering**: Respects current filters (search, status, language, genre)
+- **useRef Pattern**: Uses filteredRef and handleExportMarkdownRef for keyboard shortcut accessibility
+- **Empty Dependencies**: useEffect with empty deps [] since refs are used
 
 ### Keyboard Shortcuts Updated
 - **M** - Direct Markdown export (NEW)
 - **E** - Export dropdown menu
-- **R** - Refresh projects
-- **F** - Toggle filters
-- **S** - Toggle sort order
 - **P** - Print projects report
+- **R** - Refresh projects
 - **N** - Create new project
-- **/** - Focus search input
-- **?** - Show keyboard shortcuts
-- **Esc** - Close modal / Clear search / Close filters
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
-
-### Projects Page Markdown Export Feature Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Export dropdown shows Markdown option (cyan icon)
-- [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (total, budget, by status/language/genre)
-- [x] By Status breakdown shows table with counts
-- [x] By Language breakdown shows table with counts
-- [x] By Genre breakdown shows table with counts
-- [x] Projects detail section with all fields
-- [x] Status emoji indicators in project list
-- [x] Filters applied to export (uses filtered data via refs)
-- [x] Active filters section shows current filter settings
-- [x] Keyboard shortcut 'M' for direct Markdown export
-- [x] Keyboard shortcut 'E' opens export menu
-- [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (checks filteredLengthRef)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Tests pass (803) ✅
-
----
-
-## Build Status: ✅ PASSING (2:34 AM) - Censor Page Markdown Export IMPLEMENTED
-
-### Features Perfected This Build
-- **Censor Page - Markdown Export**: Added comprehensive Markdown export functionality
-  - **Export Option**: New "Markdown" option in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding, project name, generation date, and mode indicator
-    - **Certificate Section**: Predicted certificate, label, age rating, sensitivity score, confidence
-    - **Summary Section**: Total risk flags, high/medium/low severity counts with emojis (🔴🟠🟢)
-    - **Risk Flags by Category**: Breakdown of flags by category sorted by count
-    - **Risk Flags Detail Table**: Scene, category, severity, context for all flags
-    - **Suggestions Section**: Detailed suggestions with scene number, issue, change, why, severity delta
-    - **Top Risk Drivers**: Numbered list of risk drivers
-    - **High Risk Scenes**: List of high risk scene numbers
-    - **Uncertainties Section**: List of uncertainty notes
-  - **Content Preservation**: Full censor analysis data included in export
-  - **File Naming**: Auto-generated filename with date (censor-analysis-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (JSON, PDF)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **handleExport Function**: Extended to handle 'markdown' format with useCallback
-- **Summary Stats**: Includes severity counts (high/medium/low), suggestions, uncertainties
-- **Category Breakdown**: Groups and sorts risk flags by category
-- **Markdown Tables**: Proper markdown tables for certificate info, summary, and detail
-- **Ref Pattern**: Uses handleExportRef for keyboard shortcut accessibility
-- **useCallback Dependencies**: Properly memoized with analysis, selectedProject, isDemoMode
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **R** - Refresh analysis
-- **P** - Print report
-- **F** - Toggle filters
-- **S** - Toggle sort order
-- **1** - Summary view
-- **2** - Scene Flags view
-- **3** - Suggestions view
-- **4** - Analytics view
-- **/** - Focus search
-- **?** - Show keyboard shortcuts
-- **Esc** - Close modal / Clear filters
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
-
-### Censor Page Markdown Export Feature Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Export dropdown shows Markdown option (cyan icon)
-- [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (certificate, severity counts, suggestions)
-- [x] Certificate section shows predicted cert, label, age rating, sensitivity, confidence
-- [x] Risk Flags by Category breakdown shows counts sorted by value
-- [x] Risk Flags Detail table with all fields (scene, category, severity, context)
-- [x] Suggestions section with issue, change, why, severity delta
-- [x] Top Risk Drivers section with numbered list
-- [x] High Risk Scenes section with scene numbers
-- [x] Uncertainties section included
-- [x] Keyboard shortcut 'M' for direct Markdown export
-- [x] Keyboard shortcut 'E' opens export menu
-- [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (checks analysis existence)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-
----
-
-## Build Status: ✅ PASSING (1:54 AM) - DOOD Page Markdown Export Enhanced
-
-### Features Perfected This Build
-- **DOOD Page - Enhanced Markdown Export**: Improved the Markdown export functionality with comprehensive production data
-  - **Call Frequency Groups Section**: Added breakdown showing Heavy Call (70%+), Moderate Call (40-70%), Light Call (<40%), and Unassigned cast members
-  - **Workload Warnings Section**: Automatically detects and reports:
-    - Overwork risk (5+ consecutive shooting days)
-    - Insufficient rest days between calls
-  - **Production Notes Section**: Includes:
-    - Heavy shoot days count (days with 3+ cast members)
-    - Highest demand day with actor count
-    - Lightest day with actor count
-  - **Enhanced Day Distribution Table**: Now includes actor count per day for quick reference
-  - **Uses Filtered Data**: Export respects current filters for targeted reports
-
-### Technical Implementation
-- **Call Frequency Calculation**: Groups actors by percentage thresholds
-- **Workload Analysis**: Iterates through cast to detect consecutive days and rest gaps
-- **Daily Cast Counting**: Tracks actor requirements per shooting day
-- **Production Insights**: Calculates min/max cast requirements for scheduling
-
-### Build Verification
-- **Build:** Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-
-### DOOD Markdown Export Enhancement Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Call Frequency Groups section shows Heavy/Moderate/Light/Unassigned breakdown
-- [x] Workload Warnings automatically detect overwork and insufficient rest
-- [x] Production Notes show heavy shoot days, highest demand day, lightest day
-- [x] Day Distribution table includes actor count
-- [x] Export uses filtered data (filteredReport)
-- [x] UI professional & visual (maintains existing export UI)
-- [x] Error handling complete (shows ✅ when no warnings)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Pushed to origin/feature/continuity-sorting ✅
-
----
-
-## Build Status: ✅ PASSING (1:34 AM) - Travel-Expenses Page Markdown Export IMPLEMENTED
-
-### Features Perfected This Build
-- **Travel-Expenses Page - Markdown Export**: Added comprehensive Markdown export functionality
-  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding and generation date
-    - **Summary Section**: Total expenses, total amount, pending, approved, reimbursed amounts
-    - **By Category Breakdown**: Table with category name, count, and total amount
-    - **By Status Breakdown**: Table with status name, count, and total amount
-    - **All Expenses Table**: Full details including date, person, category, description, amount, status
-  - **Content Preservation**: Full travel expense data included in export
-  - **Works with Filters**: Exports currently filtered expenses
-  - **File Naming**: Auto-generated filename with date (travel-expenses-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **New Function**: handleExportMarkdown wrapped in useCallback for proper memoization
-- **Summary Stats**: Includes all key travel expense metrics (total, pending, approved, reimbursed)
-- **Category Breakdown**: Table with all expense categories and their totals
-- **Status Breakdown**: Table with all status types and their totals
-- **Filtered Export**: Uses filteredExpenses for export content
-- **Ref Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
-- **Blob Creation**: Creates downloadable text/markdown blob
-- **Format Currency**: Uses Indian Rupee format (₹) for amounts
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **Ctrl+E** - Export dropdown menu
-- **Ctrl+N** - Add new expense
-- **Ctrl+F** - Focus search
-- **F** - Toggle filters
-- **S** - Toggle sort order
-- **R** - Refresh data
-- **?** - Show shortcuts
-- **Esc** - Close modal
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
-
-### Travel-Expenses Page Markdown Export Feature Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Export dropdown shows Markdown option (cyan icon)
-- [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (total, pending, approved, reimbursed)
-- [x] By Category breakdown shows table with counts and totals
-- [x] By Status breakdown shows table with counts and totals
-- [x] All Expenses table with full details
-- [x] Filters applied to export (uses filteredExpenses)
-- [x] Keyboard shortcut 'M' for direct Markdown export
-- [x] Keyboard shortcut 'E' opens export menu
-- [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (disabled when no expenses)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Tests pass (803) ✅
-
----
-
-## Build Status: ✅ PASSING (12:34 AM) - Character-Costume Page Markdown Export IMPLEMENTED
-
-### Features Perfected This Build
-- **Character-Costume Page - Markdown Export**: Added comprehensive Markdown export functionality
-  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding and generation date
-    - **Summary Section**: Total characters, total budget, by role breakdown
-    - **Characters Table**: Name, Age, Gender, Role, Status, Budget
-    - **Character Details Section**: Full details for each character including appearance, personality, costume style, fabrics, color palette, and notes
-  - **Content Preservation**: Full character and costume data included in export
-  - **Works with Filters**: Exports currently filtered characters
-  - **File Naming**: Auto-generated filename with date (character-costumes-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **New Function**: handleExportMarkdown wrapped in useCallback for proper memoization
-- **Summary Stats**: Includes all key character metrics (total, budget, by role)
-- **Character Details**: Full details with appearance, personality, costume style, fabrics, color palette
-- **Filtered Export**: Uses filteredCharacters for export content
-- **Ref Pattern**: Uses filteredCharactersRef and handleExportMarkdownRef for keyboard shortcut accessibility
-- **Blob Creation**: Creates downloadable text/markdown blob
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **P** - Print character report
-- **R** - Refresh character data
 - **F** - Toggle filters
 - **S** - Toggle sort order
 - **/** - Focus search input
-- **N** - Add new character
-- **1/2/3** - Switch view modes
 - **?** - Show keyboard shortcuts
-- **Esc** - Close modal / Clear filters
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-- **Tests:** 803 passing, 0 failing ✅
-
-### Character-Costume Page Markdown Export Feature Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Export dropdown shows Markdown option (cyan icon)
-- [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (total, budget, by role)
-- [x] Characters table with all fields
-- [x] Character Details section with full info
-- [x] Filters applied to export (uses filteredCharacters)
-- [x] Keyboard shortcut 'M' for direct Markdown export
-- [x] Keyboard shortcut 'E' opens export menu
-- [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (checks filteredCharacters.length)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Tests pass (803) ✅
-
----
-
-## Build Status: ✅ PASSING (12:14 AM) - Continuity Page Markdown Export IMPLEMENTED
-
-### Features Perfected This Build
-- **Continuity Page - Markdown Export**: Added comprehensive Markdown export functionality
-  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding and generation date
-    - **Summary Section**: Total issues, critical, high, medium, low counts
-    - **By Severity Breakdown**: Emoji indicators (🔴 critical, 🟠 high, 🟡 medium, ⚪ low)
-    - **By Type Breakdown**: Issues sorted by count (Continuity, Plot Hole, Character, Timeline, Dialogue)
-    - **Issues Detail Table**: Scene, Type, Severity, Description for all issues
-  - **Content Preservation**: Full continuity analysis data included in export
-  - **Works with Filters**: Exports currently filtered warnings
-  - **File Naming**: Auto-generated filename with date (continuity-report-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **New Function**: handleExport now handles 'markdown' format
-- **Summary Stats**: Includes all key continuity metrics (severity counts, type counts)
-- **Emoji Support**: Uses emojis for severity indicators (🔴🟠🟡⚪)
-- **Type Labels**: Proper labels for type keys (continuity → Continuity, plot_hole → Plot Hole)
-- **Filtered Export**: Uses filteredWarnings for export content
-- **Ref Pattern**: Uses handleExportRef for keyboard shortcut accessibility
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **R** - Refresh continuity data
-- **P** - Print continuity report
-- **F** - Toggle filters panel
-- **S** - Toggle sort order (asc/desc)
-- **1-3** - Switch tabs (Overview/Breakdown/Trends)
-- **/** - Focus search input
-- **?** - Show keyboard shortcuts
-- **Esc** - Close modal / Clear filters
+- **Esc** - Close modal / Clear search / Close filters / Close print menu
 
 ### Build Verification
 - **Build**: Clean build with 82 routes ✅
@@ -503,132 +321,91 @@
 - **Tests:** 803 passing, 0 failing ✅
 - **Pushed:** origin/master ✅
 
-### Continuity Page Markdown Export Feature Checklist
+### Projects Page Markdown Export Feature Checklist
 - [x] Feature works 100% (Markdown export functional)
 - [x] Export dropdown shows Markdown option (cyan icon)
 - [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (total, severity counts)
-- [x] By Severity breakdown shows counts with emojis
-- [x] By Type breakdown shows issues sorted by count
-- [x] Issues detail table with all fields
-- [x] Filters applied to export (uses filteredWarnings)
+- [x] Summary section includes all key stats (total, budget, averages, counts)
+- [x] By Status breakdown shows counts with emojis
+- [x] By Language breakdown shows counts
+- [x] By Genre breakdown shows counts (primary genre)
+- [x] Projects Detail table with all fields
+- [x] Individual Project Details sections with full metadata
+- [x] Filters applied to export (respects search, status, language, genre filters)
 - [x] Keyboard shortcut 'M' for direct Markdown export
 - [x] Keyboard shortcut 'E' opens export menu
 - [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (disabled when no warnings)
+- [x] Error handling complete (checks filtered.length)
 - [x] Build passes ✅
 - [x] Lint passes ✅
 - [x] Tests pass (803) ✅
 
 ---
 
-## Build Status: ✅ PASSING (11:34 PM) - React Lint Fix Complete
+## Build Status: ✅ PASSING (11:54 PM) - Timeline Page Markdown Export IMPLEMENTED
+
+### 11:54 PM - Timeline Page Markdown Export (IMPLEMENTED)
 
 ### Features Perfected This Build
-- **React Lint Warnings Fix**: Fixed React Hook lint warnings across three pages to ensure clean lint output and proper React patterns:
-  - **Continuity Page**: 
-    - Removed unnecessary `severityCounts` dependency from useMemo (computed from warnings)
-    - Added missing `showResolved` dependency to filteredWarnings useMemo
-  - **Storyboard Page**: 
-    - Added `handleExportMarkdownRef` for proper keyboard shortcut handling
-    - Updated keyboard handler to use ref pattern (consistent with other pages)
-    - Added useEffect to update ref when function changes
-  - **Timeline Page**: 
-    - Wrapped `handleExport` in useCallback with proper dependencies
-    - Added missing `isDemoMode` dependency
-
-### Lint Fix Details
-1. **Continuity Page**: Fixed 2 lint warnings (unnecessary dependency + missing dependency)
-2. **Storyboard Page**: Fixed 1 lint warning (missing dependency in useEffect)
-3. **Timeline Page**: Fixed 2 lint warnings (missing useCallback wrapper + missing dependency)
+- **Timeline Page - Markdown Export**: Added comprehensive Markdown export functionality
+  - **Export Option**: New "Markdown" option in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding and generation date
+    - **Summary Section**: Total days, completed, in-progress, pending counts
+    - **By Status**: Breakdown with emoji indicators (✅ completed, 🔄 in-progress, ⏳ pending)
+    - **By Type**: Breakdown by production type (Pre-Production, Production, Post-Production)
+    - **Shooting Days Detail**: Comprehensive table with day, date, location, type, status, scenes, call time, hours
+    - **Active Filters**: Shows current filter settings (type, search, sort)
+  - **Content Preservation**: Full timeline data included in export
+  - **Works with Filters**: Exports currently filtered and sorted shooting days
+  - **File Naming**: Auto-generated filename with date (timeline-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
 
 ### Technical Implementation
-- **Ref Pattern**: Used consistent ref pattern for keyboard shortcuts (handleExportMarkdownRef)
-- **useCallback**: Properly wrapped handleExport in timeline page with all dependencies
-- **useEffect**: Added effect to update refs when functions change
-- **Dependencies**: Added all missing dependencies to useMemo/useCallback hooks
+- **New Function**: exportToMarkdown wrapped in useCallback
+- **Summary Stats**: Includes all key timeline metrics (total, completed, in-progress, pending)
+- **Emoji Indicators**: Uses emojis for status (✅🔄⏳) and type (🎬📽️🎞️)
+- **Tables**: Markdown tables for status breakdown, type breakdown, and shooting days detail
+- **Filtering**: Respects current filters (type, search) and sort settings
+- **useRef Pattern**: Uses exportToMarkdownRef for keyboard shortcut accessibility
+- **useEffect Assignment**: Updates ref when exportToMarkdown function changes
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **P** - Print timeline
+- **R** - Refresh timeline data
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **1/2/3** - Switch views (Timeline/Gantt/Calendar)
+- **/** - Focus search input
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear search / Clear filters
 
 ### Build Verification
 - **Build**: Clean build with 82 routes ✅
 - **Next.js Build:** Successful ✅
 - **TypeScript:** No errors ✅
 - **Lint:** No warnings or errors ✅
-- **Tests:** 803 passing ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
-
-### React Lint Fix Checklist
-- [x] Continuity page lint warnings resolved (2 warnings fixed)
-- [x] Storyboard page lint warnings resolved (1 warning fixed)
-- [x] Timeline page lint warnings resolved (2 warnings fixed)
-- [x] All keyboard shortcuts work correctly via ref pattern
-- [x] Code follows existing patterns (ref-based like other pages)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Tests pass (803) ✅
-
----
-
-## Build Status: ✅ PASSING (11:14 PM) - Storyboard Page Markdown Export IMPLEMENTED
-
-### Features Perfected This Build
-- **Storyboard Page - Markdown Export**: Added comprehensive Markdown export functionality
-  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding and generation date
-    - **Summary Section**: Total scenes, frames, approved, pending, in-progress, failed counts, approval rate
-    - **By Status Breakdown**: Emoji indicators (✅ approved, 🔄 in-progress, ⏳ pending, ❌ failed)
-    - **By Style Breakdown**: Frame counts per style (Clean Line Art, Pencil Sketch, Marker & Ink, Blueprint)
-    - **Scene Breakdown Table**: Scene number, heading, frames, approved, pending
-    - **Frame Details Table**: Scene, shot, status, style, notes for all frames
-  - **Content Preservation**: Full storyboard data included in export
-  - **Works with Filters**: Exports currently filtered scenes/frames
-  - **File Naming**: Auto-generated filename with date (storyboard-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **New Function**: handleExportMarkdown wrapped in useCallback for proper memoization
-- **Summary Stats**: Includes all key storyboard metrics (scenes, frames, approval stats)
-- **Emoji Support**: Uses emojis for status indicators (✅❌🔄⏳)
-- **Style Labels**: Proper labels for style keys (cleanLineArt → Clean Line Art)
-- **Filtered Export**: Uses filteredScenes for export content
-- **Flat Map**: Uses flatMap for detailed frame listing
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **R** - Refresh storyboard data
-- **F** - Toggle filters & sort
-- **S** - Toggle sort order (asc/desc)
-- **P** - Print storyboard report
-- **/** - Focus search input
-- **1-4** - Switch style views
-- **?** - Show keyboard shortcuts
-- **Esc** - Close modal / Clear search
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors (pre-existing warnings) ✅
-- **Lint:** No new warnings ✅
 - **Tests:** 803 passing, 0 failing ✅
-- **Pushed:** origin/feature/continuity-sorting ✅
+- **Pushed:** origin/master ✅
 
-### Storyboard Page Markdown Export Feature Checklist
+### Timeline Page Markdown Export Feature Checklist
 - [x] Feature works 100% (Markdown export functional)
 - [x] Export dropdown shows Markdown option (cyan icon)
 - [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (scenes, frames, approval rate)
+- [x] Summary section includes all key stats (total, completed, in-progress, pending)
 - [x] By Status breakdown shows counts with emojis
-- [x] By Style breakdown shows frame counts per style
-- [x] Scene Breakdown table with all fields
-- [x] Frame Details table with all fields
-- [x] Filters applied to export (uses filteredScenes)
+- [x] By Type breakdown shows counts with emojis
+- [x] Shooting Days Detail table with all fields (day, date, location, type, status, scenes, call time, hours)
+- [x] Active Filters section shows current filter settings
+- [x] Filters applied to export (respects type, search, sort)
 - [x] Keyboard shortcut 'M' for direct Markdown export
 - [x] Keyboard shortcut 'E' opens export menu
 - [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (checks filteredScenes.length)
+- [x] Error handling complete (checks shootingDays.length)
 - [x] Build passes ✅
 - [x] Lint passes ✅
 - [x] Tests pass (803) ✅
@@ -7356,65 +7133,3 @@ Added a comprehensive conflict detection system to the Catering page:
 - [x] Build passes ✅
 - [x] Lint passes ✅
 - [x] Tests pass (803) ✅
-
----
-
-## Build Status: ✅ PASSING (3:34 AM) - Chat Page Markdown Export IMPLEMENTED
-
-### 3:34 AM - Chat Page Markdown Export (IMPLEMENTED)
-
-### Features Perfected This Build
-- **Chat Page - Markdown Export**: Added comprehensive markdown export functionality
-  - **Export Option**: New "Export Markdown" button in the export dropdown (cyan colored)
-  - **Professional Format**: Clean Markdown with proper formatting:
-    - Header with CinePilot branding and generation date
-    - Summary statistics (total messages, user messages, AI responses)
-    - Production Context section (scripts, scenes, budget, schedule days, crew, warnings)
-    - Conversation section with full message transcript including role, timestamp, and content
-  - **Content Preservation**: Full chat history included in export
-  - **Works with Filters**: Exports all messages (not filtered by search)
-  - **File Naming**: Auto-generated filename with date (chat-transcript-YYYY-MM-DD.md)
-  - **Consistent UI**: Matches existing export buttons style (CSV, JSON)
-  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
-  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
-
-### Technical Implementation
-- **New Function**: handleExportMarkdown wrapped in useCallback for proper memoization
-- **Summary Stats**: Includes all key chat metrics (total, user, AI messages)
-- **Context Inclusion**: Exports production context when available
-- **Full Transcript**: Includes all messages with role, timestamp, and content
-- **Ref Pattern**: Uses handleExportMarkdownRef for keyboard shortcut accessibility
-- **Blob Creation**: Creates downloadable text/markdown blob
-
-### Keyboard Shortcuts Updated
-- **M** - Direct Markdown export (NEW)
-- **E** - Export dropdown menu
-- **C** - Clear chat
-- **P** - Print chat
-- **R** - Refresh context
-- **F** - Search messages
-- **/** - Focus input
-- **?** - Show keyboard shortcuts
-- **Esc** - Close modal
-
-### Build Verification
-- **Build**: Clean build with 82 routes ✅
-- **Next.js Build:** Successful ✅
-- **TypeScript:** No errors ✅
-- **Lint:** No warnings or errors ✅
-
-### Chat Page Markdown Export Feature Checklist
-- [x] Feature works 100% (Markdown export functional)
-- [x] Export dropdown shows Markdown option (cyan icon)
-- [x] UI professional & visual (matches existing buttons)
-- [x] Summary section includes all key stats (total, user, AI messages)
-- [x] Production Context section included when available
-- [x] Conversation section with full transcript
-- [x] Timestamps formatted correctly
-- [x] Keyboard shortcut 'M' for direct Markdown export
-- [x] Keyboard shortcut 'E' opens export menu
-- [x] Keyboard shortcuts help dialog updated with 'M'
-- [x] Error handling complete (disabled when no messages)
-- [x] Build passes ✅
-- [x] Lint passes ✅
-- [x] Pushed to origin/feature/continuity-sorting ✅

@@ -166,6 +166,7 @@ export default function MissionControl() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
 
   const fetchData = useCallback(async () => {
     try {
@@ -286,6 +287,155 @@ export default function MissionControl() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
+
+  // Markdown Export function
+  const handleExportMarkdown = useCallback(() => {
+    if (!data) return
+
+    const formatCurrency = (amount: number) => {
+      if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`
+      if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`
+      if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}K`
+      return `₹${amount}`
+    }
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+
+    const getRiskEmoji = (level: string) => {
+      switch (level) {
+        case 'high': return '🔴'
+        case 'medium': return '🟠'
+        default: return '🟢'
+      }
+    }
+
+    // Process data for export - sort by health (descending) for departments, level for risks, name for locations
+    const departments = [...(data.departments || [])].sort((a, b) => b.health - a.health)
+    const risks = [...(data.risks || [])].sort((a, b) => {
+      const levelOrder = { high: 3, medium: 2, low: 1 }
+      return (levelOrder[b.level as keyof typeof levelOrder] || 0) - (levelOrder[a.level as keyof typeof levelOrder] || 0)
+    })
+    const locations = [...(data.locations || [])].sort((a, b) => a.name.localeCompare(b.name))
+
+    const markdown = `# Mission Control Report - CinePilot
+**Generated:** ${formatDate(new Date())}
+${isDemoMode ? '⚠️ **DEMO MODE** - Using sample data' : ''}
+
+---
+
+## 📊 Production Overview
+
+### Overall Health
+- **Health Score:** ${data.production.overall}%
+- **Status:** ${data.production.overall >= 80 ? '🟢 Healthy' : data.production.overall >= 60 ? '🟡 Needs Attention' : '🔴 Critical'}
+
+### Scenes
+| Metric | Value |
+|--------|-------|
+| Total | ${data.production.scenes.total} |
+| Completed | ${data.production.scenes.completed} |
+| Remaining | ${data.production.scenes.remaining} |
+| Progress | ${data.production.scenes.total > 0 ? ((data.production.scenes.completed / data.production.scenes.total) * 100).toFixed(1) : 0}% |
+
+### Schedule
+| Metric | Value |
+|--------|-------|
+| Days Total | ${data.production.schedule.daysTotal} |
+| Days Elapsed | ${data.production.schedule.daysElapsed} |
+| Days Remaining | ${data.production.schedule.daysRemaining} |
+| Progress | ${data.production.schedule.daysTotal > 0 ? ((data.production.schedule.daysElapsed / data.production.schedule.daysTotal) * 100).toFixed(1) : 0}% |
+
+### Budget
+| Metric | Value |
+|--------|-------|
+| Total Budget | ${formatCurrency(data.production.budget.total)} |
+| Spent | ${formatCurrency(data.production.budget.spent)} |
+| Remaining | ${formatCurrency(data.production.budget.remaining)} |
+| Projected Total | ${formatCurrency(data.production.budget.projectedTotal)} |
+| Utilization | ${data.production.budget.total > 0 ? ((data.production.budget.spent / data.production.budget.total) * 100).toFixed(1) : 0}% |
+
+---
+
+## 📅 Today's Status
+
+| Metric | Value |
+|--------|-------|
+| Scenes Shot | ${data.today.scenesShot} |
+| Scenes Planned | ${data.today.scenesPlanned} |
+| Crew Present | ${data.today.crewPresent} / ${data.today.crewTotal} |
+| Hours Remaining | ${data.today.hoursRemaining}h |
+
+---
+
+## 📈 Weekly Overview
+
+| Day | Budget | Scenes |
+|-----|--------|--------|
+${data.weekly.map(w => `| ${w.day} | ${formatCurrency(w.budget)} | ${w.scenes} |`).join('\n')}
+
+---
+
+## 🏢 Departments
+
+| Department | Health | Members | Daily Rate |
+|------------|--------|---------|------------|
+${departments.map(d => `| ${d.name} | ${d.health}% | ${d.members} | ₹${d.dailyRate}/day |`).join('\n')}
+
+**Total Departments:** ${departments.length}
+
+---
+
+## ⚠️ Risk Assessment
+
+| Level | Title | Days Left |
+|-------|-------|-----------|
+${risks.map(r => `| ${getRiskEmoji(r.level)} ${r.level.charAt(0).toUpperCase() + r.level.slice(1)} | ${r.title} | ${r.daysLeft} |`).join('\n')}
+
+**Total Risks:** ${risks.length}
+
+---
+
+## 📍 Locations
+
+| Location | Scenes | Progress |
+|----------|--------|----------|
+${locations.map(l => `| ${l.name} | ${l.scenes} | ${l.progress}% |`).join('\n')}
+
+**Total Locations:** ${locations.length}
+
+---
+
+## 📋 Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Scripts | ${data.summary.totalScripts} |
+| Total Characters | ${data.summary.totalCharacters} |
+| Total Crew | ${data.summary.totalCrew} |
+| Total Locations | ${data.summary.totalLocations} |
+| Total Shooting Days | ${data.summary.totalShootingDays} |
+
+---
+
+*Report generated by CinePilot - Production Management System*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mission-control-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [data, isDemoMode])
+
+  // Update ref when handleExportMarkdown changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   // Print function
   const printMissionControl = () => {
@@ -573,6 +723,10 @@ export default function MissionControl() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current()
           break
         case 'p':
           e.preventDefault()
@@ -985,6 +1139,13 @@ export default function MissionControl() {
                       <FileText className="w-4 h-4 text-purple-400" />
                       Export JSON
                     </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-3"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
+                    </button>
                   </div>
                 )}
               </div>
@@ -1055,6 +1216,7 @@ export default function MissionControl() {
               <ShortcutRow keys={['F']} description="Toggle filters panel" />
               <ShortcutRow keys={['S']} description="Toggle sort order (asc/desc)" />
               <ShortcutRow keys={['E']} description="Export dropdown menu" />
+              <ShortcutRow keys={['M']} description="Export as Markdown" />
               <ShortcutRow keys={['P']} description="Print mission report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />

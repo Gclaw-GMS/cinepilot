@@ -129,6 +129,12 @@ export default function NotesPage() {
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   
+  // Ref for filterCategory to use in keyboard shortcuts
+  const filterCategoryRef = useRef(filterCategory)
+  useEffect(() => {
+    filterCategoryRef.current = filterCategory
+  }, [filterCategory])
+  
   // Sorting state
   const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'updatedAt' | 'category'>('updatedAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -322,6 +328,35 @@ export default function NotesPage() {
           if (selectedNoteRef.current && handleDuplicateRef.current) {
             handleDuplicateRef.current(selectedNoteRef.current)
           }
+          break
+        // Number keys 0-6 for category filtering
+        case '0':
+          e.preventDefault()
+          setFilterCategory('all')
+          break
+        case '1':
+          e.preventDefault()
+          setFilterCategory(filterCategoryRef.current === 'general' ? 'all' : 'general')
+          break
+        case '2':
+          e.preventDefault()
+          setFilterCategory(filterCategoryRef.current === 'production' ? 'all' : 'production')
+          break
+        case '3':
+          e.preventDefault()
+          setFilterCategory(filterCategoryRef.current === 'creative' ? 'all' : 'creative')
+          break
+        case '4':
+          e.preventDefault()
+          setFilterCategory(filterCategoryRef.current === 'technical' ? 'all' : 'technical')
+          break
+        case '5':
+          e.preventDefault()
+          setFilterCategory(filterCategoryRef.current === 'logistics' ? 'all' : 'logistics')
+          break
+        case '6':
+          e.preventDefault()
+          setFilterCategory(filterCategoryRef.current === 'budget' ? 'all' : 'budget')
           break
         case 'escape':
           e.preventDefault()
@@ -993,9 +1028,9 @@ export default function NotesPage() {
                         onChange={(e) => setFilterCategory(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
-                        <option value="all">All Categories</option>
-                        {CATEGORIES.map(cat => (
-                          <option key={cat.value} value={cat.value}>{cat.label}</option>
+                        <option value="all">All Categories (0)</option>
+                        {CATEGORIES.map((cat, index) => (
+                          <option key={cat.value} value={cat.value}>{cat.label} ({index + 1})</option>
                         ))}
                       </select>
                     </div>
@@ -1148,9 +1183,9 @@ export default function NotesPage() {
               onChange={(e) => setFilterCategory(e.target.value)}
               className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
             >
-              <option value="all">All Categories</option>
-              {CATEGORIES.map(cat => (
-                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              <option value="all">All Categories (0)</option>
+              {CATEGORIES.map((cat, index) => (
+                <option key={cat.value} value={cat.value}>{cat.label} ({index + 1})</option>
               ))}
             </select>
           </div>
@@ -1622,6 +1657,8 @@ export default function NotesPage() {
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Ctrl+A', action: 'Select all notes' },
                 { key: 'Ctrl+D', action: 'Delete selected notes' },
+                { key: '1-6', action: 'Filter by category (toggle)' },
+                { key: '0', action: 'Show all categories' },
                 { key: 'Esc', action: 'Close modal / Clear selection' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">

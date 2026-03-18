@@ -5,7 +5,7 @@ import {
   Heart, Activity, Database, HardDrive, Cpu, AlertTriangle, 
   CheckCircle, XCircle, RefreshCw, Clock, Server, 
   Zap, Thermometer, Gauge, Loader2, HelpCircle, X,
-  Search, Download, Printer, Filter
+  Search, Download, Printer, Filter, List, BarChart3, PieChart as PieChartIcon
 } from 'lucide-react'
 import { 
   AreaChart, Area, BarChart, Bar, 
@@ -78,15 +78,20 @@ export default function HealthPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'healthy' | 'degraded' | 'unhealthy'>('all')
   const [sortBy, setSortBy] = useState<'component' | 'status' | 'latency'>('component')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
   // Ref for keyboard shortcut access to current filter status
   const filterStatusRef = useRef(filterStatus)
+  const viewModeRef = useRef(viewMode)
   useEffect(() => {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
   
   // Calculate active filter count (includes sort state)
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (sortBy !== 'component' || sortOrder !== 'asc' ? 1 : 0)
@@ -505,11 +510,19 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
           break
         case '1':
           e.preventDefault()
-          setFilterStatus(filterStatusRef.current === 'healthy' ? 'all' : 'healthy')
+          if (viewModeRef.current !== 'list') {
+            setViewMode('list')
+          } else {
+            setFilterStatus(filterStatusRef.current === 'healthy' ? 'all' : 'healthy')
+          }
           break
         case '2':
           e.preventDefault()
-          setFilterStatus(filterStatusRef.current === 'degraded' ? 'all' : 'degraded')
+          if (viewModeRef.current !== 'analytics') {
+            setViewMode('analytics')
+          } else {
+            setFilterStatus(filterStatusRef.current === 'degraded' ? 'all' : 'degraded')
+          }
           break
         case '3':
           e.preventDefault()
@@ -518,6 +531,14 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
         case '0':
           e.preventDefault()
           setFilterStatus('all')
+          break
+        case 'l':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case 'a':
+          e.preventDefault()
+          setViewMode('analytics')
           break
       }
     }
@@ -916,7 +937,38 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
         </div>
       )}
 
-      {/* Component Health Cards */}
+      {/* View Mode Tabs */}
+      <div className="max-w-7xl mx-auto mb-6">
+        <div className="flex items-center gap-2 bg-slate-800/50 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              viewMode === 'list' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <List className="w-4 h-4" />
+            List
+            <span className="ml-1 text-xs opacity-70">(1)</span>
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              viewMode === 'analytics' 
+                ? 'bg-indigo-600 text-white' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Analytics
+            <span className="ml-1 text-xs opacity-70">(2)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Component Health Cards - List View */}
+      {viewMode === 'list' && (
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Component Status</h2>
@@ -1000,8 +1052,52 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
           )}
         </div>
       </div>
+      )}
 
-      {/* Charts Section */}
+      {/* Analytics View */}
+      {viewMode === 'analytics' && (
+      <div className="max-w-7xl mx-auto">
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
+            <div className="flex items-center gap-3 mb-2">
+              <CheckCircle className="w-5 h-5 text-emerald-500" />
+              <span className="text-slate-400">Healthy</span>
+            </div>
+            <div className="text-3xl font-bold text-emerald-500">
+              {healthData?.checks.filter(c => c.status === 'healthy').length || 0}
+            </div>
+            <div className="text-sm text-slate-500">
+              {healthData?.checks.length ? Math.round((healthData.checks.filter(c => c.status === 'healthy').length / healthData.checks.length) * 100) : 0}% of components
+            </div>
+          </div>
+          <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
+            <div className="flex items-center gap-3 mb-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <span className="text-slate-400">Degraded</span>
+            </div>
+            <div className="text-3xl font-bold text-amber-500">
+              {healthData?.checks.filter(c => c.status === 'degraded').length || 0}
+            </div>
+            <div className="text-sm text-slate-500">
+              {healthData?.checks.length ? Math.round((healthData.checks.filter(c => c.status === 'degraded').length / healthData.checks.length) * 100) : 0}% of components
+            </div>
+          </div>
+          <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
+            <div className="flex items-center gap-3 mb-2">
+              <XCircle className="w-5 h-5 text-red-500" />
+              <span className="text-slate-400">Unhealthy</span>
+            </div>
+            <div className="text-3xl font-bold text-red-500">
+              {healthData?.checks.filter(c => c.status === 'unhealthy').length || 0}
+            </div>
+            <div className="text-sm text-slate-500">
+              {healthData?.checks.length ? Math.round((healthData.checks.filter(c => c.status === 'unhealthy').length / healthData.checks.length) * 100) : 0}% of components
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Health History Chart */}
         <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
@@ -1170,6 +1266,8 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
           </div>
         </div>
       </div>
+      </div>
+      )}
 
       {/* Timestamp */}
       <div className="max-w-7xl mx-auto mt-8 text-center text-slate-500 text-sm">
@@ -1194,6 +1292,14 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
             </div>
             
             <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+                <span className="text-indigo-300 font-medium">Switch to List view</span>
+                <kbd className="px-2 py-1 bg-indigo-600 rounded text-sm font-mono">1</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+                <span className="text-indigo-300 font-medium">Switch to Analytics view</span>
+                <kbd className="px-2 py-1 bg-indigo-600 rounded text-sm font-mono">2</kbd>
+              </div>
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Search components</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">/</kbd>

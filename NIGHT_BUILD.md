@@ -66,6 +66,7 @@
 - [x] Error handling complete (shows "No data" for empty)
 - [x] Build passes ✅
 - [x] Lint passes ✅
+- [x] Pushed: origin/feature/continuity-sorting ✅
 
 ---
 

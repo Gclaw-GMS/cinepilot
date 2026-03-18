@@ -165,7 +165,20 @@ export default function DOODPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/dood?projectId=${selectedProject}`)
+      // Build query params with filters
+      const params = new URLSearchParams()
+      params.set('projectId', selectedProject)
+      
+      // Apply new API filters
+      if (filterRole !== 'all') {
+        params.set('isMain', filterRole === 'main' ? 'true' : 'false')
+      }
+      if (sortBy) {
+        params.set('sortBy', sortBy)
+      }
+      params.set('sortOrder', sortOrder)
+      
+      const res = await fetch(`/api/dood?${params.toString()}`)
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`)
       }
@@ -192,9 +205,10 @@ export default function DOODPage() {
     setLoading(false)
   }, [selectedProject])
 
+  // Reload DOOD when filters or sort change (to use server-side filtering)
   useEffect(() => {
     loadDOOD()
-  }, [loadDOOD])
+  }, [loadDOOD, filterRole, sortBy, sortOrder])
 
   // Close export menu and filter panel when clicking outside
   useEffect(() => {
@@ -1248,6 +1262,51 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
           </button>
         </div>
       )}
+
+      {/* Quick Stats Summary Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700 rounded-xl p-4">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-2 mb-2 sm:mb-0">
+            <div className="p-2 bg-cyan-500/20 rounded-lg">
+              <Activity className="w-5 h-5 text-cyan-400" />
+            </div>
+            <span className="text-sm font-medium text-slate-300">Quick Overview</span>
+          </div>
+          <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Cast:</span>
+              <span className="text-sm font-semibold text-white">{stats.totalCharacters}</span>
+              <span className="text-xs text-slate-500">({report.filter(r => r.isMain).length} main, {report.filter(r => !r.isMain).length} support)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Shoot Days:</span>
+              <span className="text-sm font-semibold text-white">{stats.totalShootingDays}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Film className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Total Calls:</span>
+              <span className="text-sm font-semibold text-white">{stats.totalCalls}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Avg/Actor:</span>
+              <span className="text-sm font-semibold text-cyan-400">{stats.avgDaysPerActor.toFixed(1)} days</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Main Cast Days:</span>
+              <span className="text-sm font-semibold text-purple-400">{stats.mainCastDays}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Sun className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Support Days:</span>
+              <span className="text-sm font-semibold text-amber-400">{stats.supportingCastDays}</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

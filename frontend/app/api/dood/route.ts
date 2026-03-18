@@ -25,6 +25,11 @@ const DEMO_STATS = {
 // GET /api/dood — get Day Out of Days report
 export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+  const filterMain = req.nextUrl.searchParams.get('isMain');
+  const minDays = req.nextUrl.searchParams.get('minDays');
+  const maxDays = req.nextUrl.searchParams.get('maxDays');
+  const sortBy = req.nextUrl.searchParams.get('sortBy') || 'total_days';
+  const sortOrder = req.nextUrl.searchParams.get('sortOrder') || 'desc';
 
   try {
     // Try database first
@@ -111,8 +116,43 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Sort by total days descending
-    report.sort((a, b) => b.total_days - a.total_days);
+    // Apply filters
+    let filteredReport = report.filter(r => {
+      // Filter by isMain
+      if (filterMain !== null && filterMain !== undefined) {
+        const isMainFilter = filterMain === 'true';
+        if (r.isMain !== isMainFilter) return false;
+      }
+      // Filter by minDays
+      if (minDays !== null && minDays !== undefined) {
+        const min = parseInt(minDays);
+        if (r.total_days < min) return false;
+      }
+      // Filter by maxDays
+      if (maxDays !== null && maxDays !== undefined) {
+        const max = parseInt(maxDays);
+        if (r.total_days > max) return false;
+      }
+      return true;
+    });
+
+    // Sort results
+    filteredReport.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'character':
+          comparison = a.character.localeCompare(b.character);
+          break;
+        case 'percentage':
+          comparison = a.percentage - b.percentage;
+          break;
+        case 'total_days':
+        default:
+          comparison = a.total_days - b.total_days;
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
     // Calculate stats
     const totalCalls = report.reduce((sum, r) => sum + r.total_days, 0);
@@ -123,30 +163,127 @@ export async function GET(req: NextRequest) {
     // If no characters found in database, fall back to demo data
     if (characters.length === 0) {
       console.log('[GET /api/dood] No characters in database, using demo data');
+      
+      // Apply filters to demo data as well
+      let filteredDemo = DEMO_DOOD_REPORT.filter(r => {
+        if (filterMain !== null && filterMain !== undefined) {
+          const isMainFilter = filterMain === 'true';
+          if (r.isMain !== isMainFilter) return false;
+        }
+        if (minDays !== null && minDays !== undefined) {
+          const min = parseInt(minDays);
+          if (r.total_days < min) return false;
+        }
+        if (maxDays !== null && maxDays !== undefined) {
+          const max = parseInt(maxDays);
+          if (r.total_days > max) return false;
+        }
+        return true;
+      });
+      
+      filteredDemo.sort((a, b) => {
+        let comparison = 0;
+        switch (sortBy) {
+          case 'character':
+            comparison = a.character.localeCompare(b.character);
+            break;
+          case 'percentage':
+            comparison = a.percentage - b.percentage;
+            break;
+          case 'total_days':
+          default:
+            comparison = a.total_days - b.total_days;
+            break;
+        }
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+      
       return NextResponse.json({
-        report: DEMO_DOOD_REPORT,
-        stats: DEMO_STATS,
+        report: filteredDemo,
+        stats: {
+          ...DEMO_STATS,
+          filteredCount: filteredDemo.length,
+        },
         isDemoMode: true,
+        filters: {
+          isMain: filterMain,
+          minDays: minDays ? parseInt(minDays) : null,
+          maxDays: maxDays ? parseInt(maxDays) : null,
+          sortBy,
+          sortOrder,
+        },
       });
     }
 
     return NextResponse.json({
-      report,
+      report: filteredReport,
       stats: {
         totalCharacters: report.length,
+        filteredCount: filteredReport.length,
         totalShootingDays,
         totalCalls,
         avgDaysPerActor,
+      },
+      filters: {
+        isMain: filterMain,
+        minDays: minDays ? parseInt(minDays) : null,
+        maxDays: maxDays ? parseInt(maxDays) : null,
+        sortBy,
+        sortOrder,
       },
     });
   } catch (error) {
     console.log('[GET /api/dood] Using demo data - database not connected');
     
+    // Apply filters to demo data even in error case
+    let filteredDemo = DEMO_DOOD_REPORT.filter(r => {
+      if (filterMain !== null && filterMain !== undefined) {
+        const isMainFilter = filterMain === 'true';
+        if (r.isMain !== isMainFilter) return false;
+      }
+      if (minDays !== null && minDays !== undefined) {
+        const min = parseInt(minDays);
+        if (r.total_days < min) return false;
+      }
+      if (maxDays !== null && maxDays !== undefined) {
+        const max = parseInt(maxDays);
+        if (r.total_days > max) return false;
+      }
+      return true;
+    });
+    
+    filteredDemo.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'character':
+          comparison = a.character.localeCompare(b.character);
+          break;
+        case 'percentage':
+          comparison = a.percentage - b.percentage;
+          break;
+        case 'total_days':
+        default:
+          comparison = a.total_days - b.total_days;
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
     // Return demo data when database is not connected
     return NextResponse.json({
-      report: DEMO_DOOD_REPORT,
-      stats: DEMO_STATS,
+      report: filteredDemo,
+      stats: {
+        ...DEMO_STATS,
+        filteredCount: filteredDemo.length,
+      },
       isDemoMode: true,
+      filters: {
+        isMain: filterMain,
+        minDays: minDays ? parseInt(minDays) : null,
+        maxDays: maxDays ? parseInt(maxDays) : null,
+        sortBy,
+        sortOrder,
+      },
     });
   } finally {
     await prisma.$disconnect().catch(() => {});

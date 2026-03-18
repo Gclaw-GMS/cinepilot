@@ -135,6 +135,12 @@ export default function ProjectsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const filteredLengthRef = useRef(0)
+  const filteredDataRef = useRef<Project[]>([])
+  const filtersRef = useRef(filters)
+  const searchRef = useRef(search)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -216,6 +222,13 @@ export default function ProjectsPage() {
     else if (e.key.toLowerCase() === 'e') {
       e.preventDefault()
       setShowExportDropdown(prev => !prev)
+    }
+    // M: Direct Markdown export
+    else if (e.key.toLowerCase() === 'm') {
+      e.preventDefault()
+      if (filteredLengthRef.current > 0) {
+        handleExportMarkdownRef.current()
+      }
     }
     // F: Toggle filters
     else if (e.key.toLowerCase() === 'f') {
@@ -448,6 +461,130 @@ export default function ProjectsPage() {
     setShowExportDropdown(false)
   }
 
+  // Markdown Export
+  const handleExportMarkdown = useCallback(() => {
+    const exportData = filteredDataRef.current
+    const timestamp = new Date().toISOString().split('T')[0]
+    const currentFilters = filtersRef.current
+    const currentSearch = searchRef.current
+    const currentSortBy = sortByRef.current
+    const currentSortOrder = sortOrderRef.current
+    
+    // Summary statistics
+    const totalBudget = exportData.reduce((sum: number, p: Project) => sum + (parseFloat(p.budget || '0') || 0), 0)
+    const byStatus = exportData.reduce((acc: Record<string, number>, p: Project) => {
+      acc[p.status] = (acc[p.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    const byLanguage = exportData.reduce((acc: Record<string, number>, p: Project) => {
+      if (p.language) {
+        acc[p.language] = (acc[p.language] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+    const byGenre = exportData.reduce((acc: Record<string, number>, p: Project) => {
+      if (p.genre) {
+        acc[p.genre] = (acc[p.genre] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+
+    // Format currency in INR
+    const formatINR = (amount: number) => {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+    }
+
+    let markdown = `# CinePilot Projects Report
+
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+---
+
+## Summary
+
+- **Total Projects:** ${exportData.length}
+- **Total Budget:** ${formatINR(totalBudget)}
+- **Active Projects:** ${byStatus.active || 0}
+- **On Hold:** ${byStatus.on_hold || 0}
+- **Completed:** ${byStatus.completed || 0}
+- **Archived:** ${byStatus.archived || 0}
+
+## By Status
+
+| Status | Count |
+|--------|-------|
+${Object.entries(byStatus).map(([status, count]) => `| ${status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} | ${count} |`).join('\n')}
+
+## By Language
+
+| Language | Count |
+|----------|-------|
+${Object.entries(byLanguage).map(([lang, count]) => `| ${lang} | ${count} |`).join('\n')}
+
+## By Genre
+
+| Genre | Count |
+|-------|-------|
+${Object.entries(byGenre).map(([genre, count]) => `| ${genre} | ${count} |`).join('\n')}
+
+---
+
+## Projects Detail
+
+`
+    // Add each project
+    exportData.forEach((p: Project, index: number) => {
+      const statusEmoji = p.status === 'active' ? '🟢' : p.status === 'completed' ? '✅' : p.status === 'on_hold' ? '⏸️' : '📦'
+      markdown += `### ${index + 1}. ${p.name} ${statusEmoji}
+
+| Field | Value |
+|-------|-------|
+| **ID** | ${p.id.slice(0, 8)} |
+| **Status** | ${p.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} |
+| **Language** | ${p.language || '-'} |
+| **Genre** | ${p.genre || '-'} |
+| **Budget** | ${p.budget ? formatINR(parseFloat(p.budget)) : '-'} |
+| **Start Date** | ${p.startDate ? new Date(p.startDate).toLocaleDateString('en-IN') : '-'} |
+| **End Date** | ${p.endDate ? new Date(p.endDate).toLocaleDateString('en-IN') : '-'} |
+| **Scripts** | ${p.scriptCount || 0} |
+| **Crew** | ${p.crewCount || 0} |
+
+${p.description ? `**Description:** ${p.description}\n` : ''}
+
+---
+`
+    })
+
+    // Add filters info if any active
+    const hasActiveFilters = currentFilters.status.length > 0 || currentFilters.language.length > 0 || currentFilters.genre.length > 0 || currentSearch || currentSortBy !== 'createdAt' || currentSortOrder !== 'desc'
+    if (hasActiveFilters) {
+      markdown += `\n## Active Filters\n\n`
+      if (currentFilters.status.length > 0) markdown += `- Status: ${currentFilters.status.join(', ')}\n`
+      if (currentFilters.language.length > 0) markdown += `- Language: ${currentFilters.language.join(', ')}\n`
+      if (currentFilters.genre.length > 0) markdown += `- Genre: ${currentFilters.genre.join(', ')}\n`
+      if (currentSearch) markdown += `- Search: "${currentSearch}"\n`
+      if (currentSortBy !== 'createdAt' || currentSortOrder !== 'desc') markdown += `- Sort: ${currentSortBy} (${currentSortOrder})\n`
+    }
+
+    markdown += `\n---\n*Generated by CinePilot*`
+
+    // Create and trigger download
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `projects-${timestamp}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportDropdown(false)
+  }, [])
+
+  // Ref for keyboard shortcut
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -598,6 +735,16 @@ export default function ProjectsPage() {
     return result
   }, [projects, search, filters, sortBy, sortOrder])
 
+  // Update refs when filtered/filter state changes
+  useEffect(() => {
+    filteredLengthRef.current = filtered.length
+    filteredDataRef.current = filtered
+    filtersRef.current = filters
+    searchRef.current = search
+    sortByRef.current = sortBy
+    sortOrderRef.current = sortOrder
+  }, [filtered, filters, search, sortBy, sortOrder])
+
   const toggleFilter = (type: 'status' | 'language' | 'genre', value: string) => {
     setFilters(prev => {
       const current = prev[type]
@@ -704,6 +851,13 @@ export default function ProjectsPage() {
                 >
                   <Download className="w-4 h-4" />
                   Export JSON
+                </button>
+                <button
+                  onClick={() => handleExportMarkdownRef.current()}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2 text-cyan-400"
+                >
+                  <Download className="w-4 h-4" />
+                  Export Markdown
                 </button>
               </div>
             )}
@@ -1221,6 +1375,7 @@ export default function ProjectsPage() {
                 { key: 'P', description: 'Print projects report' },
                 { key: 'N', description: 'Create new project' },
                 { key: 'E', description: 'Export projects' },
+                { key: 'M', description: 'Export as Markdown' },
                 { key: '?', description: 'Show this help' },
                 { key: 'Esc', description: 'Close modal / Clear search / Close filters / Close print menu' },
               ].map(({ key, description }) => (

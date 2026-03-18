@@ -28,6 +28,15 @@ interface HealthResponse {
   checks: HealthCheck[]
   version: string
   isDemo?: boolean
+  systemInfo?: {
+    platform: string
+    arch: string
+    nodeVersion: string
+    cpuCores: number
+    totalMemoryGB: number
+    freeMemoryGB: number
+    hostname: string
+  }
 }
 
 interface HealthHistory {
@@ -35,6 +44,8 @@ interface HealthHistory {
   database: number
   disk: number
   memory: number
+  cpu: number
+  external_api: number
 }
 
 const STATUS_COLORS = {
@@ -48,6 +59,8 @@ const COMPONENT_ICONS: Record<string, typeof Database> = {
   disk: HardDrive,
   memory: Cpu,
   environment: Zap,
+  cpu: Cpu,
+  external_api: Server,
 }
 
 export default function HealthPage() {
@@ -396,6 +409,10 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
                 data.checks.find(c => c.component === 'disk')?.status === 'degraded' ? 50 : 0,
           memory: data.checks.find(c => c.component === 'memory')?.status === 'healthy' ? 100 : 
                   data.checks.find(c => c.component === 'memory')?.status === 'degraded' ? 50 : 0,
+          cpu: data.checks.find(c => c.component === 'cpu')?.status === 'healthy' ? 100 : 
+               data.checks.find(c => c.component === 'cpu')?.status === 'degraded' ? 50 : 0,
+          external_api: data.checks.find(c => c.component === 'external_api')?.status === 'healthy' ? 100 : 
+                        data.checks.find(c => c.component === 'external_api')?.status === 'degraded' ? 50 : 0,
         }
         const updated = [...prev, newEntry].slice(-20)
         return updated
@@ -839,6 +856,44 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
         </div>
       </div>
 
+      {/* System Information Panel */}
+      {healthData?.systemInfo && (
+        <div className="max-w-7xl mx-auto mb-8">
+          <div className="bg-slate-900 rounded-xl p-6 border border-slate-800">
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Server className="w-5 h-5 text-indigo-500" />
+              System Information
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">Platform</div>
+                <div className="text-sm text-white font-medium">{healthData.systemInfo.platform}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">Architecture</div>
+                <div className="text-sm text-white font-medium">{healthData.systemInfo.arch}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">Node.js</div>
+                <div className="text-sm text-white font-medium">{healthData.systemInfo.nodeVersion}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">CPU Cores</div>
+                <div className="text-sm text-white font-medium">{healthData.systemInfo.cpuCores}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">Total Memory</div>
+                <div className="text-sm text-white font-medium">{healthData.systemInfo.totalMemoryGB} GB</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">Free Memory</div>
+                <div className="text-sm text-white font-medium">{healthData.systemInfo.freeMemoryGB} GB</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Component Health Cards */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -946,6 +1001,14 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
                       <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                     </linearGradient>
+                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorApi" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="timestamp" stroke="#64748b" fontSize={12} />
@@ -979,6 +1042,22 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
                     fill="url(#colorMem)" 
                     name="Memory"
                   />
+                  <Area 
+                    type="monotone" 
+                    dataKey="cpu" 
+                    stroke="#ec4899" 
+                    fillOpacity={1} 
+                    fill="url(#colorCpu)" 
+                    name="CPU"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="external_api" 
+                    stroke="#14b8a6" 
+                    fillOpacity={1} 
+                    fill="url(#colorApi)" 
+                    name="External API"
+                  /> 
                 </AreaChart>
               </ResponsiveContainer>
             ) : (

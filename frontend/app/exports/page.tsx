@@ -130,6 +130,12 @@ export default function ExportsPage() {
   const [formatFilter, setFormatFilter] = useState('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts
+  const categoryFilterRef = useRef(categoryFilter)
+  useEffect(() => {
+    categoryFilterRef.current = categoryFilter
+  }, [categoryFilter])
+  
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'format' | 'category'>('category')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -168,6 +174,26 @@ export default function ExportsPage() {
           setShowKeyboardHelp(false)
           setSearchQuery('')
           setShowFilters(false)
+          break
+        case '1':
+          e.preventDefault()
+          setCategoryFilter(categoryFilterRef.current === 'production' ? 'all' : 'production')
+          break
+        case '2':
+          e.preventDefault()
+          setCategoryFilter(categoryFilterRef.current === 'financial' ? 'all' : 'financial')
+          break
+        case '3':
+          e.preventDefault()
+          setCategoryFilter(categoryFilterRef.current === 'creative' ? 'all' : 'creative')
+          break
+        case '4':
+          e.preventDefault()
+          setCategoryFilter(categoryFilterRef.current === 'admin' ? 'all' : 'admin')
+          break
+        case '0':
+          e.preventDefault()
+          setCategoryFilter('all')
           break
       }
     }
@@ -504,11 +530,11 @@ export default function ExportsPage() {
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 >
-                  <option value="all">All Categories</option>
-                  <option value="production">Production</option>
-                  <option value="financial">Financial</option>
-                  <option value="creative">Creative</option>
-                  <option value="admin">Administrative</option>
+                  <option value="all">All Categories (0)</option>
+                  <option value="production">Production (1)</option>
+                  <option value="financial">Financial (2)</option>
+                  <option value="creative">Creative (3)</option>
+                  <option value="admin">Administrative (4)</option>
                 </select>
               </div>
               
@@ -812,6 +838,26 @@ export default function ExportsPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Toggle sort order</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter by Production (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter by Financial (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter by Creative (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter by Administrative (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Clear category filter</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">0</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Show shortcuts</span>

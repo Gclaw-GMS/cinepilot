@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
+import os from 'os';
 
 interface HealthCheck {
   component: string;
@@ -16,6 +17,15 @@ interface HealthResponse {
   checks: HealthCheck[];
   version: string;
   isDemo?: boolean;
+  systemInfo?: {
+    platform: string;
+    arch: string;
+    nodeVersion: string;
+    cpuCores: number;
+    totalMemoryGB: number;
+    freeMemoryGB: number;
+    hostname: string;
+  };
 }
 
 // Check if we're in demo mode (no database configured)
@@ -128,6 +138,79 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     });
   }
 
+  // Check CPU usage
+  const cpuStart = Date.now();
+  try {
+    const cpus = os.cpus();
+    let totalIdle = 0;
+    let totalTick = 0;
+    
+    cpus.forEach(cpu => {
+      for (const type in cpu.times) {
+        totalTick += cpu.times[type as keyof typeof cpu.times];
+      }
+      totalIdle += cpu.times.idle;
+    });
+    
+    const cpuUsage = Math.round((1 - totalIdle / totalTick) * 100);
+    const cpuModel = cpus[0]?.model || 'Unknown';
+    
+    checks.push({
+      component: 'cpu',
+      status: cpuUsage > 90 ? 'unhealthy' : cpuUsage > 75 ? 'degraded' : 'healthy',
+      message: `${cpuUsage}% usage (${cpus.length} cores)`,
+      details: { 
+        cpuUsage, 
+        cpuCores: cpus.length, 
+        cpuModel: cpuModel.substring(0, 50),
+        loadAverage: os.loadavg()
+      },
+      latencyMs: Date.now() - cpuStart,
+    });
+  } catch (error) {
+    checks.push({
+      component: 'cpu',
+      status: 'degraded',
+      message: 'Could not check CPU',
+      latencyMs: Date.now() - cpuStart,
+    });
+  }
+
+  // Check external API connectivity (Weather API)
+  const apiStart = Date.now();
+  try {
+    const weatherRes = await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&current=temperature_2m', { 
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    if (weatherRes.ok) {
+      checks.push({
+        component: 'external_api',
+        status: 'healthy',
+        message: 'Weather API reachable',
+        details: { service: 'Open-Meteo', responseTime: Date.now() - apiStart },
+        latencyMs: Date.now() - apiStart,
+      });
+    } else {
+      checks.push({
+        component: 'external_api',
+        status: 'degraded',
+        message: `Weather API returned ${weatherRes.status}`,
+        details: { service: 'Open-Meteo', status: weatherRes.status },
+        latencyMs: Date.now() - apiStart,
+      });
+    }
+  } catch (error) {
+    checks.push({
+      component: 'external_api',
+      status: 'degraded',
+      message: 'Weather API unreachable',
+      details: { service: 'Open-Meteo', error: error instanceof Error ? error.message : 'Connection failed' },
+      latencyMs: Date.now() - apiStart,
+    });
+  }
+
   // Determine overall status
   const unhealthyCount = checks.filter(c => c.status === 'unhealthy').length;
   const degradedCount = checks.filter(c => c.status === 'degraded').length;
@@ -148,6 +231,15 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     checks,
     version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
     isDemo: isDemoMode,
+    systemInfo: {
+      platform: os.platform(),
+      arch: os.arch(),
+      nodeVersion: process.version,
+      cpuCores: os.cpus().length,
+      totalMemoryGB: Math.round(os.totalmem() / (1024 * 1024 * 1024) * 100) / 100,
+      freeMemoryGB: Math.round(os.freemem() / (1024 * 1024 * 1024) * 100) / 100,
+      hostname: os.hostname(),
+    },
   };
 
   return NextResponse.json(response, {

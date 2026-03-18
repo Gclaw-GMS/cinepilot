@@ -258,6 +258,65 @@ What would you like to know about your production?`,
     setExporting(false)
   }
 
+  const handleExportMarkdown = useCallback(() => {
+    setExporting(true)
+    
+    const formatTime = (timestamp?: string) => {
+      if (!timestamp) return ''
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    let markdown = `# CinePilot AI Chat Transcript
+
+`
+
+    // Header
+    markdown += `**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+
+    // Summary
+    markdown += `## Summary\n\n`
+    markdown += `- **Total Messages:** ${messages.length}\n`
+    markdown += `- **User Messages:** ${messages.filter(m => m.role === 'user').length}\n`
+    markdown += `- **AI Responses:** ${messages.filter(m => m.role === 'assistant').length}\n`
+
+    if (context) {
+      markdown += `\n### Production Context\n\n`
+      markdown += `- **Scripts:** ${context.scriptsCount || 0}\n`
+      markdown += `- **Scenes:** ${context.scenesCount || 0}\n`
+      markdown += `- **Budget:** ₹${(context.budgetTotal || 0).toLocaleString('en-IN')}\n`
+      markdown += `- **Schedule Days:** ${context.scheduleDays || 0}\n`
+      markdown += `- **Crew Members:** ${context.crewCount || 0}\n`
+      markdown += `- **Warnings:** ${context.warningsCount || 0}\n`
+    }
+
+    markdown += `\n---\n\n## Conversation\n\n`
+
+    // Messages
+    messages.forEach((msg, idx) => {
+      const role = msg.role === 'user' ? '👤 **User**' : '🤖 **CinePilot AI**'
+      const time = formatTime(msg.timestamp)
+      markdown += `### ${role} · ${time}\n\n`
+      markdown += `${msg.content}\n\n`
+      markdown += `---\n\n`
+    })
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-transcript-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+  }, [messages, context])
+
   const handlePrintChat = useCallback(() => {
     const formatTime = (timestamp?: string) => {
       if (!timestamp) return ''
@@ -374,11 +433,16 @@ What would you like to know about your production?`,
 
   // Refs for keyboard shortcuts
   const handlePrintChatRef = useRef(handlePrintChat)
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
   const messagesLengthRef = useRef(messages.length)
   
   useEffect(() => {
     handlePrintChatRef.current = handlePrintChat
   }, [handlePrintChat])
+  
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
   
   useEffect(() => {
     messagesLengthRef.current = messages.length
@@ -449,6 +513,12 @@ What would you like to know about your production?`,
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          if (messagesLengthRef.current > 0) {
+            handleExportMarkdownRef.current()
+          }
           break
         case 'p':
           e.preventDefault()
@@ -595,6 +665,13 @@ What would you like to know about your production?`,
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-400 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -889,6 +966,10 @@ What would you like to know about your production?`,
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Export chat</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                <span className="text-cyan-400">Export Markdown</span>
+                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">M</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Print chat</span>

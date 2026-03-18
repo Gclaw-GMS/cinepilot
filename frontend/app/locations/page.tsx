@@ -138,6 +138,29 @@ export default function LocationsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Refs for keyboard shortcuts to avoid dependency issues
+  const filtersRef = useRef(filters)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+  const viewModeRef = useRef(viewMode)
+  
+  // Sync refs with state
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+  
+  useEffect(() => {
+    sortByRef.current = sortBy
+  }, [sortBy])
+  
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
+  
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -196,10 +219,103 @@ export default function LocationsPage() {
           searchInputRef.current?.focus()
           break
         case '1':
-          setViewMode('cards')
+          if (e.shiftKey) {
+            // Shift+1: Filter by placeType - Beach
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'beach' ? 'all' : 'beach' }))
+          } else {
+            setViewMode('cards')
+          }
           break
         case '2':
-          setViewMode('chart')
+          if (e.shiftKey) {
+            // Shift+2: Filter by placeType - Restaurant
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'restaurant' ? 'all' : 'restaurant' }))
+          } else {
+            setViewMode('chart')
+          }
+          break
+        case '3':
+          if (e.shiftKey) {
+            // Shift+3: Filter by placeType - Park
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'park' ? 'all' : 'park' }))
+          }
+          break
+        case '4':
+          if (e.shiftKey) {
+            // Shift+4: Filter by placeType - Warehouse
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'warehouse' ? 'all' : 'warehouse' }))
+          }
+          break
+        case '5':
+          if (e.shiftKey) {
+            // Shift+5: Filter by placeType - Hotel
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'hotel' ? 'all' : 'hotel' }))
+          }
+          break
+        case '6':
+          if (e.shiftKey) {
+            // Shift+6: Filter by placeType - Temple
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'temple' ? 'all' : 'temple' }))
+          }
+          break
+        case '7':
+          if (e.shiftKey) {
+            // Shift+7: Filter by placeType - Office
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'office' ? 'all' : 'office' }))
+          }
+          break
+        case '8':
+          if (e.shiftKey) {
+            // Shift+8: Filter by placeType - Resort
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'resort' ? 'all' : 'resort' }))
+          }
+          break
+        case '9':
+          if (e.shiftKey) {
+            // Shift+9: Filter by placeType - Mountain
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'mountain' ? 'all' : 'mountain' }))
+          }
+          break
+        case '0':
+          if (e.shiftKey) {
+            // Shift+0: Clear placeType filter
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, placeType: 'all' }))
+          } else {
+            // 0: Clear intExt filter
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, intExt: 'all' }))
+          }
+          break
+        case 'a':
+          // A: Toggle All (clear all filters)
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })
+          }
+          break
+        case 'x':
+          // X: Toggle Exterior filter
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, intExt: prev.intExt === 'EXT' ? 'all' : 'EXT' }))
+          }
+          break
+        case 'z':
+          // Z: Toggle Interior filter
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, intExt: prev.intExt === 'INT' ? 'all' : 'INT' }))
+          }
           break
         case 'f':
           setShowFilters(prev => !prev)
@@ -898,16 +1014,16 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 onChange={(e) => setFilters(prev => ({ ...prev, placeType: e.target.value }))}
                 className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
               >
-                <option value="all">All Types</option>
-                <option value="beach">🏖️ Beach</option>
-                <option value="restaurant">🍽️ Restaurant</option>
-                <option value="park">🌳 Park</option>
-                <option value="warehouse">🏭 Warehouse</option>
-                <option value="hotel">🏨 Hotel</option>
-                <option value="temple">🛕 Temple</option>
-                <option value="office">🏢 Office</option>
-                <option value="resort">🏝️ Resort</option>
-                <option value="mountain">⛰️ Mountain</option>
+                <option value="all">All Types (⇧0)</option>
+                <option value="beach">🏖️ Beach (⇧1)</option>
+                <option value="restaurant">🍽️ Restaurant (⇧2)</option>
+                <option value="park">🌳 Park (⇧3)</option>
+                <option value="warehouse">🏭 Warehouse (⇧4)</option>
+                <option value="hotel">🏨 Hotel (⇧5)</option>
+                <option value="temple">🛕 Temple (⇧6)</option>
+                <option value="office">🏢 Office (⇧7)</option>
+                <option value="resort">🏝️ Resort (⇧8)</option>
+                <option value="mountain">⛰️ Mountain (⇧9)</option>
                 <option value="forest">🌲 Forest</option>
                 <option value="studio">🎬 Studio</option>
               </select>
@@ -919,9 +1035,9 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 onChange={(e) => setFilters(prev => ({ ...prev, intExt: e.target.value }))}
                 className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
               >
-                <option value="all">All</option>
-                <option value="EXT">Exterior</option>
-                <option value="INT">Interior</option>
+                <option value="all">All (0)</option>
+                <option value="EXT">Exterior (X)</option>
+                <option value="INT">Interior (Z)</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -1003,8 +1119,14 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 { key: '/', action: 'Focus search input' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
+                { key: '0', action: 'Clear intExt filter (show all)' },
+                { key: 'X', action: 'Filter by Exterior (toggle)' },
+                { key: 'Z', action: 'Filter by Interior (toggle)' },
+                { key: 'A', action: 'Clear all filters' },
                 { key: '1', action: 'Switch to Cards view' },
                 { key: '2', action: 'Switch to Analysis view' },
+                { key: '⇧1-9', action: 'Filter by place type (Beach, Restaurant, Park, etc.)' },
+                { key: '⇧0', action: 'Clear placeType filter' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Toggle print menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },

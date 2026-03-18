@@ -618,21 +618,72 @@ export const analytics = {
 };
 
 export const productionTimeline = {
-  getMilestones: noopArray,
+  getMilestones: async (projectId?: string) => {
+    const url = projectId ? `/api/timeline?projectId=${projectId}` : '/api/timeline';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch timeline');
+    const data = await res.json();
+    // Filter for milestones only
+    return data.events?.filter((e: { type: string }) => e.type === 'milestone') || [];
+  },
 };
 
 export const castAvailability = {
-  getAll: noopArray,
-  update: noop,
+  getAll: async (projectId?: string) => {
+    const url = projectId ? `/api/character-costume?projectId=${projectId}` : '/api/character-costume';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch cast availability');
+    const data = await res.json();
+    // Return characters with their availability info
+    return data.characters || [];
+  },
+  update: async (id: string, data: { availability?: string[]; status?: string }) => {
+    const res = await fetch(`/api/character-costume?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update cast availability');
+    return res.json();
+  },
 };
 
 export const equipment = {
-  getCategories: noopArray,
+  getCategories: async (projectId?: string) => {
+    const url = projectId ? `/api/equipment?projectId=${projectId}` : '/api/equipment';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch equipment');
+    const data = await res.json();
+    // Derive unique categories from rentals
+    const categories = [...new Set(data.rentals?.map((r: { category: string }) => r.category) || [])];
+    return categories;
+  },
+  getAll: async (projectId?: string) => {
+    const url = projectId ? `/api/equipment?projectId=${projectId}` : '/api/equipment';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch equipment');
+    return res.json();
+  },
 };
 
 export const collaborationNew = {
-  getActivities: noopArray,
-  addComment: noop,
+  getActivities: async (projectId?: string) => {
+    const url = projectId ? `/api/collaboration?projectId=${projectId}` : '/api/collaboration';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch collaboration activities');
+    const data = await res.json();
+    return data.activities || data.members || [];
+  },
+  addComment: async (data: { projectId?: string; message: string; author?: string }) => {
+    const url = data.projectId ? `/api/collaboration?projectId=${data.projectId}` : '/api/collaboration';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'comment', ...data }),
+    });
+    if (!res.ok) throw new Error('Failed to add comment');
+    return res.json();
+  },
 };
 
 export const dood = {
@@ -657,9 +708,36 @@ export const dood = {
 };
 
 export const exportProject = {
-  toJSON: noop,
-  toPDF: noop,
-  toCSV: noop,
+  toJSON: async (projectId?: string, options?: { includeShots?: boolean; includeSchedule?: boolean }) => {
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    if (options?.includeShots) params.set('includeShots', 'true');
+    if (options?.includeSchedule) params.set('includeSchedule', 'true');
+    const url = `/api/exports?${params.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to export project JSON');
+    return res.json();
+  },
+  toPDF: async (projectId?: string, exportType?: string) => {
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    if (exportType) params.set('type', exportType);
+    params.set('format', 'pdf');
+    const url = `/api/exports?${params.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to export PDF');
+    return res.blob();
+  },
+  toCSV: async (projectId?: string, exportType?: string) => {
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    if (exportType) params.set('type', exportType);
+    params.set('format', 'csv');
+    const url = `/api/exports?${params.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to export CSV');
+    return res.text();
+  },
 };
 
 export const utils = {

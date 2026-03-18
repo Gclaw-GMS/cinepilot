@@ -128,6 +128,7 @@ export default function SettingsPage() {
   const printMenuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const activeFilterRef = useRef(activeFilter);
 
   const fetchSettings = useCallback(async () => {
     // First load from localStorage for instant display
@@ -163,6 +164,11 @@ export default function SettingsPage() {
   // Refs for keyboard shortcuts
   const saveRef = useRef<() => void>(() => {});
   const handlePrintRef = useRef<() => void>(() => {});
+
+  // Keep activeFilterRef in sync with activeFilter
+  useEffect(() => {
+    activeFilterRef.current = activeFilter;
+  }, [activeFilter]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -210,6 +216,32 @@ export default function SettingsPage() {
         setShowFilterPanel(!showFilterPanel);
       }
 
+      // Number keys for quick filter (0-5) with toggle behavior
+      if (e.key === '0') {
+        e.preventDefault();
+        setActiveFilter(prev => prev === 'all' ? 'all' : 'all');
+      }
+      if (e.key === '1') {
+        e.preventDefault();
+        setActiveFilter(prev => prev === 'language' ? 'all' : 'language');
+      }
+      if (e.key === '2') {
+        e.preventDefault();
+        setActiveFilter(prev => prev === 'ai' ? 'all' : 'ai');
+      }
+      if (e.key === '3') {
+        e.preventDefault();
+        setActiveFilter(prev => prev === 'appearance' ? 'all' : 'appearance');
+      }
+      if (e.key === '4') {
+        e.preventDefault();
+        setActiveFilter(prev => prev === 'notifications' ? 'all' : 'notifications');
+      }
+      if (e.key === '5') {
+        e.preventDefault();
+        setActiveFilter(prev => prev === 'production' ? 'all' : 'production');
+      }
+
       // Escape: Close modal
       if (e.key === 'Escape') {
         setShowShortcuts(false);
@@ -227,7 +259,7 @@ export default function SettingsPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchSettings, showFilterPanel]);
+  }, [fetchSettings, showFilterPanel, activeFilter]);
 
   const set = useCallback((key: string, value: unknown) => {
     setLocal((prev) => ({ ...prev, [key]: value }))
@@ -494,7 +526,7 @@ export default function SettingsPage() {
                         activeFilter === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      All Settings
+                      All Settings <span className="text-slate-500 text-xs ml-2">(0)</span>
                     </button>
                     <button
                       onClick={() => { setActiveFilter('language'); setShowFilterPanel(false); }}
@@ -502,7 +534,7 @@ export default function SettingsPage() {
                         activeFilter === 'language' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      Language & Region
+                      Language & Region <span className="text-slate-500 text-xs ml-2">(1)</span>
                     </button>
                     <button
                       onClick={() => { setActiveFilter('ai'); setShowFilterPanel(false); }}
@@ -510,7 +542,7 @@ export default function SettingsPage() {
                         activeFilter === 'ai' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      AI & Language
+                      AI & Language <span className="text-slate-500 text-xs ml-2">(2)</span>
                     </button>
                     <button
                       onClick={() => { setActiveFilter('appearance'); setShowFilterPanel(false); }}
@@ -518,7 +550,7 @@ export default function SettingsPage() {
                         activeFilter === 'appearance' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      Appearance
+                      Appearance <span className="text-slate-500 text-xs ml-2">(3)</span>
                     </button>
                     <button
                       onClick={() => { setActiveFilter('notifications'); setShowFilterPanel(false); }}
@@ -526,7 +558,7 @@ export default function SettingsPage() {
                         activeFilter === 'notifications' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      Notifications
+                      Notifications <span className="text-slate-500 text-xs ml-2">(4)</span>
                     </button>
                     <button
                       onClick={() => { setActiveFilter('production'); setShowFilterPanel(false); }}
@@ -534,7 +566,7 @@ export default function SettingsPage() {
                         activeFilter === 'production' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      Production
+                      Production <span className="text-slate-500 text-xs ml-2">(5)</span>
                     </button>
                   </div>
                 </div>
@@ -870,6 +902,12 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               {[
+                { key: '0', action: 'Show all settings' },
+                { key: '1', action: 'Filter: Language & Region' },
+                { key: '2', action: 'Filter: AI & Language' },
+                { key: '3', action: 'Filter: Appearance' },
+                { key: '4', action: 'Filter: Notifications' },
+                { key: '5', action: 'Filter: Production' },
                 { key: '/', action: 'Focus search' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'R', action: 'Refresh settings' },

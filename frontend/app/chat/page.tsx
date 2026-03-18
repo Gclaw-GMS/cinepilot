@@ -448,10 +448,23 @@ What would you like to know about your production?`,
     messagesLengthRef.current = messages.length
   }, [messages.length])
 
-  const handlePrompt = (prompt: string) => {
+  const handlePrompt = useCallback((prompt: string) => {
     setInput(prompt)
     inputRef.current?.focus()
-  }
+  }, [inputRef])
+
+  // Handle prompt selection by index (for keyboard shortcuts)
+  const handlePromptByIndex = useCallback((index: number) => {
+    if (index >= 0 && index < SUGGESTED_PROMPTS.length) {
+      handlePrompt(SUGGESTED_PROMPTS[index].prompt)
+    }
+  }, [handlePrompt])
+
+  // Ref for keyboard shortcut access
+  const handlePromptByIndexRef = useRef(handlePromptByIndex)
+  useEffect(() => {
+    handlePromptByIndexRef.current = handlePromptByIndex
+  }, [handlePromptByIndex])
 
   // Fetch context data
   const fetchContext = async () => {
@@ -501,6 +514,31 @@ What would you like to know about your production?`,
           e.preventDefault()
           setShowSearch(true)
           setTimeout(() => searchInputRef.current?.focus(), 50)
+          break
+        // Number keys 1-6 for quick prompt selection
+        case '1':
+          e.preventDefault()
+          handlePromptByIndexRef.current(0)
+          break
+        case '2':
+          e.preventDefault()
+          handlePromptByIndexRef.current(1)
+          break
+        case '3':
+          e.preventDefault()
+          handlePromptByIndexRef.current(2)
+          break
+        case '4':
+          e.preventDefault()
+          handlePromptByIndexRef.current(3)
+          break
+        case '5':
+          e.preventDefault()
+          handlePromptByIndexRef.current(4)
+          break
+        case '6':
+          e.preventDefault()
+          handlePromptByIndexRef.current(5)
           break
         case '?':
           e.preventDefault()
@@ -764,6 +802,9 @@ What would you like to know about your production?`,
               >
                 <item.icon className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition-colors" />
                 <span className="text-slate-400 group-hover:text-slate-200">{item.label}</span>
+                <kbd className="ml-auto px-1.5 py-0.5 bg-slate-700/50 border border-slate-600/50 rounded text-xs font-mono text-slate-500 group-hover:text-slate-400">
+                  {idx + 1}
+                </kbd>
               </button>
             ))}
           </div>
@@ -947,6 +988,36 @@ What would you like to know about your production?`,
               </button>
             </div>
             <div className="space-y-3">
+              {/* Quick Prompt Selection */}
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Quick Prompts</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-300 text-sm truncate">Summarize today's shoot</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-300 text-sm truncate">Budget status</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-300 text-sm truncate">Crew availability</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-300 text-sm truncate">Schedule overview</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-300 text-sm truncate">Script summary</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">5</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-300 text-sm truncate">Production risks</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">6</kbd>
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Search messages</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">F</kbd>

@@ -70,6 +70,12 @@ export default function TimelinePage() {
   const showExportMenuRef = useRef(showExportMenu);
   const showFiltersRef = useRef(showFilters);
   const showPrintMenuRef = useRef(showPrintMenu);
+  const filterTypeRef = useRef(filterType);
+  
+  // Keep filterType ref in sync
+  useEffect(() => {
+    filterTypeRef.current = filterType;
+  }, [filterType]);
   
   // Update refs when state changes
   useEffect(() => {
@@ -577,6 +583,23 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
         case '3':
           setViewMode('calendar');
           break;
+        // Number keys for production type filter (4-6)
+        case '4':
+          e.preventDefault();
+          setFilterType(filterTypeRef.current === 'pre-production' ? 'all' : 'pre-production');
+          break;
+        case '5':
+          e.preventDefault();
+          setFilterType(filterTypeRef.current === 'production' ? 'all' : 'production');
+          break;
+        case '6':
+          e.preventDefault();
+          setFilterType(filterTypeRef.current === 'post-production' ? 'all' : 'post-production');
+          break;
+        case '0':
+          e.preventDefault();
+          setFilterType('all');
+          break;
         case 'f':
           e.preventDefault();
           setShowFilters(s => !s);
@@ -1078,10 +1101,10 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                       onChange={(e) => setFilterType(e.target.value)}
                       className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"
                     >
-                      <option value="all">All Types</option>
-                      <option value="pre-production">Pre-Production</option>
-                      <option value="production">Production</option>
-                      <option value="post-production">Post-Production</option>
+                      <option value="all">All Types (0)</option>
+                      <option value="pre-production">Pre-Production (4)</option>
+                      <option value="production">Production (5)</option>
+                      <option value="post-production">Post-Production (6)</option>
                     </select>
                   </div>
                   
@@ -1270,6 +1293,22 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Switch to Calendar view</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Filter by Pre-Production (toggle)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Filter by Production (toggle)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">5</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Filter by Post-Production (toggle)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">6</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Clear type filter</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">0</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Toggle filters</span>

@@ -1,5 +1,77 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (2:34 AM) - Censor Page Markdown Export IMPLEMENTED
+
+### Features Perfected This Build
+- **Censor Page - Markdown Export**: Added comprehensive Markdown export functionality
+  - **Export Option**: New "Markdown" option in the export dropdown (cyan colored)
+  - **Professional Format**: Clean Markdown with proper formatting:
+    - Header with CinePilot branding, project name, generation date, and mode indicator
+    - **Certificate Section**: Predicted certificate, label, age rating, sensitivity score, confidence
+    - **Summary Section**: Total risk flags, high/medium/low severity counts with emojis (🔴🟠🟢)
+    - **Risk Flags by Category**: Breakdown of flags by category sorted by count
+    - **Risk Flags Detail Table**: Scene, category, severity, context for all flags
+    - **Suggestions Section**: Detailed suggestions with scene number, issue, change, why, severity delta
+    - **Top Risk Drivers**: Numbered list of risk drivers
+    - **High Risk Scenes**: List of high risk scene numbers
+    - **Uncertainties Section**: List of uncertainty notes
+  - **Content Preservation**: Full censor analysis data included in export
+  - **File Naming**: Auto-generated filename with date (censor-analysis-YYYY-MM-DD.md)
+  - **Consistent UI**: Matches existing export buttons style (JSON, PDF)
+  - **Keyboard Shortcut**: Press 'M' for direct Markdown export
+  - **Keyboard Help Updated**: Added 'M' shortcut to the shortcuts modal
+
+### Technical Implementation
+- **handleExport Function**: Extended to handle 'markdown' format with useCallback
+- **Summary Stats**: Includes severity counts (high/medium/low), suggestions, uncertainties
+- **Category Breakdown**: Groups and sorts risk flags by category
+- **Markdown Tables**: Proper markdown tables for certificate info, summary, and detail
+- **Ref Pattern**: Uses handleExportRef for keyboard shortcut accessibility
+- **useCallback Dependencies**: Properly memoized with analysis, selectedProject, isDemoMode
+
+### Keyboard Shortcuts Updated
+- **M** - Direct Markdown export (NEW)
+- **E** - Export dropdown menu
+- **R** - Refresh analysis
+- **P** - Print report
+- **F** - Toggle filters
+- **S** - Toggle sort order
+- **1** - Summary view
+- **2** - Scene Flags view
+- **3** - Suggestions view
+- **4** - Analytics view
+- **/** - Focus search
+- **?** - Show keyboard shortcuts
+- **Esc** - Close modal / Clear filters
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Pushed:** origin/feature/continuity-sorting ✅
+
+### Censor Page Markdown Export Feature Checklist
+- [x] Feature works 100% (Markdown export functional)
+- [x] Export dropdown shows Markdown option (cyan icon)
+- [x] UI professional & visual (matches existing buttons)
+- [x] Summary section includes all key stats (certificate, severity counts, suggestions)
+- [x] Certificate section shows predicted cert, label, age rating, sensitivity, confidence
+- [x] Risk Flags by Category breakdown shows counts sorted by value
+- [x] Risk Flags Detail table with all fields (scene, category, severity, context)
+- [x] Suggestions section with issue, change, why, severity delta
+- [x] Top Risk Drivers section with numbered list
+- [x] High Risk Scenes section with scene numbers
+- [x] Uncertainties section included
+- [x] Keyboard shortcut 'M' for direct Markdown export
+- [x] Keyboard shortcut 'E' opens export menu
+- [x] Keyboard shortcuts help dialog updated with 'M'
+- [x] Error handling complete (checks analysis existence)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+
+---
+
 ## Build Status: ✅ PASSING (1:54 AM) - DOOD Page Markdown Export Enhanced
 
 ### Features Perfected This Build

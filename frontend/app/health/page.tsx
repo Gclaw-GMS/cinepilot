@@ -82,6 +82,12 @@ export default function HealthPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Ref for keyboard shortcut access to current filter status
+  const filterStatusRef = useRef(filterStatus)
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
+  
   // Calculate active filter count (includes sort state)
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (sortBy !== 'component' || sortOrder !== 'asc' ? 1 : 0)
   
@@ -497,6 +503,22 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
           setSortBy('component')
           setSortOrder('asc')
           break
+        case '1':
+          e.preventDefault()
+          setFilterStatus(filterStatusRef.current === 'healthy' ? 'all' : 'healthy')
+          break
+        case '2':
+          e.preventDefault()
+          setFilterStatus(filterStatusRef.current === 'degraded' ? 'all' : 'degraded')
+          break
+        case '3':
+          e.preventDefault()
+          setFilterStatus(filterStatusRef.current === 'unhealthy' ? 'all' : 'unhealthy')
+          break
+        case '0':
+          e.preventDefault()
+          setFilterStatus('all')
+          break
       }
     }
     
@@ -663,10 +685,10 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
                       onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
                       className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="all">All Statuses</option>
-                      <option value="healthy">Healthy</option>
-                      <option value="degraded">Degraded</option>
-                      <option value="unhealthy">Unhealthy</option>
+                      <option value="all">All Statuses (0)</option>
+                      <option value="healthy">Healthy (1)</option>
+                      <option value="degraded">Degraded (2)</option>
+                      <option value="unhealthy">Unhealthy (3)</option>
                     </select>
                   </div>
                   <div className="p-3 border-b border-slate-700">
@@ -1175,6 +1197,22 @@ ${filteredChecks.map(c => `| ${c.component} | ${getStatusEmoji(c.status)} ${c.st
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Search components</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">/</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Filter by Healthy (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">1</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Filter by Degraded (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">2</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Filter by Unhealthy (toggle)</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">3</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Clear status filter</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">0</kbd>
               </div>
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Toggle filters</span>

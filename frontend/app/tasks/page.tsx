@@ -166,6 +166,19 @@ export default function TasksPage() {
   // Filter panel ref for click outside
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts (to avoid dependency issues in useEffect)
+  const filterStatusRef = useRef(filterStatus)
+  const filterPriorityRef = useRef(filterPriority)
+  
+  // Sync refs with state
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
+  
+  useEffect(() => {
+    filterPriorityRef.current = filterPriority
+  }, [filterPriority])
+  
   // Calculate active filter count (includes sort state)
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (sortBy ? 1 : 0)
   
@@ -271,6 +284,48 @@ export default function TasksPage() {
         setSelectedRowIndex(-1)
         setShowExportMenu(false)
         setShowFilters(false)
+        break
+      // Number keys for status filtering (toggle)
+      // and Shift+number for priority filtering (toggle)
+      case '0':
+        e.preventDefault()
+        if (e.shiftKey) {
+          setFilterPriority('all')
+        } else {
+          setFilterStatus('all')
+        }
+        break
+      case '1':
+        e.preventDefault()
+        if (e.shiftKey) {
+          setFilterPriority(filterPriorityRef.current === 'high' ? 'all' : 'high')
+        } else {
+          setFilterStatus(filterStatusRef.current === 'overdue' ? 'all' : 'overdue')
+        }
+        break
+      case '2':
+        e.preventDefault()
+        if (e.shiftKey) {
+          setFilterPriority(filterPriorityRef.current === 'medium' ? 'all' : 'medium')
+        } else {
+          setFilterStatus(filterStatusRef.current === 'pending' ? 'all' : 'pending')
+        }
+        break
+      case '3':
+        e.preventDefault()
+        if (e.shiftKey) {
+          setFilterPriority(filterPriorityRef.current === 'low' ? 'all' : 'low')
+        } else {
+          setFilterStatus(filterStatusRef.current === 'in_progress' ? 'all' : 'in_progress')
+        }
+        break
+      case '5':
+        e.preventDefault()
+        setFilterStatus(filterStatusRef.current === 'completed' ? 'all' : 'completed')
+        break
+      case '6':
+        e.preventDefault()
+        setFilterStatus(filterStatusRef.current === 'blocked' ? 'all' : 'blocked')
         break
       case '?':
         if (e.shiftKey) {
@@ -1420,12 +1475,12 @@ export default function TasksPage() {
                     onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
                     className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
                   >
-                    <option value="all">All Status</option>
-                    <option value="overdue">⚠️ Overdue</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="blocked">Blocked</option>
+                    <option value="all">All Status (0)</option>
+                    <option value="overdue">⚠️ Overdue (1)</option>
+                    <option value="pending">Pending (2)</option>
+                    <option value="in_progress">In Progress (3)</option>
+                    <option value="completed">Completed (5)</option>
+                    <option value="blocked">Blocked (6)</option>
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1435,10 +1490,10 @@ export default function TasksPage() {
                     onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
                     className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
                   >
-                    <option value="all">All Priority</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
+                    <option value="all">All Priority (⇧0)</option>
+                    <option value="high">High (⇧1)</option>
+                    <option value="medium">Medium (⇧2)</option>
+                    <option value="low">Low (⇧3)</option>
                   </select>
                 </div>
                 {/* Sort Controls */}
@@ -2043,6 +2098,16 @@ export default function TasksPage() {
                   { keys: ['M'], desc: 'Export Markdown', category: 'Actions' },
                   { keys: ['P'], desc: 'Print tasks', category: 'Actions' },
                   { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
+                  { keys: ['1'], desc: 'Filter: Overdue (toggle)', category: 'Filter' },
+                  { keys: ['2'], desc: 'Filter: Pending (toggle)', category: 'Filter' },
+                  { keys: ['3'], desc: 'Filter: In Progress (toggle)', category: 'Filter' },
+                  { keys: ['0'], desc: 'Filter: All statuses', category: 'Filter' },
+                  { keys: ['5'], desc: 'Filter: Completed (toggle)', category: 'Filter' },
+                  { keys: ['6'], desc: 'Filter: Blocked (toggle)', category: 'Filter' },
+                  { keys: ['Shift', '1'], desc: 'Priority: High (toggle)', category: 'Filter' },
+                  { keys: ['Shift', '2'], desc: 'Priority: Medium (toggle)', category: 'Filter' },
+                  { keys: ['Shift', '3'], desc: 'Priority: Low (toggle)', category: 'Filter' },
+                  { keys: ['Shift', '0'], desc: 'Priority: All', category: 'Filter' },
                   { keys: ['Ctrl', 'A'], desc: 'Select all tasks', category: 'Selection' },
                   { keys: ['Ctrl', 'D'], desc: 'Delete selected', category: 'Selection' },
                   { keys: ['Esc'], desc: 'Clear selection', category: 'Selection' },

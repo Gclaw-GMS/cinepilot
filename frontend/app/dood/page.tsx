@@ -203,7 +203,7 @@ export default function DOODPage() {
       setIsDemoMode(true)
     }
     setLoading(false)
-  }, [selectedProject])
+  }, [selectedProject, filterRole, sortBy, sortOrder])
 
   // Reload DOOD when filters or sort change (to use server-side filtering)
   useEffect(() => {

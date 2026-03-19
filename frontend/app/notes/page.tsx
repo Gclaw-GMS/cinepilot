@@ -137,6 +137,19 @@ export default function NotesPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts (to avoid dependency issues)
+  const showFilterPanelRef = useRef(showFilterPanel)
+  const filterCategoryRef = useRef(filterCategory)
+  
+  // Keep refs in sync with state for keyboard shortcuts
+  useEffect(() => {
+    showFilterPanelRef.current = showFilterPanel
+  }, [showFilterPanel])
+
+  useEffect(() => {
+    filterCategoryRef.current = filterCategory
+  }, [filterCategory])
+  
   // Calculate active filter count (including sort state)
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -330,18 +343,24 @@ export default function NotesPage() {
             handleDuplicateRef.current(selectedNoteRef.current)
           }
           break
-        // Number keys 1-6 for quick category filter
+        // Number keys 1-6 for quick category filter (toggle behavior)
         case '1':
         case '2':
         case '3':
         case '4':
         case '5':
         case '6':
+        case '0':
           e.preventDefault()
-          const categoryKeys = ['general', 'production', 'creative', 'technical', 'logistics', 'budget']
-          const numIndex = parseInt(e.key) - 1
-          if (numIndex >= 0 && numIndex < categoryKeys.length) {
-            setFilterCategory(filterCategory === categoryKeys[numIndex] ? 'all' : categoryKeys[numIndex])
+          if (e.key === '0') {
+            setFilterCategory('all')
+          } else {
+            const categoryKeys = ['general', 'production', 'creative', 'technical', 'logistics', 'budget']
+            const numIndex = parseInt(e.key) - 1
+            if (numIndex >= 0 && numIndex < categoryKeys.length) {
+              // Toggle behavior: if same category already selected, clear it
+              setFilterCategory(filterCategoryRef.current === categoryKeys[numIndex] ? 'all' : categoryKeys[numIndex])
+            }
           }
           break
         case 'escape':
@@ -1179,6 +1198,7 @@ export default function NotesPage() {
                 <option key={cat.value} value={cat.value}>{cat.label} ({idx + 1})</option>
               ))}
             </select>
+            <span className="text-xs text-amber-400">(1-6 to filter)</span>
           </div>
           {/* Bulk Selection Buttons */}
           <div className="flex items-center gap-2">
@@ -1646,7 +1666,8 @@ export default function NotesPage() {
                 { key: 'E', action: 'Export notes' },
                 { key: 'M', action: 'Export as Markdown' },
                 { key: 'O', action: 'Print notes report' },
-                { key: '1-6', action: 'Filter by category' },
+                { key: '1-6', action: 'Filter by category (toggle)' },
+                { key: '0', action: 'Clear category filter' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Ctrl+A', action: 'Select all notes' },
                 { key: 'Ctrl+D', action: 'Delete selected notes' },

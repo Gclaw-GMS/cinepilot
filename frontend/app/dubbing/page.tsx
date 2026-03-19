@@ -1320,6 +1320,15 @@ export default function DubbingPage() {
                   <span className="text-slate-300">Show shortcuts</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
                 </div>
+                {/* View Mode Shortcuts */}
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-green-400">List View</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-green-400">L</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-green-400">Analytics View</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-green-400">A</kbd>
+                </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-indigo-400">Filter: Telugu (toggle)</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">1</kbd>

@@ -1,5 +1,68 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (6:43 PM) - Timeline Page Context-Aware Number Key Shortcuts IMPLEMENTED
+
+### 6:43 PM - Timeline Page - Context-Aware Number Key Shortcuts with Toggle Behavior (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Timeline Page - Context-Aware Number Key Shortcuts**: Added context-aware behavior for number keys that works differently based on filter panel state
+
+### Feature Details
+- **Number Keys 1-3 (Filters Closed)**: Switch between views
+  - 1 = Timeline view
+  - 2 = Gantt view
+  - 3 = Calendar view
+- **Number Keys 1-4 (Filters Open)**: Filter by production type with toggle behavior
+  - 1 = All types (show all)
+  - 2 = Pre-production (toggle)
+  - 3 = Production (toggle)
+  - 4 = Post-production (toggle)
+- **Key 0**: Clear type filter when filters panel is open
+- **Shift+Number (1-6)**: Sort options when filters panel is open
+  - Shift+1 = Sort by phase
+  - Shift+2 = Sort by type
+  - Shift+3 = Sort by status
+  - Shift+4 = Sort by date
+  - Shift+5 = Sort by scenes
+  - Shift+6 = Sort by duration
+- **Context-Aware Behavior**: 
+  - When filters panel CLOSED: Number keys switch views
+  - When filters panel OPEN: Number keys filter by type
+- **Visual Enhancement**: Added cyan shortcut hint "(1-4 for type filter, 0 to clear, Shift+1-6 for sort)" in filter panel header
+- **Keyboard Help Updated**: Updated with color-coded sections (amber for filters closed, cyan for filters open, emerald for sort options)
+
+### Technical Implementation
+- Added filterTypeRef, sortByRef, sortOrderRef using useRef pattern
+- Added useEffect hooks to sync refs with state
+- Modified keyboard handler to support context-aware behavior
+- Uses filterTypeRef.current to check current filter before setting new one
+- If same filter is already selected, it clears to 'all'
+- Consistent with other pages (progress, notifications, health, notes, whatsapp, dubbing, analytics)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Pre-existing warning in dood page (unrelated) ✅
+
+### Timeline Page Context-Aware Number Key Shortcuts Feature Checklist
+- [x] Feature works 100% (context-aware number keys functional)
+- [x] Number keys 1-3 switch views when filter panel closed
+- [x] Number keys 1-4 filter by type when filter panel open
+- [x] Toggle behavior when filter panel open (press again to clear)
+- [x] Number key 0 clears type filter
+- [x] Shift+Number keys 1-6 for sorting when filter panel open
+- [x] Opens filter panel when closed (context-aware behavior)
+- [x] Visual shortcut hint in filter panel header (cyan text)
+- [x] Keyboard help modal updated with context-aware behavior description
+- [x] Color coded sections (amber for filters closed, cyan for filters open, emerald for sort)
+- [x] Consistent with other pages
+- [x] Build passes ✅
+- [x] TypeScript passes ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (6:03 PM) - Progress Page Context-Aware Number Key Shortcuts IMPLEMENTED
 
 ### 6:03 PM - Progress Page - Context-Aware Number Key Shortcuts with Toggle Behavior (IMPLEMENTED)

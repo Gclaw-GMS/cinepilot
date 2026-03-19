@@ -219,6 +219,29 @@ export default function ScriptsPage() {
   const handlePrintRef = useRef<() => void>()
   const handleExportMarkdownRef = useRef<() => void>(() => {})
 
+  // Refs for keyboard shortcut accessibility
+  const showFiltersRef = useRef(showFilters)
+  const intExtFilterRef = useRef(intExtFilter)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+
+  // Sync refs with state
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+
+  useEffect(() => {
+    intExtFilterRef.current = intExtFilter
+  }, [intExtFilter])
+
+  useEffect(() => {
+    sortByRef.current = sortBy
+  }, [sortBy])
+
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
+
   // Active script
   const activeScript = scripts[0]
   
@@ -231,6 +254,60 @@ export default function ScriptsPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      // Context-aware number keys
+      if (e.key >= '1' && e.key <= '9') {
+        const num = parseInt(e.key)
+        
+        // When filter panel is OPEN: number keys filter by intExt or sort
+        if (showFiltersRef.current) {
+          e.preventDefault()
+          
+          // Keys 1-3: Filter by Interior/Exterior (toggle)
+          if (num >= 1 && num <= 3) {
+            const intExtOptions = ['all', 'INT', 'EXT']
+            const target = intExtOptions[num - 1]
+            const current = intExtFilterRef.current
+            
+            // Toggle: if same filter selected, clear to 'all'
+            setIntExtFilter(current === target ? 'all' : target)
+            return
+          }
+          
+          // Keys 4-8: Sort by options (Shift required)
+          if (e.shiftKey && num >= 1 && num <= 5) {
+            e.preventDefault()
+            const sortOptions: Array<'sceneNumber' | 'location' | 'timeOfDay' | 'characters' | 'confidence'> = 
+              ['sceneNumber', 'location', 'timeOfDay', 'characters', 'confidence']
+            setSortBy(sortOptions[num - 1])
+            return
+          }
+          
+          // Key 0: Clear intExt filter
+          if (num === 0) {
+            e.preventDefault()
+            setIntExtFilter('all')
+            return
+          }
+          
+          return
+        }
+        
+        // When filter panel is CLOSED: number keys switch tabs
+        e.preventDefault()
+        const tabs: ActiveTab[] = ['upload', 'scenes', 'characters', 'quality', 'warnings', 'compare', 'analytics']
+        if (num >= 1 && num <= tabs.length) {
+          setActiveTab(tabs[num - 1])
+        }
+        return
+      }
+      
+      // Shift+0 clears sort
+      if (e.shiftKey && e.key === '0') {
+        e.preventDefault()
+        setSortBy('sceneNumber')
         return
       }
       
@@ -276,34 +353,6 @@ export default function ScriptsPage() {
           setIntExtFilter('all')
           setSortBy('sceneNumber')
           setSortOrder('asc')
-          break
-        case '1':
-          e.preventDefault()
-          setActiveTab('upload')
-          break
-        case '2':
-          e.preventDefault()
-          setActiveTab('scenes')
-          break
-        case '3':
-          e.preventDefault()
-          setActiveTab('characters')
-          break
-        case '4':
-          e.preventDefault()
-          setActiveTab('quality')
-          break
-        case '5':
-          e.preventDefault()
-          setActiveTab('warnings')
-          break
-        case '6':
-          e.preventDefault()
-          setActiveTab('compare')
-          break
-        case '7':
-          e.preventDefault()
-          setActiveTab('analytics')
           break
       }
     }
@@ -1133,9 +1182,12 @@ Warnings: ${allWarnings.length}`
               )}
             </button>
             {showFilters && (
-              <div className="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                  <span className="text-sm font-medium">Filter & Sort</span>
+                  <div>
+                    <span className="text-sm font-medium">Filter & Sort</span>
+                    <span className="text-xs text-cyan-400 ml-2">(1-3 for int/ext, 4-8+Shift for sort, 0 to clear)</span>
+                  </div>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
@@ -1148,14 +1200,14 @@ Warnings: ${allWarnings.length}`
                 <div className="p-4 space-y-4">
                   {/* Sort Options */}
                   <div>
-                    <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Sort By</label>
+                    <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Sort By <span className="text-emerald-400 normal-case">(Shift+1-5)</span></label>
                     <div className="flex flex-wrap gap-2 mb-2">
                       {[
-                        { key: 'sceneNumber', label: 'Scene #' },
-                        { key: 'location', label: 'Location' },
-                        { key: 'timeOfDay', label: 'Time' },
-                        { key: 'characters', label: 'Chars' },
-                        { key: 'confidence', label: 'Confidence' },
+                        { key: 'sceneNumber', label: 'Scene #', shortcut: '1' },
+                        { key: 'location', label: 'Location', shortcut: '2' },
+                        { key: 'timeOfDay', label: 'Time', shortcut: '3' },
+                        { key: 'characters', label: 'Chars', shortcut: '4' },
+                        { key: 'confidence', label: 'Confidence', shortcut: '5' },
                       ].map(opt => (
                         <button
                           key={opt.key}
@@ -1166,7 +1218,7 @@ Warnings: ${allWarnings.length}`
                               : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
                           }`}
                         >
-                          {opt.label}
+                          {opt.label} <span className="text-emerald-400 ml-1">(Shift+{opt.shortcut})</span>
                         </button>
                       ))}
                     </div>
@@ -1195,12 +1247,12 @@ Warnings: ${allWarnings.length}`
                   
                   {/* Interior/Exterior Filter */}
                   <div>
-                    <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Interior/Exterior</label>
+                    <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Interior/Exterior <span className="text-cyan-400 normal-case">(1-3, 0 to clear)</span></label>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        { key: 'all', label: 'All' },
-                        { key: 'INT', label: 'Interior' },
-                        { key: 'EXT', label: 'Exterior' },
+                        { key: 'all', label: 'All', shortcut: '1' },
+                        { key: 'INT', label: 'Interior', shortcut: '2' },
+                        { key: 'EXT', label: 'Exterior', shortcut: '3' },
                       ].map(opt => (
                         <button
                           key={opt.key}
@@ -1211,7 +1263,7 @@ Warnings: ${allWarnings.length}`
                               : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
                           }`}
                         >
-                          {opt.label}
+                          {opt.label} <span className="text-cyan-400 ml-1">({opt.shortcut})</span>
                         </button>
                       ))}
                     </div>
@@ -1913,7 +1965,7 @@ Warnings: ${allWarnings.length}`
       {/* Keyboard Help Modal */}
       {showKeyboardHelp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Keyboard className="w-5 h-5" /> Keyboard Shortcuts
@@ -1922,30 +1974,73 @@ Warnings: ${allWarnings.length}`
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-2 text-sm">
-              {[
-                { key: 'R', action: 'Refresh scripts' },
-                { key: 'E', action: 'Export menu' },
-                { key: 'M', action: 'Export Markdown' },
-                { key: 'P', action: 'Print script' },
-                { key: 'F', action: 'Toggle filters' },
-                { key: 'S', action: 'Toggle sort order' },
-                { key: '/', action: 'Focus search' },
-                { key: '1', action: 'Upload tab' },
-                { key: '2', action: 'Scenes tab' },
-                { key: '3', action: 'Characters tab' },
-                { key: '4', action: 'Quality tab' },
-                { key: '5', action: 'Warnings tab' },
-                { key: '6', action: 'Compare tab' },
-                { key: '7', action: 'Analytics tab' },
-                { key: '?', action: 'Show this help' },
-                { key: 'Esc', action: 'Close modal / Clear filters' },
-              ].map(({ key, action }) => (
-                <div key={key} className="flex justify-between items-center py-2 border-b border-gray-800 last:border-0">
-                  <span className="text-gray-400">{action}</span>
-                  <kbd className="px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs font-mono">{key}</kbd>
-                </div>
-              ))}
+            
+            {/* Filters Closed - Tab Switching */}
+            <div className="mb-4">
+              <p className="text-xs text-amber-400 mb-2 uppercase tracking-wider">When Filters Closed (1-7: Switch Tabs)</p>
+              <div className="space-y-1 text-sm">
+                {[
+                  { key: '1', action: 'Upload tab' },
+                  { key: '2', action: 'Scenes tab' },
+                  { key: '3', action: 'Characters tab' },
+                  { key: '4', action: 'Quality tab' },
+                  { key: '5', action: 'Warnings tab' },
+                  { key: '6', action: 'Compare tab' },
+                  { key: '7', action: 'Analytics tab' },
+                ].map(({ key, action }) => (
+                  <div key={key} className="flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
+                    <span className="text-gray-400">{action}</span>
+                    <kbd className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">{key}</kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Filters Open - Filtering & Sorting */}
+            <div className="mb-4">
+              <p className="text-xs text-cyan-400 mb-2 uppercase tracking-wider">When Filters Open (1-3: Int/Ext, Shift+1-5: Sort)</p>
+              <div className="space-y-1 text-sm">
+                {[
+                  { key: '1', action: 'Show All', color: 'text-cyan-400' },
+                  { key: '2', action: 'Interior (INT)', color: 'text-cyan-400' },
+                  { key: '3', action: 'Exterior (EXT)', color: 'text-cyan-400' },
+                  { key: '0', action: 'Clear int/ext filter', color: 'text-cyan-400' },
+                  { key: 'Shift+1', action: 'Sort by Scene #', color: 'text-emerald-400' },
+                  { key: 'Shift+2', action: 'Sort by Location', color: 'text-emerald-400' },
+                  { key: 'Shift+3', action: 'Sort by Time', color: 'text-emerald-400' },
+                  { key: 'Shift+4', action: 'Sort by Characters', color: 'text-emerald-400' },
+                  { key: 'Shift+5', action: 'Sort by Confidence', color: 'text-emerald-400' },
+                  { key: 'Shift+0', action: 'Clear sort', color: 'text-emerald-400' },
+                ].map(({ key, action, color }) => (
+                  <div key={key} className="flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
+                    <span className={`${color || 'text-gray-400'}`}>{action}</span>
+                    <kbd className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">{key}</kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* General Shortcuts */}
+            <div>
+              <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">General Shortcuts</p>
+              <div className="space-y-1 text-sm">
+                {[
+                  { key: 'R', action: 'Refresh scripts' },
+                  { key: 'E', action: 'Export menu' },
+                  { key: 'M', action: 'Export Markdown' },
+                  { key: 'P', action: 'Print script' },
+                  { key: 'F', action: 'Toggle filters' },
+                  { key: 'S', action: 'Toggle sort order' },
+                  { key: '/', action: 'Focus search' },
+                  { key: '?', action: 'Show this help' },
+                  { key: 'Esc', action: 'Close modal / Clear filters' },
+                ].map(({ key, action }) => (
+                  <div key={key} className="flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
+                    <span className="text-gray-400">{action}</span>
+                    <kbd className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">{key}</kbd>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

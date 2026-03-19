@@ -170,6 +170,15 @@ export default function NotesPage() {
     setSortOrder('desc')
   }
   
+  // Tab state for view switching
+  const [activeTab, setActiveTab] = useState<'all' | 'pinned' | 'recent' | 'analytics'>('all')
+  const activeTabRef = useRef(activeTab)
+  
+  // Keep activeTab ref in sync
+  useEffect(() => {
+    activeTabRef.current = activeTab
+  }, [activeTab])
+  
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
@@ -343,7 +352,7 @@ export default function NotesPage() {
             handleDuplicateRef.current(selectedNoteRef.current)
           }
           break
-        // Number keys 1-6 for quick category filter (toggle behavior)
+        // Context-aware number keys
         case '1':
         case '2':
         case '3':
@@ -352,14 +361,28 @@ export default function NotesPage() {
         case '6':
         case '0':
           e.preventDefault()
-          if (e.key === '0') {
-            setFilterCategory('all')
+          const num = parseInt(e.key)
+          
+          if (showFilterPanelRef.current) {
+            // When filters panel OPEN: number keys filter by category (toggle behavior)
+            if (num === 0) {
+              setFilterCategory('all')
+            } else {
+              const categoryKeys = ['general', 'production', 'creative', 'technical', 'logistics', 'budget']
+              const numIndex = num - 1
+              if (numIndex >= 0 && numIndex < categoryKeys.length) {
+                // Toggle behavior: if same category already selected, clear it
+                setFilterCategory(filterCategoryRef.current === categoryKeys[numIndex] ? 'all' : categoryKeys[numIndex])
+              }
+            }
           } else {
-            const categoryKeys = ['general', 'production', 'creative', 'technical', 'logistics', 'budget']
-            const numIndex = parseInt(e.key) - 1
-            if (numIndex >= 0 && numIndex < categoryKeys.length) {
-              // Toggle behavior: if same category already selected, clear it
-              setFilterCategory(filterCategoryRef.current === categoryKeys[numIndex] ? 'all' : categoryKeys[numIndex])
+            // When filters panel CLOSED: number keys switch tabs
+            if (num >= 1 && num <= 4) {
+              const tabs: Array<'all' | 'pinned' | 'recent' | 'analytics'> = ['all', 'pinned', 'recent', 'analytics']
+              setActiveTab(tabs[num - 1])
+            } else if (num === 0) {
+              // 0 clears category filter
+              setFilterCategory('all')
             }
           }
           break
@@ -429,7 +452,20 @@ export default function NotesPage() {
         note.content.toLowerCase().includes(search.toLowerCase()) ||
         note.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
       const matchCategory = filterCategory === 'all' || note.category === filterCategory
-      return matchSearch && matchCategory
+      
+      // Apply tab filter
+      let matchTab = true
+      if (activeTab === 'pinned') {
+        matchTab = note.isPinned === true
+      } else if (activeTab === 'recent') {
+        // Show notes from last 7 days
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        matchTab = new Date(note.updatedAt) >= sevenDaysAgo
+      }
+      // 'all' and 'analytics' tabs don't filter
+      
+      return matchSearch && matchCategory && matchTab
     })
     
     // Apply sorting
@@ -453,7 +489,7 @@ export default function NotesPage() {
     })
     
     return result
-  }, [notes, search, filterCategory, sortBy, sortOrder])
+  }, [notes, search, filterCategory, sortBy, sortOrder, activeTab])
 
   const pinnedNotes = filteredNotes.filter(n => n.isPinned)
   const regularNotes = filteredNotes.filter(n => !n.isPinned)
@@ -1154,6 +1190,37 @@ export default function NotesPage() {
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-1 mb-6 bg-slate-900/50 p-1 rounded-xl border border-slate-800 w-fit">
+          {[
+            { id: 'all', label: 'All Notes', icon: StickyNote },
+            { id: 'pinned', label: 'Pinned', icon: AlertCircle },
+            { id: 'recent', label: 'Recent', icon: Clock },
+            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+              {tab.id === 'pinned' && pinnedNotes.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
+                  {pinnedNotes.length}
+                </span>
+              )}
+            </button>
+          ))}
+          {!showFilterPanel && (
+            <span className="ml-3 text-xs text-cyan-400">(1-4 to switch tabs)</span>
+          )}
+        </div>
+
         {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
@@ -1198,7 +1265,7 @@ export default function NotesPage() {
                 <option key={cat.value} value={cat.value}>{cat.label} ({idx + 1})</option>
               ))}
             </select>
-            <span className="text-xs text-amber-400">(1-6 to filter)</span>
+            <span className="text-xs text-amber-400">{showFilterPanel ? '(1-6 to filter, 0 to clear)' : '(F to open filters)'}</span>
           </div>
           {/* Bulk Selection Buttons */}
           <div className="flex items-center gap-2">
@@ -1376,6 +1443,123 @@ export default function NotesPage() {
           </div>
         )}
 
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && !loading && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-slate-400">Total Notes</span>
+                  <StickyNote className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="text-3xl font-bold text-white">{notes.length}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-slate-400">Pinned</span>
+                  <AlertCircle className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="text-3xl font-bold text-amber-400">{pinnedNotes.length}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-slate-400">Categories</span>
+                  <Tag className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div className="text-3xl font-bold text-indigo-400">{categoryData.length}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-slate-400">Total Tags</span>
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="text-3xl font-bold text-emerald-400">{tagData.length}</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Category Distribution */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Notes by Category</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        itemStyle={{ color: '#f1f5f9' }}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              
+              {/* Timeline Chart */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Notes Over Time</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={timelineData}>
+                      <defs>
+                        <linearGradient id="colorNotes" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                      <YAxis stroke="#64748b" fontSize={12} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        itemStyle={{ color: '#f1f5f9' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="notes"
+                        stroke="#8b5cf6"
+                        fillOpacity={1}
+                        fill="url(#colorNotes)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+            
+            {/* Top Tags */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Top Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {tagData.map((tag, idx) => (
+                  <span
+                    key={tag.name}
+                    className="px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-full text-sm flex items-center gap-2"
+                  >
+                    #{tag.name}
+                    <span className="text-xs text-indigo-300">{tag.value}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Notes List (for non-analytics tabs) */}
+        {activeTab !== 'analytics' && (
+          <>
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
@@ -1441,6 +1625,8 @@ export default function NotesPage() {
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </div>
 
@@ -1655,6 +1841,44 @@ export default function NotesPage() {
               </button>
             </div>
             <div className="space-y-3">
+              {/* Tabs Section (when filters closed) */}
+              <div className="mb-4">
+                <span className="text-xs text-amber-400 font-medium uppercase tracking-wider">When Filters Closed</span>
+              </div>
+              {[
+                { key: '1', action: 'All Notes tab' },
+                { key: '2', action: 'Pinned tab' },
+                { key: '3', action: 'Recent tab' },
+                { key: '4', action: 'Analytics tab' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-amber-600/20 border border-amber-600/30 rounded text-xs font-mono text-amber-400">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+              
+              {/* Filter Section (when filters open) */}
+              <div className="mb-4 mt-4 pt-4 border-t border-slate-800">
+                <span className="text-xs text-cyan-400 font-medium uppercase tracking-wider">When Filters Open</span>
+              </div>
+              {[
+                { key: '1-6', action: 'Filter by category (toggle)', color: 'cyan' },
+                { key: '0', action: 'Clear category filter', color: 'cyan' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-cyan-600/20 border border-cyan-600/30 rounded text-xs font-mono text-cyan-400">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+              
+              {/* General Shortcuts */}
+              <div className="mb-4 mt-4 pt-4 border-t border-slate-800">
+                <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">General</span>
+              </div>
               {[
                 { key: 'R', action: 'Refresh notes' },
                 { key: '/', action: 'Focus search' },
@@ -1666,8 +1890,6 @@ export default function NotesPage() {
                 { key: 'E', action: 'Export notes' },
                 { key: 'M', action: 'Export as Markdown' },
                 { key: 'O', action: 'Print notes report' },
-                { key: '1-6', action: 'Filter by category (toggle)' },
-                { key: '0', action: 'Clear category filter' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Ctrl+A', action: 'Select all notes' },
                 { key: 'Ctrl+D', action: 'Delete selected notes' },

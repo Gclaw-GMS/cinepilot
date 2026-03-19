@@ -224,6 +224,14 @@ export default function VfxPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
+  const showFiltersRef = useRef(showFilters);
+  const typeFilterRef = useRef(typeFilter);
+  const complexityFilterRef = useRef(complexityFilter);
+  
+  // Sync refs with state for keyboard shortcuts
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters]);
+  useEffect(() => { typeFilterRef.current = typeFilter }, [typeFilter]);
+  useEffect(() => { complexityFilterRef.current = complexityFilter }, [complexityFilter]);
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -301,21 +309,65 @@ export default function VfxPage() {
             setShowPrintMenu(prev => !prev)
           }
           break
+        // Context-aware number keys
         case '1':
-          e.preventDefault()
-          setActiveTab('overview')
-          break
         case '2':
-          e.preventDefault()
-          setActiveTab('scenes')
-          break
         case '3':
-          e.preventDefault()
-          setActiveTab('cost')
-          break
         case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
           e.preventDefault()
-          setActiveTab('conflicts')
+          const num = parseInt(e.key)
+          if (showFiltersRef.current) {
+            // When filter panel is OPEN: filter by type or complexity
+            // Type filter: 1-3 = CGI, Compositing, Wire Removal
+            // Complexity filter: Shift+1-3 = Simple, Moderate, Complex
+            if (e.shiftKey) {
+              // Shift+1-3: Complexity filter
+              if (num >= 1 && num <= 3) {
+                const complexityOptions = ['simple', 'moderate', 'complex']
+                const complexity = complexityOptions[num - 1]
+                // Toggle: if same complexity selected, clear to all
+                setComplexityFilter(complexityFilterRef.current === complexity ? 'all' : complexity)
+              } else if (num === 0) {
+                // Shift+0 clears complexity filter
+                setComplexityFilter('all')
+              }
+            } else {
+              // 1-8: Type filter
+              if (num >= 1 && num <= 8) {
+                const typeIndex = num - 1
+                const typeKey = VFX_CATEGORIES[typeIndex]?.key
+                if (typeKey) {
+                  // Toggle: if same type selected, clear to all
+                  setTypeFilter(typeFilterRef.current === typeKey ? 'all' : typeKey)
+                }
+              } else if (num === 0) {
+                // 0 clears type filter
+                setTypeFilter('all')
+              }
+            }
+          } else {
+            // When filter panel is CLOSED: switch tabs
+            switch (e.key) {
+              case '1':
+                setActiveTab('overview')
+                break
+              case '2':
+                setActiveTab('scenes')
+                break
+              case '3':
+                setActiveTab('cost')
+                break
+              case '4':
+                setActiveTab('conflicts')
+                break
+            }
+          }
           break
       }
     }
@@ -2232,6 +2284,8 @@ export default function VfxPage() {
                 </button>
               </div>
               <div className="space-y-2">
+                {/* When filters panel CLOSED */}
+                <div className="text-xs font-medium text-amber-400 mt-3 mb-1">When filters panel CLOSED:</div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Refresh data</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
@@ -2280,12 +2334,73 @@ export default function VfxPage() {
                   <span className="text-slate-300">Conflicts tab</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
                 </div>
+                
+                {/* When filters panel OPEN */}
+                <div className="text-xs font-medium text-cyan-400 mt-3 mb-1">When filters panel OPEN:</div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: CGI (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Compositing (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Wire Removal (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Matte Painting (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Simulation (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">5</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Enhancement (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">6</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Explicit VFX (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">7</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Implied VFX (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">8</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Clear type filter</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">0</kbd>
+                </div>
+                
+                {/* Complexity filters with Shift */}
+                <div className="text-xs font-medium text-emerald-400 mt-3 mb-1">Complexity filters (Shift+key):</div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Simple (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Shift+1</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Moderate (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Shift+2</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Filter: Complex (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Shift+3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Clear complexity filter</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Shift+0</kbd>
+                </div>
+                
+                {/* General shortcuts */}
+                <div className="text-xs font-medium text-slate-400 mt-3 mb-1">General:</div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Show shortcuts</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-slate-300">Close / Clear filters</span>
+                  <span className="text-slate-300">Close / Clear</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
                 </div>
               </div>

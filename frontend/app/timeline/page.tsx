@@ -71,6 +71,9 @@ export default function TimelinePage() {
   const showExportMenuRef = useRef(showExportMenu);
   const showFiltersRef = useRef(showFilters);
   const showPrintMenuRef = useRef(showPrintMenu);
+  const filterTypeRef = useRef(filterType);
+  const sortByRef = useRef(sortBy);
+  const sortOrderRef = useRef(sortOrder);
   
   // Update refs when state changes
   useEffect(() => {
@@ -84,6 +87,18 @@ export default function TimelinePage() {
   useEffect(() => {
     showPrintMenuRef.current = showPrintMenu;
   }, [showPrintMenu]);
+  
+  useEffect(() => {
+    filterTypeRef.current = filterType;
+  }, [filterType]);
+  
+  useEffect(() => {
+    sortByRef.current = sortBy;
+  }, [sortBy]);
+  
+  useEffect(() => {
+    sortOrderRef.current = sortOrder;
+  }, [sortOrder]);
   
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
@@ -651,13 +666,48 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
           searchInputRef.current?.focus();
           break;
         case '1':
-          setViewMode('timeline');
+          e.preventDefault();
+          if (showFiltersRef.current) {
+            // When filters open: Show all types
+            setFilterType('all');
+          } else {
+            // When filters closed: Switch to timeline view
+            setViewMode('timeline');
+          }
           break;
         case '2':
-          setViewMode('gantt');
+          e.preventDefault();
+          if (showFiltersRef.current) {
+            // When filters open: Filter by pre-production
+            setFilterType(prev => prev === 'pre-production' ? 'all' : 'pre-production');
+          } else {
+            // When filters closed: Switch to gantt view
+            setViewMode('gantt');
+          }
           break;
         case '3':
-          setViewMode('calendar');
+          e.preventDefault();
+          if (showFiltersRef.current) {
+            // When filters open: Filter by production
+            setFilterType(prev => prev === 'production' ? 'all' : 'production');
+          } else {
+            // When filters closed: Switch to calendar view
+            setViewMode('calendar');
+          }
+          break;
+        case '4':
+          e.preventDefault();
+          if (showFiltersRef.current) {
+            // When filters open: Filter by post-production
+            setFilterType(prev => prev === 'post-production' ? 'all' : 'post-production');
+          }
+          break;
+        case '0':
+          e.preventDefault();
+          if (showFiltersRef.current) {
+            // When filters open: Clear type filter
+            setFilterType('all');
+          }
           break;
         case 'f':
           e.preventDefault();
@@ -692,6 +742,35 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
         case 'p':
           if (!printingRef.current) {
             handlePrintRef.current?.();
+          }
+          break;
+        // Shift+Number keys for sorting options (when filters open)
+        case '!':
+        case '@':
+        case '#':
+        case '$':
+        case '%':
+        case '^':
+          if (showFiltersRef.current) {
+            e.preventDefault();
+            const sortKeys: Record<string, 'phase' | 'type' | 'status' | 'date' | 'scenes' | 'duration'> = {
+              '!': 'phase',
+              '@': 'type',
+              '#': 'status',
+              '$': 'date',
+              '%': 'scenes',
+              '^': 'duration'
+            };
+            const newSort = sortKeys[e.key];
+            if (newSort) {
+              // If same sort key, toggle order; otherwise set new sort and asc order
+              if (sortByRef.current === newSort) {
+                setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy(newSort);
+                setSortOrder('asc');
+              }
+            }
           }
           break;
       }
@@ -1157,6 +1236,13 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
               >
                 <div className="flex items-center gap-6 pt-4 mt-4 border-t border-slate-800">
                   <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-purple-400" />
+                    <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
+                    <span className="text-xs text-cyan-400 ml-2">(1-4 for type filter, 0 to clear, Shift+1-6 for sort)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6 pt-2">
+                  <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-400">Type:</span>
                     <select
                       value={filterType}
@@ -1344,18 +1430,78 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                     <span className="text-slate-300">Focus search input</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">/</kbd>
                   </div>
+                  
+                  {/* View Mode Shortcuts (When filters closed) */}
+                  <div className="mt-4 pt-3 border-t border-slate-700">
+                    <p className="text-xs text-amber-400 mb-2">When filters closed:</p>
+                  </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Switch to Timeline view</span>
-                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">1</kbd>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-amber-400">1</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Switch to Gantt view</span>
-                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">2</kbd>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-amber-400">2</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Switch to Calendar view</span>
-                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">3</kbd>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-amber-400">3</kbd>
                   </div>
+                  
+                  {/* Filter Shortcuts (When filters open) */}
+                  <div className="mt-4 pt-3 border-t border-slate-700">
+                    <p className="text-xs text-cyan-400 mb-2">When filters open:</p>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Show all types</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-cyan-400">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Filter pre-production (toggle)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-cyan-400">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Filter production (toggle)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-cyan-400">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Filter post-production (toggle)</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-cyan-400">4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Clear type filter</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-cyan-400">0</kbd>
+                  </div>
+                  
+                  {/* Sort Shortcuts (When filters open) */}
+                  <div className="mt-4 pt-3 border-t border-slate-700">
+                    <p className="text-xs text-emerald-400 mb-2">When filters open, sort by:</p>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Sort by phase</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">⇧+1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Sort by type</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">⇧+2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Sort by status</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">⇧+3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Sort by date</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">⇧+4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Sort by scenes</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">⇧+5</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Sort by duration</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">⇧+6</kbd>
+                  </div>
+                  
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Toggle filters</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">F</kbd>

@@ -8904,3 +8904,72 @@ Added a comprehensive conflict detection system to the Catering page:
 - [x] Lint passes ✅
 - [x] Pushed to origin/master ✅
 
+
+---
+
+## Build Status: ✅ PASSING (7:43 PM) - Scripts Page Context-Aware Number Key Shortcuts IMPLEMENTED
+
+### 7:43 PM - Scripts Page - Context-Aware Number Key Shortcuts with Toggle Behavior (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Scripts Page - Context-Aware Number Key Shortcuts**: Added context-aware behavior for number keys that works differently based on filter panel state
+
+### Feature Details
+- **Number Keys 1-7 (Filters Closed)**: Switch between tabs
+  - 1 = Upload tab
+  - 2 = Scenes tab
+  - 3 = Characters tab
+  - 4 = Quality tab
+  - 5 = Warnings tab
+  - 6 = Compare tab
+  - 7 = Analytics tab
+- **Number Keys 1-3 (Filters Open)**: Filter by Interior/Exterior with toggle behavior
+  - 1 = All (show all)
+  - 2 = Interior (toggle)
+  - 3 = Exterior (toggle)
+- **Key 0**: Clear int/ext filter when filters panel is open
+- **Shift+Number (1-5)**: Sort options when filters panel is open
+  - Shift+1 = Sort by scene number
+  - Shift+2 = Sort by location
+  - Shift+3 = Sort by time
+  - Shift+4 = Sort by characters
+  - Shift+5 = Sort by confidence
+- **Shift+0**: Clear sort
+- **Context-Aware Behavior**: 
+  - When filters panel CLOSED: Number keys switch tabs
+  - When filters panel OPEN: Number keys filter by int/ext, Shift+Number for sort
+- **Visual Enhancement**: Added shortcut hints in filter panel header (cyan for filters, emerald for sort)
+- **Keyboard Help Updated**: Updated with color-coded sections (amber for tabs, cyan for filters, emerald for sort)
+
+### Technical Implementation
+- Added showFiltersRef, intExtFilterRef, sortByRef, sortOrderRef using useRef pattern
+- Added useEffect hooks to sync refs with state
+- Modified keyboard handler to support context-aware behavior
+- Uses intExtFilterRef.current to check current filter before setting new one
+- Toggle behavior: if same filter is already selected, it clears to 'all'
+- Added shortcut hints to dropdown labels
+- Consistent with other pages (dubbing, health, notes, whatsapp, analytics, timeline, progress)
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Pre-existing warning in dood page (unrelated) ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Scripts Page Context-Aware Number Key Shortcuts Feature Checklist
+- [x] Feature works 100% (context-aware number keys functional)
+- [x] Number keys 1-7 switch tabs when filter panel closed
+- [x] Number keys 1-3 filter by int/ext when filter panel open
+- [x] Toggle behavior when filter panel open (press again to clear)
+- [x] Number key 0 clears int/ext filter
+- [x] Shift+1-5 sort options when filter panel open
+- [x] Shift+0 clears sort
+- [x] Visual shortcut hint in filter panel header (cyan + emerald text)
+- [x] Keyboard help modal updated with context-aware behavior description
+- [x] Color coded sections (amber for tabs, cyan for filters, emerald for sort)
+- [x] Shortcut hints in dropdown labels
+- [x] Consistent with other pages (dubbing, health, notes, whatsapp, analytics, timeline, progress)
+- [x] Build passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/master ✅

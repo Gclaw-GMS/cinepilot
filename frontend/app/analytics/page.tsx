@@ -174,6 +174,7 @@ export default function AnalyticsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -282,6 +283,7 @@ export default function AnalyticsPage() {
         setDashboard(dashData)
         setMetrics(metricsData)
         setIsDemoMode(dashData.isDemoMode === true || metricsData.isDemoMode === true)
+        setLastUpdated(new Date())
       }
     } catch (err) {
       console.error('Failed to fetch analytics:', err)
@@ -902,10 +904,43 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
-          <p className="text-slate-400">Loading analytics...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="h-10 w-64 bg-slate-700/50 rounded-lg animate-pulse mb-2" />
+            <div className="h-5 w-80 bg-slate-700/30 rounded animate-pulse" />
+          </div>
+          <div className="flex gap-3">
+            <div className="h-10 w-40 bg-slate-700/50 rounded-lg animate-pulse" />
+            <div className="h-10 w-24 bg-slate-700/50 rounded-lg animate-pulse" />
+          </div>
+        </div>
+        
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-slate-700/50 rounded-lg animate-pulse" />
+                <div className="h-4 w-20 bg-slate-700/30 rounded animate-pulse" />
+              </div>
+              <div className="h-8 w-24 bg-slate-700/50 rounded animate-pulse mb-2" />
+              <div className="h-3 w-32 bg-slate-700/30 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+        
+        {/* Charts Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 h-96">
+            <div className="h-6 w-40 bg-slate-700/50 rounded animate-pulse mb-4" />
+            <div className="h-72 bg-slate-700/30 rounded animate-pulse" />
+          </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 h-96">
+            <div className="h-6 w-40 bg-slate-700/50 rounded animate-pulse mb-4" />
+            <div className="h-72 bg-slate-700/30 rounded animate-pulse" />
+          </div>
         </div>
       </div>
     )
@@ -923,6 +958,7 @@ export default function AnalyticsPage() {
           <p className="text-slate-400 mt-1">
             Real-time insights into your film's production metrics
             {isDemoMode && <span className="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded">Demo Data</span>}
+            {!isDemoMode && <span className="ml-2 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded">Live Data</span>}
           </p>
         </div>
         
@@ -956,6 +992,11 @@ export default function AnalyticsPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          {lastUpdated && (
+            <span className="text-xs text-slate-500">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
           
           <div className="relative" ref={filterPanelRef}>
             <button

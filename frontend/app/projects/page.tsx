@@ -136,6 +136,18 @@ export default function ProjectsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Refs for context-aware keyboard shortcuts
+  const showFiltersRef = useRef(showFilters)
+  const filterStatusRef = useRef(filters.status)
+  const filterLanguageRef = useRef(filters.language)
+  const filterGenreRef = useRef(filters.genre)
+  
+  // Sync refs with state
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { filterStatusRef.current = filters.status }, [filters.status])
+  useEffect(() => { filterLanguageRef.current = filters.language }, [filters.language])
+  useEffect(() => { filterGenreRef.current = filters.genre }, [filters.genre])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -234,6 +246,127 @@ export default function ProjectsPage() {
     else if (e.key.toLowerCase() === 's') {
       e.preventDefault()
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+    }
+    // Context-aware number key shortcuts
+    // When filters panel CLOSED: Opens filter panel and applies filter
+    // When filters panel OPEN: Toggles filter (press again to clear)
+    else if (e.key === '1') {
+      e.preventDefault()
+      if (!showFiltersRef.current) {
+        // Filters closed: Open filter panel and filter by planning
+        setShowFilters(true)
+        setFilters(prev => ({ ...prev, status: ['planning'] }))
+      } else {
+        // Filters open: Toggle planning status using ref for current value
+        setFilters(prev => ({ 
+          ...prev, 
+          status: filterStatusRef.current.includes('planning') ? [] : ['planning'] 
+        }))
+      }
+    }
+    else if (e.key === '2') {
+      e.preventDefault()
+      if (!showFiltersRef.current) {
+        setShowFilters(true)
+        setFilters(prev => ({ ...prev, status: ['active'] }))
+      } else {
+        setFilters(prev => ({ 
+          ...prev, 
+          status: filterStatusRef.current.includes('active') ? [] : ['active'] 
+        }))
+      }
+    }
+    else if (e.key === '3') {
+      e.preventDefault()
+      if (!showFiltersRef.current) {
+        setShowFilters(true)
+        setFilters(prev => ({ ...prev, status: ['production'] }))
+      } else {
+        setFilters(prev => ({ 
+          ...prev, 
+          status: filterStatusRef.current.includes('production') ? [] : ['production'] 
+        }))
+      }
+    }
+    else if (e.key === '4') {
+      e.preventDefault()
+      if (!showFiltersRef.current) {
+        setShowFilters(true)
+        setFilters(prev => ({ ...prev, status: ['post_production'] }))
+      } else {
+        setFilters(prev => ({ 
+          ...prev, 
+          status: filterStatusRef.current.includes('post_production') ? [] : ['post_production'] 
+        }))
+      }
+    }
+    else if (e.key === '5') {
+      e.preventDefault()
+      if (!showFiltersRef.current) {
+        setShowFilters(true)
+        setFilters(prev => ({ ...prev, status: ['completed'] }))
+      } else {
+        setFilters(prev => ({ 
+          ...prev, 
+          status: filterStatusRef.current.includes('completed') ? [] : ['completed'] 
+        }))
+      }
+    }
+    else if (e.key === '0') {
+      e.preventDefault()
+      if (!showFiltersRef.current) {
+        // Filters closed: Open filter panel
+        setShowFilters(true)
+      } else {
+        // Filters open: Clear all filters
+        setFilters({ status: [], language: [], genre: [] })
+      }
+    }
+    // Shift+number for language filter (when filters open)
+    else if (e.shiftKey && e.key === '!') {
+      e.preventDefault()
+      if (showFiltersRef.current) {
+        setFilters(prev => ({ 
+          ...prev, 
+          language: filterLanguageRef.current.includes('tamil') ? [] : ['tamil'] 
+        }))
+      }
+    }
+    else if (e.shiftKey && e.key === '@') {
+      e.preventDefault()
+      if (showFiltersRef.current) {
+        setFilters(prev => ({ 
+          ...prev, 
+          language: filterLanguageRef.current.includes('hindi') ? [] : ['hindi'] 
+        }))
+      }
+    }
+    else if (e.shiftKey && e.key === '#') {
+      e.preventDefault()
+      if (showFiltersRef.current) {
+        setFilters(prev => ({ 
+          ...prev, 
+          language: filterLanguageRef.current.includes('telugu') ? [] : ['telugu'] 
+        }))
+      }
+    }
+    else if (e.shiftKey && e.key === '$') {
+      e.preventDefault()
+      if (showFiltersRef.current) {
+        setFilters(prev => ({ 
+          ...prev, 
+          language: filterLanguageRef.current.includes('malayalam') ? [] : ['malayalam'] 
+        }))
+      }
+    }
+    else if (e.shiftKey && e.key === '%') {
+      e.preventDefault()
+      if (showFiltersRef.current) {
+        setFilters(prev => ({ 
+          ...prev, 
+          language: filterLanguageRef.current.includes('english') ? [] : ['english'] 
+        }))
+      }
     }
     // Escape: Close modal / Clear search / Close export / Close filters
     else if (e.key === 'Escape') {
@@ -892,7 +1025,10 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
       {showFilters && (
         <div ref={filterPanelRef} className="mb-6 bg-slate-900/50 border border-slate-800 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-slate-300">Filter & Sort Projects</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-medium text-slate-300">Filter & Sort Projects</h3>
+              <span className="text-xs text-cyan-400">(1-5: status, 0: clear, Shift+1-5: language)</span>
+            </div>
             {activeFilterCount > 0 && (
               <button
                 onClick={() => {
@@ -1383,6 +1519,70 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
                   </kbd>
                 </div>
               ))}
+              
+              {/* Number key shortcuts section - Filters Closed */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <h4 className="text-xs text-amber-400 uppercase tracking-wider mb-3">When Filters Closed</h4>
+                {[
+                  { key: '1-5', description: 'Open filter & filter by status' },
+                  { key: '0', description: 'Open filter panel' },
+                ].map(({ key, description }) => (
+                  <div 
+                    key={key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-400 text-sm">{description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-400 font-mono text-xs">
+                      {key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+
+              {/* Number key shortcuts section - Filters Open */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <h4 className="text-xs text-cyan-400 uppercase tracking-wider mb-3">When Filters Open</h4>
+                {[
+                  { key: '1', description: 'Filter: Planning (toggle)' },
+                  { key: '2', description: 'Filter: Active (toggle)' },
+                  { key: '3', description: 'Filter: Production (toggle)' },
+                  { key: '4', description: 'Filter: Post Production (toggle)' },
+                  { key: '5', description: 'Filter: Completed (toggle)' },
+                  { key: '0', description: 'Clear all filters' },
+                ].map(({ key, description }) => (
+                  <div 
+                    key={key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-400 text-sm">{description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-400 font-mono text-xs">
+                      {key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+
+              {/* Shift+number for language filter */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <h4 className="text-xs text-emerald-400 uppercase tracking-wider mb-3">Language Filters (Shift+Key)</h4>
+                {[
+                  { key: 'Shift+1', description: 'Filter: Tamil' },
+                  { key: 'Shift+2', description: 'Filter: Hindi' },
+                  { key: 'Shift+3', description: 'Filter: Telugu' },
+                  { key: 'Shift+4', description: 'Filter: Malayalam' },
+                  { key: 'Shift+5', description: 'Filter: English' },
+                ].map(({ key, description }) => (
+                  <div 
+                    key={key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-400 text-sm">{description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-emerald-400 font-mono text-xs">
+                      {key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-800">

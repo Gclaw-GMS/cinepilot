@@ -99,7 +99,7 @@ export default function ContinuityPage() {
   const [sortBy, setSortBy] = useState<'scene' | 'severity' | 'type' | 'description'>('severity');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  // Refs
+  // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
@@ -107,6 +107,16 @@ export default function ContinuityPage() {
   const fetchDataRef = useRef<() => void | Promise<void>>();
   const selectedScriptRef = useRef(selectedScript);
   const printContinuityReportRef = useRef<() => void>();
+  const showFiltersRef = useRef(showFilters);
+  const severityFilterRef = useRef(severityFilter);
+  const typeFilterRef = useRef(typeFilter);
+  const activeTabRef = useRef(activeTab);
+
+  // Sync refs with state
+  useEffect(() => { showFiltersRef.current = showFilters; }, [showFilters]);
+  useEffect(() => { severityFilterRef.current = severityFilter; }, [severityFilter]);
+  useEffect(() => { typeFilterRef.current = typeFilter; }, [typeFilter]);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   
   // Historical and breakdown data
   const [historicalData] = useState(DEMO_HISTORICAL_DATA);
@@ -260,6 +270,68 @@ export default function ContinuityPage() {
         return;
       }
       
+      // Context-aware number keys: behave differently when filters panel is open
+      if (showFiltersRef.current) {
+        // When filters panel is OPEN: number keys filter by severity/type
+        const severityLevels = ['all', 'critical', 'high', 'medium', 'low'];
+        const typeLevels = ['all', 'continuity', 'plot_hole', 'character', 'timeline', 'dialogue'];
+        
+        // Number keys 1-5 for severity filter (when filters open)
+        if (e.key >= '1' && e.key <= '5' && !e.shiftKey) {
+          e.preventDefault();
+          const idx = parseInt(e.key);
+          const newSeverity = severityLevels[idx];
+          // Toggle behavior: if same filter, clear it
+          if (severityFilterRef.current === newSeverity) {
+            setSeverityFilter('all');
+          } else {
+            setSeverityFilter(newSeverity);
+          }
+          return;
+        }
+        
+        // Key 0 clears severity filter (when filters open)
+        if (e.key === '0') {
+          e.preventDefault();
+          setSeverityFilter('all');
+          return;
+        }
+        
+        // Shift+1-6 for type filter (when filters open)
+        if (e.shiftKey && e.key >= '1' && e.key <= '6') {
+          e.preventDefault();
+          const idx = parseInt(e.key);
+          const newType = typeLevels[idx];
+          // Toggle behavior: if same filter, clear it
+          if (typeFilterRef.current === newType) {
+            setTypeFilter('all');
+          } else {
+            setTypeFilter(newType);
+          }
+          return;
+        }
+        
+        // Shift+0 clears type filter (when filters open)
+        if (e.shiftKey && e.key === '0') {
+          e.preventDefault();
+          setTypeFilter('all');
+          return;
+        }
+      } else {
+        // When filters panel is CLOSED: number keys switch tabs
+        switch (e.key) {
+          case '1':
+            setActiveTab('overview');
+            break;
+          case '2':
+            setActiveTab('breakdown');
+            break;
+          case '3':
+            setActiveTab('trends');
+            break;
+        }
+      }
+      
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault();
@@ -268,15 +340,6 @@ export default function ContinuityPage() {
         case '/':
           e.preventDefault();
           searchInputRef.current?.focus();
-          break;
-        case '1':
-          setActiveTab('overview');
-          break;
-        case '2':
-          setActiveTab('breakdown');
-          break;
-        case '3':
-          setActiveTab('trends');
           break;
         case 'e':
           e.preventDefault();
@@ -782,6 +845,9 @@ export default function ContinuityPage() {
               {/* Filter & Sort Panel */}
               {showFilters && (
                 <div className="absolute right-0 top-full mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-4">
+                  <div className="mb-3 pb-2 border-b border-slate-700">
+                    <span className="text-xs text-cyan-400">Filters (1-5 for severity, Shift+1-6 for type, 0 to clear)</span>
+                  </div>
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs text-slate-400 mb-2 block">Sort By</label>
@@ -806,29 +872,32 @@ export default function ContinuityPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs text-slate-400 mb-2 block">Type</label>
+                      <label className="text-xs text-slate-400 mb-2 block">Type <span className="text-amber-500">(Shift+1-6)</span></label>
                       <select
                         value={typeFilter}
                         onChange={(e) => setTypeFilter(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
                       >
-                        {WARNING_TYPES.map((type) => (
-                          <option key={type.key} value={type.key}>{type.label}</option>
-                        ))}
+                        <option value="all">All Types (Shift+0)</option>
+                        <option value="continuity">Continuity (Shift+1)</option>
+                        <option value="plot_hole">Plot Holes (Shift+2)</option>
+                        <option value="character">Character (Shift+3)</option>
+                        <option value="timeline">Timeline (Shift+4)</option>
+                        <option value="dialogue">Dialogue (Shift+5)</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs text-slate-400 mb-2 block">Severity</label>
+                      <label className="text-xs text-slate-400 mb-2 block">Severity <span className="text-amber-500">(1-5)</span></label>
                       <select
                         value={severityFilter}
                         onChange={(e) => setSeverityFilter(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
                       >
-                        <option value="all">All Severities</option>
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
+                        <option value="all">All Severities (0)</option>
+                        <option value="critical">Critical (1)</option>
+                        <option value="high">High (2)</option>
+                        <option value="medium">Medium (3)</option>
+                        <option value="low">Low (4)</option>
                       </select>
                     </div>
                     <button
@@ -1474,31 +1543,84 @@ export default function ContinuityPage() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              {[
-                { key: 'R', description: 'Refresh continuity data' },
-                { key: '/', description: 'Focus search input' },
-                { key: 'F', description: 'Toggle filters panel' },
-                { key: 'S', description: 'Toggle sort order (asc/desc)' },
-                { key: 'E', description: 'Toggle export dropdown' },
-                { key: 'M', description: 'Export as Markdown' },
-                { key: 'P', description: 'Print continuity report' },
-                { key: '1', description: 'Switch to Overview tab' },
-                { key: '2', description: 'Switch to Breakdown tab' },
-                { key: '3', description: 'Switch to Trends tab' },
-                { key: '?', description: 'Show keyboard shortcuts' },
-                { key: 'Esc', description: 'Close modal / Clear filters' },
-              ].map((shortcut) => (
-                <div 
-                  key={shortcut.key}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
-                >
-                  <span className="text-slate-300">{shortcut.description}</span>
-                  <kbd className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-indigo-400 font-mono text-sm font-medium">
-                    {shortcut.key}
-                  </kbd>
-                </div>
-              ))}
+            {/* When filters panel CLOSED */}
+            <div className="mb-4">
+              <p className="text-xs text-amber-400 font-medium mb-2 uppercase tracking-wide">Filters Closed</p>
+              <div className="space-y-2">
+                {[
+                  { key: 'R', description: 'Refresh continuity data' },
+                  { key: '/', description: 'Focus search input' },
+                  { key: 'F', description: 'Toggle filters panel' },
+                  { key: 'S', description: 'Toggle sort order (asc/desc)' },
+                  { key: 'E', description: 'Toggle export dropdown' },
+                  { key: 'M', description: 'Export as Markdown' },
+                  { key: 'P', description: 'Print continuity report' },
+                  { key: '1', description: 'Switch to Overview tab' },
+                  { key: '2', description: 'Switch to Breakdown tab' },
+                  { key: '3', description: 'Switch to Trends tab' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-300 text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-amber-400 font-mono text-xs font-medium">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* When filters panel OPEN */}
+            <div className="mb-4">
+              <p className="text-xs text-cyan-400 font-medium mb-2 uppercase tracking-wide">Filters Open</p>
+              <div className="space-y-2">
+                {[
+                  { key: '1', description: 'Filter by Critical (toggle)' },
+                  { key: '2', description: 'Filter by High (toggle)' },
+                  { key: '3', description: 'Filter by Medium (toggle)' },
+                  { key: '4', description: 'Filter by Low (toggle)' },
+                  { key: '0', description: 'Clear severity filter' },
+                  { key: 'Shift+1', description: 'Filter by Continuity (toggle)' },
+                  { key: 'Shift+2', description: 'Filter by Plot Holes (toggle)' },
+                  { key: 'Shift+3', description: 'Filter by Character (toggle)' },
+                  { key: 'Shift+4', description: 'Filter by Timeline (toggle)' },
+                  { key: 'Shift+5', description: 'Filter by Dialogue (toggle)' },
+                  { key: 'Shift+0', description: 'Clear type filter' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-300 text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400 font-mono text-xs font-medium">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* General */}
+            <div>
+              <p className="text-xs text-slate-500 font-medium mb-2 uppercase tracking-wide">General</p>
+              <div className="space-y-2">
+                {[
+                  { key: '?', description: 'Show keyboard shortcuts' },
+                  { key: 'Esc', description: 'Close modal / Clear filters' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-300 text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-slate-400 font-mono text-xs font-medium">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-700">

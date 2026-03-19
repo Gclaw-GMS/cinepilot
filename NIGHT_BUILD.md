@@ -8713,3 +8713,51 @@ Added a comprehensive conflict detection system to the Catering page:
 - [x] Build passes ✅
 - [x] Lint passes ✅
 - [x] Pushed: origin/feature/continuity-sorting ✅
+
+---
+
+## Build Status: ✅ PASSING (11:55 PM) - Crew Page Number Key Shortcuts IMPLEMENTED
+
+### 11:55 PM - Crew Page Number Key Shortcuts for Department Filtering (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Crew Page - Number Key Shortcuts for Department Filtering**: Added quick department filter shortcuts using number keys 1-9
+
+### Feature Details
+- **Number Keys 1-9**: Press 1-9 to quickly filter crew by department (when filters panel is open)
+  - 1 = Camera, 2 = Lighting, 3 = Sound
+  - 4 = Art, 5 = Makeup, 6 = Costume
+  - 7 = Direction, 8 = Production, 9 = VFX
+- **Key 0**: Clears department filter to show all (when filters open)
+- **Toggle Behavior**: Press the same number again to clear that department filter
+- **Context-Aware**: When filters panel is CLOSED, 1-3 switch between view modes (backward compatible: 1=List, 2=Skills, 3=Analytics)
+- **Visual Enhancement**: Added keyboard shortcut hints in dropdown (e.g., "All Departments (0)", "Camera (1)")
+- **Keyboard Help Updated**: Added new shortcuts to the shortcuts modal with clear sections for "When Filters Open" vs "When Filters Closed"
+
+### Technical Implementation
+- Added deptFilterRef and showFiltersRef using useRef pattern to avoid dependency issues
+- Context-aware: Number keys behave differently based on whether filters panel is open
+- Toggle behavior: If the same department is already selected, it clears the filter
+- Updated dropdown options to show shortcut hints
+- Keyboard help modal organized with amber-colored shortcuts for filter mode
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+
+### Crew Page Number Key Shortcuts Feature Checklist
+- [x] Feature works 100% (number key filtering functional)
+- [x] Number keys 1-9 filter by department (when filters open)
+- [x] Number keys 1-3 switch view modes (when filters closed, backward compatible)
+- [x] Number key 0 clears filter
+- [x] Toggle behavior (press again to clear)
+- [x] Visual shortcut hints in dropdowns
+- [x] Keyboard help modal updated with clear sections
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/feature/continuity-sorting ✅
+

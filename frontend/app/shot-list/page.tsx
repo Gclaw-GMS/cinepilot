@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter, Grid, LayoutGrid, List } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -79,6 +79,15 @@ export default function ShotHubPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
+
+  // View modes: list, grid, analytics
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'analytics'>('list')
+  const viewModeRef = useRef(viewMode)
+  
+  // Keep viewModeRef in sync
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Filter state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -274,6 +283,25 @@ export default function ShotHubPage() {
         case '2':
           e.preventDefault()
           setFilters(prev => ({ ...prev, shotSize: filtersRef.current.shotSize === 'CU' ? 'all' : 'CU' }))
+          break
+        // View mode shortcuts (only when not generating)
+        case 'l':
+          if (!generating) {
+            e.preventDefault()
+            setViewMode('list')
+          }
+          break
+        case 'g':
+          if (!generating) {
+            e.preventDefault()
+            setViewMode('grid')
+          }
+          break
+        case 'a':
+          if (!generating) {
+            e.preventDefault()
+            setViewMode('analytics')
+          }
           break
         case '3':
           e.preventDefault()
@@ -833,6 +861,19 @@ ${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle
       .sort((a, b) => b.value - a.value)
   }, [shots])
 
+  const durationData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    shots.forEach(shot => {
+      const duration = shot.durationEstSec ? 
+        (shot.durationEstSec <= 3 ? '1-3s' : 
+         shot.durationEstSec <= 5 ? '4-5s' : 
+         shot.durationEstSec <= 10 ? '6-10s' : '10s+') : 'Unspecified'
+      counts[duration] = (counts[duration] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+  }, [shots])
+
   const lensData = useMemo(() => {
     const counts: Record<string, number> = {}
     shots.forEach(shot => {
@@ -1169,6 +1210,48 @@ ${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle
         </div>
       </div>
 
+      {/* View Mode Tabs */}
+      {shots.length > 0 && (
+        <div className="flex items-center gap-1 mb-4 bg-gray-800/50 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${
+              viewMode === 'list'
+                ? 'bg-violet-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <List className="w-4 h-4" />
+            List
+            <span className="text-xs opacity-60">(L)</span>
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${
+              viewMode === 'grid'
+                ? 'bg-violet-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <Grid className="w-4 h-4" />
+            Grid
+            <span className="text-xs opacity-60">(G)</span>
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${
+              viewMode === 'analytics'
+                ? 'bg-violet-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Analytics
+            <span className="text-xs opacity-60">(A)</span>
+          </button>
+        </div>
+      )}
+
       {/* Analytics Charts Row */}
       {shots.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1308,7 +1391,242 @@ ${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle
           <div className="text-gray-500 mb-2">No script found</div>
           <Link href="/scripts" className="text-cinepilot-accent hover:underline text-sm">Upload a script first</Link>
         </div>
+      ) : viewMode === 'analytics' ? (
+        /* Analytics View - Charts only */
+        <div className="space-y-6">
+          {shots.length > 0 && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {/* Shot Size Distribution */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <PieChartIcon className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-sm font-medium text-gray-300">Shot Sizes</h3>
+                </div>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={shotSizeData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={55}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {shotSizeData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {shotSizeData.slice(0, 4).map((entry, i) => (
+                    <span key={entry.name} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '30', color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                      {entry.name}: {entry.value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Camera Angles */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Camera className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-sm font-medium text-gray-300">Camera Angles</h3>
+                </div>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={cameraAngleData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis type="number" stroke="#6b7280" fontSize={10} />
+                      <YAxis type="category" dataKey="name" stroke="#6b7280" fontSize={10} width={50} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                      <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Camera Movements */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-sm font-medium text-gray-300">Movements</h3>
+                </div>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={cameraMovementData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="name" stroke="#6b7280" fontSize={9} />
+                      <YAxis stroke="#6b7280" fontSize={10} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                      <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Duration Distribution */}
+              <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Timer className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm font-medium text-gray-300">Duration (sec)</h3>
+                </div>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={durationData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="name" stroke="#6b7280" fontSize={9} />
+                      <YAxis stroke="#6b7280" fontSize={10} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        itemStyle={{ color: '#9ca3af' }}
+                      />
+                      <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Additional Analytics Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Top Locations</h3>
+              <div className="space-y-2">
+                {Object.entries(shots.reduce((acc, shot) => {
+                  const loc = shot.scene.location || 'Unknown'
+                  acc[loc] = (acc[loc] || 0) + 1
+                  return acc
+                }, {} as Record<string, number>))
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([loc, count]) => (
+                  <div key={loc} className="flex justify-between text-sm">
+                    <span className="text-gray-400">{loc}</span>
+                    <span className="text-violet-400">{count} shots</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Int/Ext Breakdown</h3>
+              <div className="h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'INT', value: shots.filter(s => s.scene.intExt === 'INT').length },
+                        { name: 'EXT', value: shots.filter(s => s.scene.intExt === 'EXT').length },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={20}
+                      outerRadius={40}
+                      dataKey="value"
+                    >
+                      <Cell fill="#8b5cf6" />
+                      <Cell fill="#06b6d4" />
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ color: '#9ca3af' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-center gap-4 text-xs">
+                <span className="text-violet-400">INT: {shots.filter(s => s.scene.intExt === 'INT').length}</span>
+                <span className="text-cyan-400">EXT: {shots.filter(s => s.scene.intExt === 'EXT').length}</span>
+              </div>
+            </div>
+
+            <div className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Time of Day</h3>
+              <div className="space-y-2">
+                {Object.entries(shots.reduce((acc, shot) => {
+                  const tod = shot.scene.timeOfDay || 'Unknown'
+                  acc[tod] = (acc[tod] || 0) + 1
+                  return acc
+                }, {} as Record<string, number>))
+                .sort((a, b) => b[1] - a[1])
+                .map(([tod, count]) => (
+                  <div key={tod} className="flex justify-between text-sm">
+                    <span className="text-gray-400">{tod}</span>
+                    <span className="text-emerald-400">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : viewMode === 'grid' ? (
+        /* Grid View */
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {filteredShots.map(shot => (
+            <div
+              key={shot.id}
+              className="bg-cinepilot-card border border-cinepilot-border rounded-lg p-3 hover:border-violet-500/50 transition-colors cursor-pointer"
+              onClick={() => {}}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono text-violet-400">#{shot.shotIndex}</span>
+                <div className="flex items-center gap-1">
+                  {shot.isLocked ? (
+                    <Lock className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Unlock className="w-3 h-3 text-gray-500" />
+                  )}
+                </div>
+              </div>
+              <div className="text-xs text-gray-300 mb-2 line-clamp-2">
+                {shot.shotText || 'No description'}
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="bg-gray-800/50 rounded px-1.5 py-0.5">
+                  <span className="text-gray-500">Size</span>
+                  <div className="text-gray-300">{shot.shotSize || '-'}</div>
+                </div>
+                <div className="bg-gray-800/50 rounded px-1.5 py-0.5">
+                  <span className="text-gray-500">Angle</span>
+                  <div className="text-gray-300">{shot.cameraAngle || '-'}</div>
+                </div>
+                <div className="bg-gray-800/50 rounded px-1.5 py-0.5">
+                  <span className="text-gray-500">Move</span>
+                  <div className="text-gray-300">{shot.cameraMovement || '-'}</div>
+                </div>
+                <div className="bg-gray-800/50 rounded px-1.5 py-0.5">
+                  <span className="text-gray-500">Dur</span>
+                  <div className="text-gray-300">{shot.durationEstSec ? `${shot.durationEstSec}s` : '-'}</div>
+                </div>
+              </div>
+              <div className="mt-2 text-[10px] text-gray-500 truncate">
+                {shot.scene.sceneNumber} - {shot.scene.location || 'Unknown'}
+              </div>
+            </div>
+          ))}
+          {filteredShots.length === 0 && (
+            <div className="col-span-full bg-cinepilot-card border border-cinepilot-border rounded-lg p-12 text-center">
+              <div className="text-gray-500">No shots to display</div>
+            </div>
+          )}
+        </div>
       ) : (
+        /* List View - Original */
         <div className="grid grid-cols-4 gap-6">
           {/* Left Panel: Scene List */}
           <div className="col-span-1 space-y-3">
@@ -1484,6 +1802,18 @@ ${sceneShots.map(s => `| ${s.shotIndex} | ${s.shotSize || '-'} | ${s.cameraAngle
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Clear shot size filter</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">View: List mode</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">L</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">View: Grid mode</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">G</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">View: Analytics mode</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">A</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Show shortcuts</span>

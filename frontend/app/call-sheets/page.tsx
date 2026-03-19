@@ -78,6 +78,24 @@ export default function CallSheetsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts (to avoid dependency issues)
+  const filterLocationRef = useRef(filterLocation)
+  const filterMonthRef = useRef(filterMonth)
+  const showFiltersRef = useRef(showFilters)
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    filterLocationRef.current = filterLocation
+  }, [filterLocation])
+  
+  useEffect(() => {
+    filterMonthRef.current = filterMonth
+  }, [filterMonth])
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+  
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
   const deleteSheetRef = useRef<(id: string) => Promise<void>>()
@@ -180,6 +198,78 @@ export default function CallSheetsPage() {
           e.preventDefault()
           if (!creating && !isEditing) {
             toggleSortOrder()
+          }
+          break
+        // Number keys for filtering (when filters panel is open)
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
+          if (showFiltersRef.current && !creating && !isEditing) {
+            e.preventDefault()
+            const num = e.key
+            const locations = uniqueLocationsRef.current
+            const months = uniqueMonthsRef.current
+            
+            if (num === '0') {
+              // Clear all filters
+              setFilterLocation('all')
+              setFilterMonth('all')
+            } else if (locations.length > 0 && showFiltersRef.current) {
+              // Filter by location (keys 1-9)
+              const index = parseInt(num) - 1
+              if (index < locations.length) {
+                const newLoc = locations[index]
+                // Toggle: if same location selected, clear it
+                if (filterLocationRef.current === newLoc) {
+                  setFilterLocation('all')
+                } else {
+                  setFilterLocation(newLoc)
+                }
+              }
+            }
+          }
+          break
+        // Month filters (when filters open, using Shift+1-9)
+        case '!':
+        case '@':
+        case '#':
+        case '$':
+        case '%':
+        case '^':
+        case '&':
+        case '*':
+        case '(':
+          if (showFiltersRef.current && !creating && !isEditing) {
+            e.preventDefault()
+            const months = uniqueMonthsRef.current
+            let monthIndex = 0
+            switch (e.key) {
+              case '!': monthIndex = 0; break
+              case '@': monthIndex = 1; break
+              case '#': monthIndex = 2; break
+              case '$': monthIndex = 3; break
+              case '%': monthIndex = 4; break
+              case '^': monthIndex = 5; break
+              case '&': monthIndex = 6; break
+              case '*': monthIndex = 7; break
+              case '(': monthIndex = 8; break
+            }
+            if (monthIndex < months.length) {
+              const newMonth = months[monthIndex]
+              // Toggle: if same month selected, clear it
+              if (filterMonthRef.current === newMonth) {
+                setFilterMonth('all')
+              } else {
+                setFilterMonth(newMonth)
+              }
+            }
           }
           break
         case 'x':
@@ -321,6 +411,19 @@ export default function CallSheetsPage() {
     })
     return Array.from(months).sort().reverse()
   }, [callSheets])
+
+  // Refs for unique locations and months (for keyboard shortcuts)
+  const uniqueLocationsRef = useRef(uniqueLocations)
+  const uniqueMonthsRef = useRef(uniqueMonths)
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    uniqueLocationsRef.current = uniqueLocations
+  }, [uniqueLocations])
+  
+  useEffect(() => {
+    uniqueMonthsRef.current = uniqueMonths
+  }, [uniqueMonths])
 
   // Active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -886,32 +989,33 @@ export default function CallSheetsPage() {
                   </div>
                   {/* Location Filter */}
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Location</label>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Location (1-{Math.min(9, uniqueLocations.length)})</label>
                     <select
                       value={filterLocation}
                       onChange={(e) => setFilterLocation(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                     >
-                      <option value="all">All Locations</option>
-                      {uniqueLocations.map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
+                      <option value="all">All Locations (0)</option>
+                      {uniqueLocations.slice(0, 9).map((loc, i) => (
+                        <option key={loc} value={loc}>{loc} ({i + 1})</option>
                       ))}
                     </select>
                   </div>
                   {/* Month Filter */}
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Month</label>
+                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Month (Shift+1-{Math.min(9, uniqueMonths.length)})</label>
                     <select
                       value={filterMonth}
                       onChange={(e) => setFilterMonth(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                     >
-                      <option value="all">All Months</option>
-                      {uniqueMonths.map(month => {
+                      <option value="all">All Months (Shift+0)</option>
+                      {uniqueMonths.slice(0, 9).map((month, i) => {
                         const [year, m] = month.split('-')
                         const monthName = new Date(parseInt(year), parseInt(m) - 1).toLocaleString('default', { month: 'short', year: 'numeric' })
+                        const shortcut = ['!','@','#','$','%','^','&','*','('][i]
                         return (
-                          <option key={month} value={month}>{monthName}</option>
+                          <option key={month} value={month}>{monthName} (Shift+{shortcut})</option>
                         )
                       })}
                     </select>
@@ -1619,6 +1723,27 @@ export default function CallSheetsPage() {
                   </kbd>
                 </div>
               ))}
+              
+              {/* Number key shortcuts section */}
+              <div className="mt-4 pt-4 border-t border-slate-700">
+                <h4 className="text-xs text-slate-500 uppercase tracking-wider mb-3">When Filters Open</h4>
+                {[
+                  { key: '1-9', description: 'Filter by location' },
+                  { key: '0', description: 'Clear location filter' },
+                  { key: 'Shift+1-9', description: 'Filter by month' },
+                  { key: 'Shift+0', description: 'Clear month filter' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="text-slate-400 text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400 font-mono text-xs">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-700">

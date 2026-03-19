@@ -24,7 +24,6 @@ import {
   ChevronDown,
   FileText,
   Printer,
-  AlertTriangle,
 } from 'lucide-react';
 import {
   BarChart,
@@ -163,7 +162,7 @@ export default function CrewPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'skills' | 'conflicts'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'skills'>('list');
 
   // Sort options for UI
   const sortOptions = [
@@ -177,7 +176,6 @@ export default function CrewPage() {
   const viewModeOptions = [
     { key: 'list', label: 'List View', icon: Users },
     { key: 'skills', label: 'Skills Matrix', icon: Briefcase },
-    { key: 'conflicts', label: 'Conflicts', icon: AlertTriangle },
   ];
 
   const fetchCrew = useCallback(async () => {
@@ -314,9 +312,6 @@ export default function CrewPage() {
               case '2':
                 setViewMode('skills')
                 break
-              case '3':
-                setViewMode('conflicts')
-                break
             }
           }
           break
@@ -433,169 +428,6 @@ export default function CrewPage() {
     
     return { skills: sortedSkills, matrix };
   }, [crew]);
-
-  // Conflict Detection
-  type CrewConflict = {
-    id: string;
-    type: 'missing_department' | 'missing_contact' | 'missing_rate' | 'duplicate_name' | 'unusual_rate' | 'missing_skills';
-    severity: 'high' | 'medium' | 'low';
-    memberId: string;
-    memberName: string;
-    title: string;
-    description: string;
-    recommendation: string;
-  };
-
-  const crewConflicts = useMemo(() => {
-    const conflicts: CrewConflict[] = [];
-    const nameMap = new Map<string, number>();
-
-    // First pass: count names for duplicate detection
-    crew.forEach(c => {
-      const nameLower = c.name.toLowerCase().trim();
-      nameMap.set(nameLower, (nameMap.get(nameLower) || 0) + 1);
-    });
-
-    // Second pass: detect conflicts
-    crew.forEach(c => {
-      const nameLower = c.name.toLowerCase().trim();
-      const dailyRateNum = typeof c.dailyRate === 'string' ? parseInt(c.dailyRate) : Number(c.dailyRate);
-
-      // Missing Department
-      if (!c.department) {
-        conflicts.push({
-          id: `missing-dept-${c.id}`,
-          type: 'missing_department',
-          severity: 'medium',
-          memberId: c.id,
-          memberName: c.name,
-          title: 'Missing Department Assignment',
-          description: `${c.name} (${c.role}) has no department assigned`,
-          recommendation: 'Assign a department to categorize this crew member properly',
-        });
-      }
-
-      // Missing Contact Info
-      if (!c.phone && !c.email) {
-        conflicts.push({
-          id: `missing-contact-${c.id}`,
-          type: 'missing_contact',
-          severity: 'high',
-          memberId: c.id,
-          memberName: c.name,
-          title: 'Missing Contact Information',
-          description: `${c.name} has no phone or email on file`,
-          recommendation: 'Add contact details for emergency communication',
-        });
-      } else if (!c.phone || !c.email) {
-        // Partial contact - low severity
-        conflicts.push({
-          id: `partial-contact-${c.id}`,
-          type: 'missing_contact',
-          severity: 'low',
-          memberId: c.id,
-          memberName: c.name,
-          title: 'Incomplete Contact Information',
-          description: `${c.name} is missing ${!c.phone ? 'phone number' : 'email address'}`,
-          recommendation: `Add ${!c.phone ? 'phone number' : 'email address'} for complete contact details`,
-        });
-      }
-
-      // Missing Daily Rate
-      if (!c.dailyRate) {
-        conflicts.push({
-          id: `missing-rate-${c.id}`,
-          type: 'missing_rate',
-          severity: 'medium',
-          memberId: c.id,
-          memberName: c.name,
-          title: 'Missing Daily Rate',
-          description: `${c.name} has no daily rate specified`,
-          recommendation: 'Add daily rate for budget planning and payroll',
-        });
-      }
-
-      // Duplicate Names
-      if (nameMap.get(nameLower)! > 1) {
-        conflicts.push({
-          id: `duplicate-${c.id}`,
-          type: 'duplicate_name',
-          severity: 'medium',
-          memberId: c.id,
-          memberName: c.name,
-          title: 'Duplicate Crew Member Name',
-          description: `Multiple crew members named "${c.name}" found`,
-          recommendation: 'Verify if this is the same person or add middle initials to distinguish',
-        });
-      }
-
-      // Unusual Rate (very high or very low)
-      if (dailyRateNum > 0) {
-        // Calculate average rate
-        const rates = crew
-          .map(m => typeof m.dailyRate === 'string' ? parseInt(m.dailyRate) : Number(m.dailyRate))
-          .filter(r => !isNaN(r) && r > 0);
-        const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
-        
-        if (dailyRateNum > avgRate * 3) {
-          conflicts.push({
-            id: `high-rate-${c.id}`,
-            type: 'unusual_rate',
-            severity: 'low',
-            memberId: c.id,
-            memberName: c.name,
-            title: 'Unusually High Daily Rate',
-            description: `${c.name}'s rate (₹${dailyRateNum.toLocaleString('en-IN')}) is 3x above average`,
-            recommendation: 'Verify this rate is correct for the role',
-          });
-        } else if (dailyRateNum < avgRate * 0.1 && avgRate > 0) {
-          conflicts.push({
-            id: `low-rate-${c.id}`,
-            type: 'unusual_rate',
-            severity: 'low',
-            memberId: c.id,
-            memberName: c.name,
-            title: 'Unusually Low Daily Rate',
-            description: `${c.name}'s rate (₹${dailyRateNum.toLocaleString('en-IN')}) is significantly below average`,
-            recommendation: 'Verify this rate is correct or update to match market rates',
-          });
-        }
-      }
-
-      // Missing Skills
-      if (!c.skills || c.skills.length === 0) {
-        conflicts.push({
-          id: `missing-skills-${c.id}`,
-          type: 'missing_skills',
-          severity: 'low',
-          memberId: c.id,
-          memberName: c.name,
-          title: 'No Skills Listed',
-          description: `${c.name} has no skills or expertise listed`,
-          recommendation: 'Add relevant skills for better task assignment and team composition',
-        });
-      }
-    });
-
-    return conflicts;
-  }, [crew]);
-
-  // Conflict stats
-  const conflictStats = useMemo(() => ({
-    total: crewConflicts.length,
-    high: crewConflicts.filter(c => c.severity === 'high').length,
-    medium: crewConflicts.filter(c => c.severity === 'medium').length,
-    low: crewConflicts.filter(c => c.severity === 'low').length,
-  }), [crewConflicts]);
-
-  // Conflict type stats
-  const conflictTypeStats = useMemo(() => {
-    const stats: Record<string, number> = {};
-    crewConflicts.forEach(c => {
-      stats[c.type] = (stats[c.type] || 0) + 1;
-    });
-    return stats;
-  }, [crewConflicts]);
 
   const openAddModal = () => {
     setEditingId(null);
@@ -1115,11 +947,9 @@ export default function CrewPage() {
               </div>
               {/* View Mode Toggle */}
               <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1 border border-slate-700">
-                {viewModeOptions.map((option, idx) => {
+                {viewModeOptions.map((option) => {
                   const Icon = option.icon;
                   const isActive = viewMode === option.key;
-                  const shortcutNum = idx + 1;
-                  const showBadge = option.key === 'conflicts' && conflictStats.high > 0;
                   return (
                     <button
                       key={option.key}
@@ -1129,15 +959,10 @@ export default function CrewPage() {
                           ? 'bg-emerald-600 text-white' 
                           : 'text-slate-400 hover:text-white hover:bg-slate-700'
                       }`}
-                      title={`${option.label} (${shortcutNum})`}
+                      title={`${option.label} (${option.key === 'list' ? '1' : '2'})`}
                     >
                       <Icon className="w-4 h-4" />
                       <span className="hidden md:inline">{option.label}</span>
-                      {showBadge && (
-                        <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
-                          {conflictStats.high}
-                        </span>
-                      )}
                     </button>
                   );
                 })}
@@ -1468,141 +1293,6 @@ export default function CrewPage() {
           </div>
         )}
 
-        {/* Conflicts View */}
-        {viewMode === 'conflicts' && (
-          <div className="space-y-6">
-            {/* Conflict Stats */}
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-red-500/20">
-                    <AlertTriangle className="w-4 h-4 text-red-400" />
-                  </div>
-                  <span className="text-sm text-slate-400">Total Issues</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{conflictStats.total}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-red-500/20">
-                    <AlertCircle className="w-4 h-4 text-red-400" />
-                  </div>
-                  <span className="text-sm text-slate-400">High Priority</span>
-                </div>
-                <p className="text-3xl font-bold text-red-400">{conflictStats.high}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-amber-500/20">
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
-                  </div>
-                  <span className="text-sm text-slate-400">Medium</span>
-                </div>
-                <p className="text-3xl font-bold text-amber-400">{conflictStats.medium}</p>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-slate-500/20">
-                    <AlertCircle className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <span className="text-sm text-slate-400">Low</span>
-                </div>
-                <p className="text-3xl font-bold text-slate-400">{conflictStats.low}</p>
-              </div>
-            </div>
-
-            {/* Conflict Type Summary */}
-            {conflictStats.total > 0 && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-lg font-semibold text-white mb-4">Issues by Type</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {Object.entries(conflictTypeStats).map(([type, count]) => (
-                    <div key={type} className="text-center p-3 bg-slate-800 rounded-lg">
-                      <p className="text-2xl font-bold text-white">{count}</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Conflict Cards */}
-            {conflictStats.total === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-green-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">All Clear!</h3>
-                <p className="text-slate-400">No issues detected in your crew data. Looking good!</p>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {crewConflicts
-                  .sort((a, b) => {
-                    const severityOrder = { high: 0, medium: 1, low: 2 };
-                    return severityOrder[a.severity] - severityOrder[b.severity];
-                  })
-                  .map((conflict) => (
-                    <div
-                      key={conflict.id}
-                      className={`bg-slate-900 border rounded-xl p-5 cursor-pointer hover:bg-slate-800/50 transition-colors ${
-                        conflict.severity === 'high'
-                          ? 'border-red-500/30'
-                          : conflict.severity === 'medium'
-                          ? 'border-amber-500/30'
-                          : 'border-slate-700'
-                      }`}
-                      onClick={() => {
-                        const member = crew.find(c => c.id === conflict.memberId);
-                        if (member) openEditModal(member);
-                      }}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className={`p-2 rounded-lg shrink-0 ${
-                          conflict.severity === 'high'
-                            ? 'bg-red-500/20'
-                            : conflict.severity === 'medium'
-                            ? 'bg-amber-500/20'
-                            : 'bg-slate-700'
-                        }`}>
-                          <AlertTriangle className={`w-5 h-5 ${
-                            conflict.severity === 'high'
-                              ? 'text-red-400'
-                              : conflict.severity === 'medium'
-                              ? 'text-amber-400'
-                              : 'text-slate-400'
-                          }`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold text-white">{conflict.title}</h4>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              conflict.severity === 'high'
-                                ? 'bg-red-500/20 text-red-400'
-                                : conflict.severity === 'medium'
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-slate-700 text-slate-400'
-                            }`}>
-                              {conflict.severity}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-400 mb-2">{conflict.description}</p>
-                          <p className="text-sm text-emerald-400">
-                            <span className="text-slate-500">Recommendation: </span>
-                            {conflict.recommendation}
-                          </p>
-                        </div>
-                        <ChevronDown className="w-5 h-5 text-slate-500 shrink-0" />
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Crew Table */}
         {viewMode === 'list' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -1895,10 +1585,6 @@ export default function CrewPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Skills matrix view</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Conflicts view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

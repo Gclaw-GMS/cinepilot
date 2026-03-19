@@ -5,7 +5,7 @@ import {
   MapPin, Search, Filter, RefreshCw, Loader2, 
   Star, ExternalLink, TrendingUp, AlertTriangle,
   Building2, Trees, Warehouse, Waves, Users,
-  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer, FileText, CheckCircle
+  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer, FileText
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -140,37 +140,6 @@ const DEMO_CANDIDATES: CandidateData[] = [
   { id: '3', name: 'Besant Nagar Beach', latitude: '12.9989', longitude: '80.2678', placeType: 'beach', scoreTotal: 72, scoreAccess: 70, scoreLocality: 75, riskFlags: ['Weekend crowd', 'Limited space'], explanation: 'More local feel, good for village/realistic sequences. Requires early morning permit.' },
 ]
 
-// Location conflict type for conflict detection
-interface LocationConflict {
-  id: string
-  type: 'missing_info' | 'low_score' | 'duplicate' | 'missing_scenes' | 'inconsistent' | 'risk_flag'
-  severity: 'high' | 'medium' | 'low'
-  locationId: string
-  locationName: string
-  title: string
-  description: string
-  recommendation: string
-}
-
-// Labels and icons for conflict types
-const CONFLICT_TYPE_LABELS: Record<string, string> = {
-  missing_info: 'Missing Information',
-  low_score: 'Low Score',
-  duplicate: 'Duplicate',
-  missing_scenes: 'Missing Scenes',
-  inconsistent: 'Inconsistent Data',
-  risk_flag: 'Risk Flags',
-}
-
-const CONFLICT_TYPE_ICONS: Record<string, string> = {
-  missing_info: '📋',
-  low_score: '📉',
-  duplicate: '📑',
-  missing_scenes: '🎬',
-  inconsistent: '⚖️',
-  risk_flag: '⚠️',
-}
-
 export default function LocationsPage() {
   const [scenes, setScenes] = useState<SceneWithIntent[]>([])
   const [loading, setLoading] = useState(true)
@@ -182,7 +151,7 @@ export default function LocationsPage() {
   const [filterScore, setFilterScore] = useState<number>(0)
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'type' | 'access' | 'locality'>('score')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [viewMode, setViewMode] = useState<'cards' | 'chart' | 'conflicts'>('cards')
+  const [viewMode, setViewMode] = useState<'cards' | 'chart'>('cards')
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -288,12 +257,10 @@ export default function LocationsPage() {
           }
           break
         case '3':
-          // Toggle conflicts view OR filter by park if filters open
+          // Filter by park
           if (showFiltersRef.current) {
             const current = filtersRef.current.placeType
             setFilters(prev => ({ ...prev, placeType: current === 'park' ? 'all' : 'park' }))
-          } else {
-            setViewMode('conflicts')
           }
           break
         case '4':
@@ -861,160 +828,6 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [candidates])
 
-  // ===== CONFLICT DETECTION =====
-  const locationConflicts = useMemo(() => {
-    const conflicts: LocationConflict[] = []
-
-    // 1. Missing Information - locations without name, type, or scores
-    candidates.forEach((c, idx) => {
-      if (!c.name || c.name.trim() === '') {
-        conflicts.push({
-          id: `missing-name-${idx}`,
-          type: 'missing_info',
-          severity: 'high',
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: 'Missing Location Name',
-          description: 'This location candidate has no name specified.',
-          recommendation: 'Add a descriptive name for this location.'
-        })
-      }
-      if (!c.placeType) {
-        conflicts.push({
-          id: `missing-type-${idx}`,
-          type: 'missing_info',
-          severity: 'medium',
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: 'Missing Place Type',
-          description: 'This location has no place type assigned.',
-          recommendation: 'Assign a place type (beach, restaurant, hotel, etc.).'
-        })
-      }
-      if (c.scoreTotal === 0 || c.scoreTotal === undefined) {
-        conflicts.push({
-          id: `missing-score-${idx}`,
-          type: 'missing_info',
-          severity: 'medium',
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: 'Missing Score',
-          description: 'This location has no scoring data.',
-          recommendation: 'Run location scouting to generate scores.'
-        })
-      }
-    })
-
-    // 2. Low Score - locations below threshold
-    candidates.forEach((c, idx) => {
-      if (c.scoreTotal < 50) {
-        conflicts.push({
-          id: `low-score-${idx}`,
-          type: 'low_score',
-          severity: 'high',
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: 'Very Low Score',
-          description: `Location has a score of ${c.scoreTotal} (below 50 threshold).`,
-          recommendation: 'Consider finding an alternative location with better metrics.'
-        })
-      } else if (c.scoreTotal < 60) {
-        conflicts.push({
-          id: `medium-score-${idx}`,
-          type: 'low_score',
-          severity: 'medium',
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: 'Low Score',
-          description: `Location has a score of ${c.scoreTotal} (below 60).`,
-          recommendation: 'Review and improve location accessibility or locality scores.'
-        })
-      }
-    })
-
-    // 3. Duplicate Names
-    const nameMap: Record<string, number> = {}
-    candidates.forEach((c) => {
-      if (c.name) {
-        const normalizedName = c.name.toLowerCase().trim()
-        nameMap[normalizedName] = (nameMap[normalizedName] || 0) + 1
-      }
-    })
-    Object.entries(nameMap).forEach(([name, count]) => {
-      if (count > 1) {
-        const dupLocations = candidates.filter(c => c.name?.toLowerCase().trim() === name)
-        dupLocations.forEach((c, idx) => {
-          conflicts.push({
-            id: `duplicate-${idx}-${c.id}`,
-            type: 'duplicate',
-            severity: 'medium',
-            locationId: c.id,
-            locationName: c.name || 'Unnamed Location',
-            title: 'Duplicate Location Name',
-            description: `This location shares its name with ${count - 1} other(s).`,
-            recommendation: 'Verify these are distinct locations or consolidate entries.'
-          })
-        })
-      }
-    })
-
-    // 4. Risk Flags - locations with risk flags
-    candidates.forEach((c, idx) => {
-      if (c.riskFlags && c.riskFlags.length > 0) {
-        const severity = c.riskFlags.length > 2 ? 'high' : c.riskFlags.length > 0 ? 'medium' : 'low'
-        conflicts.push({
-          id: `risk-${idx}`,
-          type: 'risk_flag',
-          severity,
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: `${c.riskFlags.length} Risk Flag${c.riskFlags.length > 1 ? 's' : ''}`,
-          description: `Risks: ${c.riskFlags.join(', ')}`,
-          recommendation: 'Review risk flags and plan mitigation strategies.'
-        })
-      }
-    })
-
-    // 5. Inconsistent Data - location has place type but low score in related metrics
-    candidates.forEach((c, idx) => {
-      if (c.scoreAccess !== null && c.scoreAccess < 40 && c.scoreTotal > 70) {
-        conflicts.push({
-          id: `inconsistent-${idx}`,
-          type: 'inconsistent',
-          severity: 'low',
-          locationId: c.id,
-          locationName: c.name || 'Unnamed Location',
-          title: 'Inconsistent Scores',
-          description: 'High total score but very low accessibility score.',
-          recommendation: 'Review accessibility scoring or consider transport options.'
-        })
-      }
-    })
-
-    return conflicts
-  }, [candidates])
-
-  // Conflict statistics
-  const conflictStats = useMemo(() => {
-    return {
-      total: locationConflicts.length,
-      high: locationConflicts.filter(c => c.severity === 'high').length,
-      medium: locationConflicts.filter(c => c.severity === 'medium').length,
-      low: locationConflicts.filter(c => c.severity === 'low').length,
-    }
-  }, [locationConflicts])
-
-  const highPriorityConflictCount = conflictStats.high
-
-  // Conflict type summary
-  const conflictTypeStats = useMemo(() => {
-    const types: Record<string, number> = {}
-    locationConflicts.forEach(c => {
-      types[c.type] = (types[c.type] || 0) + 1
-    })
-    return types
-  }, [locationConflicts])
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -1173,19 +986,6 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
             >
               Analysis
             </button>
-            <button
-              onClick={() => setViewMode('conflicts')}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
-                viewMode === 'conflicts' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Conflicts
-              {highPriorityConflictCount > 0 && (
-                <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {highPriorityConflictCount}
-                </span>
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -1314,8 +1114,8 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 { key: 'F', action: 'Toggle filters panel' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: '1', action: 'Cards view / Filter by Beach (when filters open)' },
-                { key: '2', action: 'Analysis view / Filter by Restaurant (when filters open)' },
-                { key: '3', action: 'Conflicts view / Filter by Park (when filters open)' },
+                { key: '2', action: 'Chart view / Filter by Restaurant (when filters open)' },
+                { key: '3', action: 'Filter by Park' },
                 { key: '4', action: 'Filter by Warehouse' },
                 { key: '5', action: 'Filter by Hotel' },
                 { key: '6', action: 'Filter by Temple' },
@@ -1707,7 +1507,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                       )
                     })}
                   </div>
-                ) : viewMode === 'chart' ? (
+                ) : (
                   <div className="grid grid-cols-2 gap-6">
                     {/* Score Comparison Chart */}
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -1764,91 +1564,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                       </div>
                     </div>
                   </div>
-                ) : viewMode === 'conflicts' ? (
-                  <div>
-                    {/* Conflicts Summary Stats */}
-                    <div className="grid grid-cols-4 gap-4 mb-6">
-                      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                        <div className="text-2xl font-bold text-white">{conflictStats.total}</div>
-                        <div className="text-sm text-slate-500">Total Issues</div>
-                      </div>
-                      <div className="bg-slate-900 border border-red-900/50 rounded-xl p-4">
-                        <div className="text-2xl font-bold text-red-400">{conflictStats.high}</div>
-                        <div className="text-sm text-slate-500">High Priority</div>
-                      </div>
-                      <div className="bg-slate-900 border border-amber-900/50 rounded-xl p-4">
-                        <div className="text-2xl font-bold text-amber-400">{conflictStats.medium}</div>
-                        <div className="text-sm text-slate-500">Medium</div>
-                      </div>
-                      <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
-                        <div className="text-2xl font-bold text-slate-400">{conflictStats.low}</div>
-                        <div className="text-sm text-slate-500">Low</div>
-                      </div>
-                    </div>
-
-                    {/* Conflict Type Summary */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6">
-                      <h3 className="text-sm font-semibold text-slate-300 mb-3">Issues by Type</h3>
-                      <div className="flex flex-wrap gap-3">
-                        {Object.entries(conflictTypeStats).map(([type, count]) => (
-                          <div key={type} className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2">
-                            <span>{CONFLICT_TYPE_ICONS[type]}</span>
-                            <span className="text-sm text-slate-300">{CONFLICT_TYPE_LABELS[type]}</span>
-                            <span className="text-sm font-bold text-white">{count}</span>
-                          </div>
-                        ))}
-                        {conflictStats.total === 0 && (
-                          <div className="text-sm text-slate-500">No issues detected</div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Conflict Cards */}
-                    {conflictStats.total === 0 ? (
-                      <div className="bg-slate-900 border border-emerald-900/50 rounded-xl p-8 text-center">
-                        <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-white mb-2">All Clear!</h3>
-                        <p className="text-slate-500">No issues detected with your location data.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {locationConflicts.map((conflict) => (
-                          <div
-                            key={conflict.id}
-                            className={`bg-slate-900 border rounded-xl p-4 transition-all hover:border-slate-600 cursor-pointer ${
-                              conflict.severity === 'high' 
-                                ? 'border-red-900/50 hover:border-red-800' 
-                                : conflict.severity === 'medium'
-                                ? 'border-amber-900/50 hover:border-amber-800'
-                                : 'border-slate-800 hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                  conflict.severity === 'high' 
-                                    ? 'bg-red-500/20 text-red-400' 
-                                    : conflict.severity === 'medium'
-                                    ? 'bg-amber-500/20 text-amber-400'
-                                    : 'bg-slate-700 text-slate-400'
-                                }`}>
-                                  {conflict.severity.toUpperCase()}
-                                </span>
-                                <span className="text-sm text-slate-500">{CONFLICT_TYPE_ICONS[conflict.type]}</span>
-                                <span className="text-sm font-medium text-white">{conflict.title}</span>
-                              </div>
-                            </div>
-                            <p className="text-sm text-slate-400 mb-2">{conflict.description}</p>
-                            <div className="flex items-center gap-2 text-xs text-emerald-400">
-                              <Target className="w-3 h-3" />
-                              {conflict.recommendation}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
+                )}
               </>
             )}
           </div>

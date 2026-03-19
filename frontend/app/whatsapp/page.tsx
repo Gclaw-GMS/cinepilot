@@ -129,6 +129,20 @@ export default function WhatsAppPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Refs for keyboard shortcuts to avoid dependency warnings
+  const showFilterPanelRef = useRef(showFilterPanel)
+  const categoryFilterRef = useRef(categoryFilter)
+  const statusFilterRef = useRef(statusFilter)
+  const roleFilterRef = useRef(roleFilter)
+  const activeTabRef = useRef(activeTab)
+  
+  // Update refs when state changes
+  useEffect(() => { showFilterPanelRef.current = showFilterPanel }, [showFilterPanel])
+  useEffect(() => { categoryFilterRef.current = categoryFilter }, [categoryFilter])
+  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+  useEffect(() => { roleFilterRef.current = roleFilter }, [roleFilter])
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -253,12 +267,83 @@ export default function WhatsAppPage() {
             }
           }
           break
+        // Number keys for filtering (when filters panel is open)
+        case '0':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'templates') setCategoryFilter('all')
+            else if (activeTabRef.current === 'history') setStatusFilter('all')
+            else if (activeTabRef.current === 'contacts') setRoleFilter('all')
+          }
+          break
+        case '1':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'templates') setCategoryFilter('schedule')
+            else if (activeTabRef.current === 'history') setStatusFilter('pending')
+            else if (activeTabRef.current === 'contacts') setRoleFilter('Lead Actor')
+          }
+          break
+        case '2':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'templates') setCategoryFilter('reminder')
+            else if (activeTabRef.current === 'history') setStatusFilter('sent')
+            else if (activeTabRef.current === 'contacts') setRoleFilter('Lead Actress')
+          }
+          break
+        case '3':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'templates') setCategoryFilter('call_sheet')
+            else if (activeTabRef.current === 'history') setStatusFilter('delivered')
+            else if (activeTabRef.current === 'contacts') setRoleFilter('Supporting Actor')
+          }
+          break
+        case '4':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'history') setStatusFilter('read')
+            else if (activeTabRef.current === 'contacts') setRoleFilter('Cinematographer')
+          }
+          break
+        case '5':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'history') setStatusFilter('failed')
+            else if (activeTabRef.current === 'contacts') setRoleFilter('Music Director')
+          }
+          break
+        case '6':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'contacts') setRoleFilter('Director')
+          }
+          break
+        case '7':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'contacts') setRoleFilter('Producer')
+          }
+          break
+        case '8':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'contacts') setRoleFilter('Writer')
+          }
+          break
+        case '9':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            if (activeTabRef.current === 'contacts') setRoleFilter('all')
+          }
+          break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, activeTab, showBulkActions, selectedContacts, selectAllContacts, clearSelection])
+  }, [handleRefresh, activeTab, showBulkActions, selectedContacts, selectAllContacts, clearSelection, setCategoryFilter, setStatusFilter, setRoleFilter, setShowFilterPanel])
 
   // Click outside to close dropdowns and filter panel
   useEffect(() => {
@@ -778,16 +863,16 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
                 {/* Category Filter (for templates) */}
                 {activeTab === 'templates' && (
                   <div className="mb-3">
-                    <label className="text-xs text-gray-500 block mb-1">Category</label>
+                    <label className="text-xs text-gray-500 block mb-1">Category <span className="text-cyan-400">(1-4)</span></label>
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
                       className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
                     >
-                      <option value="all">All Categories</option>
-                      <option value="schedule">Schedule</option>
-                      <option value="reminder">Reminder</option>
-                      <option value="call_sheet">Call Sheet</option>
+                      <option value="all">All Categories (0)</option>
+                      <option value="schedule">Schedule (1)</option>
+                      <option value="reminder">Reminder (2)</option>
+                      <option value="call_sheet">Call Sheet (3)</option>
                     </select>
                   </div>
                 )}
@@ -795,18 +880,18 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
                 {/* Status Filter (for history) */}
                 {activeTab === 'history' && (
                   <div className="mb-3">
-                    <label className="text-xs text-gray-500 block mb-1">Status</label>
+                    <label className="text-xs text-gray-500 block mb-1">Status <span className="text-cyan-400">(1-6)</span></label>
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
                     >
-                      <option value="all">All Status</option>
-                      <option value="pending">Pending</option>
-                      <option value="sent">Sent</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="read">Read</option>
-                      <option value="failed">Failed</option>
+                      <option value="all">All Status (0)</option>
+                      <option value="pending">Pending (1)</option>
+                      <option value="sent">Sent (2)</option>
+                      <option value="delivered">Delivered (3)</option>
+                      <option value="read">Read (4)</option>
+                      <option value="failed">Failed (5)</option>
                     </select>
                   </div>
                 )}
@@ -814,17 +899,21 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
                 {/* Role Filter (for contacts) */}
                 {activeTab === 'contacts' && (
                   <div className="mb-3">
-                    <label className="text-xs text-gray-500 block mb-1">Role</label>
+                    <label className="text-xs text-gray-500 block mb-1">Role <span className="text-cyan-400">(1-9)</span></label>
                     <select
                       value={roleFilter}
                       onChange={(e) => setRoleFilter(e.target.value)}
                       className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
                     >
-                      <option value="all">All Roles</option>
-                      <option value="actor">Actor</option>
-                      <option value="cinematographer">Cinematographer</option>
-                      <option value="director">Director</option>
-                      <option value="producer">Producer</option>
+                      <option value="all">All Roles (0)</option>
+                      <option value="Lead Actor">Lead Actor (1)</option>
+                      <option value="Lead Actress">Lead Actress (2)</option>
+                      <option value="Supporting Actor">Supporting Actor (3)</option>
+                      <option value="Cinematographer">Cinematographer (4)</option>
+                      <option value="Music Director">Music Director (5)</option>
+                      <option value="Director">Director (6)</option>
+                      <option value="Producer">Producer (7)</option>
+                      <option value="Writer">Writer (8)</option>
                     </select>
                   </div>
                 )}
@@ -1208,19 +1297,65 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
             </div>
             
             <div className="space-y-3">
+              {/* Main shortcuts */}
+              <div className="text-xs text-cyan-400 uppercase tracking-wider mb-1">General</div>
               {[
                 { key: 'R', description: 'Refresh data' },
                 { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'F', description: 'Toggle filter panel' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'C', description: 'Switch to Compose tab' },
-                { key: 'T', description: 'Switch to Templates tab' },
-                { key: 'H', description: 'Switch to History tab' },
-                { key: 'O', description: 'Switch to Contacts tab' },
-                { key: 'N', description: 'Create new template' },
+              ].map(({ key, description }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                  <span className="text-gray-300">{description}</span>
+                  <kbd className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-sm font-mono text-green-400">{key}</kbd>
+                </div>
+              ))}
+              
+              {/* Tab shortcuts */}
+              <div className="text-xs text-green-400 uppercase tracking-wider mb-1 mt-3">Tabs</div>
+              {[
+                { key: 'C', description: 'Compose tab' },
+                { key: 'T', description: 'Templates tab' },
+                { key: 'H', description: 'History tab' },
+                { key: 'O', description: 'Contacts tab' },
+                { key: 'N', description: 'New template' },
+              ].map(({ key, description }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                  <span className="text-gray-300">{description}</span>
+                  <kbd className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-sm font-mono text-green-400">{key}</kbd>
+                </div>
+              ))}
+              
+              {/* Export shortcuts */}
+              <div className="text-xs text-purple-400 uppercase tracking-wider mb-1 mt-3">Export</div>
+              {[
                 { key: 'P', description: 'Toggle print menu' },
                 { key: 'E', description: 'Toggle export menu' },
                 { key: 'M', description: 'Export Markdown' },
+              ].map(({ key, description }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                  <span className="text-gray-300">{description}</span>
+                  <kbd className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-sm font-mono text-green-400">{key}</kbd>
+                </div>
+              ))}
+              
+              {/* Filter shortcuts - when filters panel is OPEN */}
+              <div className="text-xs text-amber-400 uppercase tracking-wider mb-1 mt-3">When Filters Open</div>
+              {[
+                { key: '0', description: 'Clear filter (show all)' },
+                { key: '1-3', description: 'Templates: Schedule, Reminder, Call Sheet' },
+                { key: '1-5', description: 'History: Pending, Sent, Delivered, Read, Failed' },
+                { key: '1-8', description: 'Contacts: Roles (Lead Actor → Writer)' },
+              ].map(({ key, description }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                  <span className="text-gray-300">{description}</span>
+                  <kbd className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-sm font-mono text-cyan-400">{key}</kbd>
+                </div>
+              ))}
+              
+              {/* Help shortcut */}
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-1 mt-3">Help</div>
+              {[
                 { key: '?', description: 'Show this help' },
                 { key: 'Esc', description: 'Close modal / Clear search' },
               ].map(({ key, description }) => (

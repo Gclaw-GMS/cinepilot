@@ -264,6 +264,13 @@ export default function CharacterCostumePage() {
   const handleExportMarkdownRef = useRef<() => void>()
   const charactersLengthRef = useRef(characters.length)
   const filteredCharactersRef = useRef<typeof characters>([])
+  
+  // Number key shortcuts refs
+  const showFiltersRef = useRef(showFilters)
+  const filterRoleRef = useRef(filterRole)
+  const filterStatusRef = useRef(filterStatus)
+  const uniqueRolesRef = useRef(['protagonist', 'antagonist', 'supporting', 'comic', 'romantic', 'mentor', 'tragic'])
+  const uniqueStatusesRef = useRef(['planning', 'in_progress', 'completed'])
 
   const fetchCharacters = useCallback(async () => {
     setLoading(true)
@@ -302,6 +309,57 @@ export default function CharacterCostumePage() {
         return
       }
       
+      // When filters panel is open, number keys filter by role/status
+      if (showFiltersRef.current) {
+        const roles = uniqueRolesRef.current
+        const statuses = uniqueStatusesRef.current
+        
+        // Number keys 1-7 for role filter (when filters open)
+        if (!e.shiftKey) {
+          const roleNum = parseInt(e.key)
+          if (roleNum >= 1 && roleNum <= 7) {
+            e.preventDefault()
+            const role = roles[roleNum - 1]
+            // Toggle: if same role is already selected, clear it
+            if (filterRoleRef.current === role) {
+              setFilterRole('all')
+            } else {
+              setFilterRole(role)
+            }
+            return
+          }
+          // Key 0 or 8 clears role filter
+          if (e.key === '0' || e.key === '8') {
+            e.preventDefault()
+            setFilterRole('all')
+            return
+          }
+        }
+        
+        // Shift + number keys for status filter (when filters open)
+        if (e.shiftKey) {
+          const statusNum = parseInt(e.key)
+          if (statusNum >= 1 && statusNum <= 3) {
+            e.preventDefault()
+            const status = statuses[statusNum - 1]
+            // Toggle: if same status is already selected, clear it
+            if (filterStatusRef.current === status) {
+              setFilterStatus('all')
+            } else {
+              setFilterStatus(status)
+            }
+            return
+          }
+          // Shift+0 or Shift+4 clears status filter
+          if (e.key === '0' || e.key === '4') {
+            e.preventDefault()
+            setFilterStatus('all')
+            return
+          }
+        }
+      }
+      
+      // When filters panel is closed, number keys switch view modes
       switch (e.key) {
         case '1':
           e.preventDefault()
@@ -392,6 +450,19 @@ export default function CharacterCostumePage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showForm, showFilters, filterRole, filterStatus, sortBy, sortOrder])
+
+  // Keep refs in sync with state for keyboard shortcuts
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+  
+  useEffect(() => {
+    filterRoleRef.current = filterRole
+  }, [filterRole])
+  
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
 
   // Click outside handler for export menu and filter panel
   useEffect(() => {
@@ -1104,7 +1175,10 @@ export default function CharacterCostumePage() {
               {showFilters && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-medium">Filter & Sort</span>
+                    <div>
+                      <span className="text-sm font-medium">Filter & Sort</span>
+                      <span className="text-xs text-cyan-400 ml-2">(1-7 for role, ⇧1-3 for status, 0 to clear)</span>
+                    </div>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -1123,14 +1197,14 @@ export default function CharacterCostumePage() {
                         onChange={(e) => setFilterRole(e.target.value)}
                         className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
                       >
-                        <option value="all">All Roles</option>
-                        <option value="protagonist">Protagonist</option>
-                        <option value="antagonist">Antagonist</option>
-                        <option value="supporting">Supporting</option>
-                        <option value="comic">Comic</option>
-                        <option value="romantic">Romantic</option>
-                        <option value="mentor">Mentor</option>
-                        <option value="tragic">Tragic</option>
+                        <option value="all">All Roles (0)</option>
+                        <option value="protagonist">Protagonist (1)</option>
+                        <option value="antagonist">Antagonist (2)</option>
+                        <option value="supporting">Supporting (3)</option>
+                        <option value="comic">Comic (4)</option>
+                        <option value="romantic">Romantic (5)</option>
+                        <option value="mentor">Mentor (6)</option>
+                        <option value="tragic">Tragic (7)</option>
                       </select>
                     </div>
                     
@@ -1142,10 +1216,10 @@ export default function CharacterCostumePage() {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
                       >
-                        <option value="all">All Status</option>
-                        <option value="planning">Planning</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
+                        <option value="all">All Status (⇧0)</option>
+                        <option value="planning">Planning (⇧1)</option>
+                        <option value="in_progress">In Progress (⇧2)</option>
+                        <option value="completed">Completed (⇧3)</option>
                       </select>
                     </div>
                     
@@ -1483,13 +1557,13 @@ export default function CharacterCostumePage() {
                     onChange={(e) => setFilterRole(e.target.value)}
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
                   >
-                    <option value="all">All Roles</option>
-                    <option value="protagonist">Protagonist</option>
-                    <option value="antagonist">Antagonist</option>
-                    <option value="supporting">Supporting</option>
-                    <option value="comic">Comic</option>
-                    <option value="romantic">Romantic</option>
-                    <option value="mentor">Mentor</option>
+                    <option value="all">All Roles (0)</option>
+                    <option value="protagonist">Protagonist (1)</option>
+                    <option value="antagonist">Antagonist (2)</option>
+                    <option value="supporting">Supporting (3)</option>
+                    <option value="comic">Comic (4)</option>
+                    <option value="romantic">Romantic (5)</option>
+                    <option value="mentor">Mentor (6)</option>
                   </select>
                 </div>
                 
@@ -1500,11 +1574,11 @@ export default function CharacterCostumePage() {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
                   >
-                    <option value="all">All Status</option>
-                    <option value="planning">Planning</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="reviewed">Reviewed</option>
+                    <option value="all">All Status (⇧0)</option>
+                    <option value="planning">Planning (⇧1)</option>
+                    <option value="in-progress">In Progress (⇧2)</option>
+                    <option value="completed">Completed (⇧3)</option>
+                    <option value="reviewed">Reviewed (⇧4)</option>
                   </select>
                 </div>
               </div>
@@ -2100,6 +2174,57 @@ export default function CharacterCostumePage() {
                 </button>
               </div>
               <div className="p-4 space-y-3">
+                <div className="text-xs text-cyan-400 uppercase tracking-wider mb-2">When Filters Open</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Protagonist</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Antagonist</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Supporting</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Comic</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">4</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Romantic</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">5</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Mentor</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">6</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Tragic</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">7</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Clear role filter</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">0 / 8</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Planning</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">⇧1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by In Progress</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">⇧2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter by Completed</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">⇧3</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Clear status filter</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">⇧0 / ⇧4</kbd>
+                </div>
+                <div className="border-t border-slate-700 my-3"></div>
+                <div className="text-xs text-purple-400 uppercase tracking-wider mb-2">When Filters Closed</div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">List view</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>

@@ -170,6 +170,17 @@ export default function MissionControl() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const showFilterPanelRef = useRef(showFilterPanel)
+  
+  // Unique filter values (computed from data) - wrapped in useMemo to avoid re-computation
+  const uniqueDepartments = useMemo(() => data?.departments.map(d => d.name) ?? [], [data])
+  const uniqueRiskLevels = useMemo(() => ['low', 'medium', 'high'], [])
+  const uniqueLocations = useMemo(() => data?.locations.map(l => l.name) ?? [], [data])
+  
+  // Refs for keyboard shortcut access to filter values
+  const uniqueDepartmentsRef = useRef(uniqueDepartments)
+  const uniqueRiskLevelsRef = useRef(uniqueRiskLevels)
+  const uniqueLocationsRef = useRef(uniqueLocations)
 
   const fetchData = useCallback(async () => {
     try {
@@ -759,6 +770,71 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
+        // Number keys for quick filtering (when filter panel is open)
+        case '0':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            // Clear all filters
+            setFilterDepartment('all')
+            setFilterRiskLevel('all')
+            setFilterLocation('all')
+          }
+          break
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            const num = parseInt(e.key)
+            const currentDepts = uniqueDepartmentsRef.current
+            const currentRisks = uniqueRiskLevelsRef.current
+            const currentLocs = uniqueLocationsRef.current
+            
+            // First 8 number keys (1-8) for departments
+            if (num <= currentDepts.length) {
+              const dept = currentDepts[num - 1]
+              // Toggle behavior: if same department is selected, clear it
+              setFilterDepartment(prev => prev === dept ? 'all' : dept)
+            } 
+            // Number keys for risk levels (when departments exhausted)
+            else if (num <= currentDepts.length + currentRisks.length) {
+              const risk = currentRisks[num - currentDepts.length - 1]
+              setFilterRiskLevel(prev => prev === risk ? 'all' : risk)
+            }
+            // Number keys for locations (shift + number when filter panel is open)
+          }
+          break
+        // Shift + number keys for location filtering
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+          if (showFilterPanelRef.current && e.shiftKey) {
+            e.preventDefault()
+            const num = parseInt(e.key)
+            const currentLocs = uniqueLocationsRef.current
+            
+            if (num <= currentLocs.length) {
+              const loc = currentLocs[num - 1]
+              // Toggle behavior: if same location is selected, clear it
+              setFilterLocation(prev => prev === loc ? 'all' : loc)
+            }
+          }
+          break
+        case '0':
+          // Shift+0 to clear location filter
+          if (showFilterPanelRef.current && e.shiftKey) {
+            e.preventDefault()
+            setFilterLocation('all')
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -892,6 +968,12 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
   useEffect(() => { filterDepartmentRef.current = filterDepartment }, [filterDepartment])
   useEffect(() => { filterRiskLevelRef.current = filterRiskLevel }, [filterRiskLevel])
   useEffect(() => { filterLocationRef.current = filterLocation }, [filterLocation])
+  useEffect(() => { showFilterPanelRef.current = showFilterPanel }, [showFilterPanel])
+  
+  // Update unique filter values refs when data changes
+  useEffect(() => { uniqueDepartmentsRef.current = uniqueDepartments }, [uniqueDepartments])
+  useEffect(() => { uniqueRiskLevelsRef.current = uniqueRiskLevels }, [uniqueRiskLevels])
+  useEffect(() => { uniqueLocationsRef.current = uniqueLocations }, [uniqueLocations])
 
   if (loading) {
     return (
@@ -1080,21 +1162,21 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
                     </div>
                     {/* Department Filter */}
                     <div>
-                      <label className="block text-xs text-slate-400 mb-2">Department</label>
+                      <label className="block text-xs text-slate-400 mb-2">Department <span className="text-amber-400">(1-8 to filter)</span></label>
                       <select
                         value={filterDepartment}
                         onChange={(e) => setFilterDepartment(e.target.value)}
                         className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
                       >
-                        <option value="all">All Departments</option>
-                        {data?.departments.map(dept => (
-                          <option key={dept.name} value={dept.name}>{dept.name}</option>
+                        <option value="all">All Departments (0)</option>
+                        {data?.departments.map((dept, idx) => (
+                          <option key={dept.name} value={dept.name}>{dept.name} ({idx + 1})</option>
                         ))}
                       </select>
                     </div>
                     {/* Risk Level Filter */}
                     <div>
-                      <label className="block text-xs text-slate-400 mb-2">Risk Level</label>
+                      <label className="block text-xs text-slate-400 mb-2">Risk Level <span className="text-amber-400">(9-{9 + uniqueRiskLevels.length} to filter)</span></label>
                       <select
                         value={filterRiskLevel}
                         onChange={(e) => setFilterRiskLevel(e.target.value)}
@@ -1108,15 +1190,15 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
                     </div>
                     {/* Location Filter */}
                     <div>
-                      <label className="block text-xs text-slate-400 mb-2">Location</label>
+                      <label className="block text-xs text-slate-400 mb-2">Location <span className="text-amber-400">(Shift+1-5 to filter)</span></label>
                       <select
                         value={filterLocation}
                         onChange={(e) => setFilterLocation(e.target.value)}
                         className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
                       >
-                        <option value="all">All Locations</option>
-                        {data?.locations.map(loc => (
-                          <option key={loc.name} value={loc.name}>{loc.name}</option>
+                        <option value="all">All Locations (Shift+0)</option>
+                        {data?.locations.map((loc, idx) => (
+                          <option key={loc.name} value={loc.name}>{loc.name} (Shift+{idx + 1})</option>
                         ))}
                       </select>
                     </div>
@@ -1261,6 +1343,13 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
               <ShortcutRow keys={['P']} description="Print mission report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <h3 className="text-sm font-semibold text-amber-400 mb-2">🔍 When Filters Open</h3>
+              <ShortcutRow keys={['1-8']} description="Filter by department (toggle)" />
+              <ShortcutRow keys={['Shift+1-5']} description="Filter by location (toggle)" />
+              <ShortcutRow keys={['0']} description="Clear all filters" />
+              <ShortcutRow keys={['Shift+0']} description="Clear location filter" />
             </div>
             <div className="mt-6 pt-4 border-t border-white/10">
               <p className="text-xs text-slate-500 text-center">Press the keys to trigger actions</p>

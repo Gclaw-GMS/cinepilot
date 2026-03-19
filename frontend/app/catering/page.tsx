@@ -95,7 +95,6 @@ export default function CateringPage() {
   const sortByRef = useRef(sortBy)
   const sortOrderRef = useRef(sortOrder)
   const showFiltersRef = useRef(showFilters)
-  const filterMealTypeRef = useRef(filters.mealType)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -143,15 +142,10 @@ export default function CateringPage() {
     sortOrderRef.current = sortOrder
   }, [sortBy, sortOrder])
 
-  // Update showFilters ref when showFilters changes
+  // Update showFilters ref when filters visibility changes
   useEffect(() => {
     showFiltersRef.current = showFilters
   }, [showFilters])
-
-  // Update filterMealType ref when filters.mealType changes
-  useEffect(() => {
-    filterMealTypeRef.current = filters.mealType
-  }, [filters.mealType])
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -508,73 +502,65 @@ export default function CateringPage() {
         case '1':
           e.preventDefault()
           if (showFiltersRef.current) {
-            // Filter panel open: show all meal types
+            // Filter panel OPEN: Show all meals
             setFilters(prev => ({ ...prev, mealType: 'all' }))
           } else {
-            // Filter panel closed: switch to calendar view
+            // Filter panel CLOSED: Calendar view
             setViewMode('calendar')
           }
           break
         case '2':
           e.preventDefault()
           if (showFiltersRef.current) {
-            // Filter panel open: filter by breakfast
+            // Filter panel OPEN: Filter to breakfast
             setFilters(prev => ({
               ...prev,
               mealType: prev.mealType === 'breakfast' ? 'all' : 'breakfast'
             }))
           } else {
-            // Filter panel closed: switch to analytics view
+            // Filter panel CLOSED: Analytics view
             setViewMode('analytics')
           }
           break
         case '3':
           e.preventDefault()
           if (showFiltersRef.current) {
-            // Filter panel open: filter by lunch
+            // Filter panel OPEN: Filter to lunch
             setFilters(prev => ({
               ...prev,
               mealType: prev.mealType === 'lunch' ? 'all' : 'lunch'
             }))
           } else {
-            // Filter panel closed: switch to conflicts view
+            // Filter panel CLOSED: Conflicts view
             setViewMode('conflicts')
           }
           break
         case '4':
           e.preventDefault()
           if (showFiltersRef.current) {
-            // Filter panel open: filter by snacks
+            // Filter panel OPEN: Filter to snacks
             setFilters(prev => ({
               ...prev,
               mealType: prev.mealType === 'snacks' ? 'all' : 'snacks'
             }))
           }
-          // When filter panel closed, 4 does nothing
           break
         case '5':
           e.preventDefault()
           if (showFiltersRef.current) {
-            // Filter panel open: filter by dinner
+            // Filter panel OPEN: Filter to dinner
             setFilters(prev => ({
               ...prev,
               mealType: prev.mealType === 'dinner' ? 'all' : 'dinner'
             }))
           }
-          // When filter panel closed, 5 does nothing
-          break
-        case '6':
-        case '7':
-          // These keys only work when filter panel is open
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Reserved for future meal types
-          }
           break
         case '0':
           e.preventDefault()
-          // Clear meal type filter (works in both contexts)
-          setFilters(prev => ({ ...prev, mealType: 'all' }))
+          // Clear meal type filter (works when filter panel is open)
+          if (showFiltersRef.current) {
+            setFilters(prev => ({ ...prev, mealType: 'all' }))
+          }
           break
       }
     }
@@ -952,20 +938,20 @@ export default function CateringPage() {
               <ShortcutRow keys={['F']} description="Toggle filters" />
               <ShortcutRow keys={['S']} description="Toggle sort order" />
               <div className="my-2 pt-2 border-t border-white/10">
-                <p className="text-xs text-slate-400 mb-2">When Filters Panel CLOSED:</p>
+                <p className="text-xs text-amber-400 mb-2">When filters panel CLOSED:</p>
               </div>
               <ShortcutRow keys={['1']} description="Switch to Calendar view" />
               <ShortcutRow keys={['2']} description="Switch to Analytics view" />
               <ShortcutRow keys={['3']} description="Switch to Conflicts view" />
               <div className="my-2 pt-2 border-t border-white/10">
-                <p className="text-xs text-cyan-400 mb-2">When Filters Panel OPEN:</p>
+                <p className="text-xs text-cyan-400 mb-2">When filters panel OPEN:</p>
               </div>
-              <ShortcutRow keys={['1']} description="Filter to All Meal Types" highlight />
-              <ShortcutRow keys={['2']} description="Filter by Breakfast (toggle)" highlight />
-              <ShortcutRow keys={['3']} description="Filter by Lunch (toggle)" highlight />
-              <ShortcutRow keys={['4']} description="Filter by Snacks (toggle)" highlight />
-              <ShortcutRow keys={['5']} description="Filter by Dinner (toggle)" highlight />
-              <ShortcutRow keys={['0']} description="Clear meal type filter" highlight />
+              <ShortcutRow keys={['1']} description="Show all meals" />
+              <ShortcutRow keys={['2']} description="Filter by Breakfast (toggle)" />
+              <ShortcutRow keys={['3']} description="Filter by Lunch (toggle)" />
+              <ShortcutRow keys={['4']} description="Filter by Snacks (toggle)" />
+              <ShortcutRow keys={['5']} description="Filter by Dinner (toggle)" />
+              <ShortcutRow keys={['0']} description="Clear meal type filter" />
               <div className="my-2 pt-2 border-t border-white/10">
                 <p className="text-xs text-slate-400 mb-2">Actions</p>
               </div>
@@ -1092,7 +1078,7 @@ export default function CateringPage() {
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-cyan-400 mb-3">(1-5 for meal type, 0 to clear)</p>
+                      <p className="text-xs text-cyan-400/70">Press 1-5 for meal type, 0 to clear</p>
                       
                       {/* Sort Options */}
                       <div className="mb-4 p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">
@@ -1126,11 +1112,11 @@ export default function CateringPage() {
                           onChange={(e) => setFilters(prev => ({ ...prev, mealType: e.target.value as typeof filters.mealType }))}
                           className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"
                         >
-                          <option value="all">All Meal Types (0)</option>
-                          <option value="breakfast">Breakfast (4)</option>
-                          <option value="lunch">Lunch (5)</option>
-                          <option value="snacks">Snacks (6)</option>
-                          <option value="dinner">Dinner (7)</option>
+                          <option value="all">All Meal Types (1)</option>
+                          <option value="breakfast">Breakfast (2)</option>
+                          <option value="lunch">Lunch (3)</option>
+                          <option value="snacks">Snacks (4)</option>
+                          <option value="dinner">Dinner (5)</option>
                         </select>
                       </div>
                       
@@ -1666,13 +1652,13 @@ export default function CateringPage() {
   )
 }
 
-function ShortcutRow({ keys, description, highlight }: { keys: string[], description: string, highlight?: boolean }) {
+function ShortcutRow({ keys, description }: { keys: string[], description: string }) {
   return (
     <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
-      <span className={highlight ? "text-cyan-300" : "text-slate-300"}>{description}</span>
+      <span className="text-slate-300">{description}</span>
       <div className="flex gap-1">
         {keys.map((key, i) => (
-          <kbd key={i} className={`px-3 py-1.5 bg-slate-800 border rounded-md text-sm font-mono ${highlight ? 'border-cyan-600 text-cyan-400' : 'border-slate-600 text-cyan-400'}`}>
+          <kbd key={i} className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono text-cyan-400">
             {key}
           </kbd>
         ))}

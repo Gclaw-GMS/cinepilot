@@ -174,7 +174,6 @@ export default function AnalyticsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -203,6 +202,21 @@ export default function AnalyticsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Refs for keyboard shortcuts - filter panel visibility and values
+  const showFilterPanelRef = useRef(showFilterPanel)
+  const timePeriodFilterRef = useRef(filters.timePeriod)
+  const departmentFilterRef = useRef(filters.department)
+  
+  // Sync refs with state
+  useEffect(() => {
+    showFilterPanelRef.current = showFilterPanel
+  }, [showFilterPanel])
+  
+  useEffect(() => {
+    timePeriodFilterRef.current = filters.timePeriod
+    departmentFilterRef.current = filters.department
+  }, [filters.timePeriod, filters.department])
 
   // Calculate active filter count
   const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
@@ -283,7 +297,6 @@ export default function AnalyticsPage() {
         setDashboard(dashData)
         setMetrics(metricsData)
         setIsDemoMode(dashData.isDemoMode === true || metricsData.isDemoMode === true)
-        setLastUpdated(new Date())
       }
     } catch (err) {
       console.error('Failed to fetch analytics:', err)
@@ -307,6 +320,80 @@ export default function AnalyticsPage() {
         return
       }
       
+      const isFilterPanelOpen = showFilterPanelRef.current
+      
+      // When filter panel is open, number keys filter by time period/department
+      if (isFilterPanelOpen) {
+        // Number keys 1-4 for time period (toggle behavior)
+        if (e.key === '1' && !e.shiftKey) {
+          e.preventDefault()
+          const newValue = timePeriodFilterRef.current === 'week' ? 'all' : 'week'
+          setFilters(prev => ({ ...prev, timePeriod: newValue }))
+          return
+        }
+        if (e.key === '2' && !e.shiftKey) {
+          e.preventDefault()
+          const newValue = timePeriodFilterRef.current === 'month' ? 'all' : 'month'
+          setFilters(prev => ({ ...prev, timePeriod: newValue }))
+          return
+        }
+        if (e.key === '3' && !e.shiftKey) {
+          e.preventDefault()
+          const newValue = timePeriodFilterRef.current === 'quarter' ? 'all' : 'quarter'
+          setFilters(prev => ({ ...prev, timePeriod: newValue }))
+          return
+        }
+        if (e.key === '4' && !e.shiftKey) {
+          e.preventDefault()
+          const newValue = timePeriodFilterRef.current === 'year' ? 'all' : 'year'
+          setFilters(prev => ({ ...prev, timePeriod: newValue }))
+          return
+        }
+        if (e.key === '0' && !e.shiftKey) {
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, timePeriod: 'all' }))
+          return
+        }
+        
+        // Shift + number keys 1-5 for department (toggle behavior)
+        if (e.shiftKey && e.key === '1') {
+          e.preventDefault()
+          const newValue = departmentFilterRef.current === 'camera' ? 'all' : 'camera'
+          setFilters(prev => ({ ...prev, department: newValue }))
+          return
+        }
+        if (e.shiftKey && e.key === '2') {
+          e.preventDefault()
+          const newValue = departmentFilterRef.current === 'lighting' ? 'all' : 'lighting'
+          setFilters(prev => ({ ...prev, department: newValue }))
+          return
+        }
+        if (e.shiftKey && e.key === '3') {
+          e.preventDefault()
+          const newValue = departmentFilterRef.current === 'sound' ? 'all' : 'sound'
+          setFilters(prev => ({ ...prev, department: newValue }))
+          return
+        }
+        if (e.shiftKey && e.key === '4') {
+          e.preventDefault()
+          const newValue = departmentFilterRef.current === 'art' ? 'all' : 'art'
+          setFilters(prev => ({ ...prev, department: newValue }))
+          return
+        }
+        if (e.shiftKey && e.key === '5') {
+          e.preventDefault()
+          const newValue = departmentFilterRef.current === 'vfx' ? 'all' : 'vfx'
+          setFilters(prev => ({ ...prev, department: newValue }))
+          return
+        }
+        if (e.shiftKey && e.key === '0') {
+          e.preventDefault()
+          setFilters(prev => ({ ...prev, department: 'all' }))
+          return
+        }
+      }
+      
+      // When filter panel is closed, number keys switch view modes
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
@@ -904,43 +991,10 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-        {/* Header Skeleton */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="h-10 w-64 bg-slate-700/50 rounded-lg animate-pulse mb-2" />
-            <div className="h-5 w-80 bg-slate-700/30 rounded animate-pulse" />
-          </div>
-          <div className="flex gap-3">
-            <div className="h-10 w-40 bg-slate-700/50 rounded-lg animate-pulse" />
-            <div className="h-10 w-24 bg-slate-700/50 rounded-lg animate-pulse" />
-          </div>
-        </div>
-        
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-slate-700/50 rounded-lg animate-pulse" />
-                <div className="h-4 w-20 bg-slate-700/30 rounded animate-pulse" />
-              </div>
-              <div className="h-8 w-24 bg-slate-700/50 rounded animate-pulse mb-2" />
-              <div className="h-3 w-32 bg-slate-700/30 rounded animate-pulse" />
-            </div>
-          ))}
-        </div>
-        
-        {/* Charts Skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 h-96">
-            <div className="h-6 w-40 bg-slate-700/50 rounded animate-pulse mb-4" />
-            <div className="h-72 bg-slate-700/30 rounded animate-pulse" />
-          </div>
-          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 h-96">
-            <div className="h-6 w-40 bg-slate-700/50 rounded animate-pulse mb-4" />
-            <div className="h-72 bg-slate-700/30 rounded animate-pulse" />
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
+          <p className="text-slate-400">Loading analytics...</p>
         </div>
       </div>
     )
@@ -958,7 +1012,6 @@ export default function AnalyticsPage() {
           <p className="text-slate-400 mt-1">
             Real-time insights into your film's production metrics
             {isDemoMode && <span className="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded">Demo Data</span>}
-            {!isDemoMode && <span className="ml-2 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded">Live Data</span>}
           </p>
         </div>
         
@@ -992,11 +1045,6 @@ export default function AnalyticsPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          {lastUpdated && (
-            <span className="text-xs text-slate-500">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </span>
-          )}
           
           <div className="relative" ref={filterPanelRef}>
             <button
@@ -1015,7 +1063,8 @@ export default function AnalyticsPage() {
             {showFilterPanel && (
               <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-700">
-                  <h3 className="text-white font-medium mb-3">Filter & Sort</h3>
+                  <h3 className="text-white font-medium mb-1">Filter & Sort</h3>
+                  <p className="text-xs text-amber-400">1-4: time period • Shift+1-5: department • 0/Shift+0: clear</p>
                   
                   {/* Sort Options */}
                   <div className="mb-4 p-3 bg-indigo-900/30 rounded-lg border border-indigo-700/50">
@@ -1053,34 +1102,34 @@ export default function AnalyticsPage() {
                   
                   {/* Time Period Filter */}
                   <div className="mb-4">
-                    <label className="block text-sm text-slate-400 mb-2">Time Period</label>
+                    <label className="block text-sm text-slate-400 mb-2">Time Period <span className="text-amber-400">(1-4 to filter, 0 to clear)</span></label>
                     <select
                       value={filters.timePeriod}
                       onChange={(e) => setFilters(prev => ({ ...prev, timePeriod: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="all">All Time</option>
-                      <option value="week">This Week</option>
-                      <option value="month">This Month</option>
-                      <option value="quarter">This Quarter</option>
-                      <option value="year">This Year</option>
+                      <option value="all">All Time (0)</option>
+                      <option value="week">This Week (1)</option>
+                      <option value="month">This Month (2)</option>
+                      <option value="quarter">This Quarter (3)</option>
+                      <option value="year">This Year (4)</option>
                     </select>
                   </div>
                   
                   {/* Department Filter */}
                   <div className="mb-4">
-                    <label className="block text-sm text-slate-400 mb-2">Department</label>
+                    <label className="block text-sm text-slate-400 mb-2">Department <span className="text-amber-400">(Shift+1-5 to filter, Shift+0 to clear)</span></label>
                     <select
                       value={filters.department}
                       onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="all">All Departments</option>
-                      <option value="camera">Camera</option>
-                      <option value="lighting">Lighting</option>
-                      <option value="sound">Sound</option>
-                      <option value="art">Art</option>
-                      <option value="vfx">VFX</option>
+                      <option value="all">All Departments (Shift+0)</option>
+                      <option value="camera">Camera (Shift+1)</option>
+                      <option value="lighting">Lighting (Shift+2)</option>
+                      <option value="sound">Sound (Shift+3)</option>
+                      <option value="art">Art (Shift+4)</option>
+                      <option value="vfx">VFX (Shift+5)</option>
                     </select>
                   </div>
                   
@@ -1620,7 +1669,7 @@ export default function AnalyticsPage() {
           onClick={() => setShowShortcuts(false)}
         >
           <div 
-            className="bg-slate-800 rounded-xl border border-slate-700 p-6 max-w-md w-full mx-4 shadow-2xl"
+            className="bg-slate-800 rounded-xl border border-slate-700 p-6 max-w-lg w-full mx-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
@@ -1636,31 +1685,63 @@ export default function AnalyticsPage() {
               </button>
             </div>
             
-            <div className="space-y-3">
-              {[
-                { key: 'R', description: 'Refresh analytics data' },
-                { key: 'F', description: 'Toggle filter & sort panel' },
-                { key: 'S', description: 'Toggle sort order (asc/desc)' },
-                { key: 'E', description: 'Toggle export dropdown' },
-                { key: 'M', description: 'Export as Markdown' },
-                { key: 'P', description: 'Print analytics report' },
-                { key: '/', description: 'Focus search input' },
-                { key: '1', description: 'Switch to Overview view' },
-                { key: '2', description: 'Switch to Performance view' },
-                { key: '3', description: 'Switch to Forecast view' },
-                { key: '?', description: 'Show this help modal' },
-                { key: 'Esc', description: 'Close modal, menus, or clear filters & sort' },
-              ].map((shortcut) => (
-                <div 
-                  key={shortcut.key}
-                  className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
-                >
-                  <span className="text-slate-300">{shortcut.description}</span>
-                  <kbd className="px-3 py-1 bg-slate-600 text-white text-sm font-mono rounded border border-slate-500">
-                    {shortcut.key}
-                  </kbd>
-                </div>
-              ))}
+            {/* When filter panel CLOSED */}
+            <div className="mb-6">
+              <h3 className="text-amber-400 text-sm font-medium mb-3 uppercase tracking-wide">
+                When Filters Closed
+              </h3>
+              <div className="space-y-2">
+                {[
+                  { key: 'R', description: 'Refresh analytics data' },
+                  { key: 'F', description: 'Toggle filter & sort panel' },
+                  { key: 'S', description: 'Toggle sort order (asc/desc)' },
+                  { key: 'E', description: 'Toggle export dropdown' },
+                  { key: 'M', description: 'Export as Markdown' },
+                  { key: 'P', description: 'Print analytics report' },
+                  { key: '/', description: 'Focus search input' },
+                  { key: '1', description: 'Switch to Overview view' },
+                  { key: '2', description: 'Switch to Performance view' },
+                  { key: '3', description: 'Switch to Forecast view' },
+                  { key: '?', description: 'Show this help modal' },
+                  { key: 'Esc', description: 'Close modal, menus, or clear' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
+                  >
+                    <span className="text-slate-300 text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-1 bg-slate-600 text-white text-xs font-mono rounded border border-slate-500">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* When filter panel OPEN */}
+            <div>
+              <h3 className="text-cyan-400 text-sm font-medium mb-3 uppercase tracking-wide">
+                When Filters Open
+              </h3>
+              <div className="space-y-2">
+                {[
+                  { key: '1-4', description: 'Filter by time period (week/month/quarter/year)' },
+                  { key: '0', description: 'Clear time period filter' },
+                  { key: 'Shift+1-5', description: 'Filter by department (camera/lighting/sound/art/vfx)' },
+                  { key: 'Shift+0', description: 'Clear department filter' },
+                  { key: 'F', description: 'Close filter panel' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
+                  >
+                    <span className="text-slate-300 text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-1 bg-slate-600 text-white text-xs font-mono rounded border border-slate-500">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
             </div>
             
             <p className="text-slate-500 text-sm text-center mt-6">

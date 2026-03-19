@@ -108,11 +108,31 @@ export default function ProgressPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(progress)
+  
+  // Refs for keyboard shortcuts to avoid dependency issues
+  const showFiltersRef = useRef(showFilters)
+  const filterStatusRef = useRef(filterStatus)
+  const filterPriorityRef = useRef(filterPriority)
+  const viewModeRef = useRef(viewMode)
 
   // Update progress ref when progress changes
   useEffect(() => {
     progressRef.current = progress
   }, [progress])
+
+  // Keep keyboard shortcut refs in sync
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
+  useEffect(() => {
+    filterPriorityRef.current = filterPriority
+  }, [filterPriority])
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -587,17 +607,85 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        // Context-aware number key shortcuts
+        // When filters panel OPEN: filter by status/priority
+        // When filters panel CLOSED: switch view modes
         case '1':
           e.preventDefault()
-          setViewMode('timeline')
+          if (showFiltersRef.current) {
+            // Filter by status: completed
+            setFilterStatus(prev => prev === 'completed' ? 'all' : 'completed')
+          } else {
+            setViewMode('timeline')
+          }
           break
         case '2':
           e.preventDefault()
-          setViewMode('tasks')
+          if (showFiltersRef.current) {
+            // Filter by status: in_progress
+            setFilterStatus(prev => prev === 'in_progress' ? 'all' : 'in_progress')
+          } else {
+            setViewMode('tasks')
+          }
           break
         case '3':
           e.preventDefault()
-          setViewMode('kanban')
+          if (showFiltersRef.current) {
+            // Filter by status: pending
+            setFilterStatus(prev => prev === 'pending' ? 'all' : 'pending')
+          } else {
+            setViewMode('kanban')
+          }
+          break
+        case '4':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Filter by status: delayed
+            setFilterStatus(prev => prev === 'delayed' ? 'all' : 'delayed')
+          }
+          break
+        case '5':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Filter by status: blocked
+            setFilterStatus(prev => prev === 'blocked' ? 'all' : 'blocked')
+          }
+          break
+        case '6':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Filter by priority: critical (Shift+6)
+            setFilterPriority(prev => prev === 'critical' ? 'all' : 'critical')
+          }
+          break
+        case '7':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Filter by priority: high
+            setFilterPriority(prev => prev === 'high' ? 'all' : 'high')
+          }
+          break
+        case '8':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Filter by priority: medium
+            setFilterPriority(prev => prev === 'medium' ? 'all' : 'medium')
+          }
+          break
+        case '9':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Filter by priority: low
+            setFilterPriority(prev => prev === 'low' ? 'all' : 'low')
+          }
+          break
+        case '0':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Clear all filters
+            setFilterStatus('all')
+            setFilterPriority('all')
+          }
           break
         case 'e':
           e.preventDefault()
@@ -993,33 +1081,33 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Status Filter */}
             <div>
-              <label className="block text-xs text-slate-500 mb-2">Status</label>
+              <label className="block text-xs text-slate-500 mb-2">Status <span className="text-amber-400">(1-5 to filter)</span></label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
               >
-                <option value="all">All Status</option>
-                <option value="completed">Completed</option>
-                <option value="in_progress">In Progress</option>
-                <option value="pending">Pending</option>
-                <option value="delayed">Delayed</option>
-                <option value="blocked">Blocked</option>
+                <option value="all">All Status (1)</option>
+                <option value="completed">Completed (1)</option>
+                <option value="in_progress">In Progress (2)</option>
+                <option value="pending">Pending (3)</option>
+                <option value="delayed">Delayed (4)</option>
+                <option value="blocked">Blocked (5)</option>
               </select>
             </div>
             {/* Priority Filter */}
             <div>
-              <label className="block text-xs text-slate-500 mb-2">Priority</label>
+              <label className="block text-xs text-slate-500 mb-2">Priority <span className="text-amber-400">(6-9 to filter)</span></label>
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value as typeof filterPriority)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
               >
-                <option value="all">All Priority</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
+                <option value="all">All Priority (6)</option>
+                <option value="critical">Critical (6)</option>
+                <option value="high">High (7)</option>
+                <option value="medium">Medium (8)</option>
+                <option value="low">Low (9)</option>
               </select>
             </div>
             {/* Sort By */}
@@ -1085,6 +1173,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
               </button>
             </div>
             <div className="space-y-2">
+              <div className="text-xs text-amber-400 font-medium mb-2">When filters panel CLOSED:</div>
               {[
                 { key: 'R', action: 'Refresh data' },
                 { key: '/', action: 'Focus search' },
@@ -1098,6 +1187,26 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
                 { key: 'P', action: 'Print report' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">
+                  <span className="text-slate-300">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm font-mono text-cyan-400">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+              <div className="text-xs text-amber-400 font-medium mb-2 mt-4">When filters panel OPEN:</div>
+              {[
+                { key: '1', action: 'Filter by status: completed (toggle)' },
+                { key: '2', action: 'Filter by status: in_progress (toggle)' },
+                { key: '3', action: 'Filter by status: pending (toggle)' },
+                { key: '4', action: 'Filter by status: delayed (toggle)' },
+                { key: '5', action: 'Filter by status: blocked (toggle)' },
+                { key: '6', action: 'Filter by priority: critical (toggle)' },
+                { key: '7', action: 'Filter by priority: high (toggle)' },
+                { key: '8', action: 'Filter by priority: medium (toggle)' },
+                { key: '9', action: 'Filter by priority: low (toggle)' },
+                { key: '0', action: 'Clear all filters' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">
                   <span className="text-slate-300">{shortcut.action}</span>

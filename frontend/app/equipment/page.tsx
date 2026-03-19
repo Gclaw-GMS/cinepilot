@@ -137,6 +137,10 @@ export default function EquipmentPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'status' | 'dailyRate' | 'dateEnd'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // Refs for keyboard shortcuts (to avoid dependency issues)
+  const showFiltersRef = useRef(showFilters)
+  const filterStatusRef = useRef(filterStatus)
   const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(new Set())
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
@@ -172,6 +176,15 @@ export default function EquipmentPage() {
   const clearSelectionRef = useRef<() => void>(() => {})
   const selectAllEquipmentRef = useRef<() => void>(() => {})
   const filteredLengthRef = useRef<number>(0)
+
+  // Keep refs in sync with state for keyboard shortcuts
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -577,6 +590,9 @@ export default function EquipmentPage() {
         return
       }
       
+      // Context-aware keyboard shortcuts
+      const isFiltersOpen = showFiltersRef.current
+      
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
@@ -588,15 +604,51 @@ export default function EquipmentPage() {
           break
         case '1':
           e.preventDefault()
-          setViewMode('list')
+          if (isFiltersOpen) {
+            // Filter by all status
+            setFilterStatus(prev => prev === 'all' ? 'all' : 'all')
+          } else {
+            setViewMode('list')
+          }
           break
         case '2':
           e.preventDefault()
-          setViewMode('analytics')
+          if (isFiltersOpen) {
+            // Filter by available status (toggle)
+            setFilterStatus(prev => prev === 'available' ? 'all' : 'available')
+          } else {
+            setViewMode('analytics')
+          }
           break
         case '3':
           e.preventDefault()
-          setViewMode('conflicts')
+          if (isFiltersOpen) {
+            // Filter by in-use status (toggle)
+            setFilterStatus(prev => prev === 'in-use' ? 'all' : 'in-use')
+          } else {
+            setViewMode('conflicts')
+          }
+          break
+        case '4':
+          e.preventDefault()
+          if (isFiltersOpen) {
+            // Filter by maintenance status (toggle)
+            setFilterStatus(prev => prev === 'maintenance' ? 'all' : 'maintenance')
+          }
+          break
+        case '5':
+          e.preventDefault()
+          if (isFiltersOpen) {
+            // Filter by returned status (toggle)
+            setFilterStatus(prev => prev === 'returned' ? 'all' : 'returned')
+          }
+          break
+        case '0':
+          e.preventDefault()
+          if (isFiltersOpen) {
+            // Clear status filter
+            setFilterStatus('all')
+          }
           break
         case '/':
           e.preventDefault()
@@ -1094,7 +1146,10 @@ export default function EquipmentPage() {
               {showFilters && (
                 <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-medium">Filters</span>
+                    <div>
+                      <span className="text-sm font-medium">Filters</span>
+                      <span className="text-xs text-cyan-400 ml-2">(1-5 for status, 0 to clear)</span>
+                    </div>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -1998,7 +2053,45 @@ export default function EquipmentPage() {
                   <X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                <div className="text-xs font-medium text-cyan-400 uppercase tracking-wider mt-2 mb-1">When Filters OPEN (press F)</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter All Status</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-cyan-300 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter Available (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-cyan-300 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter In-Use (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-cyan-300 rounded text-sm">3</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter Maintenance (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-cyan-300 rounded text-sm">4</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Filter Returned (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-cyan-300 rounded text-sm">5</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Clear Status Filter</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-cyan-300 rounded text-sm">0</kbd>
+                </div>
+                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">When Filters CLOSED</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Switch to List view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Switch to Analytics view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Switch to Conflicts view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
+                </div>
                 <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Selection</div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Select all equipment</span>

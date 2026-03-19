@@ -167,6 +167,19 @@ export default function SettingsPage() {
   const saveRef = useRef<() => void>(() => {});
   const handlePrintRef = useRef<() => void>(() => {});
   const handleExportMarkdownRef = useRef<() => void>(() => {});
+  
+  // Refs for context-aware keyboard shortcuts
+  const showFilterPanelRef = useRef(showFilterPanel);
+  const activeFilterRef = useRef(activeFilter);
+  
+  // Sync refs with state for context-aware shortcuts
+  useEffect(() => {
+    showFilterPanelRef.current = showFilterPanel;
+  }, [showFilterPanel]);
+  
+  useEffect(() => {
+    activeFilterRef.current = activeFilter;
+  }, [activeFilter]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -224,6 +237,54 @@ export default function SettingsPage() {
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         setShowFilterPanel(!showFilterPanel);
+      }
+
+      // Context-aware number keys for category filtering
+      if (showFilterPanelRef.current) {
+        // When filter panel is OPEN: Number keys 1-5 filter by category (toggle)
+        const filterCategories: Record<string, string> = {
+          '1': 'all',
+          '2': 'language',
+          '3': 'ai',
+          '4': 'appearance',
+          '5': 'notifications',
+          '6': 'production',
+        };
+        
+        if (filterCategories[e.key]) {
+          e.preventDefault();
+          const category = filterCategories[e.key];
+          // Toggle behavior: if same category is selected, clear to 'all'
+          if (activeFilterRef.current === category) {
+            setActiveFilter('all');
+          } else {
+            setActiveFilter(category);
+          }
+        }
+        
+        // 0: Clear filter (show all)
+        if (e.key === '0') {
+          e.preventDefault();
+          setActiveFilter('all');
+        }
+      } else {
+        // When filter panel is CLOSED: Number keys could do something else
+        // For now, we'll just open the filter panel when 1-6 is pressed
+        const filterCategories: Record<string, string> = {
+          '1': 'all',
+          '2': 'language',
+          '3': 'ai',
+          '4': 'appearance',
+          '5': 'notifications',
+          '6': 'production',
+        };
+        
+        if (filterCategories[e.key]) {
+          e.preventDefault();
+          setShowFilterPanel(true);
+          const category = filterCategories[e.key];
+          setActiveFilter(category);
+        }
       }
 
       // Escape: Close modal
@@ -595,7 +656,7 @@ export default function SettingsPage() {
                 )}
               </button>
               {showFilterPanel && (
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="p-3 border-b border-slate-700">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">Filter Settings</span>
@@ -608,6 +669,7 @@ export default function SettingsPage() {
                         </button>
                       )}
                     </div>
+                    <div className="text-xs text-cyan-400 mt-1">(1-6 to filter, 0 to clear)</div>
                   </div>
                   <div className="p-2">
                     <button
@@ -616,6 +678,7 @@ export default function SettingsPage() {
                         activeFilter === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
+                      <span className="text-amber-400 mr-2">1</span>
                       All Settings
                     </button>
                     <button
@@ -624,6 +687,7 @@ export default function SettingsPage() {
                         activeFilter === 'language' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
+                      <span className="text-amber-400 mr-2">2</span>
                       Language & Region
                     </button>
                     <button
@@ -632,6 +696,7 @@ export default function SettingsPage() {
                         activeFilter === 'ai' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
+                      <span className="text-amber-400 mr-2">3</span>
                       AI & Language
                     </button>
                     <button
@@ -640,6 +705,7 @@ export default function SettingsPage() {
                         activeFilter === 'appearance' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
+                      <span className="text-amber-400 mr-2">4</span>
                       Appearance
                     </button>
                     <button
@@ -648,6 +714,7 @@ export default function SettingsPage() {
                         activeFilter === 'notifications' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
+                      <span className="text-amber-400 mr-2">5</span>
                       Notifications
                     </button>
                     <button
@@ -656,6 +723,7 @@ export default function SettingsPage() {
                         activeFilter === 'production' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
                       }`}
                     >
+                      <span className="text-amber-400 mr-2">6</span>
                       Production
                     </button>
                   </div>
@@ -1014,8 +1082,61 @@ export default function SettingsPage() {
               </button>
             </div>
             <div className="space-y-2">
+              {/* General Shortcuts */}
+              <div className="text-xs text-cyan-400 mb-1">General:</div>
               {[
                 { key: '/', action: 'Focus search' },
+                { key: '?', action: 'Show shortcuts' },
+                { key: 'Esc', action: 'Close modal' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-1">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-xs font-mono text-slate-300 border border-slate-700">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+              
+              {/* Filter Panel Closed - Number keys open filter */}
+              <div className="text-xs text-amber-400 mt-3 mb-1">When filters closed:</div>
+              {[
+                { key: '1', action: 'Show all settings' },
+                { key: '2', action: 'Filter: Language' },
+                { key: '3', action: 'Filter: AI' },
+                { key: '4', action: 'Filter: Appearance' },
+                { key: '5', action: 'Filter: Notifications' },
+                { key: '6', action: 'Filter: Production' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-1">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-xs font-mono text-amber-400 border border-slate-700">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+              
+              {/* Filter Panel Open - Number keys filter */}
+              <div className="text-xs text-cyan-400 mt-3 mb-1">When filters open:</div>
+              {[
+                { key: '1', action: 'Filter: All (toggle)' },
+                { key: '2', action: 'Filter: Language (toggle)' },
+                { key: '3', action: 'Filter: AI (toggle)' },
+                { key: '4', action: 'Filter: Appearance (toggle)' },
+                { key: '5', action: 'Filter: Notifications (toggle)' },
+                { key: '6', action: 'Filter: Production (toggle)' },
+                { key: '0', action: 'Clear filter' },
+              ].map((shortcut) => (
+                <div key={shortcut.key} className="flex items-center justify-between py-1">
+                  <span className="text-slate-400 text-sm">{shortcut.action}</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-xs font-mono text-cyan-400 border border-slate-700">
+                    {shortcut.key}
+                  </kbd>
+                </div>
+              ))}
+              
+              {/* Action Shortcuts */}
+              <div className="text-xs text-emerald-400 mt-3 mb-1">Actions:</div>
+              {[
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
@@ -1023,10 +1144,8 @@ export default function SettingsPage() {
                 { key: 'E', action: 'Export menu' },
                 { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print settings' },
-                { key: '?', action: 'Show shortcuts' },
-                { key: 'Esc', action: 'Close modal' },
               ].map((shortcut) => (
-                <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                <div key={shortcut.key} className="flex items-center justify-between py-1">
                   <span className="text-slate-400 text-sm">{shortcut.action}</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-xs font-mono text-slate-300 border border-slate-700">
                     {shortcut.key}

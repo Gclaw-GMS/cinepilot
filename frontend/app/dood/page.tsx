@@ -136,6 +136,7 @@ export default function DOODPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'analytics' | 'workload'>('analytics')
   const [filterRole, setFilterRole] = useState<'all' | 'main' | 'supporting'>('all')
+  const [filterHighCompletion, setFilterHighCompletion] = useState(false)
   const [filterSearch, setFilterSearch] = useState('')
   
   // Sort state
@@ -153,12 +154,13 @@ export default function DOODPage() {
   const handleExportMarkdownRef = useRef<() => void>()
   const showKeyboardHelpRef = useRef(showKeyboardHelp)
   const filterRoleRef = useRef(filterRole)
+  const filterHighCompletionRef = useRef(filterHighCompletion)
   const filterSearchRef = useRef(filterSearch)
   const sortByRef = useRef(sortBy)
   const sortOrderRef = useRef(sortOrder)
   
   // Active filter count for badge (includes sort as active filter)
-  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterSearch.trim() ? 1 : 0) + (sortBy !== 'character' || sortOrder !== 'asc' ? 1 : 0)
+  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterHighCompletion ? 1 : 0) + (filterSearch.trim() ? 1 : 0) + (sortBy !== 'character' || sortOrder !== 'asc' ? 1 : 0)
 
   // Update refs when values change
   useEffect(() => {
@@ -169,6 +171,10 @@ export default function DOODPage() {
   useEffect(() => {
     filterRoleRef.current = filterRole
   }, [filterRole])
+
+  useEffect(() => {
+    filterHighCompletionRef.current = filterHighCompletion
+  }, [filterHighCompletion])
 
   useEffect(() => {
     filterSearchRef.current = filterSearch
@@ -277,10 +283,16 @@ export default function DOODPage() {
           // Filter by Supporting Cast (toggle)
           setFilterRole(filterRoleRef.current === 'supporting' ? 'all' : 'supporting')
           break
+        case '3':
+          e.preventDefault()
+          // Filter by High Completion (>=70%) - toggle
+          setFilterHighCompletion(prev => !prev)
+          break
         case '0':
           e.preventDefault()
-          // Clear role filter
+          // Clear role filter and completion filter
           setFilterRole('all')
+          setFilterHighCompletion(false)
           break
         case 'a':
           e.preventDefault()
@@ -348,6 +360,11 @@ export default function DOODPage() {
       filtered = filtered.filter(r => !r.isMain)
     }
     
+    // Filter by high completion (>=70%)
+    if (filterHighCompletion) {
+      filtered = filtered.filter(r => r.percentage >= 70)
+    }
+    
     // Filter by search
     if (filterSearch.trim()) {
       const searchLower = filterSearch.toLowerCase()
@@ -384,7 +401,7 @@ export default function DOODPage() {
     })
     
     return sorted
-  }, [report, filterRole, filterSearch, sortBy, sortOrder])
+  }, [report, filterRole, filterHighCompletion, filterSearch, sortBy, sortOrder])
 
   // Chart data
   const pieChartData = useMemo(() => {
@@ -1176,6 +1193,19 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
                   <option value="main">Main Cast (1)</option>
                   <option value="supporting">Supporting (2)</option>
                 </select>
+              </div>
+              {/* High Completion Filter */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFilterHighCompletion(!filterHighCompletion)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    filterHighCompletion
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-800 border border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>≥70% Complete (3)</span>
+                </button>
               </div>
               {/* Search Filter */}
               <div className="flex items-center gap-2">
@@ -2077,6 +2107,10 @@ ${workloadWarnings.length > 0 ? workloadWarnings.join('\n') : '✅ No workload w
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Filter Supporting</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">High Completion (≥70%)</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">3</kbd>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Clear filter</span>

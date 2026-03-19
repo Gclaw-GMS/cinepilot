@@ -163,6 +163,8 @@ export default function LocationsPage() {
     intExt: 'all',
     timeOfDay: 'all',
     favoritesOnly: false,
+    minScore: 0, // Minimum score filter (0-100)
+    riskFree: false, // Filter to show only locations without risk flags
   })
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -189,6 +191,8 @@ export default function LocationsPage() {
     if (filters.intExt !== 'all') count++
     if (filters.timeOfDay !== 'all') count++
     if (filters.favoritesOnly) count++
+    if (filters.minScore > 0) count++
+    if (filters.riskFree) count++
     if (sortBy !== 'score' || sortOrder !== 'desc') count++
     return count
   }, [filters, sortBy, sortOrder])
@@ -308,7 +312,13 @@ export default function LocationsPage() {
         case '0':
           // Clear all filters
           if (showFiltersRef.current) {
-            setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })
+            setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false, minScore: 0, riskFree: false })
+          }
+          break
+        case 'm':
+          // Toggle risk-free filter
+          if (showFiltersRef.current) {
+            setFilters(prev => ({ ...prev, riskFree: !prev.riskFree }))
           }
           break
         case 'f':
@@ -773,6 +783,16 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
       result = result.filter(c => c.id && favorites.has(c.id))
     }
     
+    // Apply minimum score filter
+    if (filters.minScore > 0) {
+      result = result.filter(c => c.scoreTotal >= filters.minScore)
+    }
+    
+    // Apply risk-free filter (show only locations without risk flags)
+    if (filters.riskFree) {
+      result = result.filter(c => !c.riskFlags || c.riskFlags.length === 0)
+    }
+    
     if (sortBy === 'score') {
       return result.sort((a, b) => sortOrder === 'desc' ? b.scoreTotal - a.scoreTotal : a.scoreTotal - b.scoreTotal)
     }
@@ -1062,10 +1082,34 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 <span className="text-sm text-slate-300">Favorites Only</span>
               </label>
             </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.riskFree}
+                  onChange={(e) => setFilters(prev => ({ ...prev, riskFree: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                />
+                <span className="text-sm text-slate-300">Risk Free Only</span>
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Min Score:</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="10"
+                value={filters.minScore}
+                onChange={(e) => setFilters(prev => ({ ...prev, minScore: parseInt(e.target.value) }))}
+                className="w-24 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              />
+              <span className="text-sm text-emerald-400 font-medium w-12">{filters.minScore > 0 ? `${filters.minScore}+` : 'All'}</span>
+            </div>
             {activeFilterCount > 0 && (
               <button
                 onClick={() => {
-                  setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })
+                  setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false, minScore: 0, riskFree: false })
                   setSortBy('score')
                   setSortOrder('desc')
                 }}
@@ -1113,6 +1157,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 { key: '/', action: 'Focus search input' },
                 { key: 'F', action: 'Toggle filters panel' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
+                { key: 'M', action: 'Toggle risk-free filter (when filters open)' },
                 { key: '1', action: 'Cards view / Filter by Beach (when filters open)' },
                 { key: '2', action: 'Chart view / Filter by Restaurant (when filters open)' },
                 { key: '3', action: 'Filter by Park' },
@@ -1377,7 +1422,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                     <p className="text-slate-500 mb-6">Try adjusting your filters to see more results</p>
                     {activeFilterCount > 0 && (
                       <button
-                        onClick={() => setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })}
+                        onClick={() => setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false, minScore: 0, riskFree: false })}
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
                       >
                         <X className="w-4 h-4" />

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown, BarChart3 as BarChart3Icon, Clock } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
   id: string
@@ -77,6 +77,15 @@ export default function DubbingPage() {
   // Sort state
   const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list')
+  const viewModeRef = useRef(viewMode)
+  
+  // Sync viewModeRef when viewMode changes
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
   
   // Computed filtered and sorted versions
   const filteredVersions = useMemo(() => {
@@ -187,6 +196,19 @@ export default function DubbingPage() {
         case '4':
           e.preventDefault()
           setLanguageFilter(languageFilterRef.current === 'kannada' ? 'all' : 'kannada')
+          break
+        case '5':
+          e.preventDefault()
+          setLanguageFilter(languageFilterRef.current === 'english' ? 'all' : 'english')
+          break
+        // View mode shortcuts (using letter keys to free up numbers for filtering)
+        case 'l':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case 'a':
+          e.preventDefault()
+          setViewMode('analytics')
           break
         case '5':
           e.preventDefault()
@@ -675,6 +697,35 @@ export default function DubbingPage() {
                 <span className="text-xs font-medium text-amber-400">Demo Mode</span>
               </div>
             )}
+            {/* View Mode Tabs */}
+            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'list' 
+                    ? 'bg-indigo-500 text-white' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="List view (L)"
+              >
+                <FileText className="w-4 h-4" />
+                <span>List</span>
+                <span className="text-xs opacity-60">(L)</span>
+              </button>
+              <button
+                onClick={() => setViewMode('analytics')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'analytics' 
+                    ? 'bg-indigo-500 text-white' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Analytics view (A)"
+              >
+                <BarChart3Icon className="w-4 h-4" />
+                <span>Analytics</span>
+                <span className="text-xs opacity-60">(A)</span>
+              </button>
+            </div>
             {/* Filter Toggle */}
             <div className="relative" ref={filterMenuRef}>
               <button
@@ -829,48 +880,51 @@ export default function DubbingPage() {
           </div>
         )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm text-slate-400">Source Scripts</span>
-            </div>
-            <p className="text-2xl font-semibold text-white">{scripts.length}</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Languages className="w-4 h-4 text-green-400" />
-              <span className="text-sm text-slate-400">Dubbed Versions</span>
-              {activeFilterCount > 0 && (
-                <span className="ml-auto text-xs text-indigo-400">
-                  {sortBy !== 'date' && (
-                    <span className="bg-indigo-500/20 px-1.5 py-0.5 rounded">
-                      {sortBy === 'title' ? 'Title' : sortBy === 'language' ? 'Lang' : 'Date'} {sortOrder === 'asc' ? '↑' : '↓'}
+        {/* View Mode Content */}
+        {viewMode === 'list' ? (
+          <>
+            {/* Stats Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4 text-indigo-400" />
+                  <span className="text-sm text-slate-400">Source Scripts</span>
+                </div>
+                <p className="text-2xl font-semibold text-white">{scripts.length}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Languages className="w-4 h-4 text-green-400" />
+                  <span className="text-sm text-slate-400">Dubbed Versions</span>
+                  {activeFilterCount > 0 && (
+                    <span className="ml-auto text-xs text-indigo-400">
+                      {sortBy !== 'date' && (
+                        <span className="bg-indigo-500/20 px-1.5 py-0.5 rounded">
+                          {sortBy === 'title' ? 'Title' : sortBy === 'language' ? 'Lang' : 'Date'} {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
                     </span>
                   )}
-                </span>
-              )}
+                </div>
+                <p className="text-2xl font-semibold text-white">
+                  {activeFilterCount > 0 ? filteredVersions.length : dubbedVersions.length}
+                </p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe className="w-4 h-4 text-yellow-400" />
+                  <span className="text-sm text-slate-400">Languages</span>
+                </div>
+                <p className="text-2xl font-semibold text-white">{TARGET_LANGUAGES.length}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm text-slate-400">Preview Scenes</span>
+                </div>
+                <p className="text-2xl font-semibold text-white">{preview.length}</p>
+              </div>
             </div>
-            <p className="text-2xl font-semibold text-white">
-              {activeFilterCount > 0 ? filteredVersions.length : dubbedVersions.length}
-            </p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Globe className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm text-slate-400">Languages</span>
-            </div>
-            <p className="text-2xl font-semibold text-white">{TARGET_LANGUAGES.length}</p>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm text-slate-400">Preview Scenes</span>
-            </div>
-            <p className="text-2xl font-semibold text-white">{preview.length}</p>
-          </div>
-        </div>
 
         {/* Language Distribution Chart */}
         {filteredVersions.length > 0 && (
@@ -1079,6 +1133,144 @@ export default function DubbingPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
             <FileText className="w-12 h-12 text-slate-700 mx-auto mb-3" />
             <p className="text-slate-400">No scripts found. Upload a script first.</p>
+          </div>
+        )}
+        </>
+        ) : viewMode === 'analytics' && (
+          <div className="space-y-6">
+            {/* Analytics Header */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-3 mb-6">
+                <BarChart3Icon className="w-6 h-6 text-indigo-400" />
+                Dubbing Analytics
+              </h2>
+              
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs text-slate-400">Total Scripts</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{scripts.length}</p>
+                </div>
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Languages className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-slate-400">Dubbed Versions</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{dubbedVersions.length}</p>
+                </div>
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs text-slate-400">Languages Used</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{new Set(dubbedVersions.map(d => d.language)).size}</p>
+                </div>
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs text-slate-400">Preview Scenes</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{preview.length}</p>
+                </div>
+              </div>
+
+              {/* Language Distribution Chart */}
+              {dubbedVersions.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Pie Chart */}
+                  <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-white mb-4">Language Distribution</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={languageDistribution}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            nameKey="name"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {languageDistribution.map((entry, index) => (
+                              <Cell key={entry.name} fill={LANGUAGE_COLORS[entry.name]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                            formatter={(value: number) => [`${value} versions`, '']}
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Bar Chart */}
+                  <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-white mb-4">Versions by Language</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={languageDistribution} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis type="number" stroke="#64748b" fontSize={12} />
+                          <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={12} width={80} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                            formatter={(value: number) => [`${value} versions`, '']}
+                          />
+                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                            {languageDistribution.map((entry, index) => (
+                              <Cell key={entry.name} fill={LANGUAGE_COLORS[entry.name]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-8 text-center">
+                  <Languages className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">No dubbed versions to analyze yet.</p>
+                  <p className="text-sm text-slate-500">Generate a dubbed version to see analytics.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Activity Timeline */}
+            {dubbedVersions.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-indigo-400" />
+                  Recent Dubbing Activity
+                </h3>
+                <div className="space-y-3">
+                  {[...dubbedVersions]
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 5)
+                    .map((dub, idx) => (
+                      <div key={dub.id} className="flex items-center gap-4 bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                          <Globe className="w-4 h-4 text-indigo-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{dub.title}</p>
+                          <p className="text-xs text-slate-500">{dub.language}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">{new Date(dub.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         

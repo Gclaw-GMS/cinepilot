@@ -485,30 +485,34 @@ export default function HealthPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
-        // Number keys for status filtering (when filter panel is open)
+        // Number keys for status filtering (context-aware)
         case '1':
-          e.preventDefault()
-          setFilterStatus('all')
-          if (!showFiltersRef.current) setShowFilters(true)
-          break
         case '2':
-          e.preventDefault()
-          setFilterStatus('healthy')
-          if (!showFiltersRef.current) setShowFilters(true)
-          break
         case '3':
-          e.preventDefault()
-          setFilterStatus('degraded')
-          if (!showFiltersRef.current) setShowFilters(true)
-          break
         case '4':
-          e.preventDefault()
-          setFilterStatus('unhealthy')
-          if (!showFiltersRef.current) setShowFilters(true)
-          break
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
         case '0':
           e.preventDefault()
-          setFilterStatus('all')
+          const num = parseInt(e.key)
+          if (num === 0) {
+            // 0 clears status filter
+            setFilterStatus('all')
+          } else if (num >= 1 && num <= 4) {
+            const statusOptions: Array<'all' | 'healthy' | 'degraded' | 'unhealthy'> = ['all', 'healthy', 'degraded', 'unhealthy']
+            const newStatus = statusOptions[num - 1]
+            if (showFiltersRef.current) {
+              // When filters panel OPEN: toggle behavior
+              setFilterStatus(filterStatusRef.current === newStatus ? 'all' : newStatus)
+            } else {
+              // When filters panel CLOSED: open panel and set filter
+              setFilterStatus(newStatus)
+              setShowFilters(true)
+            }
+          }
           break
         case 'escape':
           e.preventDefault()
@@ -682,8 +686,9 @@ export default function HealthPage() {
               {/* Filter & Sort Panel */}
               {showFilters && (
                 <div className="filter-menu absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                  <div className="p-3 border-b border-slate-700">
+                  <div className="p-3 border-b border-slate-700 flex items-center justify-between">
                     <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
+                    <span className="text-xs text-cyan-400">(1-4 to filter, 0 to clear)</span>
                   </div>
                   <div className="p-3 border-b border-slate-700">
                     <label className="block text-xs text-slate-400 mb-2">Status</label>
@@ -1147,9 +1152,29 @@ export default function HealthPage() {
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">F</kbd>
               </div>
-              {/* Number key shortcuts for status filtering */}
+              {/* Number key shortcuts - context-aware */}
               <div className="border-t border-slate-700 pt-3 mt-3">
-                <p className="text-xs text-slate-500 mb-2">Status Filter (1-4 to filter, 0 to clear)</p>
+                <p className="text-xs text-amber-400 mb-2">Number Keys 1-4: Filter by status (auto-opens filter panel)</p>
+                <div className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg">
+                  <span className="text-slate-300 text-sm">Show all (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono">1</kbd>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg">
+                  <span className="text-emerald-400 text-sm">Healthy (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono">2</kbd>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg">
+                  <span className="text-amber-400 text-sm">Degraded (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono">3</kbd>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg mb-2">
+                  <span className="text-red-400 text-sm">Unhealthy (toggle)</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono">4</kbd>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg mb-2">
+                  <span className="text-slate-300 text-sm">Clear filter</span>
+                  <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono">0</kbd>
+                </div>
               </div>
               <div className="flex items-center justify-between p-2 bg-slate-800/30 rounded-lg">
                 <span className="text-slate-300 text-sm">Show all</span>

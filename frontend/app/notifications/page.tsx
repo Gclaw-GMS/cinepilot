@@ -221,7 +221,18 @@ export default function NotificationsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
   const filterPanelRef = useRef<HTMLDivElement>(null);
+  const filterTabRef = useRef(filterTab)
+  const showFiltersRef = useRef(showFilters)
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
+
+  // Sync refs with state for keyboard shortcuts
+  useEffect(() => {
+    filterTabRef.current = filterTab
+  }, [filterTab])
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -621,19 +632,70 @@ export default function NotificationsPage() {
           break
         case '1':
           e.preventDefault()
-          setFilterTab('all')
+          if (showFiltersRef.current) {
+            // When filters panel OPEN: Filter by All tab (toggle)
+            if (filterTabRef.current === 'all') {
+              setFilterTab('all')
+            } else {
+              setFilterTab('all')
+            }
+          } else {
+            // When filters panel CLOSED: Open filters and set to All
+            setShowFilters(true)
+            setFilterTab('all')
+          }
           break
         case '2':
           e.preventDefault()
-          setFilterTab('unread')
+          if (showFiltersRef.current) {
+            // When filters panel OPEN: Filter by Unread tab (toggle)
+            if (filterTabRef.current === 'unread') {
+              setFilterTab('all')
+            } else {
+              setFilterTab('unread')
+            }
+          } else {
+            // When filters panel CLOSED: Open filters and set to Unread
+            setShowFilters(true)
+            setFilterTab('unread')
+          }
           break
         case '3':
           e.preventDefault()
-          setFilterTab('sent')
+          if (showFiltersRef.current) {
+            // When filters panel OPEN: Filter by Sent tab (toggle)
+            if (filterTabRef.current === 'sent') {
+              setFilterTab('all')
+            } else {
+              setFilterTab('sent')
+            }
+          } else {
+            // When filters panel CLOSED: Open filters and set to Sent
+            setShowFilters(true)
+            setFilterTab('sent')
+          }
           break
         case '4':
           e.preventDefault()
-          setFilterTab('failed')
+          if (showFiltersRef.current) {
+            // When filters panel OPEN: Filter by Failed tab (toggle)
+            if (filterTabRef.current === 'failed') {
+              setFilterTab('all')
+            } else {
+              setFilterTab('failed')
+            }
+          } else {
+            // When filters panel CLOSED: Open filters and set to Failed
+            setShowFilters(true)
+            setFilterTab('failed')
+          }
+          break
+        case '0':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // When filters panel OPEN: Clear tab filter
+            setFilterTab('all')
+          }
           break
         case 'c':
           e.preventDefault()
@@ -1488,6 +1550,7 @@ export default function NotificationsPage() {
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-indigo-400" />
                   <span className="text-sm font-medium text-slate-300">Filters:</span>
+                  <span className="text-xs text-cyan-400 ml-1">(1-4 to filter, 0 to clear)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-slate-400">Channel:</label>
@@ -1750,20 +1813,22 @@ export default function NotificationsPage() {
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">/</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
-                <span className="text-slate-300">Filter: All</span>
-                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">1</kbd>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400">Filters closed:</span>
+                  <span className="text-slate-300">Open filters + filter</span>
+                </div>
+                <span className="text-xs text-slate-500">1-4</span>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
-                <span className="text-slate-300">Filter: Unread</span>
-                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">2</kbd>
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan-400">Filters open:</span>
+                  <span className="text-slate-300">Toggle filter (press again to clear)</span>
+                </div>
+                <span className="text-xs text-slate-500">1-4</span>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
-                <span className="text-slate-300">Filter: Sent</span>
-                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">3</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
-                <span className="text-slate-300">Filter: Failed</span>
-                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">4</kbd>
+                <span className="text-cyan-400">Clear tab filter</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-cyan-400">0</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Go to Inbox</span>

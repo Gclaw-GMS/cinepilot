@@ -149,11 +149,21 @@ export default function CrewPage() {
   
   // View mode ref for keyboard shortcuts
   const viewModeRef = useRef(viewMode);
+  const deptFilterRef = useRef(deptFilter);
+  const showFiltersRef = useRef(showFilters);
   
-  // Keep viewMode ref in sync
+  // Keep refs in sync
   useEffect(() => {
     viewModeRef.current = viewMode;
   }, [viewMode]);
+  
+  useEffect(() => {
+    deptFilterRef.current = deptFilter;
+  }, [deptFilter]);
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters;
+  }, [showFilters]);
 
   // Sort options for UI
   const sortOptions = [
@@ -265,17 +275,81 @@ export default function CrewPage() {
           e.preventDefault()
           setViewMode(prev => prev === 'list' ? 'skills' : 'list')
           break
+        // Number keys - context-aware: filter by department when filters open, view mode when closed
+        case '0':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setDeptFilter('all')
+          }
+          break
         case '1':
           e.preventDefault()
-          setViewMode('list')
+          if (showFiltersRef.current) {
+            // Filter by Camera (department 1)
+            setDeptFilter(prev => prev === 'Camera' ? 'all' : 'Camera')
+          } else {
+            setViewMode('list')
+          }
           break
         case '2':
           e.preventDefault()
-          setViewMode('skills')
+          if (showFiltersRef.current) {
+            // Filter by Lighting (department 2)
+            setDeptFilter(prev => prev === 'Lighting' ? 'all' : 'Lighting')
+          } else {
+            setViewMode('skills')
+          }
           break
         case '3':
           e.preventDefault()
-          setViewMode('analytics')
+          if (showFiltersRef.current) {
+            // Filter by Sound (department 3)
+            setDeptFilter(prev => prev === 'Sound' ? 'all' : 'Sound')
+          } else {
+            setViewMode('analytics')
+          }
+          break
+        case '4':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by Art (department 4)
+            setDeptFilter(prev => prev === 'Art' ? 'all' : 'Art')
+          }
+          break
+        case '5':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by Makeup (department 5)
+            setDeptFilter(prev => prev === 'Makeup' ? 'all' : 'Makeup')
+          }
+          break
+        case '6':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by Costume (department 6)
+            setDeptFilter(prev => prev === 'Costume' ? 'all' : 'Costume')
+          }
+          break
+        case '7':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by Direction (department 7)
+            setDeptFilter(prev => prev === 'Direction' ? 'all' : 'Direction')
+          }
+          break
+        case '8':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by Production (department 8)
+            setDeptFilter(prev => prev === 'Production' ? 'all' : 'Production')
+          }
+          break
+        case '9':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by VFX (department 9)
+            setDeptFilter(prev => prev === 'VFX' ? 'all' : 'VFX')
+          }
           break
       }
     }
@@ -1199,8 +1273,8 @@ export default function CrewPage() {
                   onChange={(e) => setDeptFilter(e.target.value)}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
                 >
-                  <option value="all">All Departments</option>
-                  {DEPARTMENTS.map((d) => (<option key={d} value={d}>{d}</option>))}
+                  <option value="all">All Departments (0)</option>
+                  {DEPARTMENTS.map((d, idx) => (<option key={d} value={d}>{d} ({idx + 1})</option>))}
                 </select>
               </div>
               <button
@@ -1766,17 +1840,65 @@ export default function CrewPage() {
                 <span className="text-slate-300">Toggle view mode</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">V</kbd>
               </div>
+              {/* When Filters Closed - View Modes */}
+              <div className="mt-3 mb-1 px-1">
+                <span className="text-xs text-slate-500 uppercase tracking-wider">When Filters Closed</span>
+              </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">List view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">1</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Skills matrix view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">2</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Analytics view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              {/* When Filters Open - Department Filters */}
+              <div className="mt-3 mb-1 px-1">
+                <span className="text-xs text-amber-500 uppercase tracking-wider">When Filters Open</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Clear filter (show all)</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Camera</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Lighting</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Sound</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Art</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Makeup</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">5</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Costume</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">6</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Direction</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">7</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Production</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">8</kbd>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
+                <span className="text-slate-300">Filter by VFX</span>
+                <kbd className="px-2 py-0.5 bg-slate-800 rounded text-sm text-amber-400">9</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

@@ -5,9 +5,9 @@ import {
   Brain, Sparkles, FileText, Clapperboard, DollarSign, 
   Calendar, AlertTriangle, MessageSquare, Wand2,
   Play, ArrowRight, TrendingUp, Target, Zap, Loader2,
-  BarChart3, PieChart, Activity, Gauge, AlertOctagon,
+  BarChart3, PieChart as PieChartIcon, Activity, Gauge, AlertOctagon,
   CheckCircle, XCircle, Info, RefreshCw, Keyboard, Search, X,
-  Download, Printer
+  Download, Printer, Grid, List
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -381,6 +381,13 @@ export default function AIToolsPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const sortPanelRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
+  
+  // View Mode state
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'analytics'>('list')
+  const viewModeRef = useRef(viewMode)
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -763,6 +770,15 @@ export default function AIToolsPage() {
       } else if (e.key === '0') {
         e.preventDefault()
         setCategoryFilter('all')
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault()
+        setViewMode('list')
+      } else if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault()
+        setViewMode('grid')
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault()
+        setViewMode('analytics')
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
         setShowFilterPanel(!showFilterPanel)
@@ -900,6 +916,50 @@ export default function AIToolsPage() {
               </div>
               <p className="text-slate-500 text-sm mt-1">Powered by AIML API — Intelligent film production analysis</p>
             </div>
+            
+            {/* View Mode Tabs */}
+            <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-lg border border-slate-700">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'list' 
+                    ? 'bg-indigo-500 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+                title="List View (L)"
+              >
+                <List className="w-4 h-4" />
+                <span className="hidden sm:inline">List</span>
+                <span className="text-xs opacity-60">(L)</span>
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'grid' 
+                    ? 'bg-indigo-500 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+                title="Grid View (G)"
+              >
+                <Grid className="w-4 h-4" />
+                <span className="hidden sm:inline">Grid</span>
+                <span className="text-xs opacity-60">(G)</span>
+              </button>
+              <button
+                onClick={() => setViewMode('analytics')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === 'analytics' 
+                    ? 'bg-indigo-500 text-white shadow-md' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+                title="Analytics View (A)"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Analytics</span>
+                <span className="text-xs opacity-60">(A)</span>
+              </button>
+            </div>
+            
             <div className="flex items-center gap-3">
               {/* Search Input */}
               <div className="relative">
@@ -1241,50 +1301,245 @@ export default function AIToolsPage() {
           </div>
         </div>
 
-        {/* Feature Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {loadingTools ? (
-            <div className="col-span-full flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mr-2" />
-              <span className="text-slate-400">Loading AI tools...</span>
-            </div>
-          ) : (
-            aiFeatures.map((feature) => {
-              const IconComponent = feature.iconComponent || FileText;
-              return (
-                <button
-                  key={feature.id}
-                  onClick={() => runAnalysis(feature.id)}
-                  disabled={loading}
-                  style={{ 
-                    borderColor: selected === feature.id ? getFeatureColor(feature.color) + '/50' : undefined,
-                    boxShadow: selected === feature.id ? `0 0 20px ${getFeatureColor(feature.color)}/20` : undefined
-                  }}
-                  className={`text-left bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-600 hover:shadow-lg transition-all ${loading ? 'opacity-50' : ''}`}
-                >
-                  <div className="flex items-start gap-4">
+        {/* Feature Grid - View Mode Conditional Rendering */}
+        {viewMode === 'list' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {loadingTools ? (
+              <div className="col-span-full flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mr-2" />
+                <span className="text-slate-400">Loading AI tools...</span>
+              </div>
+            ) : (
+              aiFeatures.map((feature) => {
+                const IconComponent = feature.iconComponent || FileText;
+                return (
+                  <button
+                    key={feature.id}
+                    onClick={() => runAnalysis(feature.id)}
+                    disabled={loading}
+                    style={{ 
+                      borderColor: selected === feature.id ? getFeatureColor(feature.color) + '/50' : undefined,
+                      boxShadow: selected === feature.id ? `0 0 20px ${getFeatureColor(feature.color)}/20` : undefined
+                    }}
+                    className={`text-left bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-600 hover:shadow-lg transition-all ${loading ? 'opacity-50' : ''}`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div 
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: `${getFeatureColor(feature.color)}20` }}
+                      >
+                        <IconComponent className="w-6 h-6" style={{ color: getFeatureColor(feature.color) }} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-white">{feature.name}</h3>
+                          {selected === feature.id && loading && <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />}
+                        </div>
+                        <p className="text-slate-400 text-sm mt-1">{feature.desc}</p>
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-500">{feature.category}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Grid View - Compact Visual Cards */}
+        {viewMode === 'grid' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 mb-8">
+            {loadingTools ? (
+              <div className="col-span-full flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mr-2" />
+                <span className="text-slate-400">Loading AI tools...</span>
+              </div>
+            ) : (
+              aiFeatures.map((feature) => {
+                const IconComponent = feature.iconComponent || FileText;
+                return (
+                  <button
+                    key={feature.id}
+                    onClick={() => runAnalysis(feature.id)}
+                    disabled={loading}
+                    style={{ 
+                      borderColor: selected === feature.id ? getFeatureColor(feature.color) + '/50' : undefined,
+                      backgroundColor: selected === feature.id ? `${getFeatureColor(feature.color)}10` : undefined
+                    }}
+                    className={`flex flex-col items-center justify-center text-center bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-600 hover:shadow-lg transition-all ${loading ? 'opacity-50' : ''}`}
+                  >
                     <div 
-                      className="p-3 rounded-xl"
+                      className="p-3 rounded-xl mb-3"
                       style={{ backgroundColor: `${getFeatureColor(feature.color)}20` }}
                     >
-                      <IconComponent className="w-6 h-6" style={{ color: getFeatureColor(feature.color) }} />
+                      <IconComponent className="w-8 h-8" style={{ color: getFeatureColor(feature.color) }} />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-white">{feature.name}</h3>
-                        {selected === feature.id && loading && <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />}
-                      </div>
-                      <p className="text-slate-400 text-sm mt-1">{feature.desc}</p>
-                      <div className="flex items-center gap-2 mt-3">
-                        <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-500">{feature.category}</span>
-                      </div>
-                    </div>
+                    <h3 className="font-semibold text-white text-sm mb-1">{feature.name}</h3>
+                    <span className="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-500">{feature.category}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Analytics View - Charts and Statistics */}
+        {viewMode === 'analytics' && (
+          <div className="space-y-6 mb-8">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-500/20 rounded-lg">
+                    <Brain className="w-5 h-5 text-indigo-400" />
                   </div>
-                </button>
-              );
-            })
-          )}
-        </div>
+                  <div>
+                    <p className="text-slate-500 text-xs">Total Tools</p>
+                    <p className="text-2xl font-bold text-white">{aiFeatures.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg">
+                    <PieChartIcon className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-xs">Categories</p>
+                    <p className="text-2xl font-bold text-white">{allCategories.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/20 rounded-lg">
+                    <BarChart3 className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-xs">Search Results</p>
+                    <p className="text-2xl font-bold text-white">{filteredTools.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-500/20 rounded-lg">
+                    <Activity className="w-5 h-5 text-rose-400" />
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-xs">Active Filters</p>
+                    <p className="text-2xl font-bold text-white">{activeFilterCount}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Category Distribution Chart */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <PieChartIcon className="w-5 h-5 text-indigo-400" />
+                  Category Distribution
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie
+                        data={allCategories.map((cat, idx) => ({
+                          name: cat,
+                          value: aiFeatures.filter(f => f.category === cat).length,
+                          color: Object.values(COLORS_MAP)[idx % Object.values(COLORS_MAP).length]
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {allCategories.map((cat, idx) => (
+                          <Cell key={cat} fill={Object.values(COLORS_MAP)[idx % Object.values(COLORS_MAP).length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        itemStyle={{ color: '#f1f5f9' }}
+                      />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-emerald-400" />
+                  Tools by Category
+                </h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={allCategories.map((cat) => ({
+                        category: cat,
+                        count: aiFeatures.filter(f => f.category === cat).length
+                      }))}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis type="number" stroke="#64748b" />
+                      <YAxis type="category" dataKey="category" stroke="#64748b" />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                        itemStyle={{ color: '#f1f5f9' }}
+                      />
+                      <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Tools by Category Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Brain className="w-5 h-5 text-indigo-400" />
+                Tools by Category
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-800">
+                      <th className="text-left py-3 px-4 text-slate-400 font-medium">Category</th>
+                      <th className="text-center py-3 px-4 text-slate-400 font-medium">Tools Count</th>
+                      <th className="text-left py-3 px-4 text-slate-400 font-medium">Tool Names</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allCategories.map((cat) => {
+                      const categoryTools = aiFeatures.filter(f => f.category === cat)
+                      return (
+                        <tr key={cat} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                          <td className="py-3 px-4">
+                            <span className="text-white font-medium">{cat}</span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded text-sm">{categoryTools.length}</span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-300 text-sm">
+                            {categoryTools.map(t => t.name).join(', ')}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Results Section */}
         {loading && (
@@ -1433,6 +1688,23 @@ export default function AIToolsPage() {
               </div>
               
               <div className="space-y-3">
+                {/* View Mode Shortcuts */}
+                <div className="pb-2 border-b border-slate-800">
+                  <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">View Modes</h3>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">List View</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">L</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Grid View</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">G</kbd>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-400">Analytics View</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">A</kbd>
+                </div>
+                
                 {/* Category Filter Shortcuts */}
                 <div className="pb-2 border-b border-slate-800">
                   <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Category Filter</h3>

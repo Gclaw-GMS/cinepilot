@@ -507,6 +507,10 @@ export default function WeatherPage() {
   const filtersRef = useRef(filters);
   const sortByRef = useRef(sortBy);
   const sortOrderRef = useRef(sortOrder);
+  // Refs for context-aware keyboard shortcuts
+  const showFiltersRef = useRef(showFilters);
+  const viewModeRef = useRef(viewMode);
+  const filterConditionRef = useRef(filters.condition);
 
   // Fetch schedule data for integration
   const fetchScheduleData = useCallback(async () => {
@@ -620,6 +624,18 @@ export default function WeatherPage() {
     sortOrderRef.current = sortOrder;
   }, [sortOrder]);
 
+  useEffect(() => {
+    showFiltersRef.current = showFilters;
+  }, [showFilters]);
+
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  useEffect(() => {
+    filterConditionRef.current = filters.condition;
+  }, [filters.condition]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -639,93 +655,166 @@ export default function WeatherPage() {
           break
         case '1':
           e.preventDefault()
-          setViewMode('forecast')
-          break
-        case '2':
-          e.preventDefault()
-          setViewMode('hourly')
-          break
-        case '3':
-          e.preventDefault()
-          setViewMode('analytics')
-          break
-        case '4':
-          e.preventDefault()
-          setViewMode('schedule')
-          break
-        case '5':
-          e.preventDefault()
-          setViewMode('alerts')
-          break
-        // Number keys 0-6 for condition filter (when not in input)
-        case '0':
-          if (!e.shiftKey) {
-            e.preventDefault()
-            setFilters(prev => ({ ...prev, condition: 'all' }))
-          }
-          break
-        case '6':
-          if (!e.shiftKey) {
-            e.preventDefault()
-            const currentFilters = filtersRef.current
+          if (showFiltersRef.current) {
+            // Filter by condition: sunny
             const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
-            // Toggle: if already selected, clear it
             setFilters(prev => ({
               ...prev,
               condition: prev.condition === conditions[0] ? 'all' : conditions[0]
             }))
+          } else {
+            setViewMode('forecast')
           }
           break
-        case '7':
-          if (!e.shiftKey) {
-            e.preventDefault()
+        case '2':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by condition: partly_cloudy
             const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
             setFilters(prev => ({
               ...prev,
               condition: prev.condition === conditions[1] ? 'all' : conditions[1]
             }))
+          } else {
+            setViewMode('hourly')
           }
           break
-        case '8':
-          if (!e.shiftKey) {
-            e.preventDefault()
+        case '3':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by condition: cloudy
             const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
             setFilters(prev => ({
               ...prev,
               condition: prev.condition === conditions[2] ? 'all' : conditions[2]
             }))
+          } else {
+            setViewMode('analytics')
           }
           break
-        case '9':
-          if (!e.shiftKey) {
-            e.preventDefault()
+        case '4':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by condition: rain
             const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
             setFilters(prev => ({
               ...prev,
               condition: prev.condition === conditions[3] ? 'all' : conditions[3]
             }))
+          } else {
+            setViewMode('schedule')
           }
           break
-        // Shift+number for date range filter
+        case '5':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter by condition: thunderstorm
+            const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+            setFilters(prev => ({
+              ...prev,
+              condition: prev.condition === conditions[4] ? 'all' : conditions[4]
+            }))
+          } else {
+            setViewMode('alerts')
+          }
+          break
+        // Number key 0 clears filter (when filters open)
+        case '0':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            if (showFiltersRef.current) {
+              setFilters(prev => ({ ...prev, condition: 'all' }))
+            }
+          }
+          break
+        case '6':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            if (showFiltersRef.current) {
+              // Already in filter mode, toggle sunny (same as key 1)
+              const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+              setFilters(prev => ({
+                ...prev,
+                condition: prev.condition === conditions[0] ? 'all' : conditions[0]
+              }))
+            } else {
+              // Open filters panel first
+              setShowFilters(true)
+            }
+          }
+          break
+        case '7':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            if (showFiltersRef.current) {
+              const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+              setFilters(prev => ({
+                ...prev,
+                condition: prev.condition === conditions[1] ? 'all' : conditions[1]
+              }))
+            } else {
+              setShowFilters(true)
+            }
+          }
+          break
+        case '8':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            if (showFiltersRef.current) {
+              const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+              setFilters(prev => ({
+                ...prev,
+                condition: prev.condition === conditions[2] ? 'all' : conditions[2]
+              }))
+            } else {
+              setShowFilters(true)
+            }
+          }
+          break
+        case '9':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            if (showFiltersRef.current) {
+              const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+              setFilters(prev => ({
+                ...prev,
+                condition: prev.condition === conditions[3] ? 'all' : conditions[3]
+              }))
+            } else {
+              setShowFilters(true)
+            }
+          }
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          toggleSortOrder()
+          break
+        // Shift+number for date range filter (only when filters open)
         case 'Shift':
           // Handled in the key press, not here
           break
-        // Date range filter with Shift+number
+        // Date range filter with Shift+number (only when filters open)
         default:
           if (e.shiftKey && ['1', '2', '3', '4', '0'].includes(e.key)) {
             e.preventDefault()
-            const dateRanges: Record<string, string> = {
-              '1': '3',
-              '2': '5',
-              '3': 'weekend',
-              '4': 'all', // Clear
-              '0': 'all'
-            }
-            const newRange = dateRanges[e.key]
-            if (newRange === 'all') {
-              setFilters(prev => ({ ...prev, dateRange: 'all' }))
-            } else {
-              setFilters(prev => ({ ...prev, dateRange: newRange }))
+            if (showFiltersRef.current) {
+              const dateRanges: Record<string, string> = {
+                '1': '3',
+                '2': '5',
+                '3': 'weekend',
+                '4': 'all',
+                '0': 'all'
+              }
+              const newRange = dateRanges[e.key]
+              if (newRange === 'all') {
+                setFilters(prev => ({ ...prev, dateRange: 'all' }))
+              } else {
+                setFilters(prev => ({ ...prev, dateRange: newRange }))
+              }
             }
           }
           break
@@ -1289,27 +1378,33 @@ export default function WeatherPage() {
               <div className="space-y-3">
                 <ShortcutRow keys={['R']} description="Refresh weather data" />
                 <ShortcutRow keys={['/']} description="Search locations" />
+                <div className="pt-2 pb-1 border-t border-white/10">
+                  <span className="text-xs text-amber-400 font-medium">When Filters Closed</span>
+                </div>
                 <ShortcutRow keys={['1']} description="Switch to Forecast view" />
                 <ShortcutRow keys={['2']} description="Switch to Hourly view" />
                 <ShortcutRow keys={['3']} description="Switch to Analytics view" />
                 <ShortcutRow keys={['4']} description="Switch to Schedule view" />
                 <ShortcutRow keys={['5']} description="Switch to Alerts view" />
+                <ShortcutRow keys={['6-9']} description="Open filter panel" />
                 <div className="pt-2 pb-1 border-t border-white/10">
-                  <span className="text-xs text-blue-400 font-medium">Condition Filter</span>
+                  <span className="text-xs text-cyan-400 font-medium">When Filters Open</span>
                 </div>
-                <ShortcutRow keys={['0']} description="All Conditions (clear)" />
-                <ShortcutRow keys={['6']} description="Filter by Sunny (toggle)" />
-                <ShortcutRow keys={['7']} description="Filter by Partly Cloudy (toggle)" />
-                <ShortcutRow keys={['8']} description="Filter by Cloudy (toggle)" />
-                <ShortcutRow keys={['9']} description="Filter by Rain (toggle)" />
-                <div className="pt-2 pb-1 border-t border-white/10">
-                  <span className="text-xs text-blue-400 font-medium">Date Range Filter</span>
-                </div>
-                <ShortcutRow keys={['⇧1']} description="Filter: Next 3 Days (toggle)" />
-                <ShortcutRow keys={['⇧2']} description="Filter: Next 5 Days (toggle)" />
-                <ShortcutRow keys={['⇧3']} description="Filter: This Weekend (toggle)" />
+                <ShortcutRow keys={['1']} description="Filter by Sunny (toggle)" />
+                <ShortcutRow keys={['2']} description="Filter by Partly Cloudy (toggle)" />
+                <ShortcutRow keys={['3']} description="Filter by Cloudy (toggle)" />
+                <ShortcutRow keys={['4']} description="Filter by Rain (toggle)" />
+                <ShortcutRow keys={['5']} description="Filter by Thunderstorm (toggle)" />
+                <ShortcutRow keys={['0']} description="Clear condition filter" />
+                <ShortcutRow keys={['6-9']} description="Quick filter by condition" />
+                <ShortcutRow keys={['⇧1']} description="Filter: Next 3 Days" />
+                <ShortcutRow keys={['⇧2']} description="Filter: Next 5 Days" />
+                <ShortcutRow keys={['⇧3']} description="Filter: This Weekend" />
                 <ShortcutRow keys={['⇧0']} description="Clear date range filter" />
-                <ShortcutRow keys={['F']} description="Toggle filters" />
+                <div className="pt-2 pb-1 border-t border-white/10">
+                  <span className="text-xs text-emerald-400 font-medium">General</span>
+                </div>
+                <ShortcutRow keys={['F']} description="Toggle filters panel" />
                 <ShortcutRow keys={['S']} description="Toggle sort order" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
                 <ShortcutRow keys={['M']} description="Export Markdown" />
@@ -1558,6 +1653,7 @@ export default function WeatherPage() {
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-400" />
                 <span className="text-sm font-medium text-slate-300">Filters:</span>
+                <span className="text-xs text-cyan-400">(1-5 for condition, 0 to clear, ⇧1-3 for date)</span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-slate-400">Condition:</label>

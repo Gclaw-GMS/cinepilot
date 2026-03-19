@@ -155,26 +155,31 @@ export default function DubbingPage() {
           e.preventDefault()
           setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
           break
-        // Number keys for language filtering (when filter panel is open)
+        // Number keys for language filtering (context-aware)
         case '1':
         case '2':
         case '3':
         case '4':
         case '5':
-          if (showFilterPanelRef.current) {
-            e.preventDefault()
-            const langIndex = parseInt(e.key) - 1
-            const languages = ['telugu', 'hindi', 'malayalam', 'kannada', 'english']
-            const targetLang = languages[langIndex]
-            const current = languageFilterRef.current
+          e.preventDefault()
+          const langIndex = parseInt(e.key) - 1
+          const languages = ['telugu', 'hindi', 'malayalam', 'kannada', 'english']
+          const targetLang = languages[langIndex]
+          const current = languageFilterRef.current
+          
+          // Context-aware: Open filter panel if closed, then apply filter
+          if (!showFilterPanelRef.current) {
+            setShowFilterPanel(true)
+            setLanguageFilter(targetLang)
+          } else {
+            // Toggle behavior: if same language already selected, clear it
             setLanguageFilter(current === targetLang ? 'all' : targetLang)
           }
           break
         case '0':
-          if (showFilterPanelRef.current) {
-            e.preventDefault()
-            setLanguageFilter('all')
-          }
+          e.preventDefault()
+          // Clear language filter (works regardless of panel state)
+          setLanguageFilter('all')
           break
         case 'e':
           e.preventDefault()
@@ -696,8 +701,9 @@ export default function DubbingPage() {
               </button>
               {showFilterPanel && (
                 <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-700">
+                  <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
                     <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
+                    <span className="text-xs text-cyan-400">(1-5 to filter, 0 to clear)</span>
                   </div>
                   <div className="p-4 space-y-4">
                     {/* Language Filter */}
@@ -1110,9 +1116,9 @@ export default function DubbingPage() {
                   <span className="text-slate-300">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
                 </div>
-                {/* Language filter shortcuts - shown only when filters open */}
+                {/* Context-aware number keys - reorganized */}
                 <div className="flex justify-between items-center py-1 border-b border-slate-800">
-                  <span className="text-slate-400 text-xs">Filter by language (when filters open):</span>
+                  <span className="text-amber-400 text-xs">Number keys 1-5 open filters & apply (toggle):</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-slate-800">
                   <span className="text-cyan-400 text-sm">Filter by Telugu</span>

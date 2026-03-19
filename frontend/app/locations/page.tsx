@@ -242,76 +242,99 @@ export default function LocationsPage() {
           e.preventDefault()
           searchInputRef.current?.focus()
           break
+        // Context-aware number key shortcuts
+        // When filters panel CLOSED: Opens filter panel and applies filter
+        // When filters panel OPEN: Toggles filter (press again to clear)
         case '1':
-          // Toggle cards view OR filter by beach if filters open
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'beach' ? 'all' : 'beach' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            // Filters closed: Open filter panel and apply place type filter
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'beach' }))
           } else {
-            setViewMode('cards')
+            // Filters open: Toggle filter
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'beach' ? 'all' : 'beach' }))
           }
           break
         case '2':
-          // Toggle chart view OR filter by restaurant if filters open
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'restaurant' ? 'all' : 'restaurant' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'restaurant' }))
           } else {
-            setViewMode('chart')
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'restaurant' ? 'all' : 'restaurant' }))
           }
           break
         case '3':
-          // Filter by park
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'park' ? 'all' : 'park' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'park' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'park' ? 'all' : 'park' }))
           }
           break
         case '4':
-          // Filter by warehouse
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'warehouse' ? 'all' : 'warehouse' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'warehouse' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'warehouse' ? 'all' : 'warehouse' }))
           }
           break
         case '5':
-          // Filter by hotel
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'hotel' ? 'all' : 'hotel' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'hotel' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'hotel' ? 'all' : 'hotel' }))
           }
           break
         case '6':
-          // Filter by temple
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'temple' ? 'all' : 'temple' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'temple' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'temple' ? 'all' : 'temple' }))
           }
           break
         case '7':
-          // Filter by office
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'office' ? 'all' : 'office' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'office' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'office' ? 'all' : 'office' }))
           }
           break
         case '8':
-          // Filter by resort
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'resort' ? 'all' : 'resort' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'resort' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'resort' ? 'all' : 'resort' }))
           }
           break
         case '9':
-          // Filter by mountain
-          if (showFiltersRef.current) {
-            const current = filtersRef.current.placeType
-            setFilters(prev => ({ ...prev, placeType: current === 'mountain' ? 'all' : 'mountain' }))
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilters(prev => ({ ...prev, placeType: 'mountain' }))
+          } else {
+            setFilters(prev => ({ ...prev, placeType: prev.placeType === 'mountain' ? 'all' : 'mountain' }))
           }
           break
         case '0':
-          // Clear all filters
-          if (showFiltersRef.current) {
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            // Filters closed: Open filter panel
+            setShowFilters(true)
+          } else {
+            // Filters open: Clear all filters
             setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false, minScore: 0, riskFree: false })
           }
           break
@@ -921,6 +944,8 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
               <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-xs rounded-full">{activeFilterCount}</span>
             )}
           </button>
+          {/* Shortcut hint */}
+          <span className="text-xs text-slate-500 hidden md:inline">(1-9 place type, 0 clear)</span>
 
           {/* Keyboard Shortcuts Button */}
           <button
@@ -1152,22 +1177,58 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
               </button>
             </div>
             <div className="space-y-3">
+              {/* When filters panel is OPEN */}
+              <div className="mt-3 mb-1 px-2">
+                <span className="text-xs font-medium text-cyan-400 uppercase tracking-wider">When Filters Open:</span>
+              </div>
+              {[
+                { key: '1', action: 'Filter by Beach (toggle)' },
+                { key: '2', action: 'Filter by Restaurant (toggle)' },
+                { key: '3', action: 'Filter by Park (toggle)' },
+                { key: '4', action: 'Filter by Warehouse (toggle)' },
+                { key: '5', action: 'Filter by Hotel (toggle)' },
+                { key: '6', action: 'Filter by Temple (toggle)' },
+                { key: '7', action: 'Filter by Office (toggle)' },
+                { key: '8', action: 'Filter by Resort (toggle)' },
+                { key: '9', action: 'Filter by Mountain (toggle)' },
+                { key: '0', action: 'Clear all filters' },
+                { key: 'M', action: 'Toggle risk-free filter' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50">
+                  <span className="text-cyan-300">{action}</span>
+                  <kbd className="bg-slate-800 border border-cyan-700 text-cyan-300 px-3 py-1 rounded-lg text-sm font-mono">{key}</kbd>
+                </div>
+              ))}
+              {/* When filters panel is CLOSED */}
+              <div className="mt-3 mb-1 px-2">
+                <span className="text-xs font-medium text-amber-400 uppercase tracking-wider">When Filters Closed:</span>
+              </div>
+              {[
+                { key: '1', action: 'Open filters & filter by Beach' },
+                { key: '2', action: 'Open filters & filter by Restaurant' },
+                { key: '3', action: 'Open filters & filter by Park' },
+                { key: '4', action: 'Open filters & filter by Warehouse' },
+                { key: '5', action: 'Open filters & filter by Hotel' },
+                { key: '6', action: 'Open filters & filter by Temple' },
+                { key: '7', action: 'Open filters & filter by Office' },
+                { key: '8', action: 'Open filters & filter by Resort' },
+                { key: '9', action: 'Open filters & filter by Mountain' },
+                { key: '0', action: 'Open filters panel' },
+              ].map(({ key, action }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50">
+                  <span className="text-amber-300">{action}</span>
+                  <kbd className="bg-slate-800 border border-amber-700 text-amber-300 px-3 py-1 rounded-lg text-sm font-mono">{key}</kbd>
+                </div>
+              ))}
+              {/* General shortcuts */}
+              <div className="mt-3 mb-1 px-2">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">General:</span>
+              </div>
               {[
                 { key: 'R', action: 'Refresh location data' },
                 { key: '/', action: 'Focus search input' },
                 { key: 'F', action: 'Toggle filters panel' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
-                { key: 'M', action: 'Toggle risk-free filter (when filters open)' },
-                { key: '1', action: 'Cards view / Filter by Beach (when filters open)' },
-                { key: '2', action: 'Chart view / Filter by Restaurant (when filters open)' },
-                { key: '3', action: 'Filter by Park' },
-                { key: '4', action: 'Filter by Warehouse' },
-                { key: '5', action: 'Filter by Hotel' },
-                { key: '6', action: 'Filter by Temple' },
-                { key: '7', action: 'Filter by Office' },
-                { key: '8', action: 'Filter by Resort' },
-                { key: '9', action: 'Filter by Mountain' },
-                { key: '0', action: 'Clear all filters (when filters open)' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Toggle print menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },

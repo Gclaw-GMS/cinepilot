@@ -267,74 +267,98 @@ export default function WhatsAppPage() {
             }
           }
           break
-        // Number keys for filtering (when filters panel is open)
+        // Context-aware number keys: different behavior based on filter panel state
+        // When filters panel CLOSED: number keys switch tabs
+        // When filters panel OPEN: number keys filter by category/status/role
         case '0':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: clear filters
             if (activeTabRef.current === 'templates') setCategoryFilter('all')
             else if (activeTabRef.current === 'history') setStatusFilter('all')
             else if (activeTabRef.current === 'contacts') setRoleFilter('all')
           }
           break
         case '1':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'templates') setCategoryFilter('schedule')
             else if (activeTabRef.current === 'history') setStatusFilter('pending')
             else if (activeTabRef.current === 'contacts') setRoleFilter('Lead Actor')
+          } else {
+            // Filters closed: switch to Compose tab
+            setActiveTab('compose')
           }
           break
         case '2':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'templates') setCategoryFilter('reminder')
             else if (activeTabRef.current === 'history') setStatusFilter('sent')
             else if (activeTabRef.current === 'contacts') setRoleFilter('Lead Actress')
+          } else {
+            // Filters closed: switch to Templates tab
+            setActiveTab('templates')
           }
           break
         case '3':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'templates') setCategoryFilter('call_sheet')
             else if (activeTabRef.current === 'history') setStatusFilter('delivered')
             else if (activeTabRef.current === 'contacts') setRoleFilter('Supporting Actor')
+          } else {
+            // Filters closed: switch to History tab
+            setActiveTab('history')
           }
           break
         case '4':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'history') setStatusFilter('read')
             else if (activeTabRef.current === 'contacts') setRoleFilter('Cinematographer')
+          } else {
+            // Filters closed: switch to Contacts tab
+            setActiveTab('contacts')
           }
           break
         case '5':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'history') setStatusFilter('failed')
             else if (activeTabRef.current === 'contacts') setRoleFilter('Music Director')
           }
           break
         case '6':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'contacts') setRoleFilter('Director')
           }
           break
         case '7':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'contacts') setRoleFilter('Producer')
           }
           break
         case '8':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'contacts') setRoleFilter('Writer')
           }
           break
         case '9':
+          e.preventDefault()
           if (showFilterPanelRef.current) {
-            e.preventDefault()
+            // Filters open: apply filter
             if (activeTabRef.current === 'contacts') setRoleFilter('all')
           }
           break
@@ -775,7 +799,10 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
             >
               <div className="p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
+                    <span className="text-xs text-cyan-400">Number keys to filter • 0 to clear</span>
+                  </div>
                   <button 
                     onClick={() => { clearFilters() }}
                     className="text-xs text-green-400 hover:text-green-300"
@@ -1339,8 +1366,22 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
                 </div>
               ))}
               
+              {/* Number keys - when filters panel is CLOSED */}
+              <div className="text-xs text-amber-400 uppercase tracking-wider mb-1 mt-3">When Filters Closed (Number Keys)</div>
+              {[
+                { key: '1', description: 'Switch to Compose tab' },
+                { key: '2', description: 'Switch to Templates tab' },
+                { key: '3', description: 'Switch to History tab' },
+                { key: '4', description: 'Switch to Contacts tab' },
+              ].map(({ key, description }) => (
+                <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                  <span className="text-gray-300">{description}</span>
+                  <kbd className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-sm font-mono text-amber-400">{key}</kbd>
+                </div>
+              ))}
+
               {/* Filter shortcuts - when filters panel is OPEN */}
-              <div className="text-xs text-amber-400 uppercase tracking-wider mb-1 mt-3">When Filters Open</div>
+              <div className="text-xs text-cyan-400 uppercase tracking-wider mb-1 mt-3">When Filters Open (Number Keys)</div>
               {[
                 { key: '0', description: 'Clear filter (show all)' },
                 { key: '1-3', description: 'Templates: Schedule, Reminder, Call Sheet' },

@@ -112,6 +112,15 @@ export default function TravelExpensesPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleExportMarkdownRef = useRef<(() => void) | null>(null)
   const viewModeRef = useRef(viewMode)
+  const showFiltersRef = useRef(showFilters)
+  const categoryFilterRef = useRef(categoryFilter)
+  const statusFilterRef = useRef(statusFilter)
+
+  // Sync refs with state
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { categoryFilterRef.current = categoryFilter }, [categoryFilter])
+  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+  useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
 
   const [formData, setFormData] = useState({
     category: 'flight',
@@ -723,10 +732,106 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === '?' || (e.shiftKey && e.key === '/')) { setShowHelp(true) }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
       if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
-      // Number keys for view mode switching (using ref for current state)
-      if (e.key === '1' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('dashboard') }
-      if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('list') }
-      if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('conflicts') }
+      // Context-aware number key shortcuts
+      // When filters panel OPEN: filter by category (1-9) or status (Shift+1-4)
+      // When filters panel CLOSED: switch view modes (1-3)
+      const categoryKeys = ['flight', 'train', 'bus', 'taxi', 'auto', 'hotel', 'stay', 'per_diem', 'daily_allowance']
+      const statusKeys = ['pending', 'approved', 'rejected', 'reimbursed']
+      
+      switch (e.key) {
+        case '1':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setCategoryFilter(prev => prev === 'flight' ? 'all' : 'flight')
+          } else {
+            setViewMode('dashboard')
+          }
+          break
+        case '2':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setCategoryFilter(prev => prev === 'train' ? 'all' : 'train')
+          } else {
+            setViewMode('list')
+          }
+          break
+        case '3':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setCategoryFilter(prev => prev === 'bus' ? 'all' : 'bus')
+          } else {
+            setViewMode('conflicts')
+          }
+          break
+        case '4':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter(prev => prev === 'taxi' ? 'all' : 'taxi')
+          }
+          break
+        case '5':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter(prev => prev === 'auto' ? 'all' : 'auto')
+          }
+          break
+        case '6':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter(prev => prev === 'hotel' ? 'all' : 'hotel')
+          }
+          break
+        case '7':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter(prev => prev === 'stay' ? 'all' : 'stay')
+          }
+          break
+        case '8':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter(prev => prev === 'per_diem' ? 'all' : 'per_diem')
+          }
+          break
+        case '9':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter(prev => prev === 'daily_allowance' ? 'all' : 'daily_allowance')
+          }
+          break
+        case '0':
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            setCategoryFilter('all')
+          }
+          break
+      }
+      
+      // Shift+number for status filters when filters panel is open
+      if (e.shiftKey && showFiltersRef.current) {
+        switch (e.key) {
+          case '1':
+            e.preventDefault()
+            setStatusFilter(prev => prev === 'pending' ? 'all' : 'pending')
+            break
+          case '2':
+            e.preventDefault()
+            setStatusFilter(prev => prev === 'approved' ? 'all' : 'approved')
+            break
+          case '3':
+            e.preventDefault()
+            setStatusFilter(prev => prev === 'rejected' ? 'all' : 'rejected')
+            break
+          case '4':
+            e.preventDefault()
+            setStatusFilter(prev => prev === 'reimbursed' ? 'all' : 'reimbursed')
+            break
+          case '0':
+            e.preventDefault()
+            setStatusFilter('all')
+            break
+        }
+      }
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); searchInputRef.current?.focus() }
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         handleRefreshRef.current?.()
@@ -1009,27 +1114,34 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
             ref={filterPanelRef}
             className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4"
           >
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-medium text-slate-300">Filters:</span>
+              <span className="text-xs text-cyan-400">(Press 1-9 to filter by category, Shift+1-4 for status, 0 to clear)</span>
+            </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-amber-500" />
-                <span className="text-sm font-medium text-slate-300">Filters:</span>
+                <span className="text-sm font-medium text-slate-300">Category (1-9):</span>
+                <select 
+                  value={categoryFilter} 
+                  onChange={(e) => setCategoryFilter(e.target.value)} 
+                  className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All Categories</option>
+                  {EXPENSE_CATEGORIES.map((cat, idx) => <option key={cat.key} value={cat.key}>{idx + 1}. {cat.label}</option>)}
+                </select>
               </div>
-              <select 
-                value={categoryFilter} 
-                onChange={(e) => setCategoryFilter(e.target.value)} 
-                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
-              >
-                <option value="all">All Categories</option>
-                {EXPENSE_CATEGORIES.map(cat => <option key={cat.key} value={cat.key}>{cat.label}</option>)}
-              </select>
-              <select 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)} 
-                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
-              >
-                <option value="all">All Status</option>
-                {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-              </select>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-300">Status (Shift+1-4):</span>
+                <select 
+                  value={statusFilter} 
+                  onChange={(e) => setStatusFilter(e.target.value)} 
+                  className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All Status</option>
+                  {STATUS_OPTIONS.map((s, idx) => <option key={s.key} value={s.key}>Shift+{idx + 1}. {s.label}</option>)}
+                </select>
+              </div>
               <div className="h-6 w-px bg-slate-600" />
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-slate-300">Sort by:</span>
@@ -1288,10 +1400,29 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
-              <div className="text-sm font-medium text-amber-400 mb-2">View Modes</div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to Dashboard</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">1</kbd></div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to List</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">2</kbd></div>
-              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to Conflicts</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">3</kbd></div>
+              <div className="text-sm font-medium text-amber-400 mb-2">When Filters Panel CLOSED</div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to Dashboard (1)</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to List (2)</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to Conflicts (3)</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">3</kbd></div>
+              <div className="border-t border-slate-700 my-2"></div>
+              <div className="text-sm font-medium text-cyan-400 mb-2">When Filters Panel OPEN</div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Flight</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Train</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Bus</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">3</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Taxi</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">4</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Auto</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">5</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Hotel</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">6</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Stay</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">7</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Per Diem</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">8</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Daily Allowance</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">9</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Clear category filter</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">0</kbd></div>
+              <div className="border-t border-slate-700 my-2"></div>
+              <div className="text-sm font-medium text-cyan-400 mb-2">Status Filters (Shift+Number)</div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Pending</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Shift+1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Approved</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Shift+2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Rejected</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Shift+3</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Reimbursed</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Shift+4</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Clear status filter</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Shift+0</kbd></div>
               <div className="border-t border-slate-700 my-2"></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle sort order</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">S</kbd></div>

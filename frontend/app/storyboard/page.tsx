@@ -80,6 +80,11 @@ export default function StoryboardPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const handleExportMarkdownRef = useRef<() => void>(() => {})
+  
+  // Refs for context-aware keyboard shortcuts
+  const showFiltersRef = useRef(showFilters)
+  const statusFilterRef = useRef(statusFilter)
+  const selectedStyleRef = useRef(selectedStyle)
 
   useEffect(() => {
     selectedScriptRef.current = selectedScript
@@ -88,6 +93,18 @@ export default function StoryboardPage() {
   useEffect(() => {
     scenesLengthRef.current = scenes.length
   }, [scenes.length])
+
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+
+  useEffect(() => {
+    statusFilterRef.current = statusFilter
+  }, [statusFilter])
+
+  useEffect(() => {
+    selectedStyleRef.current = selectedStyle
+  }, [selectedStyle])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -581,19 +598,59 @@ ${filteredScenes.map(scene =>
           break
         case '1':
           e.preventDefault()
-          setSelectedStyle('cleanLineArt')
+          if (showFiltersRef.current) {
+            // When filters open: show all status
+            setStatusFilter('all')
+          } else {
+            // When filters closed: switch style
+            setSelectedStyle('cleanLineArt')
+          }
           break
         case '2':
           e.preventDefault()
-          setSelectedStyle('pencilSketch')
+          if (showFiltersRef.current) {
+            // Toggle status filter (all, approved, pending, failed)
+            const current = statusFilterRef.current
+            if (current === 'approved') {
+              setStatusFilter('all')
+            } else {
+              setStatusFilter('approved')
+            }
+          } else {
+            setSelectedStyle('pencilSketch')
+          }
           break
         case '3':
           e.preventDefault()
-          setSelectedStyle('markerLine')
+          if (showFiltersRef.current) {
+            const current = statusFilterRef.current
+            if (current === 'pending') {
+              setStatusFilter('all')
+            } else {
+              setStatusFilter('pending')
+            }
+          } else {
+            setSelectedStyle('markerLine')
+          }
           break
         case '4':
           e.preventDefault()
-          setSelectedStyle('blueprint')
+          if (showFiltersRef.current) {
+            const current = statusFilterRef.current
+            if (current === 'failed') {
+              setStatusFilter('all')
+            } else {
+              setStatusFilter('failed')
+            }
+          } else {
+            setSelectedStyle('blueprint')
+          }
+          break
+        case '0':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setStatusFilter('all')
+          }
           break
         case 'e':
           e.preventDefault()
@@ -876,7 +933,10 @@ ${filteredScenes.map(scene =>
               {showFilters && (
                 <div className="absolute right-0 mt-2 w-72 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                    <span className="text-sm font-medium">Filter & Sort</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Filter & Sort</span>
+                      <span className="text-xs text-cyan-400">(1-4 for status, 0 to clear)</span>
+                    </div>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -929,10 +989,10 @@ ${filteredScenes.map(scene =>
                       <label className="text-xs text-gray-500 uppercase tracking-wider block mb-2">Status</label>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { key: 'all', label: 'All' },
-                          { key: 'approved', label: 'Approved' },
-                          { key: 'pending', label: 'Pending' },
-                          { key: 'failed', label: 'Failed' },
+                          { key: 'all', label: 'All (1)', shortcut: '1' },
+                          { key: 'approved', label: 'Approved (2)', shortcut: '2' },
+                          { key: 'pending', label: 'Pending (3)', shortcut: '3' },
+                          { key: 'failed', label: 'Failed (4)', shortcut: '4' },
                         ].map(status => (
                           <button
                             key={status.key}
@@ -1316,16 +1376,47 @@ ${filteredScenes.map(scene =>
                 </button>
               </div>
               <div className="space-y-3">
+                {/* Filters Closed Section */}
+                <div className="text-xs text-amber-400 uppercase tracking-wider mb-2">Filters Closed</div>
+                {[
+                  { key: '1', action: 'Clean Line Art style' },
+                  { key: '2', action: 'Pencil Sketch style' },
+                  { key: '3', action: 'Marker & Ink style' },
+                  { key: '4', action: 'Blueprint style' },
+                ].map(shortcut => (
+                  <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                    <span className="text-gray-400 text-sm">{shortcut.action}</span>
+                    <kbd className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded font-mono">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+                
+                {/* Filters Open Section */}
+                <div className="text-xs text-cyan-400 uppercase tracking-wider mt-4 mb-2">Filters Open</div>
+                {[
+                  { key: '1', action: 'Show all status' },
+                  { key: '2', action: 'Filter by Approved (toggle)' },
+                  { key: '3', action: 'Filter by Pending (toggle)' },
+                  { key: '4', action: 'Filter by Failed (toggle)' },
+                  { key: '0', action: 'Clear status filter' },
+                ].map(shortcut => (
+                  <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                    <span className="text-gray-400 text-sm">{shortcut.action}</span>
+                    <kbd className="px-2 py-1 bg-gray-800 text-cyan-400 text-xs rounded font-mono">
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+                
+                {/* General Shortcuts */}
+                <div className="text-xs text-emerald-400 uppercase tracking-wider mt-4 mb-2">General</div>
                 {[
                   { key: 'R', action: 'Refresh storyboard data' },
                   { key: 'F', action: 'Toggle filters & sort' },
                   { key: 'S', action: 'Toggle sort order (asc/desc)' },
                   { key: 'P', action: 'Print storyboard report' },
                   { key: '/', action: 'Focus search input' },
-                  { key: '1', action: 'Switch to Clean Line Art style' },
-                  { key: '2', action: 'Switch to Pencil Sketch style' },
-                  { key: '3', action: 'Switch to Marker & Ink style' },
-                  { key: '4', action: 'Switch to Blueprint style' },
                   { key: 'E', action: 'Export menu' },
                   { key: 'M', action: 'Export as Markdown' },
                   { key: '?', action: 'Show this help modal' },

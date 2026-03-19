@@ -314,7 +314,7 @@ export default function DOODPage() {
           break
         case 's':
           e.preventDefault()
-          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+          setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc')
           break
         case '0':
           e.preventDefault()

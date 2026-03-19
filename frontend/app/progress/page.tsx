@@ -608,84 +608,99 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           searchInputRef.current?.focus()
           break
         // Context-aware number key shortcuts
-        // When filters panel OPEN: filter by status/priority
-        // When filters panel CLOSED: switch view modes
+        // When filters panel CLOSED: Opens filter panel and applies filter
+        // When filters panel OPEN: Toggles filter (press again to clear)
         case '1':
           e.preventDefault()
-          if (showFiltersRef.current) {
-            // Filter by status: completed
-            setFilterStatus(prev => prev === 'completed' ? 'all' : 'completed')
+          if (!showFiltersRef.current) {
+            // Filters closed: Open filter panel and apply status filter
+            setShowFilters(true)
+            setFilterStatus('completed')
           } else {
-            setViewMode('timeline')
+            // Filters open: Toggle filter
+            setFilterStatus(prev => prev === 'completed' ? 'all' : 'completed')
           }
           break
         case '2':
           e.preventDefault()
-          if (showFiltersRef.current) {
-            // Filter by status: in_progress
-            setFilterStatus(prev => prev === 'in_progress' ? 'all' : 'in_progress')
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterStatus('in_progress')
           } else {
-            setViewMode('tasks')
+            setFilterStatus(prev => prev === 'in_progress' ? 'all' : 'in_progress')
           }
           break
         case '3':
           e.preventDefault()
-          if (showFiltersRef.current) {
-            // Filter by status: pending
-            setFilterStatus(prev => prev === 'pending' ? 'all' : 'pending')
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterStatus('pending')
           } else {
-            setViewMode('kanban')
+            setFilterStatus(prev => prev === 'pending' ? 'all' : 'pending')
           }
           break
         case '4':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Filter by status: delayed
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterStatus('delayed')
+          } else {
             setFilterStatus(prev => prev === 'delayed' ? 'all' : 'delayed')
           }
           break
         case '5':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Filter by status: blocked
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterStatus('blocked')
+          } else {
             setFilterStatus(prev => prev === 'blocked' ? 'all' : 'blocked')
           }
           break
         case '6':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Filter by priority: critical (Shift+6)
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterPriority('critical')
+          } else {
             setFilterPriority(prev => prev === 'critical' ? 'all' : 'critical')
           }
           break
         case '7':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Filter by priority: high
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterPriority('high')
+          } else {
             setFilterPriority(prev => prev === 'high' ? 'all' : 'high')
           }
           break
         case '8':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Filter by priority: medium
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterPriority('medium')
+          } else {
             setFilterPriority(prev => prev === 'medium' ? 'all' : 'medium')
           }
           break
         case '9':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Filter by priority: low
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
+            setFilterPriority('low')
+          } else {
             setFilterPriority(prev => prev === 'low' ? 'all' : 'low')
           }
           break
         case '0':
-          if (showFiltersRef.current) {
-            e.preventDefault()
-            // Clear all filters
-            setFilterStatus('all')
-            setFilterPriority('all')
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setShowFilters(true)
           }
+          // Always clear filters when 0 is pressed
+          setFilterStatus('all')
+          setFilterPriority('all')
           break
         case 'e':
           e.preventDefault()
@@ -1070,6 +1085,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
             <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
               <Filter className="w-4 h-4 text-cyan-400" />
               Filter & Sort
+              <span className="text-xs text-cyan-400 ml-2">(1-5 status, 6-9 priority, 0 clear)</span>
             </h3>
             <button
               onClick={clearFilters}
@@ -1179,9 +1195,9 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
                 { key: '/', action: 'Focus search' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order' },
-                { key: '1', action: 'Timeline view' },
-                { key: '2', action: 'Tasks view' },
-                { key: '3', action: 'Kanban view' },
+                { key: '1-5', action: 'Open filters & filter by status' },
+                { key: '6-9', action: 'Open filters & filter by priority' },
+                { key: '0', action: 'Open filters & clear all' },
                 { key: 'E', action: 'Export menu' },
                 { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print report' },
@@ -1195,18 +1211,19 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
                   </kbd>
                 </div>
               ))}
-              <div className="text-xs text-amber-400 font-medium mb-2 mt-4">When filters panel OPEN:</div>
+              <div className="text-xs text-cyan-400 font-medium mb-2 mt-4">When filters panel OPEN:</div>
               {[
-                { key: '1', action: 'Filter by status: completed (toggle)' },
-                { key: '2', action: 'Filter by status: in_progress (toggle)' },
-                { key: '3', action: 'Filter by status: pending (toggle)' },
-                { key: '4', action: 'Filter by status: delayed (toggle)' },
-                { key: '5', action: 'Filter by status: blocked (toggle)' },
-                { key: '6', action: 'Filter by priority: critical (toggle)' },
-                { key: '7', action: 'Filter by priority: high (toggle)' },
-                { key: '8', action: 'Filter by priority: medium (toggle)' },
-                { key: '9', action: 'Filter by priority: low (toggle)' },
+                { key: '1', action: 'Filter: completed (toggle)' },
+                { key: '2', action: 'Filter: in_progress (toggle)' },
+                { key: '3', action: 'Filter: pending (toggle)' },
+                { key: '4', action: 'Filter: delayed (toggle)' },
+                { key: '5', action: 'Filter: blocked (toggle)' },
+                { key: '6', action: 'Filter: critical (toggle)' },
+                { key: '7', action: 'Filter: high (toggle)' },
+                { key: '8', action: 'Filter: medium (toggle)' },
+                { key: '9', action: 'Filter: low (toggle)' },
                 { key: '0', action: 'Clear all filters' },
+                { key: 'F', action: 'Close filters panel' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">
                   <span className="text-slate-300">{shortcut.action}</span>

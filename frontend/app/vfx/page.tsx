@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson, Printer } from 'lucide-react';
+import { Sparkles, Wand2, AlertTriangle, Film, BarChart3, TrendingUp, AlertCircle, CheckCircle, Download, DollarSign, Clock, Plus, X, Save, Edit2, Trash2, Search, Filter, RefreshCw, HelpCircle, ChevronDown, FileText, FileJson, Printer, Shield } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
@@ -147,8 +147,8 @@ export default function VfxPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isUsingDemo, setIsUsingDemo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost'>('overview');
-  
+  const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost' | 'conflicts'>('overview');
+
   // Form states for add/edit
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [editingNote, setEditingNote] = useState<VfxNote | null>(null);
@@ -161,17 +161,17 @@ export default function VfxPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Filter and search
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Sorting state
   const [sortBy, setSortBy] = useState<'scene' | 'type' | 'confidence' | 'complexity'>('scene');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
+
   // Sort options
   const sortOptions = [
     { key: 'scene', label: 'Scene Number' },
@@ -179,7 +179,7 @@ export default function VfxPage() {
     { key: 'confidence', label: 'Confidence' },
     { key: 'complexity', label: 'Complexity' },
   ];
-  
+
   // Toggle sort order
   const toggleSortOrder = () => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -187,7 +187,37 @@ export default function VfxPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
-  
+
+  // Budget tracking state
+  const [budgetLimit, setBudgetLimit] = useState<number>(5000000); // Default ₹5Cr VFX budget
+
+  // Budget calculations
+  const budgetUsedPercent = useMemo(() => {
+    if (!summary || budgetLimit === 0) return 0;
+    return Math.round((summary.estimatedTotalCost / budgetLimit) * 100);
+  }, [summary, budgetLimit]);
+
+  const budgetRemaining = useMemo(() => {
+    if (!summary) return budgetLimit;
+    return budgetLimit - summary.estimatedTotalCost;
+  }, [summary, budgetLimit]);
+
+  const isOverBudget = useMemo(() => {
+    if (!summary) return false;
+    return summary.estimatedTotalCost > budgetLimit;
+  }, [summary, budgetLimit]);
+
+  const isWarning = useMemo(() => {
+    if (!summary || isOverBudget) return false;
+    return budgetUsedPercent >= 80;
+  }, [summary, budgetUsedPercent, isOverBudget]);
+
+  const budgetStatus = useMemo(() => {
+    if (isOverBudget) return 'over';
+    if (isWarning) return 'warning';
+    return 'ok';
+  }, [isOverBudget, isWarning]);
+
   // Refs for keyboard shortcuts and menus
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
@@ -211,7 +241,7 @@ export default function VfxPage() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
         return
       }
-      
+
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
@@ -259,6 +289,12 @@ export default function VfxPage() {
             setShowExportMenu(prev => !prev)
           }
           break
+        case 'm':
+          if (vfxNotes.length > 0 || vfxWarnings.length > 0) {
+            e.preventDefault()
+            exportToMarkdownRef.current()
+          }
+          break
         case 'p':
           if (vfxNotes.length > 0) {
             e.preventDefault()
@@ -277,9 +313,13 @@ export default function VfxPage() {
           e.preventDefault()
           setActiveTab('cost')
           break
+        case '4':
+          e.preventDefault()
+          setActiveTab('conflicts')
+          break
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedScript, showNoteForm, vfxNotes.length, vfxWarnings.length, showFilters])
@@ -297,7 +337,7 @@ export default function VfxPage() {
         setShowFilters(false)
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showExportMenu, showPrintMenu, showFilters])
@@ -335,27 +375,27 @@ export default function VfxPage() {
   // Filtered notes based on search and filters
   const filteredNotes = useMemo(() => {
     let notes = [...vfxNotes];
-    
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      notes = notes.filter(n => 
+      notes = notes.filter(n =>
         n.description.toLowerCase().includes(query) ||
         n.scene.sceneNumber.includes(query) ||
         n.scene.headingRaw?.toLowerCase().includes(query)
       );
     }
-    
+
     // Type filter
     if (typeFilter !== 'all') {
       notes = notes.filter(n => n.vfxType === typeFilter);
     }
-    
+
     // Complexity filter
     if (complexityFilter !== 'all') {
       notes = notes.filter(n => getComplexity(n.confidence) === complexityFilter);
     }
-    
+
     // Apply sorting
     notes.sort((a, b) => {
       let comparison = 0;
@@ -378,7 +418,7 @@ export default function VfxPage() {
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-    
+
     return notes;
   }, [vfxNotes, searchQuery, typeFilter, complexityFilter, sortBy, sortOrder]);
 
@@ -413,6 +453,121 @@ export default function VfxPage() {
       return aIdx - bIdx;
     });
   }, [filteredNotes, vfxWarnings, vfxProps]);
+
+  // VFX Conflict Detection
+  type Conflict = {
+    id: string;
+    type: 'budget' | 'certification' | 'complexity' | 'timeline' | 'technical';
+    severity: 'high' | 'medium' | 'low';
+    scene: string;
+    sceneHeading: string | null;
+    title: string;
+    description: string;
+    recommendation?: string;
+  };
+
+  const vfxConflicts = useMemo(() => {
+    const conflicts: Conflict[] = [];
+    const COMPLEX_SCENE_THRESHOLD = 3;
+    const EXPLICIT_CONTENT_WARNING = ['explicit', 'blood', 'violence', 'gore'];
+
+    // 1. Budget Overrun Detection
+    if (summary && summary.estimatedTotalCost > budgetLimit) {
+      const overrun = summary.estimatedTotalCost - budgetLimit;
+      conflicts.push({
+        id: 'budget-1',
+        type: 'budget',
+        severity: overrun > 2000000 ? 'high' : 'medium',
+        scene: 'All',
+        sceneHeading: null,
+        title: 'Budget Overrun Warning',
+        description: `Estimated VFX cost (₹${(summary.estimatedTotalCost / 100000).toFixed(1)}L) exceeds budget limit (₹${budgetLimit / 100000}L) by ₹${(overrun / 100000).toFixed(1)}L`,
+        recommendation: 'Consider simplifying complex shots or moving some VFX to post-production'
+      });
+    }
+
+    // 2. Complex Scene Detection
+    const complexScenes = vfxNotes.filter(n => n.vfxType === 'explicit' || n.vfxType === 'simulation');
+    if (complexScenes.length > COMPLEX_SCENE_THRESHOLD) {
+      const complexSceneNumbers = [...new Set(complexScenes.map(n => n.scene.sceneNumber))].slice(0, 5);
+      conflicts.push({
+        id: 'complexity-1',
+        type: 'complexity',
+        severity: complexScenes.length > 6 ? 'high' : 'medium',
+        scene: complexSceneNumbers.join(', '),
+        sceneHeading: complexScenes[0]?.scene.headingRaw || null,
+        title: 'High Complexity Scenes Detected',
+        description: `${complexScenes.length} complex VFX shots detected (explicit content, simulations). This may impact production timeline.`,
+        recommendation: 'Schedule these shots early in the shoot to allow buffer time for corrections'
+      });
+    }
+
+    // 3. Certification Issues Detection
+    const explicitNotes = vfxNotes.filter(n =>
+      n.vfxType === 'explicit' || n.description.toLowerCase().includes('blood') ||
+      n.description.toLowerCase().includes('violence') || n.description.toLowerCase().includes('gore')
+    );
+    if (explicitNotes.length > 0) {
+      const uniqueScenes = [...new Set(explicitNotes.map(n => n.scene.sceneNumber))];
+      conflicts.push({
+        id: 'cert-1',
+        type: 'certification',
+        severity: 'high',
+        scene: uniqueScenes.join(', '),
+        sceneHeading: explicitNotes[0]?.scene.headingRaw || null,
+        title: 'Certification Risk Detected',
+        description: `${explicitNotes.length} explicit VFX shots detected across ${uniqueScenes.length} scenes. May require UA/A certification cuts.`,
+        recommendation: 'Plan for alternate takes or post-production edits for theatrical release'
+      });
+    }
+
+    // 4. Low Confidence Detection (Technical Feasibility)
+    const lowConfidenceNotes = vfxNotes.filter(n => n.confidence < 0.5);
+    if (lowConfidenceNotes.length > 0) {
+      conflicts.push({
+        id: 'tech-1',
+        type: 'technical',
+        severity: 'low',
+        scene: lowConfidenceNotes.map(n => n.scene.sceneNumber).join(', '),
+        sceneHeading: lowConfidenceNotes[0]?.scene.headingRaw || null,
+        title: 'Low Confidence VFX Shots',
+        description: `${lowConfidenceNotes.length} VFX shots have low confidence scores (<50%). These may need additional planning or reference material.`,
+        recommendation: 'Gather more reference material or consult with VFX supervisor for these shots'
+      });
+    }
+
+    // 5. Timeline Conflict - too many VFX shots per scene
+    const sceneVfxCount = new Map<string, number>();
+    vfxNotes.forEach(note => {
+      const count = sceneVfxCount.get(note.scene.sceneNumber) || 0;
+      sceneVfxCount.set(note.scene.sceneNumber, count + 1);
+    });
+    sceneVfxCount.forEach((count, sceneNum) => {
+      if (count > 5) {
+        const note = vfxNotes.find(n => n.scene.sceneNumber === sceneNum);
+        conflicts.push({
+          id: `timeline-${sceneNum}`,
+          type: 'timeline',
+          severity: count > 8 ? 'high' : 'medium',
+          scene: sceneNum,
+          sceneHeading: note?.scene.headingRaw || null,
+          title: 'High VFX Shot Count',
+          description: `Scene ${sceneNum} has ${count} VFX shots - may require multiple shoot days or extended post time.`,
+          recommendation: 'Consider splitting into pickup shoots or simplifying during pre-production'
+        });
+      }
+    });
+
+    return conflicts;
+  }, [vfxNotes, summary, budgetLimit]);
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: vfxConflicts.length,
+    high: vfxConflicts.filter(c => c.severity === 'high').length,
+    medium: vfxConflicts.filter(c => c.severity === 'medium').length,
+    low: vfxConflicts.filter(c => c.severity === 'low').length,
+  }), [vfxConflicts]);
 
   // Form handlers
   const resetForm = () => {
@@ -451,14 +606,14 @@ export default function VfxPage() {
   const handleSaveNote = async () => {
     if (!validateForm()) return;
     setSubmitting(true);
-    
+
     try {
       if (editingNote) {
         // Update existing note
-        const updatedNotes = vfxNotes.map(n => 
-          n.id === editingNote.id 
-            ? { 
-                ...n, 
+        const updatedNotes = vfxNotes.map(n =>
+          n.id === editingNote.id
+            ? {
+                ...n,
                 description: formData.description,
                 vfxType: formData.vfxType,
                 confidence: formData.confidence / 100,
@@ -479,10 +634,10 @@ export default function VfxPage() {
           vfxType: formData.vfxType,
           confidence: formData.confidence / 100,
           estimatedDuration: formData.estimatedDuration,
-          scene: { 
-            sceneNumber: formData.sceneNumber, 
-            headingRaw: `Scene ${formData.sceneNumber}`, 
-            sceneIndex: parseInt(formData.sceneNumber) || 0 
+          scene: {
+            sceneNumber: formData.sceneNumber,
+            headingRaw: `Scene ${formData.sceneNumber}`,
+            sceneIndex: parseInt(formData.sceneNumber) || 0
           }
         };
         const updatedNotes = [...vfxNotes, newNote];
@@ -542,7 +697,7 @@ export default function VfxPage() {
       const res = await fetch(`/api/vfx?scriptId=${scriptId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch');
-      
+
       // Use real data if available, otherwise use demo data
       if (data.vfxNotes && data.vfxNotes.length > 0) {
         setVfxNotes(data.vfxNotes || []);
@@ -694,7 +849,7 @@ export default function VfxPage() {
         description: p.prop.description,
       })),
     };
-    
+
     const json = JSON.stringify(exportData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -710,9 +865,9 @@ export default function VfxPage() {
   function printVfxReport() {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
-    
+
     const scriptTitle = scripts.find(s => s.id === selectedScript)?.title || 'Unknown Script';
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -753,7 +908,7 @@ export default function VfxPage() {
     <h1>VFX Breakdown Report</h1>
     <p>${scriptTitle} - Generated on ${new Date().toLocaleDateString()}</p>
   </div>
-  
+
   <div class="summary">
     <div class="summary-card">
       <div class="label">VFX Scenes</div>
@@ -780,7 +935,7 @@ export default function VfxPage() {
       <div class="value">${summary?.totalWarnings || 0}</div>
     </div>
   </div>
-  
+
   <table>
     <thead>
       <tr>
@@ -796,7 +951,7 @@ export default function VfxPage() {
         const maxConf = Math.max(...group.notes.map(n => n.confidence), 0);
         const complexity = getComplexity(maxConf);
         const compClass = `complexity-${complexity}`;
-        
+
         return `
           <tr class="scene-header">
             <td colspan="5">Scene ${sceneNum}${group.heading ? ' - ' + group.heading : ''}</td>
@@ -826,14 +981,14 @@ export default function VfxPage() {
       }).join('')}
     </tbody>
   </table>
-  
+
   <div style="text-align: center; color: #999; font-size: 12px; margin-top: 20px;">
     Generated by CinePilot - VFX Breakdown Tool
   </div>
 </body>
 </html>
     `;
-    
+
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
@@ -871,13 +1026,180 @@ export default function VfxPage() {
 
   // Use filtered scenes for display when filters or sort are active, otherwise use all scenes
   const isFilterOrSortActive = searchQuery || typeFilter !== 'all' || complexityFilter !== 'all' || sortBy !== 'scene' || sortOrder !== 'asc';
-  const displayScenes = isFilterOrSortActive 
-    ? filteredSceneGroups 
+  const displayScenes = isFilterOrSortActive
+    ? filteredSceneGroups
     : [...sceneGroups.entries()].sort((a, b) => {
         const aIdx = vfxNotes.find((n) => n.scene.sceneNumber === a[0])?.scene.sceneIndex ?? 0;
         const bIdx = vfxNotes.find((n) => n.scene.sceneNumber === b[0])?.scene.sceneIndex ?? 0;
         return aIdx - bIdx;
       });
+
+  // Export VFX data to Markdown
+  const exportToMarkdown = useCallback(() => {
+    if (vfxNotes.length === 0 && vfxWarnings.length === 0) return;
+    
+    const notesToExport = isFilterOrSortActive ? filteredNotes : vfxNotes;
+    const scriptTitle = scripts.find(s => s.id === selectedScript)?.title || 'Unknown';
+    
+    // Calculate summary statistics
+    const totalNotes = notesToExport.length;
+    const totalWarnings = vfxWarnings.length;
+    const explicitNotes = notesToExport.filter(n => n.vfxType === 'explicit' || n.vfxType === 'simulation').length;
+    const impliedNotes = notesToExport.filter(n => n.vfxType === 'implied').length;
+    const highConfidenceNotes = notesToExport.filter(n => n.confidence >= 0.7).length;
+    const mediumConfidenceNotes = notesToExport.filter(n => n.confidence >= 0.4 && n.confidence < 0.7).length;
+    const lowConfidenceNotes = notesToExport.filter(n => n.confidence < 0.4).length;
+    
+    // Complexity breakdown
+    const complexityCounts = notesToExport.reduce((acc, note) => {
+      const conf = note.confidence;
+      if (conf >= 0.7) acc.complex++;
+      else if (conf >= 0.4) acc.moderate++;
+      else acc.simple++;
+      return acc;
+    }, { simple: 0, moderate: 0, complex: 0 });
+
+    // Category breakdown
+    const categoryCounts = notesToExport.reduce((acc, note) => {
+      acc[note.vfxType] = (acc[note.vfxType] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Warning severity breakdown
+    const severityCounts = vfxWarnings.reduce((acc, w) => {
+      acc[w.severity] = (acc[w.severity] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const getCategoryLabel = (cat: string) => {
+      const labels: Record<string, string> = {
+        'cgi': '🖥️ CGI',
+        'compositing': '🎬 Compositing',
+        'wire_removal': '〰️ Wire Removal',
+        'matte_painting': '🎨 Matte Painting',
+        'simulation': '💨 Simulation',
+        'enhancement': '✨ Enhancement',
+        'explicit': '🔴 Explicit VFX',
+        'implied': '🟢 Implied VFX',
+      };
+      return labels[cat] || cat;
+    };
+    
+    const getSeverityIcon = (sev: string) => {
+      if (sev === 'high') return '🔴';
+      if (sev === 'medium') return '🟡';
+      return '🟢';
+    };
+    
+    let markdown = `# VFX Breakdown - CinePilot
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| **Script** | ${scriptTitle} |
+| **Total VFX Shots** | ${totalNotes} |
+| **Total Warnings** | ${totalWarnings} |
+| **Explicit VFX** | ${explicitNotes} |
+| **Implied VFX** | ${impliedNotes} |
+| **Estimated Cost** | ₹${(summary?.estimatedTotalCost || 0).toLocaleString()} |
+| **Estimated Duration** | ${summary?.estimatedTotalDuration || 0} seconds |
+
+## Confidence Distribution
+
+| Confidence Level | Count | Percentage |
+|------------------|-------|------------|
+| 🟢 High (70%+) | ${highConfidenceNotes} | ${totalNotes > 0 ? Math.round((highConfidenceNotes / totalNotes) * 100) : 0}% |
+| 🟡 Medium (40-69%) | ${mediumConfidenceNotes} | ${totalNotes > 0 ? Math.round((mediumConfidenceNotes / totalNotes) * 100) : 0}% |
+| 🔴 Low (<40%) | ${lowConfidenceNotes} | ${totalNotes > 0 ? Math.round((lowConfidenceNotes / totalNotes) * 100) : 0}% |
+
+## Complexity Breakdown
+
+| Complexity | Count | Percentage |
+|------------|-------|------------|
+| 🔴 Complex (70%+) | ${complexityCounts.complex} | ${totalNotes > 0 ? Math.round((complexityCounts.complex / totalNotes) * 100) : 0}% |
+| 🟡 Moderate (40-69%) | ${complexityCounts.moderate} | ${totalNotes > 0 ? Math.round((complexityCounts.moderate / totalNotes) * 100) : 0}% |
+| 🟢 Simple (<40%) | ${complexityCounts.simple} | ${totalNotes > 0 ? Math.round((complexityCounts.simple / totalNotes) * 100) : 0}% |
+
+## Category Breakdown
+
+| Category | Count |
+|----------|-------|
+`;
+    
+    Object.entries(categoryCounts).forEach(([cat, count]) => {
+      markdown += `| ${getCategoryLabel(cat)} | ${count} |\n`;
+    });
+    
+    if (vfxWarnings.length > 0) {
+      markdown += `
+## Warning Severity Breakdown
+
+| Severity | Count |
+|----------|-------|
+`;
+      Object.entries(severityCounts).forEach(([sev, count]) => {
+        markdown += `| ${getSeverityIcon(sev)} ${sev.charAt(0).toUpperCase() + sev.slice(1)} | ${count} |\n`;
+      });
+    }
+    
+    if (notesToExport.length > 0) {
+      markdown += `
+## VFX Shots Detail
+
+| Scene | Heading | Type | Description | Confidence |
+|-------|---------|------|-------------|------------|
+`;
+      notesToExport.forEach(note => {
+        const confidencePct = Math.round(note.confidence * 100);
+        const confIcon = confidencePct >= 70 ? '🟢' : confidencePct >= 40 ? '🟡' : '🔴';
+        markdown += `| ${note.scene.sceneNumber} | ${note.scene.headingRaw || '-'} | ${getCategoryLabel(note.vfxType)} | ${note.description.substring(0, 50)}${note.description.length > 50 ? '...' : ''} | ${confIcon} ${confidencePct}% |\n`;
+      });
+    }
+    
+    if (vfxWarnings.length > 0) {
+      markdown += `
+## Warnings Detail
+
+| Scene | Heading | Severity | Description |
+|-------|---------|----------|-------------|
+`;
+      vfxWarnings.forEach(warn => {
+        markdown += `| ${warn.scene.sceneNumber} | ${warn.scene.headingRaw || '-'} | ${getSeverityIcon(warn.severity)} ${warn.severity} | ${warn.description} |\n`;
+      });
+    }
+    
+    if (isFilterOrSortActive) {
+      markdown += `
+## Filters Applied
+
+- **Search Query**: ${searchQuery || 'None'}
+- **Type Filter**: ${typeFilter || 'None'}
+- **Complexity Filter**: ${complexityFilter || 'None'}
+- **Sort By**: ${sortBy} (${sortOrder})
+`;
+    }
+    
+    markdown += `
+---
+*Generated by CinePilot on ${new Date().toLocaleString()}*
+`;
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vfx-breakdown-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  }, [vfxNotes, vfxWarnings, filteredNotes, summary, selectedScript, scripts, isFilterOrSortActive, searchQuery, typeFilter, complexityFilter, sortBy, sortOrder]);
+
+  // Ref for keyboard shortcut
+  const exportToMarkdownRef = useRef(() => {});
+  useEffect(() => {
+    exportToMarkdownRef.current = exportToMarkdown;
+  }, [exportToMarkdown]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">
@@ -974,6 +1296,13 @@ export default function VfxPage() {
                         <FileJson className="w-4 h-4 text-purple-400" />
                         Export JSON
                       </button>
+                      <button
+                        onClick={() => { exportToMarkdown(); setShowExportMenu(false); }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-cyan-400" />
+                        Export Markdown
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1027,8 +1356,8 @@ export default function VfxPage() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-                showFilters 
-                  ? 'bg-purple-600 text-white' 
+                showFilters
+                  ? 'bg-purple-600 text-white'
                   : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
               }`}
               title="Toggle Filters (F)"
@@ -1047,7 +1376,7 @@ export default function VfxPage() {
 
         {/* Filter Panel */}
         {showFilters && vfxNotes.length > 0 && (
-          <div 
+          <div
             ref={filterPanelRef}
             className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-200"
           >
@@ -1097,8 +1426,8 @@ export default function VfxPage() {
                 <button
                   onClick={toggleSortOrder}
                   className={`p-1.5 rounded-lg transition-colors ${
-                    sortOrder === 'asc' 
-                      ? 'bg-purple-500/20 text-purple-400' 
+                    sortOrder === 'asc'
+                      ? 'bg-purple-500/20 text-purple-400'
                       : 'bg-purple-600/20 text-purple-300'
                   }`}
                   title={`Sort ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
@@ -1158,7 +1487,7 @@ export default function VfxPage() {
                   <X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
-              
+
               <div className="p-4 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Scene Number</label>
@@ -1290,6 +1619,83 @@ export default function VfxPage() {
                 </div>
                 <div className="text-2xl font-bold">{formatDuration(summary.estimatedTotalDuration)}</div>
               </div>
+              {/* Budget Tracking Card */}
+              <div className={`bg-slate-900 border rounded-xl p-4 ${
+                budgetStatus === 'over' ? 'border-red-500/50 bg-red-900/20' :
+                budgetStatus === 'warning' ? 'border-amber-500/50 bg-amber-900/20' :
+                'border-emerald-500/30 bg-emerald-900/10'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className={`w-4 h-4 ${
+                      budgetStatus === 'over' ? 'text-red-400' :
+                      budgetStatus === 'warning' ? 'text-amber-400' :
+                      'text-emerald-400'
+                    }`} />
+                    <span className={`text-xs ${
+                      budgetStatus === 'over' ? 'text-red-300' :
+                      budgetStatus === 'warning' ? 'text-amber-300' :
+                      'text-emerald-300'
+                    }`}>Budget Limit</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {budgetStatus === 'over' ? (
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                    ) : budgetStatus === 'warning' ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    )}
+                  </div>
+                </div>
+                {/* Budget Progress Bar */}
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-400">{budgetUsedPercent}% used</span>
+                    <span className={
+                      budgetStatus === 'over' ? 'text-red-400' :
+                      budgetStatus === 'warning' ? 'text-amber-400' :
+                      'text-emerald-400'
+                    }>{budgetRemaining >= 0 ? formatCurrency(budgetRemaining) : `-${formatCurrency(Math.abs(budgetRemaining))}`} remaining</span>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${
+                      budgetStatus === 'over' ? 'bg-red-500' :
+                      budgetStatus === 'warning' ? 'bg-amber-500' :
+                      'bg-emerald-500'
+                    }`} style={{ width: `${Math.min(budgetUsedPercent, 100)}%` }} />
+                  </div>
+                </div>
+                {/* Budget Limit Input */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-xs">Set Limit:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-400">₹</span>
+                    <input
+                      type="number"
+                      value={budgetLimit}
+                      onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                      className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+                {/* Status Message */}
+                {budgetStatus === 'over' && (
+                  <p className="text-xs text-red-400 mt-2">
+                    ⚠️ Over budget by {formatCurrency(Math.abs(budgetRemaining))}
+                  </p>
+                )}
+                {budgetStatus === 'warning' && budgetRemaining >= 0 && (
+                  <p className="text-xs text-amber-400 mt-2">
+                    ⚠️ Approaching budget limit ({budgetUsedPercent}%)
+                  </p>
+                )}
+                {budgetStatus === 'ok' && budgetRemaining > 0 && (
+                  <p className="text-xs text-emerald-400 mt-2">
+                    ✓ Within budget
+                  </p>
+                )}
+              </div>
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -1343,6 +1749,21 @@ export default function VfxPage() {
                 }`}
               >
                 Cost Analysis
+              </button>
+              <button
+                onClick={() => setActiveTab('conflicts')}
+                className={`px-4 py-2 text-sm font-medium rounded-t transition-colors relative ${
+                  activeTab === 'conflicts'
+                    ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Conflicts
+                {conflictStats.high > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold">
+                    {conflictStats.high}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -1413,6 +1834,50 @@ export default function VfxPage() {
                           formatter={(value: number) => [`${value}%`, 'Confidence']}
                         />
                         <Bar dataKey="confidence" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Estimated Cost by Scene */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 md:col-span-2">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-emerald-400" />
+                    Estimated VFX Cost by Scene
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={displayScenes.map(([sceneNum, group]) => {
+                          const avgConfidence = group.notes.length > 0
+                            ? group.notes.reduce((sum, n) => sum + n.confidence, 0) / group.notes.length
+                            : 0;
+                          const complexity = getComplexity(avgConfidence);
+                          const costPerSecond = VFX_COST_PER_SECOND[complexity as keyof typeof VFX_COST_PER_SECOND] || VFX_COST_PER_SECOND.simple;
+                          const avgDuration = group.notes.length > 0
+                            ? group.notes.reduce((sum, n) => sum + (n.estimatedDuration || 10), 0) / group.notes.length
+                            : 10;
+                          const estimatedCost = costPerSecond * avgDuration;
+                          return {
+                            scene: `S${sceneNum}`,
+                            cost: Math.round(estimatedCost / 1000),
+                            complexity,
+                          };
+                        })}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="scene" stroke="#94a3b8" fontSize={12} />
+                        <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `₹${v}K`} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                          itemStyle={{ color: '#e2e8f0' }}
+                          formatter={(value: number, name: string) => {
+                            if (name === 'cost') return [`₹${value}K`, 'Est. Cost'];
+                            return [value, name];
+                          }}
+                        />
+                        <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1635,7 +2100,124 @@ export default function VfxPage() {
             </div>
           </div>
         )}
-        
+
+        {/* Conflicts Tab */}
+        {activeTab === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Stats Dashboard */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="text-sm text-slate-400 mb-1">Total Conflicts</div>
+                <div className="text-3xl font-bold text-white">{conflictStats.total}</div>
+              </div>
+              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                <div className="text-sm text-red-400 mb-1">High Priority</div>
+                <div className="text-3xl font-bold text-red-400">{conflictStats.high}</div>
+              </div>
+              <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl p-4">
+                <div className="text-sm text-amber-400 mb-1">Medium Priority</div>
+                <div className="text-3xl font-bold text-amber-400">{conflictStats.medium}</div>
+              </div>
+              <div className="bg-slate-700/30 border border-slate-600/30 rounded-xl p-4">
+                <div className="text-sm text-slate-400 mb-1">Low Priority</div>
+                <div className="text-3xl font-bold text-slate-400">{conflictStats.low}</div>
+              </div>
+            </div>
+
+            {/* All Clear State */}
+            {vfxConflicts.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">VFX Plan Looks Good!</h3>
+                <p className="text-slate-400">No conflicts detected. Your VFX shots are within budget and timeline.</p>
+              </div>
+            ) : (
+              /* Conflict Cards Grid */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vfxConflicts.map((conflict) => {
+                  const severityStyles = {
+                    high: { bg: 'bg-red-900/20', border: 'border-red-500/30', text: 'text-red-400', badge: 'bg-red-500' },
+                    medium: { bg: 'bg-amber-900/20', border: 'border-amber-500/30', text: 'text-amber-400', badge: 'bg-amber-500' },
+                    low: { bg: 'bg-slate-800/30', border: 'border-slate-600/30', text: 'text-slate-400', badge: 'bg-slate-500' },
+                  };
+                  const typeIcons = {
+                    budget: <DollarSign className="w-5 h-5" />,
+                    certification: <Shield className="w-5 h-5" />,
+                    complexity: <AlertTriangle className="w-5 h-5" />,
+                    timeline: <Clock className="w-5 h-5" />,
+                    technical: <Wand2 className="w-5 h-5" />,
+                  };
+                  const typeLabels = {
+                    budget: 'Budget',
+                    certification: 'Certification',
+                    complexity: 'Complexity',
+                    timeline: 'Timeline',
+                    technical: 'Technical',
+                  };
+                  const style = severityStyles[conflict.severity];
+
+                  return (
+                    <div key={conflict.id} className={`${style.bg} border ${style.border} rounded-xl p-5`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`${style.text}`}>
+                            {typeIcons[conflict.type]}
+                          </span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text} border ${style.border}`}>
+                            {typeLabels[conflict.type]}
+                          </span>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${style.badge}`}>
+                          {conflict.severity.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <h4 className="text-lg font-semibold text-white mb-2">{conflict.title}</h4>
+
+                      {conflict.scene && (
+                        <div className="text-sm text-slate-400 mb-2">
+                          <span className="text-slate-500">Scene:</span> {conflict.scene}
+                        </div>
+                      )}
+
+                      <p className="text-sm text-slate-300 mb-3">{conflict.description}</p>
+
+                      {conflict.recommendation && (
+                        <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
+                          <div className="text-xs text-purple-400 font-medium mb-1">Recommendation</div>
+                          <p className="text-sm text-slate-300">{conflict.recommendation}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Conflict Summary by Type */}
+            {vfxConflicts.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4">Conflicts by Type</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {[
+                    { type: 'budget', label: 'Budget', icon: DollarSign, count: vfxConflicts.filter(c => c.type === 'budget').length },
+                    { type: 'certification', label: 'Certification', icon: Shield, count: vfxConflicts.filter(c => c.type === 'certification').length },
+                    { type: 'complexity', label: 'Complexity', icon: AlertTriangle, count: vfxConflicts.filter(c => c.type === 'complexity').length },
+                    { type: 'timeline', label: 'Timeline', icon: Clock, count: vfxConflicts.filter(c => c.type === 'timeline').length },
+                    { type: 'technical', label: 'Technical', icon: Wand2, count: vfxConflicts.filter(c => c.type === 'technical').length },
+                  ].map(({ type, label, icon: Icon, count }) => (
+                    <div key={type} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
+                      <Icon className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-white">{count}</div>
+                      <div className="text-xs text-slate-500">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Keyboard Help Modal */}
         {showKeyboardHelp && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
@@ -1675,6 +2257,10 @@ export default function VfxPage() {
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Export as Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Print VFX report</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
                 </div>
@@ -1689,6 +2275,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Cost Analysis tab</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Conflicts tab</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Show shortcuts</span>

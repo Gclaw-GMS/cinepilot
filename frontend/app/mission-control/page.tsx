@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   Radar as RadarIcon, Gauge, Activity, Zap, Target, TrendingUp, 
   Clock, Film, Users, DollarSign, MapPin, Calendar, FileText,
   AlertTriangle, CheckCircle, Play, Pause, RotateCcw, Download,
-  Loader2, RefreshCw, HelpCircle, X, Search, Printer, Filter
+  Loader2, RefreshCw, HelpCircle, X, Search, Printer, Filter,
+  ArrowUpDown, ArrowUp, ArrowDown, FileJson
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -148,11 +149,20 @@ export default function MissionControl() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [exporting, setExporting] = useState(false)
+  
+  // Ref for keyboard shortcut access
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
   
   // Filter states
   const [filterDepartment, setFilterDepartment] = useState('all')
   const [filterRiskLevel, setFilterRiskLevel] = useState('all')
   const [filterLocation, setFilterLocation] = useState('all')
+  
+  // Sort states
+  const [sortBy, setSortBy] = useState<'name' | 'health' | 'members' | 'dailyRate' | 'level' | 'daysLeft' | 'scenes' | 'progress' | 'title'>('health')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [sortCategory, setSortCategory] = useState<'departments' | 'risks' | 'locations'>('departments')
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
@@ -221,12 +231,12 @@ export default function MissionControl() {
       ['Today', 'Crew Present', data.today.crewPresent.toString()],
       ['Today', 'Crew Total', data.today.crewTotal.toString()],
       ['Today', 'Hours Remaining', data.today.hoursRemaining.toString()],
-      // Departments
-      ...data.departments.map(d => ['Department', d.name, `Health: ${d.health}%, Members: ${d.members}, Rate: ₹${d.dailyRate}/day`]),
-      // Risks
-      ...data.risks.map(r => ['Risk', r.title, `Level: ${r.level}, Days Left: ${r.daysLeft}`]),
-      // Locations
-      ...data.locations.map(l => ['Location', l.name, `Scenes: ${l.scenes}, Progress: ${l.progress}%`]),
+      // Departments (sorted)
+      ...sortedDepartments.map(d => ['Department', d.name, `Health: ${d.health}%, Members: ${d.members}, Rate: ₹${d.dailyRate}/day`]),
+      // Risks (sorted)
+      ...sortedRisks.map(r => ['Risk', r.title, `Level: ${r.level}, Days Left: ${r.daysLeft}`]),
+      // Locations (sorted)
+      ...sortedLocations.map(l => ['Location', l.name, `Scenes: ${l.scenes}, Progress: ${l.progress}%`]),
     ]
     
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -248,14 +258,25 @@ export default function MissionControl() {
       production: data.production,
       today: data.today,
       weekly: data.weekly,
-      departments: data.departments,
-      risks: data.risks,
-      locations: data.locations,
+      departments: sortedDepartments,
+      risks: sortedRisks,
+      locations: sortedLocations,
       summary: data.summary,
+      sortInfo: {
+        sortBy,
+        sortOrder,
+        sortCategory,
+      },
+      filterInfo: {
+        searchQuery,
+        filterDepartment,
+        filterRiskLevel,
+        filterLocation,
+      },
       stats: {
-        totalDepartments: data.departments.length,
-        totalRisks: data.risks.length,
-        totalLocations: data.locations.length,
+        totalDepartments: sortedDepartments.length,
+        totalRisks: sortedRisks.length,
+        totalLocations: sortedLocations.length,
       }
     }
     
@@ -270,7 +291,168 @@ export default function MissionControl() {
     setShowExportMenu(false)
   }
 
-  // Print function
+  // Markdown export function
+  const handleExportMarkdown = useCallback(() => {
+    const currentData = dataRef.current
+    if (!currentData) return
+    
+    const currentSortedDepartments = sortedDepartmentsRef.current
+    const currentSortedRisks = sortedRisksRef.current
+    const currentSortedLocations = sortedLocationsRef.current
+    const currentIsDemoMode = isDemoModeRef.current
+    const currentSearchQuery = searchQueryRef.current
+    const currentSortBy = sortByRef.current
+    const currentSortOrder = sortOrderRef.current
+    const currentFilterDepartment = filterDepartmentRef.current
+    const currentFilterRiskLevel = filterRiskLevelRef.current
+    const currentFilterLocation = filterLocationRef.current
+    
+    setExporting(true)
+    
+    // Helper to format currency
+    const formatCurr = (amount: number) => {
+      if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`
+      if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)} L`
+      if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)} K`
+      return `₹${amount}`
+    }
+    
+    // Get emoji for risk level
+    const getRiskEmoji = (level: string) => {
+      switch (level) {
+        case 'high': return '🔴'
+        case 'medium': return '🟠'
+        default: return '🟢'
+      }
+    }
+    
+    // Get emoji for health status
+    const getHealthEmoji = (health: number) => {
+      if (health >= 90) return '🟢'
+      if (health >= 70) return '🟡'
+      return '🔴'
+    }
+    
+    const markdown = `# 🎯 Mission Control Report - CinePilot
+
+**Generated:** ${new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}
+**Production Mode:** ${currentIsDemoMode ? 'Demo Data' : 'Live'}
+
+---
+
+## 📊 Production Health Overview
+
+| Metric | Value |
+|--------|-------|
+| Overall Health | **${currentData.production.overall}%** |
+| Production Day | Day ${currentData.production.schedule.daysElapsed} of ${currentData.production.schedule.daysTotal} |
+
+---
+
+## 🎬 Scene Progress
+
+| Status | Count |
+|--------|-------|
+| Completed | ${currentData.production.scenes.completed} |
+| Remaining | ${currentData.production.scenes.remaining} |
+| Total | ${currentData.production.scenes.total} |
+
+---
+
+## 💰 Budget Overview
+
+| Metric | Amount |
+|--------|--------|
+| Total Budget | ${formatCurr(currentData.production.budget.total)} |
+| Spent | ${formatCurr(currentData.production.budget.spent)} |
+| Remaining | ${formatCurr(currentData.production.budget.remaining)} |
+| Projected Total | ${formatCurr(currentData.production.budget.projectedTotal)} |
+
+---
+
+## 📅 Today's Pulse
+
+| Metric | Value |
+|--------|-------|
+| Scenes Shot | ${currentData.today.scenesShot} / ${currentData.today.scenesPlanned} |
+| Crew Present | ${currentData.today.crewPresent} / ${currentData.today.crewTotal} |
+| Hours Remaining | ${currentData.today.hoursRemaining} |
+
+---
+
+## 🏢 Departments${currentSortedDepartments.length > 0 ? '' : ' (None)'}
+
+${currentSortedDepartments.length > 0 ? `| Department | Health | Members | Daily Rate |
+|------------|--------|---------|------------|
+${currentSortedDepartments.map(d => `| ${d.name} | ${getHealthEmoji(d.health)} ${d.health}% | ${d.members} | ${formatCurr(d.dailyRate)} |`).join('\n')}` : '*No department data available*'}
+
+---
+
+## ⚠️ Risk Alerts${currentSortedRisks.length > 0 ? '' : ' (None)'}
+
+${currentSortedRisks.length > 0 ? `| Level | Title | Days Left |
+|-------|-------|------------|
+${currentSortedRisks.map(r => `| ${getRiskEmoji(r.level)} ${r.level} | ${r.title} | ${r.daysLeft} |`).join('\n')}` : '*No active risks*'}
+
+---
+
+## 📍 Locations${currentSortedLocations.length > 0 ? '' : ' (None)'}
+
+${currentSortedLocations.length > 0 ? `| Location | Scenes | Progress |
+|----------|--------|----------|
+${currentSortedLocations.map(l => `| ${l.name} | ${l.scenes} | ${l.progress}% |`).join('\n')}` : '*No location data available*'}
+
+---
+
+## 📈 Weekly Performance
+
+| Day | Budget | Scenes |
+|-----|--------|--------|
+${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes} |`).join('\n')}
+
+---
+
+## 🎯 Production Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Scripts | ${currentData.summary.totalScripts} |
+| Total Characters | ${currentData.summary.totalCharacters} |
+| Total Crew | ${currentData.summary.totalCrew} |
+| Total Locations | ${currentData.summary.totalLocations} |
+| Shooting Days | ${currentData.summary.totalShootingDays} |
+
+---
+
+## 🔍 Filter & Sort Settings
+
+- **Search Query:** ${currentSearchQuery || '(none)'}
+- **Sort By:** ${currentSortBy} (${currentSortOrder})
+- **Department Filter:** ${currentFilterDepartment === 'all' ? 'All' : currentFilterDepartment}
+- **Risk Level Filter:** ${currentFilterRiskLevel === 'all' ? 'All' : currentFilterRiskLevel}
+- **Location Filter:** ${currentFilterLocation === 'all' ? 'All' : currentFilterLocation}
+
+---
+
+*Report generated by CinePilot • ${new Date().toISOString()}*
+`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mission-control-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExporting(false)
+    setShowExportMenu(false)
+  }, []) // Empty deps since refs are used
+
+  // Update ref for markdown export
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+  
   const printMissionControl = () => {
     if (!data) return
     
@@ -534,7 +716,7 @@ export default function MissionControl() {
   }, [showFilterPanel])
 
   // Active filter count
-  const activeFilterCount = (filterDepartment !== 'all' ? 1 : 0) + (filterRiskLevel !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0)
+  const activeFilterCount = (filterDepartment !== 'all' ? 1 : 0) + (filterRiskLevel !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'health' || sortOrder !== 'desc' ? 1 : 0)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -557,6 +739,10 @@ export default function MissionControl() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current()
+          break
         case 'p':
           e.preventDefault()
           setShowPrintMenu(prev => !prev)
@@ -568,6 +754,10 @@ export default function MissionControl() {
         case 'f':
           e.preventDefault()
           setShowFilterPanel(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case 'escape':
           e.preventDefault()
@@ -599,22 +789,109 @@ export default function MissionControl() {
 
   const productionHealth = data?.production.overall ?? 0
 
-  // Filter departments, risks, and locations based on search
-  const filteredDepartments = data?.departments.filter(d => 
-    d.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) ?? []
-  
-  const filteredRisks = data?.risks.filter(r => 
-    r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.level.toLowerCase().includes(searchQuery.toLowerCase())
-  ) ?? []
-  
-  const filteredLocations = data?.locations.filter(l => 
-    l.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) ?? []
+  // Sorting functions using useMemo for performance
+  const sortedDepartments = useMemo(() => {
+    const filtered = data?.departments.filter(d => 
+      d.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ) ?? []
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'health':
+          comparison = a.health - b.health
+          break
+        case 'members':
+          comparison = a.members - b.members
+          break
+        case 'dailyRate':
+          comparison = a.dailyRate - b.dailyRate
+          break
+        default:
+          comparison = a.health - b.health
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [data?.departments, searchQuery, sortBy, sortOrder])
 
-  const hasActiveFilters = searchQuery.trim().length > 0
-  const totalFiltered = filteredDepartments.length + filteredRisks.length + filteredLocations.length
+  const sortedRisks = useMemo(() => {
+    const filtered = data?.risks.filter(r => 
+      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.level.toLowerCase().includes(searchQuery.toLowerCase())
+    ) ?? []
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      const levelOrder = { high: 3, medium: 2, low: 1 }
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'level':
+          comparison = (levelOrder[a.level as keyof typeof levelOrder] || 0) - (levelOrder[b.level as keyof typeof levelOrder] || 0)
+          break
+        case 'daysLeft':
+          comparison = a.daysLeft - b.daysLeft
+          break
+        default:
+          comparison = (levelOrder[a.level as keyof typeof levelOrder] || 0) - (levelOrder[b.level as keyof typeof levelOrder] || 0)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [data?.risks, searchQuery, sortBy, sortOrder])
+
+  const sortedLocations = useMemo(() => {
+    const filtered = data?.locations.filter(l => 
+      l.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ) ?? []
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'scenes':
+          comparison = a.scenes - b.scenes
+          break
+        case 'progress':
+          comparison = a.progress - b.progress
+          break
+        default:
+          comparison = a.name.localeCompare(b.name)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [data?.locations, searchQuery, sortBy, sortOrder])
+
+  const hasActiveFilters = searchQuery.trim().length > 0 || sortBy !== 'health' || sortOrder !== 'desc'
+  const totalFiltered = sortedDepartments.length + sortedRisks.length + sortedLocations.length
+
+  // Refs for markdown export - initialized after useMemo declarations
+  const dataRef = useRef(data)
+  const isDemoModeRef = useRef(isDemoMode)
+  const sortedDepartmentsRef = useRef(sortedDepartments)
+  const sortedRisksRef = useRef(sortedRisks)
+  const sortedLocationsRef = useRef(sortedLocations)
+  const searchQueryRef = useRef(searchQuery)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+  const filterDepartmentRef = useRef(filterDepartment)
+  const filterRiskLevelRef = useRef(filterRiskLevel)
+  const filterLocationRef = useRef(filterLocation)
+  
+  // Update refs when values change
+  useEffect(() => { dataRef.current = data }, [data])
+  useEffect(() => { isDemoModeRef.current = isDemoMode }, [isDemoMode])
+  useEffect(() => { sortedDepartmentsRef.current = sortedDepartments }, [sortedDepartments])
+  useEffect(() => { sortedRisksRef.current = sortedRisks }, [sortedRisks])
+  useEffect(() => { sortedLocationsRef.current = sortedLocations }, [sortedLocations])
+  useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
+  useEffect(() => { sortByRef.current = sortBy }, [sortBy])
+  useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
+  useEffect(() => { filterDepartmentRef.current = filterDepartment }, [filterDepartment])
+  useEffect(() => { filterRiskLevelRef.current = filterRiskLevel }, [filterRiskLevel])
+  useEffect(() => { filterLocationRef.current = filterLocation }, [filterLocation])
 
   if (loading) {
     return (
@@ -719,11 +996,88 @@ export default function MissionControl() {
                 )}
               </button>
               {showFilterPanel && (
-                <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute left-0 mt-2 w-72 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-white/10">
-                    <h3 className="text-sm font-medium text-white">Filter Mission Control</h3>
+                    <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
                   </div>
                   <div className="p-4 space-y-4">
+                    {/* Sort Section */}
+                    <div className="pb-4 border-b border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-xs text-slate-400 flex items-center gap-1">
+                          <ArrowUpDown className="w-3 h-3" />
+                          Sort By
+                        </label>
+                        <button
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 rounded-lg text-xs text-cyan-400 transition-colors"
+                          title="Toggle sort order (S)"
+                        >
+                          {sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                          {sortOrder.toUpperCase()}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <button
+                          onClick={() => { setSortCategory('departments'); setSortBy('health'); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            sortCategory === 'departments' 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          Depts
+                        </button>
+                        <button
+                          onClick={() => { setSortCategory('risks'); setSortBy('level'); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            sortCategory === 'risks' 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          Risks
+                        </button>
+                        <button
+                          onClick={() => { setSortCategory('locations'); setSortBy('name'); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                            sortCategory === 'locations' 
+                              ? 'bg-cyan-500 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          Locs
+                        </button>
+                      </div>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        {sortCategory === 'departments' && (
+                          <>
+                            <option value="health">Health %</option>
+                            <option value="name">Name</option>
+                            <option value="members">Members</option>
+                            <option value="dailyRate">Daily Rate</option>
+                          </>
+                        )}
+                        {sortCategory === 'risks' && (
+                          <>
+                            <option value="level">Risk Level</option>
+                            <option value="title">Title</option>
+                            <option value="daysLeft">Days Left</option>
+                          </>
+                        )}
+                        {sortCategory === 'locations' && (
+                          <>
+                            <option value="name">Name</option>
+                            <option value="scenes">Scenes</option>
+                            <option value="progress">Progress %</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
                     {/* Department Filter */}
                     <div>
                       <label className="block text-xs text-slate-400 mb-2">Department</label>
@@ -770,10 +1124,16 @@ export default function MissionControl() {
                   {activeFilterCount > 0 && (
                     <div className="px-4 py-3 border-t border-white/10 bg-slate-800/50">
                       <button
-                        onClick={() => { setFilterDepartment('all'); setFilterRiskLevel('all'); setFilterLocation('all'); }}
+                        onClick={() => { 
+                          setFilterDepartment('all'); 
+                          setFilterRiskLevel('all'); 
+                          setFilterLocation('all'); 
+                          setSortBy('health');
+                          setSortOrder('desc');
+                        }}
                         className="w-full text-center text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
                       >
-                        Clear All Filters
+                        Clear All Filters & Sort
                       </button>
                     </div>
                   )}
@@ -817,8 +1177,15 @@ export default function MissionControl() {
                       onClick={handleExportJSON}
                       className="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-3"
                     >
-                      <FileText className="w-4 h-4 text-purple-400" />
+                      <FileJson className="w-4 h-4 text-purple-400" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={() => handleExportMarkdownRef.current()}
+                      className="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-3"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -888,7 +1255,9 @@ export default function MissionControl() {
               <ShortcutRow keys={['R']} description="Refresh mission data" />
               <ShortcutRow keys={['/']} description="Focus search input" />
               <ShortcutRow keys={['F']} description="Toggle filters panel" />
+              <ShortcutRow keys={['S']} description="Toggle sort order (asc/desc)" />
               <ShortcutRow keys={['E']} description="Export dropdown menu" />
+              <ShortcutRow keys={['M']} description="Export Markdown" />
               <ShortcutRow keys={['P']} description="Print mission report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
@@ -1059,8 +1428,8 @@ export default function MissionControl() {
               RISK ALERTS
             </h3>
             <div className="space-y-2">
-              {filteredRisks && filteredRisks.length > 0 ? (
-                filteredRisks.map((risk, i) => (
+              {sortedRisks && sortedRisks.length > 0 ? (
+                sortedRisks.map((risk, i) => (
                   <div key={i} className={`p-3 rounded-lg border ${
                     risk.level === 'high' ? 'bg-rose-500/10 border-rose-500/30' :
                     risk.level === 'medium' ? 'bg-amber-500/10 border-amber-500/30' :
@@ -1100,8 +1469,8 @@ export default function MissionControl() {
               DEPT HEALTH
             </h3>
             <div className="space-y-2">
-              {filteredDepartments && filteredDepartments.length > 0 ? (
-                filteredDepartments.slice(0, 5).map((dept, i) => (
+              {sortedDepartments && sortedDepartments.length > 0 ? (
+                sortedDepartments.slice(0, 5).map((dept, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-400">{dept.name}</span>
@@ -1161,8 +1530,8 @@ export default function MissionControl() {
               LOCATION PROGRESS
             </h3>
             <div className="space-y-2">
-              {filteredLocations && filteredLocations.length > 0 ? (
-                filteredLocations.slice(0, 4).map((loc, i) => (
+              {sortedLocations && sortedLocations.length > 0 ? (
+                sortedLocations.slice(0, 4).map((loc, i) => (
                   <div key={i} className="p-3 bg-slate-800/50 rounded-lg">
                     <div className="flex justify-between mb-2">
                       <span className="font-medium">{loc.name}</span>

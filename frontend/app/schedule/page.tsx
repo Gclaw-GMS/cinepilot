@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { 
   Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer, AlertCircle
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -228,7 +228,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true)
   const [optimizing, setOptimizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'timeline' | 'chart'>('timeline')
+  const [viewMode, setViewMode] = useState<'timeline' | 'chart' | 'conflicts'>('timeline')
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
@@ -241,15 +241,20 @@ export default function SchedulePage() {
   const [filterLocation, setFilterLocation] = useState<string>('all')
   
   // Sorting state
-  const [sortBy, setSortBy] = useState<'dayNumber' | 'date' | 'callTime' | 'hours' | 'location' | 'status'>('dayNumber')
+  const [sortBy, setSortBy] = useState<'dayNumber' | 'date' | 'location' | 'status' | 'scenes' | 'hours'>('dayNumber')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
-  // Toggle sort order
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }
+  // Sort options
+  const sortOptions = [
+    { value: 'dayNumber', label: 'Day Number' },
+    { value: 'date', label: 'Date' },
+    { value: 'location', label: 'Location' },
+    { value: 'status', label: 'Status' },
+    { value: 'scenes', label: 'Scenes' },
+    { value: 'hours', label: 'Hours' },
+  ]
   
-  // Calculate active filter count (includes sort)
+  // Calculate active filter count (including sort)
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'dayNumber' || sortOrder !== 'asc' ? 1 : 0)
   
   // Refs
@@ -260,8 +265,17 @@ export default function SchedulePage() {
   const handlePrintRef = useRef<() => void>(() => {})
   const handleOptimizeRef = useRef<() => void>(() => {})
   const fetchDataRef = useRef<() => void>(() => {})
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
   const shootingDaysRef = useRef<ShootingDayData[]>([])
   const filteredShootingDaysRef = useRef<ShootingDayData[]>([])
+  
+  // Refs for keyboard shortcuts - filter status
+  const filterStatusRef = useRef(filterStatus)
+  const showFiltersRef = useRef(showFilters)
+  
+  // Keep refs in sync with state
+  useEffect(() => { filterStatusRef.current = filterStatus }, [filterStatus])
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -347,6 +361,10 @@ export default function SchedulePage() {
           e.preventDefault()
           setViewMode('chart')
           break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case 'o':
           e.preventDefault()
           handleOptimizeRef.current?.()
@@ -362,10 +380,6 @@ export default function SchedulePage() {
           setShowPrintMenu(false)
           setSearchQuery('')
           setShowFilters(false)
-          setFilterStatus('all')
-          setFilterLocation('all')
-          setSortBy('dayNumber')
-          setSortOrder('asc')
           break
         case 'e':
           e.preventDefault()
@@ -381,7 +395,60 @@ export default function SchedulePage() {
           break
         case 's':
           e.preventDefault()
-          toggleSortOrder()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
+          break
+        // Number keys 1-5 for status filter (when filter panel is open or when using number keys)
+        case '1':
+          e.preventDefault()
+          // If filter panel is open, filter by status; otherwise set view mode
+          if (showFiltersRef.current || filterStatusRef.current !== 'all') {
+            setFilterStatus('all')
+            setShowFilters(true)
+          } else {
+            setViewMode('timeline')
+          }
+          break
+        case '2':
+          e.preventDefault()
+          if (showFiltersRef.current || filterStatusRef.current !== 'all') {
+            setFilterStatus('scheduled')
+            setShowFilters(true)
+          } else {
+            setViewMode('chart')
+          }
+          break
+        case '3':
+          e.preventDefault()
+          if (showFiltersRef.current || filterStatusRef.current !== 'all') {
+            setFilterStatus('in-progress')
+            setShowFilters(true)
+          } else {
+            setViewMode('conflicts')
+          }
+          break
+        case '4':
+          e.preventDefault()
+          if (showFiltersRef.current || filterStatusRef.current !== 'all') {
+            setFilterStatus('completed')
+            setShowFilters(true)
+          }
+          break
+        case '5':
+          e.preventDefault()
+          if (showFiltersRef.current || filterStatusRef.current !== 'all') {
+            setFilterStatus('delayed')
+            setShowFilters(true)
+          }
+          break
+        case '0':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setFilterStatus('all')
+          }
           break
       }
     }
@@ -444,15 +511,17 @@ export default function SchedulePage() {
     
     const exportData = {
       exportDate: new Date().toISOString(),
-      filters: {
-        searchQuery,
+      totalDays: shootingDays.length,
+      stats,
+      sortInfo: {
+        sortBy,
+        sortOrder,
+      },
+      filterInfo: {
         filterStatus,
         filterLocation,
-        sortBy,
-        sortOrder
+        searchQuery,
       },
-      totalDays: filteredShootingDays.length,
-      stats,
       shootingDays: filteredShootingDays.map(day => ({
         dayNumber: day.dayNumber,
         date: day.scheduledDate,
@@ -481,6 +550,130 @@ export default function SchedulePage() {
     URL.revokeObjectURL(url)
     setExporting(false)
   }
+
+  // Markdown export function
+  const handleExportMarkdown = useCallback(() => {
+    const currentFilteredDays = filteredShootingDaysRef.current
+    
+    // Calculate stats
+    const totalDays = currentFilteredDays.length
+    const totalScenes = currentFilteredDays.reduce((acc, day) => acc + day.dayScenes.length, 0)
+    const totalHours = currentFilteredDays.reduce((acc, day) => acc + parseFloat(day.estimatedHours || '0'), 0)
+    const totalMinutes = currentFilteredDays.reduce((acc, day) => acc + day.dayScenes.reduce((a, ds) => a + (ds.estimatedMinutes || 0), 0), 0)
+    
+    // Status breakdown
+    const statusCounts: Record<string, number> = {}
+    currentFilteredDays.forEach(day => {
+      statusCounts[day.status] = (statusCounts[day.status] || 0) + 1
+    })
+    
+    // Location breakdown
+    const locationCounts: Record<string, number> = {}
+    currentFilteredDays.forEach(day => {
+      const loc = day.location?.name || 'TBD'
+      locationCounts[loc] = (locationCounts[loc] || 0) + 1
+    })
+    
+    // Build markdown content
+    let markdown = `# CinePilot Shooting Schedule Report
+
+**Generated:** ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+
+---
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Shooting Days | ${totalDays} |
+| Total Scenes | ${totalScenes} |
+| Total Estimated Hours | ${totalHours} |
+| Total Scene Minutes | ${totalMinutes} |
+| Average Hours/Day | ${totalDays > 0 ? (totalHours / totalDays).toFixed(1) : '0'} |
+| Average Scenes/Day | ${totalDays > 0 ? (totalScenes / totalDays).toFixed(1) : '0'} |
+
+---
+
+## Status Breakdown
+
+| Status | Count |
+|--------|-------|
+`
+    
+    Object.entries(statusCounts).forEach(([status, count]) => {
+      const emoji = status === 'completed' ? '✅' : status === 'in-progress' ? '🔄' : status === 'delayed' ? '⚠️' : '📅'
+      markdown += `| ${emoji} ${status.charAt(0).toUpperCase() + status.slice(1)} | ${count} |\n`
+    })
+    
+    markdown += `
+---
+
+## Location Breakdown
+
+| Location | Days |
+|----------|------|
+`
+    
+    Object.entries(locationCounts).sort((a, b) => b[1] - a[1]).forEach(([location, count]) => {
+      markdown += `| ${location} | ${count} |\n`
+    })
+    
+    markdown += `
+---
+
+## Shooting Schedule
+
+| Day | Date | Location | Status | Scenes | Call Time | Hours | Notes |
+|-----|------|----------|--------|--------|-----------|-------|-------|
+`
+    
+    currentFilteredDays.forEach(day => {
+      const date = day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN') : 'TBD'
+      const location = day.location?.name || 'TBD'
+      const scenes = day.dayScenes.map(ds => ds.scene.sceneNumber).join(', ')
+      const callTime = day.callTime || '-'
+      const hours = day.estimatedHours || '-'
+      const notes = day.notes || '-'
+      const emoji = day.status === 'completed' ? '✅' : day.status === 'in-progress' ? '🔄' : day.status === 'delayed' ? '⚠️' : '📅'
+      
+      markdown += `| ${day.dayNumber} | ${date} | ${location} | ${emoji} ${day.status} | ${scenes} | ${callTime} | ${hours} | ${notes} |\n`
+    })
+    
+    markdown += `
+---
+
+## Detailed Scene Breakdown
+
+`
+    
+    currentFilteredDays.forEach(day => {
+      const date = day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN') : 'Day ' + day.dayNumber
+      markdown += `### ${date} - ${day.location?.name || 'Location TBD'}\n\n`
+      markdown += `| # | Scene | INT/EXT | Time | Duration | Location |\n`
+      markdown += `|---|-------|---------|------|----------|----------|\n`
+      
+      day.dayScenes.forEach((ds, idx) => {
+        markdown += `| ${idx + 1} | ${ds.scene.sceneNumber} | ${ds.scene.intExt || '-'} | ${ds.scene.timeOfDay || '-'} | ${ds.estimatedMinutes || '-'} min | ${ds.scene.location || '-'} |\n`
+      })
+      
+      markdown += '\n'
+    })
+    
+    markdown += `---\n\n*Generated by CinePilot - Production Management System*\n`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `schedule-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [])
+
+  // Update ref
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handlePrint = useCallback(() => {
     const currentShootingDays = shootingDaysRef.current
@@ -695,9 +888,9 @@ export default function SchedulePage() {
     return Array.from(locations).sort()
   }, [shootingDays])
 
-  // Filter and sort shooting days
+  // Filter shooting days by search query and filters
   const filteredShootingDays = useMemo(() => {
-    let days = [...shootingDays]
+    let days = shootingDays
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -723,32 +916,37 @@ export default function SchedulePage() {
     }
     
     // Apply sorting
-    days.sort((a, b) => {
+    const sortedDays = [...days].sort((a, b) => {
       let comparison = 0
+      
       switch (sortBy) {
         case 'dayNumber':
           comparison = a.dayNumber - b.dayNumber
           break
         case 'date':
-          comparison = (a.scheduledDate || '').localeCompare(b.scheduledDate || '')
-          break
-        case 'callTime':
-          comparison = (a.callTime || '').localeCompare(b.callTime || '')
-          break
-        case 'hours':
-          comparison = (parseInt(a.estimatedHours || '0') - parseInt(b.estimatedHours || '0'))
+          const dateA = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0
+          const dateB = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0
+          comparison = dateA - dateB
           break
         case 'location':
           comparison = (a.location?.name || '').localeCompare(b.location?.name || '')
           break
         case 'status':
-          comparison = a.status.localeCompare(b.status)
+          const statusOrder = { delayed: 0, 'in-progress': 1, scheduled: 2, completed: 3 }
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] ?? 4) - (statusOrder[b.status as keyof typeof statusOrder] ?? 4)
+          break
+        case 'scenes':
+          comparison = a.dayScenes.length - b.dayScenes.length
+          break
+        case 'hours':
+          comparison = (Number(a.estimatedHours) || 0) - (Number(b.estimatedHours) || 0)
           break
       }
+      
       return sortOrder === 'asc' ? comparison : -comparison
     })
     
-    return days
+    return sortedDays
   }, [shootingDays, searchQuery, filterStatus, filterLocation, sortBy, sortOrder])
 
   // Night vs Day breakdown
@@ -787,6 +985,140 @@ export default function SchedulePage() {
       extScenes,
     }
   }, [shootingDays])
+
+  // Conflict detection logic
+  interface ScheduleConflict {
+    id: string
+    type: 'overtime' | 'location' | 'day_change' | 'scene_gap' | 'late_call' | 'early_call'
+    severity: 'high' | 'medium' | 'low'
+    dayNumber: number
+    title: string
+    description: string
+    recommendation: string
+  }
+
+  const scheduleConflicts = useMemo((): ScheduleConflict[] => {
+    const conflicts: ScheduleConflict[] = []
+    
+    shootingDays.forEach(day => {
+      // Overtime detection (>10 hours)
+      const hours = Number(day.estimatedHours || 0)
+      if (hours > 10) {
+        conflicts.push({
+          id: `overtime-${day.id}`,
+          type: 'overtime',
+          severity: hours > 12 ? 'high' : 'medium',
+          dayNumber: day.dayNumber,
+          title: 'Overtime Scheduled',
+          description: `Day ${day.dayNumber} is scheduled for ${hours} hours, which exceeds the standard 10-hour workday.`,
+          recommendation: 'Consider splitting scenes across multiple days or hiring additional crew for support.'
+        })
+      }
+
+      // Late call time detection (after 10 AM)
+      if (day.callTime) {
+        const [hours] = day.callTime.split(':').map(Number)
+        if (hours >= 14) { // 2 PM or later
+          conflicts.push({
+            id: `late-call-${day.id}`,
+            type: 'late_call',
+            severity: 'low',
+            dayNumber: day.dayNumber,
+            title: 'Late Call Time',
+            description: `Day ${day.dayNumber} call time is ${day.callTime}, which may impact the shooting schedule.`,
+            recommendation: 'Ensure equipment is prepped the night before to maximize shooting time.'
+          })
+        }
+        if (hours < 5) { // Before 5 AM
+          conflicts.push({
+            id: `early-call-${day.id}`,
+            type: 'early_call',
+            severity: hours < 4 ? 'high' : 'medium',
+            dayNumber: day.dayNumber,
+            title: 'Early Morning Call',
+            description: `Day ${day.dayNumber} call time is ${day.callTime}, requiring early crew call.`,
+            recommendation: 'Ensure crew accommodation is close to location or arrange transport.'
+          })
+        }
+      }
+
+      // Location change detection (multiple locations in one day)
+      const locations = new Set(day.dayScenes.map(ds => ds.scene.location).filter(Boolean))
+      if (locations.size > 2) {
+        conflicts.push({
+          id: `location-${day.id}`,
+          type: 'location',
+          severity: locations.size > 3 ? 'high' : 'medium',
+          dayNumber: day.dayNumber,
+          title: 'Multiple Location Changes',
+          description: `Day ${day.dayNumber} has scenes at ${locations.size} different locations.`,
+          recommendation: 'Group scenes by location and shoot in geographic order to minimize travel time.'
+        })
+      }
+
+      // Night-to-day transition detection
+      const timeOfDaySet = new Set(day.dayScenes.map(ds => ds.scene.timeOfDay).filter(Boolean))
+      if (timeOfDaySet.has('NIGHT') && timeOfDaySet.has('DAY')) {
+        conflicts.push({
+          id: `day-change-${day.id}`,
+          type: 'day_change',
+          severity: 'medium',
+          dayNumber: day.dayNumber,
+          title: 'Day/Night Transition',
+          description: `Day ${day.dayNumber} has both DAY and NIGHT scenes, requiring lighting changes.`,
+          recommendation: 'Schedule DAY scenes first, then break for NIGHT setup to maximize efficiency.'
+        })
+      }
+
+      // Scene gap detection
+      const totalMinutes = day.dayScenes.reduce((sum, ds) => sum + (ds.estimatedMinutes || 0), 0)
+      if (totalMinutes > hours * 50) { // More scenes than reasonable hours can accommodate
+        conflicts.push({
+          id: `scene-gap-${day.id}`,
+          type: 'scene_gap',
+          severity: 'high',
+          dayNumber: day.dayNumber,
+          title: 'Unrealistic Schedule',
+          description: `Day ${day.dayNumber} has ${day.dayScenes.length} scenes totaling ~${totalMinutes} minutes (${Math.round(totalMinutes/60)} hours), but only ${hours} hours allocated.`,
+          recommendation: 'Reduce scene count or extend the estimated hours for this day.'
+        })
+      }
+    })
+
+    // Check for consecutive night shoots (crew fatigue)
+    let nightStreak = 0
+    shootingDays.forEach(day => {
+      const hasNight = day.dayScenes.some(ds => ds.scene.timeOfDay === 'NIGHT')
+      if (hasNight) {
+        nightStreak++
+        if (nightStreak >= 3) {
+          conflicts.push({
+            id: `fatigue-${day.id}`,
+            type: 'overtime',
+            severity: 'high',
+            dayNumber: day.dayNumber,
+            title: 'Crew Fatigue Risk',
+            description: `This is the ${nightStreak}th consecutive night shoot, increasing fatigue risk.`,
+            recommendation: 'Consider scheduling a rest day or daytime-only shoot after 3 consecutive night shoots.'
+          })
+        }
+      } else {
+        nightStreak = 0
+      }
+    })
+
+    return conflicts
+  }, [shootingDays])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => {
+    return {
+      total: scheduleConflicts.length,
+      high: scheduleConflicts.filter(c => c.severity === 'high').length,
+      medium: scheduleConflicts.filter(c => c.severity === 'medium').length,
+      low: scheduleConflicts.filter(c => c.severity === 'low').length,
+    }
+  }, [scheduleConflicts])
 
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -859,6 +1191,22 @@ export default function SchedulePage() {
             >
               <TrendingUp className="w-4 h-4 inline-block mr-1.5" />
               Analytics
+            </button>
+            <button
+              onClick={() => setViewMode('conflicts')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                viewMode === 'conflicts' 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <AlertCircle className="w-4 h-4 inline-block mr-1.5" />
+              Conflicts
+              {conflictStats.high > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                  {conflictStats.high}
+                </span>
+              )}
             </button>
           </div>
           {/* Filter Toggle Button */}
@@ -934,6 +1282,13 @@ export default function SchedulePage() {
                   <Download className="w-4 h-4" />
                   Export JSON
                 </button>
+                <button
+                  onClick={() => { handleExportMarkdown(); setShowExportMenu(false); }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export Markdown
+                </button>
               </div>
             )}
           </div>
@@ -977,11 +1332,38 @@ export default function SchedulePage() {
           ref={filterPanelRef}
           className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200"
         >
-          <div className="flex flex-wrap items-center gap-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm font-medium text-gray-300">Filter & Sort:</span>
+              <span className="text-sm font-medium text-gray-300">Filters & Sort:</span>
+              <span className="text-xs text-cyan-400 ml-1">(1-5 for status, 0 to clear)</span>
             </div>
+            {/* Sort Options */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-400">Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                {sortOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                sortBy !== 'dayNumber' || sortOrder !== 'asc'
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title="Toggle Sort Order (S)"
+            >
+              {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+            </button>
+            <div className="w-px h-6 bg-gray-600" />
+            {/* Filter Options */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-400">Status:</label>
               <select
@@ -1009,35 +1391,6 @@ export default function SchedulePage() {
                 ))}
               </select>
             </div>
-          </div>
-          
-          {/* Sort Controls */}
-          <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Sort by:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value="dayNumber">Day Number</option>
-                <option value="date">Date</option>
-                <option value="callTime">Call Time</option>
-                <option value="hours">Hours</option>
-                <option value="location">Location</option>
-                <option value="status">Status</option>
-              </select>
-            </div>
-            <button
-              onClick={toggleSortOrder}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sortOrder === 'asc' 
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
-              }`}
-            >
-              {sortOrder === 'asc' ? 'ASC ↑' : 'DESC ↓'}
-            </button>
             <button
               onClick={() => { 
                 setFilterStatus('all'); 
@@ -1047,7 +1400,7 @@ export default function SchedulePage() {
               }}
               className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
             >
-              Clear All
+              Clear Filters & Sort
             </button>
           </div>
         </div>
@@ -1317,6 +1670,114 @@ export default function SchedulePage() {
         </div>
       )}
 
+      {/* Conflicts View */}
+      {viewMode === 'conflicts' && (
+        <div className="space-y-6">
+          {/* Conflict Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Total Issues</p>
+                  <p className="text-2xl font-semibold text-white mt-1">{conflictStats.total}</p>
+                </div>
+                <AlertTriangle className="w-8 h-8 text-amber-400" />
+              </div>
+            </div>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-red-400 uppercase tracking-wider">High Priority</p>
+                  <p className="text-2xl font-semibold text-red-400 mt-1">{conflictStats.high}</p>
+                </div>
+                <AlertTriangle className="w-8 h-8 text-red-400" />
+              </div>
+            </div>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-amber-400 uppercase tracking-wider">Medium</p>
+                  <p className="text-2xl font-semibold text-amber-400 mt-1">{conflictStats.medium}</p>
+                </div>
+                <Clock className="w-8 h-8 text-amber-400" />
+              </div>
+            </div>
+            <div className="bg-gray-500/10 border border-gray-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Low</p>
+                  <p className="text-2xl font-semibold text-gray-400 mt-1">{conflictStats.low}</p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-gray-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* All Clear State */}
+          {scheduleConflicts.length === 0 ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-8 text-center">
+              <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">All Clear!</h3>
+              <p className="text-gray-400">No scheduling conflicts detected. Your schedule looks good!</p>
+            </div>
+          ) : (
+            /* Conflict List */
+            <div className="space-y-4">
+              {scheduleConflicts.map((conflict, idx) => (
+                <div 
+                  key={conflict.id}
+                  className={`rounded-xl border p-4 ${
+                    conflict.severity === 'high' 
+                      ? 'bg-red-500/10 border-red-500/20' 
+                      : conflict.severity === 'medium'
+                        ? 'bg-amber-500/10 border-amber-500/20'
+                        : 'bg-gray-500/10 border-gray-500/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-2 rounded-lg ${
+                      conflict.severity === 'high' 
+                        ? 'bg-red-500/20' 
+                        : conflict.severity === 'medium'
+                          ? 'bg-amber-500/20'
+                          : 'bg-gray-500/20'
+                    }`}>
+                      <AlertTriangle className={`w-5 h-5 ${
+                        conflict.severity === 'high' 
+                          ? 'text-red-400' 
+                          : conflict.severity === 'medium'
+                            ? 'text-amber-400'
+                            : 'text-gray-400'
+                      }`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium uppercase ${
+                          conflict.severity === 'high' 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : conflict.severity === 'medium'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {conflict.severity}
+                        </span>
+                        <span className="text-xs text-gray-500">Day {conflict.dayNumber}</span>
+                      </div>
+                      <h4 className="text-white font-medium mb-1">{conflict.title}</h4>
+                      <p className="text-sm text-gray-400 mb-2">{conflict.description}</p>
+                      <div className="bg-gray-800/50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 mb-1">Recommendation:</p>
+                        <p className="text-sm text-gray-300">{conflict.recommendation}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Version Info */}
       {versions.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
@@ -1507,19 +1968,24 @@ export default function SchedulePage() {
               {[
                 { key: 'R', desc: 'Refresh schedule data' },
                 { key: '/', desc: 'Focus search input' },
-                { key: 'F', desc: 'Toggle filters panel' },
-                { key: 'S', desc: 'Toggle sort order (ASC/DESC)' },
-                { key: '1', desc: 'Switch to Timeline view' },
-                { key: '2', desc: 'Switch to Analytics view' },
+                { key: 'F', desc: 'Toggle filters & sort panel' },
+                { key: 'S', desc: 'Toggle sort order (asc/desc)' },
+                { key: '1', desc: 'Filter: All Status / Timeline view', highlight: 'cyan' },
+                { key: '2', desc: 'Filter: Scheduled / Chart view', highlight: 'cyan' },
+                { key: '3', desc: 'Filter: In Progress / Conflicts view', highlight: 'cyan' },
+                { key: '4', desc: 'Filter: Completed', highlight: 'cyan' },
+                { key: '5', desc: 'Filter: Delayed', highlight: 'cyan' },
+                { key: '0', desc: 'Clear status filter', highlight: 'cyan' },
                 { key: 'O', desc: 'Open optimize schedule' },
-                { key: 'E', desc: 'Export schedule (CSV/JSON)' },
+                { key: 'E', desc: 'Export schedule (CSV/JSON/Markdown)' },
+                { key: 'M', desc: 'Export as Markdown' },
                 { key: 'P', desc: 'Print schedule report' },
                 { key: '?', desc: 'Show this help modal' },
-                { key: 'Esc', desc: 'Close modal / Clear search & filters / Reset sort' },
-              ].map(({ key, desc }) => (
+                { key: 'Esc', desc: 'Close modal / Clear search / Close filters' },
+              ].map(({ key, desc, highlight }) => (
                 <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-700/50 transition-colors">
                   <span className="text-gray-300">{desc}</span>
-                  <span className="text-sm font-mono bg-gray-900 px-3 py-1.5 rounded text-indigo-400 border border-gray-700">{key}</span>
+                  <span className={`text-sm font-mono bg-gray-900 px-3 py-1.5 rounded border border-gray-700 ${highlight === 'cyan' ? 'text-cyan-400' : 'text-indigo-400'}`}>{key}</span>
                 </div>
               ))}
             </div>

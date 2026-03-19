@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard, FileJson, FileText } from 'lucide-react';
+import { Eye, AlertTriangle, Search, RefreshCw, FileCheck, AlertCircle, BarChart3, LayoutGrid, List, TrendingDown, TrendingUp, Clock, Target, Zap, Filter, Download, Printer, X, ChevronRight, Keyboard, FileJson, FileText, FileCode } from 'lucide-react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -96,27 +96,8 @@ export default function ContinuityPage() {
   const [selectedWarning, setSelectedWarning] = useState<Warning | null>(null);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Sorting state
-  const [sortBy, setSortBy] = useState<'scene' | 'severity' | 'type' | 'description'>('scene');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
-  // Compute active filter count (includes sort as active filter)
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (typeFilter !== 'all') count++;
-    if (severityFilter !== 'all') count++;
-    if (sortBy !== 'scene' || sortOrder !== 'asc') count++;
-    return count;
-  }, [typeFilter, severityFilter, sortBy, sortOrder]);
-  
-  // Clear all filters (including sort)
-  const clearAllFilters = useCallback(() => {
-    setTypeFilter('all');
-    setSeverityFilter('all');
-    setSortBy('scene');
-    setSortOrder('asc');
-  }, []);
+  const [sortBy, setSortBy] = useState<'scene' | 'severity' | 'type' | 'description'>('severity');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -301,6 +282,12 @@ export default function ContinuityPage() {
           e.preventDefault();
           setShowExportMenu(!showExportMenu);
           break;
+        case 'm':
+          e.preventDefault();
+          if (warnings.length > 0) {
+            handleExportRef.current('markdown');
+          }
+          break;
         case 'p':
           e.preventDefault();
           if (warnings.length > 0) {
@@ -326,14 +313,13 @@ export default function ContinuityPage() {
           setShowFilters(false);
           setShowPrintMenu(false);
           setFilter('');
-          clearAllFilters();
           break;
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportMenu, showFilters, showPrintMenu, warnings.length, sortOrder, clearAllFilters]);
+  }, [showExportMenu, showFilters, showPrintMenu, warnings.length, sortOrder]);
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -430,20 +416,16 @@ export default function ContinuityPage() {
           (w.scene.headingRaw || '').toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
-    
-    // Apply sorting
-    const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-    filtered = [...filtered].sort((a, b) => {
+    // Sort warnings
+    const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+    return [...filtered].sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
         case 'scene':
-          // Sort by scene number (extract numeric part)
-          const aNum = parseInt(a.scene.sceneNumber.replace(/\D/g, '')) || 0;
-          const bNum = parseInt(b.scene.sceneNumber.replace(/\D/g, '')) || 0;
-          comparison = aNum - bNum;
+          comparison = a.scene.sceneNumber.localeCompare(b.scene.sceneNumber, undefined, { numeric: true });
           break;
         case 'severity':
-          comparison = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+          comparison = (severityOrder[a.severity as keyof typeof severityOrder] || 0) - (severityOrder[b.severity as keyof typeof severityOrder] || 0);
           break;
         case 'type':
           comparison = a.warningType.localeCompare(b.warningType);
@@ -454,12 +436,10 @@ export default function ContinuityPage() {
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-    
-    return filtered;
   }, [warnings, typeFilter, severityFilter, searchQuery, filter, sortBy, sortOrder]);
 
   // Export handlers
-  const handleExport = (format: 'csv' | 'json' | 'pdf') => {
+  const handleExport = (format: 'csv' | 'json' | 'pdf' | 'markdown') => {
     const data = filteredWarnings.map(w => ({
       scene: w.scene.sceneNumber,
       heading: w.scene.headingRaw,
@@ -485,9 +465,92 @@ export default function ContinuityPage() {
       a.href = url;
       a.download = `continuity-issues-${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
+    } else if (format === 'markdown') {
+      // Generate Markdown content
+      const severityEmoji: Record<string, string> = {
+        critical: '🔴',
+        high: '🟠',
+        medium: '🟡',
+        low: '⚪',
+      };
+      
+      const typeLabels: Record<string, string> = {
+        continuity: 'Continuity',
+        plot_hole: 'Plot Hole',
+        character: 'Character',
+        timeline: 'Timeline',
+        dialogue: 'Dialogue',
+      };
+      
+      // Calculate summary stats
+      const total = data.length;
+      const bySeverity = data.reduce((acc, w) => {
+        acc[w.severity] = (acc[w.severity] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const byType = data.reduce((acc, w) => {
+        acc[w.type] = (acc[w.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      let markdown = `# CinePilot Continuity Report
+
+> Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Issues** | ${total} |
+| **Critical** | ${bySeverity.critical || 0} |
+| **High** | ${bySeverity.high || 0} |
+| **Medium** | ${bySeverity.medium || 0} |
+| **Low** | ${bySeverity.low || 0} |
+
+## By Severity
+
+`;
+      
+      // Add severity breakdown
+      Object.entries(bySeverity).forEach(([severity, count]) => {
+        markdown += `- ${severityEmoji[severity] || '⚪'} **${severity.charAt(0).toUpperCase() + severity.slice(1)}**: ${count}\n`;
+      });
+      
+      markdown += `\n## By Type\n\n`;
+      
+      // Add type breakdown
+      Object.entries(byType).sort((a, b) => b[1] - a[1]).forEach(([type, count]) => {
+        markdown += `- **${typeLabels[type] || type}**: ${count}\n`;
+      });
+      
+      markdown += `\n## Issues Detail\n\n`;
+      
+      // Add issues table
+      markdown += `| Scene | Type | Severity | Description |\n`;
+      markdown += `|-------|------|----------|-------------|\n`;
+      
+      data.forEach(d => {
+        const desc = d.description.replace(/\|/g, '\\|').substring(0, 50);
+        markdown += `| ${d.scene} | ${typeLabels[d.type] || d.type} | ${severityEmoji[d.severity]} ${d.severity} | ${desc}${d.description.length > 50 ? '...' : ''} |\n`;
+      });
+      
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `continuity-report-${new Date().toISOString().split('T')[0]}.md`;
+      a.click();
     }
     setShowExportMenu(false);
   };
+
+  // Ref for keyboard shortcut accessibility
+  const handleExportRef = useRef(handleExport)
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    handleExportRef.current = handleExport
+  }, [])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Print function for Continuity Report
   const printContinuityReport = () => {
@@ -698,28 +761,50 @@ export default function ContinuityPage() {
               />
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">/</span>
             </div>
-            {/* Filter Toggle Button */}
+            {/* Filter & Sort Toggle Button */}
             <div className="relative" ref={filterPanelRef}>
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  showFilters || severityFilter !== 'all' || typeFilter !== 'all'
+                  showFilters || severityFilter !== 'all' || typeFilter !== 'all' || sortBy !== 'severity' || sortOrder !== 'desc'
                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
                 }`}
               >
                 <Filter className="w-4 h-4" />
                 Filter & Sort
-                {activeFilterCount > 0 && (
+                {((severityFilter !== 'all' || typeFilter !== 'all') || (sortBy !== 'severity' || sortOrder !== 'desc')) && (
                   <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs font-medium rounded">
-                    {activeFilterCount}
+                    {([severityFilter !== 'all', typeFilter !== 'all', sortBy !== 'severity' || sortOrder !== 'desc'].filter(Boolean)).length}
                   </span>
                 )}
               </button>
-              {/* Filter Panel */}
+              {/* Filter & Sort Panel */}
               {showFilters && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-4">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-4">
                   <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-2 block">Sort By</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
+                        >
+                          <option value="severity">Severity</option>
+                          <option value="scene">Scene</option>
+                          <option value="type">Type</option>
+                          <option value="description">Description</option>
+                        </select>
+                        <button
+                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                          className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+                          title="Toggle sort order"
+                        >
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </button>
+                      </div>
+                    </div>
                     <div>
                       <label className="text-xs text-slate-400 mb-2 block">Type</label>
                       <select
@@ -746,35 +831,8 @@ export default function ContinuityPage() {
                         <option value="low">Low</option>
                       </select>
                     </div>
-                    {/* Sort Options */}
-                    <div className="border-t border-slate-700 pt-4">
-                      <label className="text-xs text-slate-400 mb-2 block">Sort By</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm"
-                        >
-                          <option value="scene">Scene</option>
-                          <option value="severity">Severity</option>
-                          <option value="type">Type</option>
-                          <option value="description">Description</option>
-                        </select>
-                        <button
-                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                          className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                            sortBy !== 'scene' || sortOrder !== 'asc'
-                              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                              : 'bg-slate-900 border border-slate-700 text-slate-400 hover:bg-slate-700'
-                          }`}
-                          title="Toggle Sort Order"
-                        >
-                          {sortOrder === 'asc' ? '↑' : '↓'}
-                        </button>
-                      </div>
-                    </div>
                     <button
-                      onClick={clearAllFilters}
+                      onClick={() => { setTypeFilter('all'); setSeverityFilter('all'); setSortBy('severity'); setSortOrder('desc'); }}
                       className="w-full py-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                     >
                       Clear Filters & Sort
@@ -842,6 +900,17 @@ export default function ContinuityPage() {
                     <div>
                       <div className="text-sm text-white">CSV</div>
                       <div className="text-xs text-slate-500">Spreadsheet format</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { handleExport('markdown'); setShowExportMenu(false) }}
+                    disabled={!warnings.length}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left disabled:opacity-50"
+                  >
+                    <FileCode className="w-4 h-4 text-cyan-400" />
+                    <div>
+                      <div className="text-sm text-white">Markdown</div>
+                      <div className="text-xs text-slate-500">Formatted report</div>
                     </div>
                   </button>
                 </div>
@@ -1410,14 +1479,15 @@ export default function ContinuityPage() {
                 { key: 'R', description: 'Refresh continuity data' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters panel' },
-                { key: 'S', description: 'Toggle sort order' },
+                { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'E', description: 'Toggle export dropdown' },
+                { key: 'M', description: 'Export as Markdown' },
                 { key: 'P', description: 'Print continuity report' },
                 { key: '1', description: 'Switch to Overview tab' },
                 { key: '2', description: 'Switch to Breakdown tab' },
                 { key: '3', description: 'Switch to Trends tab' },
                 { key: '?', description: 'Show keyboard shortcuts' },
-                { key: 'Esc', description: 'Close modal / Clear filters & sort' },
+                { key: 'Esc', description: 'Close modal / Clear filters' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

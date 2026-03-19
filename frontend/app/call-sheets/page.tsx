@@ -5,7 +5,7 @@ import {
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
   Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2,
-  Keyboard, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown
+  Keyboard, Search, Filter
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -73,7 +73,7 @@ export default function CallSheetsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterLocation, setFilterLocation] = useState('all')
   const [filterMonth, setFilterMonth] = useState('all')
-  const [sortBy, setSortBy] = useState<'date' | 'title' | 'location' | 'callTime'>('date')
+  const [sortBy, setSortBy] = useState<'date' | 'title' | 'location'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -83,7 +83,7 @@ export default function CallSheetsPage() {
   const deleteSheetRef = useRef<(id: string) => Promise<void>>()
   const startEditingRef = useRef<() => void>()
   const cancelEditingRef = useRef<() => void>()
-  const toggleSortOrderRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -135,6 +135,11 @@ export default function CallSheetsPage() {
     fetchCrew()
   }, [fetchCallSheets, fetchCrew])
 
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }, [])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -174,13 +179,19 @@ export default function CallSheetsPage() {
         case 's':
           e.preventDefault()
           if (!creating && !isEditing) {
-            toggleSortOrderRef.current?.()
+            toggleSortOrder()
           }
           break
         case 'x':
           e.preventDefault()
           if (selected && !isEditing) {
             setShowExportMenu(prev => !prev)
+          }
+          break
+        case 'm':
+          e.preventDefault()
+          if (selected && !isEditing) {
+            handleExportMarkdownRef.current?.()
           }
           break
         case 'd':
@@ -210,7 +221,7 @@ export default function CallSheetsPage() {
           } else if (isEditing) {
             cancelEditingRef.current?.()
           } else {
-            // Reset sort to default when no modal/panel is open
+            // Reset sort to default
             setSortBy('date')
             setSortOrder('desc')
           }
@@ -220,7 +231,7 @@ export default function CallSheetsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets])
+  }, [selected, isEditing, creating, deleting, showKeyboardHelp, showExportMenu, showFilters, fetchCallSheets, toggleSortOrder])
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -271,7 +282,6 @@ export default function CallSheetsPage() {
     // Apply sorting
     result = [...result].sort((a, b) => {
       let comparison = 0
-      
       switch (sortBy) {
         case 'date':
           comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -282,26 +292,12 @@ export default function CallSheetsPage() {
         case 'location':
           comparison = (a.content?.location || '').localeCompare(b.content?.location || '')
           break
-        case 'callTime':
-          comparison = (a.content?.callTime || '').localeCompare(b.content?.callTime || '')
-          break
       }
-      
       return sortOrder === 'asc' ? comparison : -comparison
     })
     
     return result
   }, [callSheets, searchQuery, filterLocation, filterMonth, sortBy, sortOrder])
-
-  // Active filter count
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (searchQuery) count++
-    if (filterLocation !== 'all') count++
-    if (filterMonth !== 'all') count++
-    if (sortBy !== 'date' || sortOrder !== 'desc') count++
-    return count
-  }, [searchQuery, filterLocation, filterMonth, sortBy, sortOrder])
 
   // Get unique locations for filter
   const uniqueLocations = useMemo(() => {
@@ -326,18 +322,22 @@ export default function CallSheetsPage() {
     return Array.from(months).sort().reverse()
   }, [callSheets])
 
-  // Clear all filters
+  // Active filter count (includes sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterLocation !== 'all') count++
+    if (filterMonth !== 'all') count++
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++
+    return count
+  }, [filterLocation, filterMonth, sortBy, sortOrder])
+
+  // Clear all filters and sort
   const clearFilters = () => {
     setFilterLocation('all')
     setFilterMonth('all')
     setSortBy('date')
     setSortOrder('desc')
   }
-
-  // Toggle sort order
-  const toggleSortOrder = useCallback(() => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }, [])
 
   const createNew = async () => {
     try {
@@ -457,10 +457,6 @@ export default function CallSheetsPage() {
   useEffect(() => {
     cancelEditingRef.current = cancelEditing
   }, [cancelEditing])
-
-  useEffect(() => {
-    toggleSortOrderRef.current = toggleSortOrder
-  }, [toggleSortOrder])
 
   const saveChanges = async () => {
     if (!selected) return
@@ -678,6 +674,101 @@ export default function CallSheetsPage() {
     setShowExportMenu(false)
   }
 
+  // Export to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    if (!selected) return
+    
+    const crewCalls = selected.content?.crewCalls || []
+    const scenes = selected.content?.scenes || []
+    
+    // Calculate summary stats
+    const departments = [...new Set(crewCalls.map(c => c.department).filter(Boolean))]
+    const crewByDept: Record<string, number> = {}
+    crewCalls.forEach(c => {
+      const dept = c.department || 'Other'
+      crewByDept[dept] = (crewByDept[dept] || 0) + 1
+    })
+    
+    let markdown = `# Call Sheet: ${selected.title}\n\n`
+    markdown += `**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+    
+    // Executive Summary
+    markdown += `## Executive Summary\n\n`
+    markdown += `| Metric | Value |\n`
+    markdown += `|--------|-------|\n`
+    markdown += `| **Date** | ${selected.date || 'TBD'} |\n`
+    markdown += `| **Call Time** | ${selected.content?.callTime || 'TBD'} |\n`
+    markdown += `| **Wrap Time** | ${selected.content?.wrapTime || 'TBD'} |\n`
+    markdown += `| **Location** | ${selected.content?.location || 'TBD'} |\n`
+    markdown += `| **Total Crew** | ${crewCalls.length} |\n`
+    markdown += `| **Departments** | ${departments.length} |\n`
+    markdown += `| **Scenes** | ${scenes.length} |\n\n`
+    
+    // Weather Info
+    if (selected.content?.weather) {
+      markdown += `## Weather\n\n`
+      markdown += `- **Conditions:** ${selected.content.weather || 'N/A'}\n\n`
+    }
+    
+    // Department Breakdown
+    if (Object.keys(crewByDept).length > 0) {
+      markdown += `## Department Breakdown\n\n`
+      markdown += `| Department | Count |\n`
+      markdown += `|------------|-------|\n`
+      Object.entries(crewByDept).sort(([,a], [,b]) => b - a).forEach(([dept, count]) => {
+        markdown += `| ${dept} | ${count} |\n`
+      })
+      markdown += `\n`
+    }
+    
+    // Scenes
+    if (scenes.length > 0) {
+      markdown += `## Scheduled Scenes\n\n`
+      markdown += `| # |\n`
+      markdown += `|----|\n`
+      scenes.forEach(scene => {
+        markdown += `| ${scene} |\n`
+      })
+      markdown += `\n`
+    }
+    
+    // Crew Call List
+    if (crewCalls.length > 0) {
+      markdown += `## Crew Call List\n\n`
+      markdown += `| Role | Name | Department | Call Time |\n`
+      markdown += `|------|------|------------|----------|\n`
+      crewCalls.forEach(crew => {
+        markdown += `| ${crew.role || '-'} | ${crew.name || '-'} | ${crew.department || '-'} | ${crew.callTime || selected.content?.callTime || '-'} |\n`
+      })
+      markdown += `\n`
+    }
+    
+    // Notes
+    if (selected.notes) {
+      markdown += `## Notes\n\n`
+      markdown += `${selected.notes}\n\n`
+    }
+    
+    // Footer
+    markdown += `---\n\n`
+    markdown += `*Generated by CinePilot - Call Sheet Export*\n`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const exportDate = new Date().toISOString().split('T')[0]
+    a.download = `callsheet-${exportDate}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [selected])
+
+  // Store handleExportMarkdown in ref for keyboard shortcuts
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
   // Group crew by department for display
   const crewByDepartment = useMemo(() => {
     if (!selected?.content?.crewCalls) return {}
@@ -744,7 +835,7 @@ export default function CallSheetsPage() {
                   ? 'bg-cyan-600 border-cyan-500 text-white'
                   : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
               }`}
-              title="Filter (F)"
+              title="Filter & Sort (F)"
             >
               <Filter className="w-4 h-4" />
               {activeFilterCount > 0 && (
@@ -769,24 +860,27 @@ export default function CallSheetsPage() {
                 <div className="p-4 space-y-4">
                   {/* Sort Options */}
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Sort By</label>
+                    <label className="text-xs text-cyan-500 uppercase tracking-wider block mb-2">Sort By</label>
                     <div className="flex gap-2">
                       <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as 'date' | 'title' | 'location' | 'callTime')}
+                        onChange={(e) => setSortBy(e.target.value as 'date' | 'title' | 'location')}
                         className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
                       >
                         <option value="date">Date</option>
                         <option value="title">Title</option>
                         <option value="location">Location</option>
-                        <option value="callTime">Call Time</option>
                       </select>
                       <button
                         onClick={toggleSortOrder}
-                        className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white flex items-center gap-1 transition-colors"
-                        title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          sortOrder === 'asc' 
+                            ? 'bg-cyan-600 text-white hover:bg-cyan-500' 
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Toggle sort order (S)"
                       >
-                        {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                        {sortOrder === 'asc' ? 'ASC' : 'DESC'}
                       </button>
                     </div>
                   </div>
@@ -1080,7 +1174,7 @@ export default function CallSheetsPage() {
                           <Download className="w-4 h-4" />
                         </button>
                         {showExportMenu && (
-                          <div className="absolute right-0 top-full mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                          <div className="absolute right-0 top-full mt-2 w-44 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                             <button
                               onClick={handleExportCSV}
                               className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
@@ -1094,6 +1188,13 @@ export default function CallSheetsPage() {
                             >
                               <FileText className="w-4 h-4" />
                               Export JSON
+                            </button>
+                            <button
+                              onClick={handleExportMarkdown}
+                              className="w-full px-3 py-2 text-left text-sm text-cyan-300 hover:bg-slate-700 hover:text-cyan-200 flex items-center gap-2"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Export Markdown
                             </button>
                           </div>
                         )}
@@ -1497,11 +1598,12 @@ export default function CallSheetsPage() {
               {[
                 { key: 'R', description: 'Refresh call sheets' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'F', description: 'Toggle filters & sort' },
-                { key: 'S', description: 'Toggle sort order' },
+                { key: 'F', description: 'Toggle filters' },
+                { key: 'S', description: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', description: 'New call sheet' },
                 { key: 'E', description: 'Edit selected sheet' },
                 { key: 'X', description: 'Export dropdown menu' },
+                { key: 'M', description: 'Export as Markdown' },
                 { key: 'D', description: 'Delete selected sheet' },
                 { key: 'P', description: 'Print selected sheet' },
                 { key: '?', description: 'Show keyboard shortcuts' },

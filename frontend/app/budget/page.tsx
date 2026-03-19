@@ -47,7 +47,24 @@ interface ForecastData {
   categories: { category: string; planned: number; actual: number; forecast: number; status: string }[]
 }
 
-type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast'
+type ActiveTab = 'overview' | 'breakdown' | 'expenses' | 'forecast' | 'scenarios'
+
+// Scenario Planning Types
+interface BudgetScenario {
+  id: string
+  name: string
+  description: string
+  type: 'optimistic' | 'pessimistic' | 'realistic' | 'custom'
+  adjustments: ScenarioAdjustment[]
+  totalBudget: number
+  createdAt: string
+}
+
+interface ScenarioAdjustment {
+  category: string
+  percentageChange: number // -50 to +50
+  notes: string
+}
 
 const REGIONS = ['Tamil Nadu', 'Chennai', 'Madurai', 'Ooty']
 const SCALES = [
@@ -145,17 +162,69 @@ export default function BudgetPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleRefreshRef = useRef<() => Promise<void>>()
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
+  
+  // Refs for keyboard shortcuts (to avoid dependency issues in useEffect)
+  const categoryFilterRef = useRef(categoryFilter)
+  const showFiltersRef = useRef(showFilters)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    categoryFilterRef.current = categoryFilter
+  }, [categoryFilter])
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
   const subcategories = [...new Set(items.map(item => item.subcategory).filter(Boolean))].sort() as string[]
   const sources = [...new Set(items.map(item => item.source))].sort()
 
+  // Scenario Planning State - initialized after categories
+  const defaultScenarios: BudgetScenario[] = [
+    {
+      id: 'baseline',
+      name: 'Baseline',
+      description: 'Original budget plan',
+      type: 'realistic',
+      adjustments: [],
+      totalBudget: 85000000,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'optimistic',
+      name: 'Optimistic',
+      description: 'Best case scenario - all costs at lower end',
+      type: 'optimistic',
+      adjustments: categories.map(cat => ({ category: cat, percentageChange: -15, notes: 'Lower end of estimates' })),
+      totalBudget: 72250000,
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'pessimistic',
+      name: 'Pessimistic',
+      description: 'Worst case scenario - costs at upper end',
+      type: 'pessimistic',
+      adjustments: categories.map(cat => ({ category: cat, percentageChange: 20, notes: 'Upper end with buffer' })),
+      totalBudget: 102000000,
+      createdAt: new Date().toISOString()
+    }
+  ]
+  const [scenarios, setScenarios] = useState<BudgetScenario[]>(defaultScenarios)
+  const [selectedScenario, setSelectedScenario] = useState<string>('baseline')
+  const [showScenarioEditor, setShowScenarioEditor] = useState(false)
+  const [editingScenario, setEditingScenario] = useState<BudgetScenario | null>(null)
+  const [newScenarioName, setNewScenarioName] = useState('')
+  const [newScenarioType, setNewScenarioType] = useState<'optimistic' | 'pessimistic' | 'realistic' | 'custom'>('custom')
+  const [scenarioAdjustments, setScenarioAdjustments] = useState<ScenarioAdjustment[]>([])
+
   // Count active filters
   const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
 
-  // Helper to sort items (used by exports)
-  const sortItems = (itemsToSort: BudgetItemData[]) => {
+  // Helper to sort items (used by exports) - wrapped in useCallback to fix dependency warning
+  const sortItems = useCallback((itemsToSort: BudgetItemData[]) => {
     return [...itemsToSort].sort((a, b) => {
       let comparison = 0
       switch (sortBy) {
@@ -179,7 +248,7 @@ export default function BudgetPage() {
       }
       return sortOrder === 'asc' ? comparison : -comparison
     })
-  }
+  }, [sortBy, sortOrder])
 
   // Export functions
   const handleExportCSV = () => {
@@ -241,6 +310,169 @@ export default function BudgetPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
+
+  const handleExportMarkdown = useCallback(() => {
+    // Filter items based on current filters
+    const sortedItems = sortItems(items.filter(item => {
+      // Search filter
+      if (searchQuery && 
+          !item.category.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !(item.subcategory?.toLowerCase() || '').includes(searchQuery.toLowerCase()) &&
+          !(item.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+      ) return false
+      // Category filter
+      if (categoryFilter !== 'all' && item.category !== categoryFilter) return false
+      // Subcategory filter
+      if (subcategoryFilter !== 'all' && item.subcategory !== subcategoryFilter) return false
+      // Source filter
+      if (sourceFilter !== 'all' && item.source !== sourceFilter) return false
+      return true
+    }))
+
+    // Filter expenses based on current filters
+    const sortedExpenses = expenses.filter(exp => {
+      // Search filter
+      if (searchQuery && 
+          !exp.category.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !exp.description.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !(exp.vendor?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+      ) return false
+      // Category filter for expenses
+      if (categoryFilter !== 'all' && exp.category !== categoryFilter) return false
+      return true
+    }).sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'category':
+          comparison = (a.category || '').localeCompare(b.category || '')
+          break
+        case 'description':
+          comparison = (a.description || '').localeCompare(b.description || '')
+          break
+        case 'amount':
+          comparison = Number(a.amount || 0) - Number(b.amount || 0)
+          break
+        case 'date':
+          comparison = (a.date || '').localeCompare(b.date || '')
+          break
+        case 'vendor':
+          comparison = (a.vendor || '').localeCompare(b.vendor || '')
+          break
+        default:
+          comparison = (a.date || '').localeCompare(b.date || '')
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+    // Build filter info for export metadata
+    const filterInfo: string[] = []
+    if (categoryFilter !== 'all') filterInfo.push(`Category: ${categoryFilter}`)
+    if (subcategoryFilter !== 'all') filterInfo.push(`Subcategory: ${subcategoryFilter}`)
+    if (sourceFilter !== 'all') filterInfo.push(`Source: ${sourceFilter}`)
+    if (searchQuery) filterInfo.push(`Search: ${searchQuery}`)
+
+    // Calculate totals from sortedItems
+    const totalPlanned = sortedItems.reduce((s, i) => s + Number(i.total || 0), 0)
+    const totalActual = sortedExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+    const variance = totalPlanned - totalActual
+
+    // Calculate category totals
+    const categoryTotals: Record<string, number> = {}
+    sortedItems.forEach(item => {
+      const cat = item.category
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.total || 0)
+    })
+
+    // Calculate expense totals by category
+    const expenseByCategory: Record<string, number> = {}
+    sortedExpenses.forEach(exp => {
+      expenseByCategory[exp.category] = (expenseByCategory[exp.category] || 0) + Number(exp.amount)
+    })
+
+    let markdown = `# 🎬 CinePilot Budget Report
+
+> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 📊 Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Planned Budget** | ₹${totalPlanned.toLocaleString('en-IN')} |
+| **Total Actual Spend** | ₹${totalActual.toLocaleString('en-IN')} |
+| **Budget Variance** | ${variance >= 0 ? '+' : '-'}₹${Math.abs(variance).toLocaleString('en-IN')} |
+| **Budget Used** | ${totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0}% |
+| **Forecast (EAC)** | ₹${forecast?.eacTotal.toLocaleString('en-IN') || '—'} |
+| **Items Count** | ${sortedItems.length} |
+| **Expenses Count** | ${sortedExpenses.length} |
+
+${filterInfo.length > 0 ? `### 🔍 Filters Applied\n${filterInfo.map(f => `- ${f}`).join('\n')}\n` : ''}
+---
+
+## 📁 Budget Breakdown by Category
+
+| Category | Planned | Expenses | Remaining |
+|----------|---------|----------|-----------|
+${Object.entries(categoryTotals).map(([cat, planned]) => {
+  const expenses = expenseByCategory[cat] || 0
+  const remaining = planned - expenses
+  return `| ${cat} | ₹${Number(planned).toLocaleString('en-IN')} | ₹${expenses.toLocaleString('en-IN')} | ₹${remaining.toLocaleString('en-IN')} |`
+}).join('\n')}
+
+**Total Planned:** ₹${totalPlanned.toLocaleString('en-IN')} | **Total Expenses:** ₹${totalActual.toLocaleString('en-IN')} | **Remaining:** ₹${(totalPlanned - totalActual).toLocaleString('en-IN')}
+
+---
+
+## 💰 Detailed Budget Items
+
+| Category | Subcategory | Description | Quantity | Unit | Rate | Total |
+|----------|-------------|-------------|----------|------|------|-------|
+${sortedItems.map(item => `| ${item.category} | ${item.subcategory || '-'} | ${item.description || '-'} | ${item.quantity || '-'} | ${item.unit || '-'} | ₹${Number(item.rate || 0).toLocaleString('en-IN')} | ₹${Number(item.total || 0).toLocaleString('en-IN')} |`).join('\n')}
+
+---
+
+## 🧾 Recent Expenses
+
+| Date | Category | Description | Vendor | Amount | Status |
+|------|----------|-------------|--------|--------|--------|
+${sortedExpenses.length > 0 ? sortedExpenses.map(exp => `| ${exp.date || '-'} | ${exp.category} | ${exp.description} | ${exp.vendor || '-'} | ₹${Number(exp.amount).toLocaleString('en-IN')} | ${exp.status} |`).join('\n') : '| - | - | No expenses recorded | - | - | - |'}
+
+---
+
+## 📈 Forecast Analysis
+
+${forecast ? `| Category | Planned | Actual | Forecast | Status |
+|----------|---------|--------|----------|--------|
+${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleString('en-IN')} | ₹${cat.actual.toLocaleString('en-IN')} | ₹${cat.forecast.toLocaleString('en-IN')} | ${cat.status === 'on_track' ? '✅ On Track' : cat.status === 'warning' ? '⚠️ Warning' : '❌ Over'} |`).join('\n')}
+
+### Forecast Summary
+- **Planned Total:** ₹${forecast.planned.toLocaleString('en-IN')}
+- **Actual Spent:** ₹${forecast.actual.toLocaleString('en-IN')}
+- **Forecast Total (EAC):** ₹${forecast.eacTotal.toLocaleString('en-IN')}
+- **Variance:** ${forecast.variance >= 0 ? '+' : '-'}₹${Math.abs(forecast.variance).toLocaleString('en-IN')}
+- **Percent Spent:** ${forecast.percentSpent}%
+` : '*No forecast data available*'}
+
+---
+
+*Report generated by CinePilot - Film Production Management System*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `budget-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [items, expenses, sortItems, sortBy, sortOrder, categoryFilter, subcategoryFilter, sourceFilter, searchQuery, forecast])
+
+  // Update ref when function changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handlePrint = () => {
     // Use sorted items for print output
@@ -513,20 +745,54 @@ export default function BudgetPage() {
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case '1':
-          e.preventDefault()
-          setActiveTab('overview')
-          break
         case '2':
-          e.preventDefault()
-          setActiveTab('breakdown')
-          break
         case '3':
-          e.preventDefault()
-          setActiveTab('expenses')
-          break
         case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
           e.preventDefault()
-          setActiveTab('forecast')
+          const num = parseInt(e.key)
+          if (showFiltersRef.current) {
+            // When filters panel is OPEN: number keys filter by category
+            if (num >= 1 && num <= 9) {
+              const catIndex = num - 1
+              if (catIndex < categories.length) {
+                const cat = categories[catIndex]
+                // Toggle: if same category selected, clear to all
+                setCategoryFilter(categoryFilterRef.current === cat ? 'all' : cat)
+              }
+            } else if (num === 0) {
+              // 0 clears category filter
+              setCategoryFilter('all')
+            }
+          } else {
+            // When filters panel is CLOSED: number keys switch tabs
+            switch (e.key) {
+              case '1':
+                setActiveTab('overview')
+                break
+              case '2':
+                setActiveTab('breakdown')
+                break
+              case '3':
+                setActiveTab('expenses')
+                break
+              case '4':
+                setActiveTab('forecast')
+                break
+              case '5':
+                setActiveTab('scenarios')
+                break
+            }
+          }
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current()
           break
         case 'e':
           e.preventDefault()
@@ -541,7 +807,7 @@ export default function BudgetPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [categories])
 
   // Click outside to close filter panel
   useEffect(() => {
@@ -709,6 +975,7 @@ export default function BudgetPage() {
     { key: 'breakdown', label: `Breakdown (${filteredItems.length})` },
     { key: 'expenses', label: `Expenses (${filteredExpenses.length})` },
     { key: 'forecast', label: 'Forecast' },
+    { key: 'scenarios', label: 'Scenarios' },
   ]
 
   if (loading) {
@@ -790,10 +1057,17 @@ export default function BudgetPage() {
               Export
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+              <div className="absolute right-0 mt-1 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                <button 
+                  onClick={handleExportMarkdown}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-t-lg"
+                >
+                  <FileText className="w-4 h-4 text-cyan-400" />
+                  Export Markdown
+                </button>
                 <button 
                   onClick={handleExportCSV}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 rounded-t-lg"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
                   Export CSV
@@ -939,8 +1213,8 @@ export default function BudgetPage() {
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
               >
-                <option value="all">All Categories</option>
-                {categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}
+                <option value="all">All Categories (0)</option>
+                {categories.map((cat, idx) => (<option key={cat} value={cat}>{cat} ({idx + 1})</option>))}
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -1394,6 +1668,206 @@ export default function BudgetPage() {
         </div>
       )}
 
+      {/* Scenarios Tab */}
+      {activeTab === 'scenarios' && (
+        <div className="space-y-6">
+          {/* Scenario Header */}
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-indigo-400" />
+                  What-If Scenario Planner
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">Model different budget scenarios and compare outcomes</p>
+              </div>
+              <button
+                onClick={() => {
+                  setNewScenarioName('')
+                  setNewScenarioType('custom')
+                  setScenarioAdjustments(categories.map(cat => ({ category: cat, percentageChange: 0, notes: '' })))
+                  setShowScenarioEditor(true)
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                New Scenario
+              </button>
+            </div>
+
+            {/* Scenario Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {scenarios.map((scenario) => (
+                <div
+                  key={scenario.id}
+                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                    selectedScenario === scenario.id
+                      ? 'bg-indigo-600/20 border-indigo-500/50'
+                      : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'
+                  }`}
+                  onClick={() => setSelectedScenario(scenario.id)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      scenario.type === 'optimistic' ? 'bg-emerald-500/20 text-emerald-400' :
+                      scenario.type === 'pessimistic' ? 'bg-red-500/20 text-red-400' :
+                      scenario.type === 'realistic' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-purple-500/20 text-purple-400'
+                    }`}>
+                      {scenario.type.charAt(0).toUpperCase() + scenario.type.slice(1)}
+                    </span>
+                    {scenario.id !== 'baseline' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setScenarios(scenarios.filter(s => s.id !== scenario.id))
+                        }}
+                        className="text-slate-500 hover:text-red-400"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <h3 className="font-semibold text-white mb-1">{scenario.name}</h3>
+                  <p className="text-xs text-slate-400 mb-3">{scenario.description}</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-white">₹{(scenario.totalBudget / 10000000).toFixed(1)}Cr</span>
+                    <span className={`text-xs ${scenario.totalBudget > totalPlanned ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {scenario.totalBudget > totalPlanned ? '+' : ''}{((scenario.totalBudget - totalPlanned) / totalPlanned * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Scenario Comparison Chart */}
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-4">Scenario Comparison</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={scenarios.map(s => ({
+                  name: s.name,
+                  budget: s.totalBudget,
+                  variance: s.totalBudget - totalPlanned
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                  <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v) => `₹${(v/10000000).toFixed(1)}Cr`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    formatter={(value: number) => [`₹${(value/10000000).toFixed(2)}Cr`, 'Budget']}
+                  />
+                  <Bar dataKey="budget" fill="#6366f1" radius={[4, 4, 0, 0]} name="Budget" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Selected Scenario Details */}
+          {selectedScenario && (
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4">
+                {scenarios.find(s => s.id === selectedScenario)?.name} - Category Adjustments
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Category</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Base Amount</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Adjustment</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Adjusted Amount</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-400">Impact</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((category) => {
+                      const scenario = scenarios.find(s => s.id === selectedScenario)
+                      const adjustment = scenario?.adjustments.find(a => a.category === category)
+                      const baseAmount = items.filter(i => i.category === category).reduce((sum, i) => sum + Number(i.total || 0), 0)
+                      const percentageChange = adjustment?.percentageChange || 0
+                      const adjustedAmount = baseAmount * (1 + percentageChange / 100)
+                      const impact = adjustedAmount - baseAmount
+
+                      return (
+                        <tr key={category} className="border-b border-slate-700/50">
+                          <td className="py-3 px-4 text-sm text-white">{category}</td>
+                          <td className="py-3 px-4 text-sm text-slate-300 text-right">₹{(baseAmount/100000).toFixed(1)}L</td>
+                          <td className={`py-3 px-4 text-sm text-right ${percentageChange >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                            {percentageChange > 0 ? '+' : ''}{percentageChange}%
+                          </td>
+                          <td className="py-3 px-4 text-sm text-white text-right font-medium">₹{(adjustedAmount/100000).toFixed(1)}L</td>
+                          <td className={`py-3 px-4 text-sm text-right ${impact >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                            {impact >= 0 ? '+' : ''}₹{(impact/100000).toFixed(1)}L
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    <tr className="bg-slate-900/50">
+                      <td className="py-3 px-4 text-sm font-semibold text-white">Total</td>
+                      <td className="py-3 px-4 text-sm text-slate-300 text-right font-semibold">₹{(totalPlanned/10000000).toFixed(1)}Cr</td>
+                      <td className="py-3 px-4 text-sm text-slate-300 text-right">-</td>
+                      <td className="py-3 px-4 text-sm text-indigo-400 text-right font-semibold">
+                        ₹{((scenarios.find(s => s.id === selectedScenario)?.totalBudget || 0) / 10000000).toFixed(1)}Cr
+                      </td>
+                      <td className={`py-3 px-4 text-sm text-right font-semibold ${
+                        (scenarios.find(s => s.id === selectedScenario)?.totalBudget || 0) > totalPlanned ? 'text-red-400' : 'text-emerald-400'
+                      }`}>
+                        {((scenarios.find(s => s.id === selectedScenario)?.totalBudget || 0) > totalPlanned ? '+' : '')}
+                        ₹{(((scenarios.find(s => s.id === selectedScenario)?.totalBudget || 0) - totalPlanned) / 10000000).toFixed(1)}Cr
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-emerald-400" />
+              AI Recommendations
+            </h3>
+            <div className="space-y-3">
+              {scenarios.find(s => s.id === selectedScenario)?.type === 'pessimistic' && (
+                <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-red-400 font-medium">High Budget Warning</p>
+                    <p className="text-xs text-slate-400 mt-1">Consider increasing contingency to 15% in pessimistic scenarios or negotiating better rates with vendors.</p>
+                  </div>
+                </div>
+              )}
+              {scenarios.find(s => s.id === selectedScenario)?.type === 'optimistic' && (
+                <div className="flex items-start gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-emerald-400 font-medium">Cost Optimization</p>
+                    <p className="text-xs text-slate-400 mt-1">This scenario assumes vendors agree to lower rates. Consider locking in prices early to secure these savings.</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-blue-400 font-medium">Production Phase Allocation</p>
+                  <p className="text-xs text-slate-400 mt-1">Based on your shooting schedule, allocate at least 45% of budget for the production phase. Current: 53%.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <DollarSign className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-amber-400 font-medium">Contingency Recommendation</p>
+                  <p className="text-xs text-slate-400 mt-1">Industry standard suggests 10-15% contingency. Current: 10% (₹85L). Consider increasing to ₹1.2Cr for safety.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Keyboard Help Modal */}
       {showKeyboardHelp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
@@ -1414,12 +1888,12 @@ export default function BudgetPage() {
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', action: 'Add new expense' },
+                { key: 'M', action: 'Export as Markdown' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Print budget report' },
-                { key: '1', action: 'Switch to Overview tab' },
-                { key: '2', action: 'Switch to Breakdown tab' },
-                { key: '3', action: 'Switch to Expenses tab' },
-                { key: '4', action: 'Switch to Forecast tab' },
+                { key: '1-5', action: 'Switch tabs (when filters closed)' },
+                { key: '1-7', action: 'Filter by category (when filters open)' },
+                { key: '0', action: 'Clear category filter (when filters open)' },
                 { key: '?', action: 'Show this help' },
                 { key: 'Esc', action: 'Close modal / Clear search / Reset filters' },
               ].map(({ key, action }) => (

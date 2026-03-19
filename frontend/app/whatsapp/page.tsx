@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown, Filter } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown, Filter, AlertTriangle } from 'lucide-react'
 
 interface WhatsAppTemplate { id: string; name: string; category: string; content: string; variables: string[]; createdAt: string }
 interface SentMessage { id: string; recipient: string; recipientName?: string; message: string; status: string; timestamp: string }
@@ -56,8 +56,64 @@ export default function WhatsAppPage() {
   const [roleFilter, setRoleFilter] = useState('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Calculate active filter count
-  const activeFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (roleFilter !== 'all' ? 1 : 0)
+  // Sort state
+  const [sortBy, setSortBy] = useState<'date' | 'status' | 'recipient' | 'name' | 'category'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
+  // Bulk selection state for contacts
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set())
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
+  // Bulk selection handlers
+  const toggleContactSelection = useCallback((contactId: string) => {
+    setSelectedContacts(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(contactId)) {
+        newSet.delete(contactId)
+      } else {
+        newSet.add(contactId)
+      }
+      return newSet
+    })
+  }, [])
+  
+  const selectAllContacts = useCallback(() => {
+    // Select all contacts (filtered view shows subset)
+    setSelectedContacts(new Set(contacts.map(c => c.id)))
+  }, [contacts])
+  
+  const clearSelection = useCallback(() => {
+    setSelectedContacts(new Set())
+    setShowBulkActions(false)
+  }, [])
+  
+  const handleBulkDelete = useCallback(() => {
+    // In demo mode, just clear selection
+    // In production, would call API to remove contacts
+    setSelectedContacts(new Set())
+    setShowDeleteConfirm(false)
+    setShowBulkActions(false)
+  }, [])
+  
+  const handleBulkMessage = useCallback(() => {
+    // Add selected contacts to compose tab
+    const selectedNames = contacts
+      .filter(c => selectedContacts.has(c.id))
+      .map(c => c.name)
+      .join(', ')
+    setMessage(prev => prev + (prev ? '\n' : '') + `Bulk message to: ${selectedNames}`)
+    setActiveTab('compose')
+    clearSelection()
+  }, [selectedContacts, contacts, clearSelection])
+  
+  // Show bulk actions when contacts are selected
+  useEffect(() => {
+    setShowBulkActions(selectedContacts.size > 0)
+  }, [selectedContacts])
+  
+  // Calculate active filter count (includes sort state)
+  const activeFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (roleFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' || sortOrder !== 'desc' ? 1 : 0)
   
   // Clear all filters
   const clearFilters = () => {
@@ -65,6 +121,8 @@ export default function WhatsAppPage() {
     setStatusFilter('all')
     setRoleFilter('all')
     setSearchQuery('')
+    setSortBy('date')
+    setSortOrder('desc')
   }
   
   // Refs for keyboard shortcuts and click outside
@@ -152,6 +210,14 @@ export default function WhatsAppPage() {
           e.preventDefault()
           setShowExportDropdown(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
+          break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'f':
           e.preventDefault()
           setShowFilterPanel(prev => !prev)
@@ -163,14 +229,36 @@ export default function WhatsAppPage() {
           setShowPrintMenu(false)
           setShowExportDropdown(false)
           setShowFilterPanel(false)
+          setShowDeleteConfirm(false)
           setSearchQuery('')
+          // Clear selection if bulk actions are shown
+          if (showBulkActions) {
+            clearSelection()
+          }
+          break
+        // Bulk selection shortcuts (only when on contacts tab)
+        case 'a':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (activeTab === 'contacts') {
+              selectAllContacts()
+            }
+          }
+          break
+        case 'd':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (activeTab === 'contacts' && selectedContacts.size > 0) {
+              setShowDeleteConfirm(true)
+            }
+          }
           break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh])
+  }, [handleRefresh, activeTab, showBulkActions, selectedContacts, selectAllContacts, clearSelection])
 
   // Click outside to close dropdowns and filter panel
   useEffect(() => {
@@ -388,21 +476,164 @@ export default function WhatsAppPage() {
     setShowExportDropdown(false)
   }
 
-  const filteredMessages = messages.filter(m => {
-    const matchSearch = !searchQuery || m.recipient.includes(searchQuery) || m.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()) || m.message.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchStatus = statusFilter === 'all' || m.status === statusFilter
-    return matchSearch && matchStatus
-  })
-  const filteredTemplates = templates.filter(t => {
-    const matchCategory = categoryFilter === 'all' || t.category === categoryFilter
-    const matchSearch = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchCategory && matchSearch
-  })
-  const filteredContacts = contacts.filter(c => {
-    const matchSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.phone.includes(searchQuery)
-    const matchRole = roleFilter === 'all' || c.role?.toLowerCase().includes(roleFilter.toLowerCase())
-    return matchSearch && matchRole
-  })
+
+
+  const filteredMessages = useMemo(() => {
+    let result = messages.filter(m => {
+      const matchSearch = !searchQuery || m.recipient.includes(searchQuery) || m.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()) || m.message.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchStatus = statusFilter === 'all' || m.status === statusFilter
+      return matchSearch && matchStatus
+    })
+    
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'recipient':
+          comparison = (a.recipientName || a.recipient).localeCompare(b.recipientName || b.recipient)
+          break
+        default:
+          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [messages, searchQuery, statusFilter, sortBy, sortOrder])
+  const filteredTemplates = useMemo(() => {
+    let result = templates.filter(t => {
+      const matchCategory = categoryFilter === 'all' || t.category === categoryFilter
+      const matchSearch = !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.content.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchCategory && matchSearch
+    })
+    
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'category':
+          comparison = a.category.localeCompare(b.category)
+          break
+        case 'date':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+        default:
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [templates, searchQuery, categoryFilter, sortBy, sortOrder])
+  
+  const filteredContacts = useMemo(() => {
+    let result = contacts.filter(c => {
+      const matchSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.phone.includes(searchQuery)
+      const matchRole = roleFilter === 'all' || c.role?.toLowerCase().includes(roleFilter.toLowerCase())
+      return matchSearch && matchRole
+    })
+    
+    // Apply sorting
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'category':
+          // For contacts, 'category' is used as 'role'
+          comparison = (a.role || '').localeCompare(b.role || '')
+          break
+        case 'recipient':
+          // For contacts, 'recipient' is used as 'phone'
+          comparison = a.phone.localeCompare(b.phone)
+          break
+        default:
+          comparison = a.name.localeCompare(b.name)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [contacts, searchQuery, roleFilter, sortBy, sortOrder])
+
+  // Markdown Export function - placed after filtered data definitions
+  const handleExportMarkdown = useCallback(() => {
+    const exportDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    const exportTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    
+    // Build markdown content
+    let markdown = `# CinePilot WhatsApp Report
+
+**Generated:** ${exportDate} at ${exportTime}
+
+---
+
+## 📊 Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Messages | ${messages.length} |
+| Total Templates | ${templates.length} |
+| Total Contacts | ${contacts.length} |
+| Delivered | ${messages.filter(m => m.status === 'delivered').length} |
+| Read | ${messages.filter(m => m.status === 'read').length} |
+| Failed | ${messages.filter(m => m.status === 'failed').length} |
+| Pending | ${messages.filter(m => m.status === 'pending').length} |
+
+---
+
+## 📋 Templates (${templates.length})
+
+| Name | Category | Variables | Created |
+|------|----------|-----------|----------|
+${templates.map(t => `| ${t.name} | ${t.category} | ${t.variables.join(', ') || '-'} | ${new Date(t.createdAt).toLocaleDateString('en-IN')} |`).join('\n')}
+
+---
+
+## 💬 Message History (${filteredMessages.length})
+
+| Date | Recipient | Name | Message | Status |
+|------|-----------|------|---------|--------|
+${filteredMessages.map(m => {
+  const date = new Date(m.timestamp).toLocaleDateString('en-IN')
+  const statusEmoji = m.status === 'delivered' ? '✅' : m.status === 'read' ? '👁️' : m.status === 'failed' ? '❌' : '⏳'
+  const shortMsg = m.message.length > 50 ? m.message.substring(0, 47) + '...' : m.message.replace(/\n/g, ' ')
+  return `| ${date} | ${m.recipient} | ${m.recipientName || '-'} | ${shortMsg} | ${statusEmoji} ${m.status} |`
+}).join('\n')}
+
+---
+
+## 👥 Contacts (${contacts.length})
+
+| Name | Phone | Role |
+|------|-------|------|
+${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
+
+---
+
+*Exported from CinePilot Production Management System*
+`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `whatsapp-report-${new Date().toISOString().split('T')[0]}.md`; a.click()
+    setShowExportDropdown(false)
+  }, [messages, templates, contacts, filteredMessages])
+
+  // Ref for handleExportMarkdown to use in keyboard handler (avoids ordering issues)
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const STATUS_COLORS: Record<string, string> = { pending: 'bg-yellow-500/20 text-yellow-400', sent: 'bg-blue-500/20 text-blue-400', delivered: 'bg-green-500/20 text-green-400', read: 'bg-emerald-500/20 text-emerald-400', failed: 'bg-red-500/20 text-red-400' }
 
@@ -444,44 +675,159 @@ export default function WhatsAppPage() {
           >
             <Filter className="w-4 h-4" />
             <span>Filters</span>
-            {(categoryFilter !== 'all' || searchQuery) && (
+            {activeFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-green-500 text-white text-xs rounded">
-                {(categoryFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)}
+                {activeFilterCount}
               </span>
             )}
           </button>
 
-          {/* Filter Panel */}
+          {/* Filter & Sort Panel */}
           {showFilterPanel && (
             <div 
               ref={filterPanelRef}
-              className="absolute right-0 top-full mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
+              className="absolute right-0 top-full mt-2 w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
             >
               <div className="p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">Filter Options</h3>
+                  <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
                   <button 
-                    onClick={() => { setCategoryFilter('all'); setSearchQuery('') }}
+                    onClick={() => { clearFilters() }}
                     className="text-xs text-green-400 hover:text-green-300"
                   >
-                    Clear Filters
+                    Clear All ({activeFilterCount})
                   </button>
                 </div>
                 
-                {/* Category Filter */}
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Category</label>
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
+                {/* Sort Options */}
+                <div className="mb-4">
+                  <label className="text-xs text-gray-500 block mb-2">Sort By</label>
+                  <div className="flex flex-wrap gap-2">
+                    {activeTab === 'history' && [
+                      { value: 'date', label: 'Date' },
+                      { value: 'status', label: 'Status' },
+                      { value: 'recipient', label: 'Recipient' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSortBy(opt.value as typeof sortBy)}
+                        className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          sortBy === opt.value
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    {activeTab === 'templates' && [
+                      { value: 'date', label: 'Date' },
+                      { value: 'name', label: 'Name' },
+                      { value: 'category', label: 'Category' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSortBy(opt.value as typeof sortBy)}
+                        className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          sortBy === opt.value
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    {activeTab === 'contacts' && [
+                      { value: 'name', label: 'Name' },
+                      { value: 'category', label: 'Role' },
+                      { value: 'recipient', label: 'Phone' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSortBy(opt.value as typeof sortBy)}
+                        className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          sortBy === opt.value
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      sortBy !== 'date' || sortOrder !== 'desc'
+                        ? 'bg-green-600/20 text-green-400 border border-green-500/30'
+                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                    }`}
                   >
-                    <option value="all">All Categories</option>
-                    <option value="schedule">Schedule</option>
-                    <option value="reminder">Reminder</option>
-                    <option value="call_sheet">Call Sheet</option>
-                  </select>
+                    {sortOrder === 'asc' ? (
+                      <>
+                        <span>↑</span> Ascending
+                      </>
+                    ) : (
+                      <>
+                        <span>↓</span> Descending
+                      </>
+                    )}
+                  </button>
                 </div>
+                
+                {/* Category Filter (for templates) */}
+                {activeTab === 'templates' && (
+                  <div className="mb-3">
+                    <label className="text-xs text-gray-500 block mb-1">Category</label>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="schedule">Schedule</option>
+                      <option value="reminder">Reminder</option>
+                      <option value="call_sheet">Call Sheet</option>
+                    </select>
+                  </div>
+                )}
+                
+                {/* Status Filter (for history) */}
+                {activeTab === 'history' && (
+                  <div className="mb-3">
+                    <label className="text-xs text-gray-500 block mb-1">Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="sent">Sent</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="read">Read</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </div>
+                )}
+                
+                {/* Role Filter (for contacts) */}
+                {activeTab === 'contacts' && (
+                  <div className="mb-3">
+                    <label className="text-xs text-gray-500 block mb-1">Role</label>
+                    <select
+                      value={roleFilter}
+                      onChange={(e) => setRoleFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500"
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="actor">Actor</option>
+                      <option value="cinematographer">Cinematographer</option>
+                      <option value="director">Director</option>
+                      <option value="producer">Producer</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -493,21 +839,6 @@ export default function WhatsAppPage() {
             className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
           >
             <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-          
-          {/* Filter Toggle Button */}
-          <button 
-            onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-lg flex items-center gap-2 ${showFilterPanel || activeFilterCount > 0 ? 'bg-green-500/20 text-green-400' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'}`}
-            title={`Filters (F) - ${activeFilterCount} active`}
-            data-filter-toggle
-          >
-            <Filter className="w-5 h-5" />
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                {activeFilterCount}
-              </span>
-            )}
           </button>
           
           {/* Keyboard Help Button */}
@@ -567,6 +898,13 @@ export default function WhatsAppPage() {
                 >
                   <Download className="w-4 h-4" />
                   <span>Export CSV</span>
+                </button>
+                <button 
+                  onClick={handleExportMarkdown}
+                  className="w-full px-4 py-3 text-left text-cyan-400 hover:bg-gray-700 flex items-center gap-3"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export Markdown</span>
                 </button>
               </div>
             )}
@@ -716,7 +1054,142 @@ export default function WhatsAppPage() {
 
       {activeTab === 'history' && (<div className="space-y-4"><div className="flex items-center justify-between"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-64" /></div><button onClick={handleExportJSON} className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300"><Download className="w-4 h-4 inline mr-2" />Export</button></div><div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">{filteredMessages.length > 0 ? (<table className="w-full"><thead className="bg-gray-800/50"><tr><th className="text-left p-4 text-xs text-gray-400">Recipient</th><th className="text-left p-4 text-xs text-gray-400">Message</th><th className="text-center p-4 text-xs text-gray-400">Status</th><th className="text-right p-4 text-xs text-gray-400">Time</th></tr></thead><tbody className="divide-y divide-gray-800">{filteredMessages.map(m => (<tr key={m.id} className="hover:bg-gray-800/30"><td className="p-4"><p className="text-white">{m.recipientName || m.recipient}</p><p className="text-gray-500 text-xs">{m.recipient}</p></td><td className="p-4"><p className="text-gray-300 text-sm line-clamp-1">{m.message}</p></td><td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-xs ${STATUS_COLORS[m.status] || 'bg-gray-800 text-gray-400'}`}>{m.status}</span></td><td className="p-4 text-right text-gray-500 text-sm">{formatTime(m.timestamp)}</td></tr>))}</tbody></table>) : (<div className="text-center py-12 text-gray-500">No messages found.</div>)}</div></div>)}
 
-      {activeTab === 'contacts' && (<div className="space-y-4"><div className="relative"><Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search contacts..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-64" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredContacts.length > 0 ? filteredContacts.map(c => (<div key={c.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-green-500/30 transition-colors"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center"><span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span></div><div className="flex-1"><p className="font-medium text-white">{c.name}</p><p className="text-xs text-gray-500">{c.role}</p></div></div><div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between"><span className="text-xs text-gray-500">{c.phone}</span><button onClick={() => { setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} className="text-xs text-green-400">Send →</button></div></div>)) : (<div className="col-span-full text-center py-12 text-gray-500">No contacts found.</div>)}</div></div>)}
+      {activeTab === 'contacts' && (<div className="space-y-4">
+        {/* Selection Header */}
+        <div className="flex items-center justify-between">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search contacts..." className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white w-64" />
+          </div>
+          {showBulkActions ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-green-400 font-medium">{selectedContacts.size} selected</span>
+              <button onClick={clearSelection} className="text-sm text-gray-400 hover:text-white">Clear</button>
+            </div>
+          ) : (
+            filteredContacts.length > 0 && (
+              <button onClick={selectAllContacts} className="text-sm text-gray-400 hover:text-green-400 flex items-center gap-1">
+                Select All
+              </button>
+            )
+          )}
+        </div>
+        
+        {/* Contacts Grid with Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredContacts.length > 0 ? filteredContacts.map(c => {
+            const isSelected = selectedContacts.has(c.id)
+            return (
+              <div 
+                key={c.id} 
+                className={`bg-gray-900 border rounded-xl p-4 transition-all cursor-pointer ${
+                  isSelected 
+                    ? 'border-green-500 ring-1 ring-green-500/30' 
+                    : 'border-gray-800 hover:border-green-500/30'
+                }`}
+                onClick={() => toggleContactSelection(c.id)}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Checkbox */}
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                    isSelected ? 'bg-green-500 border-green-500' : 'border-gray-600'
+                  }`}>
+                    {isSelected && <span className="text-black text-xs font-bold">✓</span>}
+                  </div>
+                  
+                  {/* Avatar */}
+                  <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-green-400 font-semibold text-sm">{c.name.split(' ').map(n => n[0]).join('')}</span>
+                  </div>
+                  
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">{c.name}</p>
+                    <p className="text-xs text-gray-500">{c.role}</p>
+                  </div>
+                </div>
+                
+                <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between">
+                  <span className="text-xs text-gray-500 truncate">{c.phone}</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setRecipient(c.phone); setRecipientName(c.name); setActiveTab('compose') }} 
+                    className="text-xs text-green-400 hover:text-green-300 flex-shrink-0"
+                  >
+                    Send →
+                  </button>
+                </div>
+              </div>
+            )
+          }) : (
+            <div className="col-span-full text-center py-12 text-gray-500">No contacts found.</div>
+          )}
+        </div>
+        
+        {/* Floating Bulk Actions Toolbar */}
+        {showBulkActions && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-xl flex items-center gap-4 z-40">
+            <span className="px-3 py-1.5 bg-green-500/20 text-green-400 text-sm font-medium rounded-full">
+              {selectedContacts.size} selected
+            </span>
+            <div className="h-6 w-px bg-gray-700" />
+            <button 
+              onClick={handleBulkMessage}
+              className="px-4 py-2 bg-green-500 hover:bg-green-400 text-black text-sm font-medium rounded-lg flex items-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Send Message
+            </button>
+            <button 
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 text-sm font-medium rounded-lg flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+            <div className="h-6 w-px bg-gray-700" />
+            <button 
+              onClick={clearSelection}
+              className="px-3 py-2 text-gray-400 hover:text-white text-sm"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+        
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Delete Contacts</h3>
+                  <p className="text-sm text-gray-400">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-gray-300 mb-6">
+                Are you sure you want to delete {selectedContacts.size} selected contact{selectedContacts.size > 1 ? 's' : ''}?
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleBulkDelete}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-400 text-white rounded-lg"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>)}
 
       {showTemplateEditor && (<div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"><div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg p-6"><div className="flex items-center justify-between mb-6"><h3 className="text-xl font-semibold text-white">{editingTemplate ? 'Edit' : 'New'} Template</h3><button onClick={() => setShowTemplateEditor(false)}><X className="w-5 h-5 text-gray-400" /></button></div><div className="space-y-4"><div><label className="block text-sm text-gray-400 mb-1">Name</label><input type="text" value={templateFormData.name} onChange={(e) => setTemplateFormData(p => ({...p, name: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white" /></div><div><label className="block text-sm text-gray-400 mb-1">Category</label><select value={templateFormData.category} onChange={(e) => setTemplateFormData(p => ({...p, category: e.target.value}))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white"><option value="schedule">Schedule</option><option value="reminder">Reminder</option><option value="call_sheet">Call Sheet</option><option value="update">Update</option></select></div><div><label className="block text-sm text-gray-400 mb-1">Content (use {'{var}'})</label><textarea value={templateFormData.content} onChange={(e) => setTemplateFormData(p => ({...p, content: e.target.value}))} rows={6} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white resize-none" /></div><button onClick={handleSaveTemplate} disabled={savingTemplate} className="w-full py-3 bg-green-500 hover:bg-green-400 disabled:opacity-50 text-black font-semibold rounded-lg flex items-center justify-center gap-2">{savingTemplate ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Save Template</button></div></div></div>)}
 
@@ -737,9 +1210,9 @@ export default function WhatsAppPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh data' },
+                { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'F', description: 'Toggle filter panel' },
                 { key: '/', description: 'Focus search input' },
-                { key: 'F', description: 'Toggle filters' },
                 { key: 'C', description: 'Switch to Compose tab' },
                 { key: 'T', description: 'Switch to Templates tab' },
                 { key: 'H', description: 'Switch to History tab' },
@@ -747,6 +1220,7 @@ export default function WhatsAppPage() {
                 { key: 'N', description: 'Create new template' },
                 { key: 'P', description: 'Toggle print menu' },
                 { key: 'E', description: 'Toggle export menu' },
+                { key: 'M', description: 'Export Markdown' },
                 { key: '?', description: 'Show this help' },
                 { key: 'Esc', description: 'Close modal / Clear search' },
               ].map(({ key, description }) => (

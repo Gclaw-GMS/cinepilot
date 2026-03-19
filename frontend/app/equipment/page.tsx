@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, Check } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -25,6 +25,17 @@ interface EquipmentStats {
   inUse: number
   maintenance: number
   returned: number
+}
+
+interface EquipmentConflict {
+  id: string
+  type: 'overdue' | 'maintenance' | 'budget' | 'missing-date' | 'high-value' | 'quantity'
+  severity: 'high' | 'medium' | 'low'
+  equipmentId: string
+  equipmentName: string
+  title: string
+  description: string
+  recommendation: string
 }
 
 const CATEGORIES = [
@@ -126,6 +137,12 @@ export default function EquipmentPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'status' | 'dailyRate' | 'dateEnd'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [selectedEquipment, setSelectedEquipment] = useState<Set<string>>(new Set())
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
+  const [budgetLimit, setBudgetLimit] = useState<number>(50000) // Daily budget limit for rentals
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -148,6 +165,13 @@ export default function EquipmentPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  const bulkStatusMenuRef = useRef<HTMLDivElement>(null)
+  const deleteConfirmRef = useRef<HTMLDivElement>(null)
+  const selectedEquipmentRef = useRef<Set<string>>(new Set())
+  const showBulkActionsRef = useRef<boolean>(false)
+  const clearSelectionRef = useRef<() => void>(() => {})
+  const selectAllEquipmentRef = useRef<() => void>(() => {})
+  const filteredLengthRef = useRef<number>(0)
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -173,6 +197,130 @@ export default function EquipmentPage() {
     })
     return Object.entries(breakdown).map(([name, value]) => ({ name, value }))
   }, [equipment])
+
+  // Conflict detection
+  const equipmentConflicts = useMemo(() => {
+    const conflicts: EquipmentConflict[] = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    equipment.forEach(eq => {
+      const startDate = new Date(eq.dateStart)
+      const endDate = new Date(eq.dateEnd)
+      
+      // 1. Overdue Returns: Past return date but still in-use
+      if (eq.status === 'in-use' && endDate < today) {
+        const daysOverdue = Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24))
+        conflicts.push({
+          id: `overdue-${eq.id}`,
+          type: 'overdue',
+          severity: daysOverdue > 7 ? 'high' : 'medium',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'Overdue Return',
+          description: `${eq.name} was due ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago (${eq.dateEnd}) but is still marked as in-use`,
+          recommendation: 'Confirm return status with vendor or update the equipment status'
+        })
+      }
+
+      // 2. Maintenance Issues: Equipment in maintenance for too long
+      if (eq.status === 'maintenance') {
+        const daysInMaintenance = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysInMaintenance > 7) {
+          conflicts.push({
+            id: `maintenance-${eq.id}`,
+            type: 'maintenance',
+            severity: daysInMaintenance > 14 ? 'high' : 'medium',
+            equipmentId: eq.id,
+            equipmentName: eq.name,
+            title: 'Extended Maintenance',
+            description: `${eq.name} has been in maintenance for ${daysInMaintenance} days`,
+            recommendation: 'Review maintenance status and either return to service or arrange replacement'
+          })
+        }
+      }
+
+      // 3. Missing Return Date
+      if (!eq.dateEnd || eq.dateEnd === '') {
+        conflicts.push({
+          id: `missing-date-${eq.id}`,
+          type: 'missing-date',
+          severity: 'medium',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'Missing Return Date',
+          description: `${eq.name} does not have a return date specified`,
+          recommendation: 'Add a return date to track rental period'
+        })
+      }
+
+      // 4. High Value Items: Expensive daily rate
+      if (eq.dailyRate > 20000) {
+        conflicts.push({
+          id: `high-value-${eq.id}`,
+          type: 'high-value',
+          severity: 'low',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'High Value Rental',
+          description: `${eq.name} has a daily rate of ₹${eq.dailyRate.toLocaleString()}`,
+          recommendation: 'Ensure adequate insurance coverage for this high-value item'
+        })
+      }
+
+      // 5. Quantity Issues
+      if (eq.quantity < 1) {
+        conflicts.push({
+          id: `quantity-${eq.id}`,
+          type: 'quantity',
+          severity: 'high',
+          equipmentId: eq.id,
+          equipmentName: eq.name,
+          title: 'Invalid Quantity',
+          description: `${eq.name} has quantity of ${eq.quantity}, which is invalid`,
+          recommendation: 'Update quantity to at least 1 or remove the equipment'
+        })
+      }
+    })
+
+    // 6. Budget Overrun: Check total daily rate against budget limit
+    const totalDailyRate = equipment
+      .filter(eq => eq.status === 'in-use')
+      .reduce((acc, eq) => acc + eq.dailyRate * eq.quantity, 0)
+    
+    if (totalDailyRate > budgetLimit) {
+      const overrun = totalDailyRate - budgetLimit
+      conflicts.push({
+        id: 'budget-overrun',
+        type: 'budget',
+        severity: overrun > budgetLimit * 0.5 ? 'high' : 'medium',
+        equipmentId: 'budget',
+        equipmentName: 'All In-Use Equipment',
+        title: 'Budget Overrun',
+        description: `Total daily rental cost (₹${totalDailyRate.toLocaleString()}) exceeds budget limit (₹${budgetLimit.toLocaleString()}) by ₹${overrun.toLocaleString()}`,
+        recommendation: 'Review active rentals and consider returning unused equipment'
+      })
+    }
+
+    return conflicts
+  }, [equipment, budgetLimit])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: equipmentConflicts.length,
+    high: equipmentConflicts.filter(c => c.severity === 'high').length,
+    medium: equipmentConflicts.filter(c => c.severity === 'medium').length,
+    low: equipmentConflicts.filter(c => c.severity === 'low').length,
+  }), [equipmentConflicts])
+
+  // Conflict type breakdown
+  const conflictTypeStats = useMemo(() => {
+    const types: Record<string, number> = {}
+    equipmentConflicts.forEach(c => {
+      types[c.type] = (types[c.type] || 0) + 1
+    })
+    return Object.entries(types).map(([type, count]) => ({ type, count }))
+  }, [equipmentConflicts])
 
   const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
   const STATUS_COLORS: Record<string, string> = {
@@ -227,103 +375,6 @@ export default function EquipmentPage() {
     fetchEquipment()
   }, [fetchEquipment])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input/textarea/select
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
-        return
-      }
-      
-      switch (e.key.toLowerCase()) {
-        case 'r':
-          e.preventDefault()
-          fetchDataRef.current?.()
-          break
-        case 'f':
-          e.preventDefault()
-          setShowFilters(prev => !prev)
-          break
-        case '/':
-          e.preventDefault()
-          searchInputRef.current?.focus()
-          break
-        case 'n':
-          e.preventDefault()
-          if (!modalOpen && !editModalOpen) {
-            setModalOpen(true)
-            setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
-          }
-          break
-        case '?':
-          e.preventDefault()
-          setShowKeyboardHelp(true)
-          break
-        case 'e':
-          e.preventDefault()
-          setShowExportMenu(prev => !prev)
-          break
-        case 'p':
-          e.preventDefault()
-          if (equipment.length > 0) {
-            handlePrintRef.current?.()
-          }
-          break
-        case 'escape':
-          e.preventDefault()
-          setShowKeyboardHelp(false)
-          setShowExportMenu(false)
-          setShowPrintMenu(false)
-          setShowFilters(false)
-          setSearch('')
-          setFilterCat('all')
-          setFilterStatus('all')
-          break
-        // Number keys for category filter (1-5)
-        case '1':
-          e.preventDefault()
-          setFilterCat('camera')
-          break
-        case '2':
-          e.preventDefault()
-          setFilterCat('lighting')
-          break
-        case '3':
-          e.preventDefault()
-          setFilterCat('sound')
-          break
-        case '4':
-          e.preventDefault()
-          setFilterCat('grip')
-          break
-        case '5':
-          e.preventDefault()
-          setFilterCat('art')
-          break
-        case '0':
-          e.preventDefault()
-          setFilterCat('all')
-          break
-        // Status filter with Shift+number
-        case '!':
-          e.preventDefault()
-          setFilterStatus('available')
-          break
-        case '@':
-          e.preventDefault()
-          setFilterStatus('in-use')
-          break
-        case '#':
-          e.preventDefault()
-          setFilterStatus('maintenance')
-          break
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalOpen, editModalOpen, showExportMenu, equipment.length])
-
   // Click outside to close export menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -369,6 +420,36 @@ export default function EquipmentPage() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showPrintMenu])
+
+  // Click outside to close bulk status menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bulkStatusMenuRef.current && !bulkStatusMenuRef.current.contains(e.target as Node)) {
+        setShowBulkStatusMenu(false)
+      }
+    }
+    if (showBulkStatusMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showBulkStatusMenu])
+
+  // Click outside to close delete confirm
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (deleteConfirmRef.current && !deleteConfirmRef.current.contains(e.target as Node)) {
+        setShowDeleteConfirm(false)
+      }
+    }
+    if (showDeleteConfirm) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showDeleteConfirm])
 
   const filtered = equipment.filter(eq => {
     const matchSearch = eq.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -443,6 +524,188 @@ export default function EquipmentPage() {
     }
   }
 
+  // Bulk selection handlers
+  const toggleEquipmentSelection = useCallback((id: string) => {
+    setSelectedEquipment(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      selectedEquipmentRef.current = newSet
+      setShowBulkActions(newSet.size > 0)
+      showBulkActionsRef.current = newSet.size > 0
+      return newSet
+    })
+  }, [])
+
+  const selectAllEquipment = useCallback(() => {
+    const allIds = new Set(filtered.map(eq => eq.id))
+    setSelectedEquipment(allIds)
+    selectedEquipmentRef.current = allIds
+    setShowBulkActions(allIds.size > 0)
+    showBulkActionsRef.current = allIds.size > 0
+  }, [filtered])
+
+  const clearSelection = useCallback(() => {
+    setSelectedEquipment(new Set())
+    selectedEquipmentRef.current = new Set()
+    setShowBulkActions(false)
+    showBulkActionsRef.current = false
+    setShowBulkStatusMenu(false)
+    setShowDeleteConfirm(false)
+  }, [])
+
+  // Update refs for keyboard shortcuts
+  useEffect(() => {
+    selectAllEquipmentRef.current = selectAllEquipment
+  }, [selectAllEquipment])
+
+  useEffect(() => {
+    clearSelectionRef.current = clearSelection
+  }, [clearSelection])
+
+  useEffect(() => {
+    filteredLengthRef.current = filtered.length
+  }, [filtered.length])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return
+      }
+      
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault()
+          fetchDataRef.current?.()
+          break
+        case 'f':
+          e.preventDefault()
+          setShowFilters(prev => !prev)
+          break
+        case '1':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
+        case '/':
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          break
+        case 'n':
+          e.preventDefault()
+          if (!modalOpen && !editModalOpen) {
+            setModalOpen(true)
+            setForm({ name: '', category: 'camera', dateStart: '', dateEnd: '', dailyRate: '', vendor: '', notes: '' })
+          }
+          break
+        case '?':
+          e.preventDefault()
+          setShowKeyboardHelp(true)
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          if (filtered.length > 0) {
+            handleExportMarkdownRef.current()
+          }
+          break
+        case 'p':
+          e.preventDefault()
+          if (equipment.length > 0) {
+            handlePrintRef.current?.()
+          }
+          break
+        case 'escape':
+          e.preventDefault()
+          setShowKeyboardHelp(false)
+          setShowExportMenu(false)
+          setShowPrintMenu(false)
+          setShowFilters(false)
+          setShowBulkStatusMenu(false)
+          setShowDeleteConfirm(false)
+          setSearch('')
+          setFilterCat('all')
+          setFilterStatus('all')
+          if (showBulkActionsRef.current) {
+            clearSelectionRef.current()
+          }
+          break
+        case 'a':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (filteredLengthRef.current > 0) {
+              selectAllEquipmentRef.current()
+            }
+          }
+          break
+        case 'd':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (selectedEquipmentRef.current.size > 0) {
+              setShowDeleteConfirm(true)
+            }
+          }
+          break
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, editModalOpen, showExportMenu])
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedEquipment)
+    setShowDeleteConfirm(false)
+    try {
+      const deletePromises = ids.map(id => 
+        fetch(`/api/equipment?id=${id}`, { method: 'DELETE' })
+      )
+      await Promise.all(deletePromises)
+      await fetchEquipment()
+      clearSelection()
+      setSuccess(`${ids.length} equipment item(s) removed!`)
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Failed to delete selected equipment')
+    }
+  }, [selectedEquipment, fetchEquipment, clearSelection])
+
+  const handleBulkStatusChange = useCallback(async (newStatus: string) => {
+    const ids = Array.from(selectedEquipment)
+    setShowBulkStatusMenu(false)
+    try {
+      const updatePromises = ids.map(id => 
+        fetch('/api/equipment', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, status: newStatus }),
+        })
+      )
+      await Promise.all(updatePromises)
+      await fetchEquipment()
+      clearSelection()
+      setSuccess(`${ids.length} equipment status changed!`)
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError('Failed to update equipment status')
+    }
+  }, [selectedEquipment, fetchEquipment, clearSelection])
+
   // Export functions
   const handleExportCSV = () => {
     setExporting(true)
@@ -514,6 +777,88 @@ export default function EquipmentPage() {
     setSuccess('Equipment exported to JSON!')
     setTimeout(() => setSuccess(null), 3000)
   }
+
+  const handleExportMarkdown = useCallback(() => {
+    setExporting(true)
+    
+    const totalItems = filtered.length
+    const totalDailyRate = filtered.reduce((acc, eq) => acc + eq.dailyRate, 0)
+    const available = filtered.filter(eq => eq.status === 'available').length
+    const inUse = filtered.filter(eq => eq.status === 'in-use').length
+    const maintenance = filtered.filter(eq => eq.status === 'maintenance').length
+    const returned = filtered.filter(eq => eq.status === 'returned').length
+    
+    // Category breakdown
+    const categoryBreakdown: Record<string, number> = {}
+    filtered.forEach(eq => {
+      categoryBreakdown[eq.category] = (categoryBreakdown[eq.category] || 0) + 1
+    })
+    
+    // Status breakdown with emojis
+    const statusEmoji: Record<string, string> = {
+      available: '✅',
+      'in-use': '📷',
+      maintenance: '🔧',
+      returned: '📦',
+    }
+    
+    let markdown = `# Equipment Rental Report - CinePilot
+
+**Generated:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Items | ${totalItems} |
+| Total Daily Rate | $${totalDailyRate.toLocaleString()} |
+| Available | ${available} |
+| In Use | ${inUse} |
+| Maintenance | ${maintenance} |
+| Returned | ${returned} |
+
+---
+
+## By Category
+
+`
+    
+    Object.entries(categoryBreakdown).forEach(([category, count]) => {
+      const dailyRate = filtered.filter(eq => eq.category === category).reduce((acc, eq) => acc + eq.dailyRate, 0)
+      markdown += `- **${category.charAt(0).toUpperCase() + category.slice(1)}**: ${count} items ($${dailyRate.toLocaleString()}/day)\n`
+    })
+    
+    markdown += `\n## Equipment Details\n\n`
+    markdown += `| Name | Category | Status | Daily Rate | Vendor | Start Date | End Date | Qty |\n`
+    markdown += `|------|----------|--------|------------|--------|------------|----------|-----|\n`
+    
+    filtered.forEach(eq => {
+      const statusIcon = statusEmoji[eq.status] || '❓'
+      markdown += `| ${eq.name} | ${eq.category} | ${statusIcon} ${eq.status} | $${eq.dailyRate.toLocaleString()} | ${eq.vendor || '-'} | ${eq.dateStart.split('T')[0]} | ${eq.dateEnd.split('T')[0]} | ${eq.quantity} |\n`
+    })
+    
+    markdown += `\n---\n\n*Generated by CinePilot - Film Production Management*`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `equipment-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+    setSuccess('Equipment exported to Markdown!')
+    setTimeout(() => setSuccess(null), 3000)
+  }, [filtered])
+
+  // Assign handleExportMarkdown to ref for keyboard shortcuts
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  handleExportMarkdownRef.current = handleExportMarkdown
 
   // Print functionality
   const handlePrint = useCallback(() => {
@@ -873,6 +1218,13 @@ export default function EquipmentPage() {
                     <Download className="w-4 h-4 text-violet-400" />
                     Export JSON
                   </button>
+                  <button
+                    onClick={handleExportMarkdown}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-cyan-400" />
+                    Export Markdown
+                  </button>
                 </div>
               )}
             </div>
@@ -922,6 +1274,52 @@ export default function EquipmentPage() {
           </div>
         )}
 
+        {/* View Mode Tabs */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'list'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Package className="w-4 h-4 inline-block mr-2" />
+            List
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'analytics'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <DollarSign className="w-4 h-4 inline-block mr-2" />
+            Analytics
+          </button>
+          <button
+            onClick={() => setViewMode('conflicts')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+              viewMode === 'conflicts'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4 inline-block" />
+            Conflicts
+            {conflictStats.high > 0 && (
+              <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {conflictStats.high}
+              </span>
+            )}
+          </button>
+          <span className="text-xs text-slate-500 ml-2">Press 1, 2, 3 to switch views</span>
+        </div>
+
+        {/* List/Analytics View */}
+        {(viewMode === 'list' || viewMode === 'analytics') && (
+          <>
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <StatCard title="Total Items" value={stats.totalItems} color="indigo" icon={<Package className="w-5 h-5 text-indigo-400" />} />
@@ -990,6 +1388,131 @@ export default function EquipmentPage() {
             </div>
           </div>
         )}
+          </>
+        )}
+
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Budget Limit Input */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Daily Budget Limit</h3>
+                  <p className="text-sm text-slate-400">Set threshold for budget alerts</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    value={budgetLimit}
+                    onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                    className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Total Issues</p>
+                <p className="text-3xl font-bold mt-1">{conflictStats.total}</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-xs text-red-400 uppercase tracking-wider">High Priority</p>
+                <p className="text-3xl font-bold text-red-400 mt-1">{conflictStats.high}</p>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                <p className="text-xs text-amber-400 uppercase tracking-wider">Medium Priority</p>
+                <p className="text-3xl font-bold text-amber-400 mt-1">{conflictStats.medium}</p>
+              </div>
+              <div className="bg-slate-500/10 border border-slate-500/20 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Low Priority</p>
+                <p className="text-3xl font-bold text-slate-400 mt-1">{conflictStats.low}</p>
+              </div>
+            </div>
+
+            {/* Conflict Type Summary */}
+            {conflictTypeStats.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <h3 className="font-semibold mb-3">Issues by Type</h3>
+                <div className="flex flex-wrap gap-3">
+                  {conflictTypeStats.map(({ type, count }) => (
+                    <span key={type} className="px-3 py-1.5 bg-slate-800 rounded-lg text-sm">
+                      <span className="capitalize">{type.replace('-', ' ')}</span>: <span className="text-indigo-400 font-medium">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Clear State */}
+            {equipmentConflicts.length === 0 ? (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-8 text-center">
+                <Check className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-emerald-400">All Clear!</h3>
+                <p className="text-slate-400 mt-2">No issues detected with your equipment rentals.</p>
+              </div>
+            ) : (
+              /* Conflict Cards */
+              <div className="grid gap-4">
+                {equipmentConflicts.map((conflict) => (
+                  <div
+                    key={conflict.id}
+                    className={`bg-slate-900 border rounded-xl p-5 ${
+                      conflict.severity === 'high'
+                        ? 'border-red-500/30'
+                        : conflict.severity === 'medium'
+                        ? 'border-amber-500/30'
+                        : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className={`p-2 rounded-lg ${
+                          conflict.severity === 'high'
+                            ? 'bg-red-500/20'
+                            : conflict.severity === 'medium'
+                            ? 'bg-amber-500/20'
+                            : 'bg-slate-800'
+                        }`}>
+                          <AlertTriangle className={`w-5 h-5 ${
+                            conflict.severity === 'high'
+                              ? 'text-red-400'
+                              : conflict.severity === 'medium'
+                              ? 'text-amber-400'
+                              : 'text-slate-400'
+                          }`} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{conflict.title}</h4>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              conflict.severity === 'high'
+                                ? 'bg-red-500/20 text-red-400'
+                                : conflict.severity === 'medium'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-slate-700 text-slate-400'
+                            }`}>
+                              {conflict.severity}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-400 mt-1">{conflict.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-800">
+                      <p className="text-xs text-slate-500">
+                        <span className="text-indigo-400 font-medium">Recommendation:</span> {conflict.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -1043,47 +1566,81 @@ export default function EquipmentPage() {
 
         {/* Equipment Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Select All Header */}
+          {filtered.length > 0 && (
+            <div className="col-span-full flex items-center gap-3 mb-2 px-2">
+              <input
+                type="checkbox"
+                checked={selectedEquipment.size === filtered.length && filtered.length > 0}
+                onChange={(e) => e.target.checked ? selectAllEquipment() : clearSelection()}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
+              />
+              <span className="text-sm text-slate-400">
+                {selectedEquipment.size > 0 ? `${selectedEquipment.size} of ${filtered.length} selected` : 'Select all'}
+              </span>
+              {selectedEquipment.size > 0 && (
+                <button onClick={clearSelection} className="text-xs text-indigo-400 hover:text-indigo-300 ml-2">Clear</button>
+              )}
+            </div>
+          )}
           {filtered.map((eq) => (
-            <div key={eq.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
-                  <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <button
-                    onClick={() => handleEdit(eq)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
-                    title="Edit"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(eq.id)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-400 capitalize">
-                  {eq.category}
-                </span>
-                <StatusBadge status={eq.status} />
-              </div>
-              
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                <div>
-                  <p className="text-sm text-slate-400">₹{eq.dailyRate.toLocaleString()}/day</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500">
-                    {new Date(eq.dateStart).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - 
-                    {new Date(eq.dateEnd).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                  </p>
+            <div 
+              key={eq.id} 
+              className={`bg-slate-900 border rounded-xl p-5 transition-all group ${
+                selectedEquipment.has(eq.id) 
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20' 
+                  : 'border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedEquipment.has(eq.id)}
+                  onChange={() => toggleEquipmentSelection(eq.id)}
+                  className="w-4 h-4 mt-1 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                />
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-lg text-white">{eq.name}</h3>
+                      <p className="text-slate-500 text-sm">{eq.vendor || 'No vendor'}</p>
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        onClick={() => handleEdit(eq)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(eq.id)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-xs text-slate-400 capitalize">
+                      {eq.category}
+                    </span>
+                    <StatusBadge status={eq.status} />
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                    <div>
+                      <p className="text-sm text-slate-400">₹{eq.dailyRate.toLocaleString()}/day</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">
+                        {new Date(eq.dateStart).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} - 
+                        {new Date(eq.dateEnd).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1102,6 +1659,94 @@ export default function EquipmentPage() {
             </div>
           )}
         </div>
+
+        {/* Floating Bulk Actions Toolbar */}
+        {showBulkActions && selectedEquipment.size > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 z-50 flex items-center gap-4 animate-in slide-in-from-bottom-4">
+            <div className="flex items-center gap-2">
+              <span className="bg-indigo-500 text-white text-sm font-medium px-3 py-1 rounded-full">
+                {selectedEquipment.size} selected
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-700" />
+            <div className="relative" ref={bulkStatusMenuRef}>
+              <button
+                onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors"
+              >
+                Change Status
+                <ChevronRight className={`w-4 h-4 transition-transform ${showBulkStatusMenu ? 'rotate-90' : ''}`} />
+              </button>
+              {showBulkStatusMenu && (
+                <div className="absolute bottom-full mb-2 left-0 bg-slate-700 border border-slate-600 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+                  {['available', 'in-use', 'maintenance', 'returned'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => handleBulkStatusChange(status)}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-600 transition-colors flex items-center gap-2 capitalize"
+                    >
+                      <span className={`w-2 h-2 rounded-full ${
+                        status === 'available' ? 'bg-emerald-500' :
+                        status === 'in-use' ? 'bg-amber-500' :
+                        status === 'maintenance' ? 'bg-red-500' : 'bg-slate-500'
+                      }`} />
+                      {status === 'in-use' ? 'In Use' : status.charAt(0).toUpperCase() + status.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg text-sm transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6" ref={deleteConfirmRef}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <Trash2 className="w-5 h-5 text-red-400" />
+                  </div>
+                  <h2 className="text-xl font-semibold">Delete Equipment</h2>
+                </div>
+                <button onClick={() => setShowDeleteConfirm(false)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-slate-400 mb-6">
+                Are you sure you want to delete {selectedEquipment.size} equipment item{selectedEquipment.size > 1 ? 's' : ''}? This cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-400 rounded-lg text-sm font-medium text-white transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Modal */}
         {modalOpen && (
@@ -1354,6 +1999,20 @@ export default function EquipmentPage() {
                 </button>
               </div>
               <div className="p-4 space-y-3">
+                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Selection</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Select all equipment</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Ctrl+A</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Delete selected</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Ctrl+D</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Clear selection</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
+                </div>
+                <div className="text-xs font-medium text-indigo-400 uppercase tracking-wider mt-2 mb-1">Actions</div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh equipment data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
@@ -1375,6 +2034,10 @@ export default function EquipmentPage() {
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Export Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">M</kbd>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-slate-300">Print equipment report</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">P</kbd>
                 </div>
@@ -1385,48 +2048,6 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Close modal / Clear</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">Esc</kbd>
-                </div>
-                <div className="border-t border-slate-700 pt-3 mt-3">
-                  <span className="text-slate-400 text-sm">Category Filters</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Camera</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Lighting</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Sound</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Grip</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">4</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Art</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">5</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">All Categories</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">0</kbd>
-                </div>
-                <div className="border-t border-slate-700 pt-3 mt-3">
-                  <span className="text-slate-400 text-sm">Status Filters</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Available</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">!</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">In Use</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">@</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Maintenance</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">#</kbd>
                 </div>
               </div>
             </div>

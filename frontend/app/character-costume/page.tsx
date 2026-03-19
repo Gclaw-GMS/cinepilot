@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   User, Shirt, Palette, Sparkles, Plus, Edit2, Trash2, 
   Users, Calendar, Download, Filter, Search, Loader2,
   Image, MessageSquare, TrendingUp, Save, X, Copy,
   Palette as PaletteIcon, Crown, Heart, Zap, Shield, Star,
-  DollarSign, RefreshCw, HelpCircle, Printer
+  DollarSign, RefreshCw, HelpCircle, Printer, AlertCircle, CheckCircle,
+  List, AlertTriangle, BarChart3
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -123,6 +124,136 @@ export default function CharacterCostumePage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [exporting, setExporting] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'role' | 'status' | 'budget' | 'gender'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
+  
+  // Budget tracking state
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000)
+  
+  // Budget calculations
+  const totalEstimatedBudget = summary?.totalBudget || 0
+  const budgetUsedPercent = Math.min((totalEstimatedBudget / budgetLimit) * 100, 100)
+  const budgetRemaining = budgetLimit - totalEstimatedBudget
+  const isOverBudget = totalEstimatedBudget > budgetLimit
+  const isWarning = totalEstimatedBudget >= budgetLimit * 0.8 && !isOverBudget
+  const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
+
+  // Conflict detection
+  interface CostumeConflict {
+    id: string
+    type: 'budget-overrun' | 'missing-budget' | 'missing-costume' | 'incomplete-details' | 'no-fabrics' | 'status-delayed'
+    severity: 'high' | 'medium' | 'low'
+    characterId: string
+    characterName: string
+    title: string
+    description: string
+    recommendation: string
+  }
+
+  const conflicts = useMemo((): CostumeConflict[] => {
+    const conflictList: CostumeConflict[] = []
+    
+    characters.forEach((char) => {
+      // Missing budget
+      if (!char.estimatedBudget || char.estimatedBudget === 0) {
+        conflictList.push({
+          id: `no-budget-${char.id}`,
+          type: 'missing-budget',
+          severity: 'medium',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Missing Budget',
+          description: `${char.name} has no costume budget assigned`,
+          recommendation: 'Assign estimated budget for costume design'
+        })
+      }
+      
+      // Missing costume details
+      if (!char.costumeNotes || char.costumeNotes.trim() === '') {
+        conflictList.push({
+          id: `no-costume-${char.id}`,
+          type: 'missing-costume',
+          severity: 'medium',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Missing Costume Details',
+          description: `${char.name} has no costume description`,
+          recommendation: 'Add costume description and style notes'
+        })
+      }
+      
+      // Missing fabrics
+      if (!char.fabrics || char.fabrics.length === 0) {
+        conflictList.push({
+          id: `no-fabrics-${char.id}`,
+          type: 'no-fabrics',
+          severity: 'low',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'No Fabrics Specified',
+          description: `${char.name} has no fabric materials listed`,
+          recommendation: 'Add fabric materials for costume'
+        })
+      }
+      
+      // Incomplete details
+      if (!char.colorPalette || char.colorPalette.length === 0) {
+        conflictList.push({
+          id: `no-colors-${char.id}`,
+          type: 'incomplete-details',
+          severity: 'low',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Missing Color Palette',
+          description: `${char.name} has no color palette defined`,
+          recommendation: 'Define color palette for costume design'
+        })
+      }
+    })
+    
+    // Budget overrun (global check)
+    if (isOverBudget) {
+      conflictList.push({
+        id: 'budget-overrun-global',
+        type: 'budget-overrun',
+        severity: 'high',
+        characterId: 'global',
+        characterName: 'All Characters',
+        title: 'Total Budget Exceeded',
+        description: `Total costume budget (₹${totalEstimatedBudget.toLocaleString('en-IN')}) exceeds limit (₹${budgetLimit.toLocaleString('en-IN')})`,
+        recommendation: 'Review and optimize costume budgets across all characters'
+      })
+    }
+    
+    // Status delayed check
+    characters.forEach((char) => {
+      if (char.status === 'planning') {
+        // Check if this is an old planning item (would need date comparison in real app)
+        conflictList.push({
+          id: `delayed-${char.id}`,
+          type: 'status-delayed',
+          severity: 'low',
+          characterId: char.id,
+          characterName: char.name,
+          title: 'Planning Status',
+          description: `${char.name} is still in planning phase`,
+          recommendation: 'Consider moving to in-progress if shoot date is near'
+        })
+      }
+    })
+    
+    return conflictList
+  }, [characters, isOverBudget, totalEstimatedBudget, budgetLimit])
+
+  // Filter conflicts by severity
+  const highSeverityConflicts = conflicts.filter(c => c.severity === 'high')
+  const mediumSeverityConflicts = conflicts.filter(c => c.severity === 'medium')
+  const lowSeverityConflicts = conflicts.filter(c => c.severity === 'low')
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -130,6 +261,7 @@ export default function CharacterCostumePage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
   const charactersLengthRef = useRef(characters.length)
   const filteredCharactersRef = useRef<typeof characters>([])
 
@@ -170,14 +302,28 @@ export default function CharacterCostumePage() {
         return
       }
       
-      switch (e.key.toLowerCase()) {
+      switch (e.key) {
+        case '1':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
         case 'r':
+        case 'R':
           e.preventDefault()
           fetchDataRef.current?.()
           break
-        case 'f':
+        case 's':
+        case 'S':
           e.preventDefault()
-          setShowFilters(prev => !prev)
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case '/':
           e.preventDefault()
@@ -210,6 +356,8 @@ export default function CharacterCostumePage() {
           setSearchTerm('')
           setFilterRole('all')
           setFilterStatus('all')
+          setSortBy('name')
+          setSortOrder('asc')
           break
         case 'f':
           e.preventDefault()
@@ -229,12 +377,21 @@ export default function CharacterCostumePage() {
             setShowExportMenu(prev => !prev)
           }
           break
+        case 'm':
+        case 'M':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            if (filteredCharactersRef.current.length > 0) {
+              handleExportMarkdownRef.current?.()
+            }
+          }
+          break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showFilters, filterRole, filterStatus])
+  }, [showForm, showFilters, filterRole, filterStatus, sortBy, sortOrder])
 
   // Click outside handler for export menu and filter panel
   useEffect(() => {
@@ -574,21 +731,162 @@ export default function CharacterCostumePage() {
     setFormData({ ...formData, [field]: updated })
   }
 
-  const filteredCharacters = characters.filter(char => {
-    const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      char.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = filterRole === 'all' || char.role === filterRole
-    const matchesStatus = filterStatus === 'all' || char.status === filterStatus
-    return matchesSearch && matchesRole && matchesStatus
-  })
+  // Filter and sort characters using useMemo for performance
+  const filteredCharacters = useMemo(() => {
+    let result = characters.filter(char => {
+      const matchesSearch = char.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        char.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesRole = filterRole === 'all' || char.role === filterRole
+      const matchesStatus = filterStatus === 'all' || char.status === filterStatus
+      return matchesSearch && matchesRole && matchesStatus
+    })
+    
+    // Apply sorting
+    const sorted = [...result].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'role':
+          comparison = a.role.localeCompare(b.role)
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'budget':
+          comparison = (a.estimatedBudget || 0) - (b.estimatedBudget || 0)
+          break
+        case 'gender':
+          comparison = a.gender.localeCompare(b.gender)
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return sorted
+  }, [characters, searchTerm, filterRole, filterStatus, sortBy, sortOrder])
 
-  // Calculate active filter count
-  const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0)
+  // Calculate active filter count (including sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = (filterRole !== 'all' ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0)
+    if (sortBy !== 'name' || sortOrder !== 'asc') count++
+    return count
+  }, [filterRole, filterStatus, sortBy, sortOrder])
 
-  // Clear all filters
+  // Markdown export functionality
+  const handleExportMarkdown = useCallback(() => {
+    if (filteredCharacters.length === 0) return
+    
+    setExporting(true)
+    
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+
+    // Generate Markdown content
+    let markdown = `# CinePilot Character & Costume Report
+
+**Generated:** ${timestamp}
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Characters | ${filteredCharacters.length} |
+| Total Budget | ₹${(summary?.totalBudget || 0).toLocaleString('en-IN')} |
+
+### By Role
+
+`
+    
+    // Add role breakdown
+    if (summary?.byRole) {
+      Object.entries(summary.byRole).forEach(([role, count]) => {
+        markdown += `- **${role.charAt(0).toUpperCase() + role.slice(1)}**: ${count}\n`
+      })
+    }
+
+    markdown += `\n## Characters\n\n`
+
+    // Add character table
+    markdown += `| Name | Age | Gender | Role | Status | Budget |\n`
+    markdown += `|------|-----|--------|------|--------|--------|\n`
+    
+    filteredCharacters.forEach(char => {
+      const budget = char.estimatedBudget ? `₹${char.estimatedBudget.toLocaleString('en-IN')}` : '-'
+      markdown += `| ${char.name} | ${char.age} | ${char.gender} | ${char.role} | ${char.status} | ${budget} |\n`
+    })
+
+    markdown += `\n## Character Details\n\n`
+
+    // Add full character details
+    filteredCharacters.forEach((char, index) => {
+      markdown += `### ${index + 1}. ${char.name}\n\n`
+      markdown += `- **Age:** ${char.age}\n`
+      markdown += `- **Gender:** ${char.gender}\n`
+      markdown += `- **Role:** ${char.role}\n`
+      markdown += `- **Status:** ${char.status}\n`
+      if (char.estimatedBudget) {
+        markdown += `- **Budget:** ₹${char.estimatedBudget.toLocaleString('en-IN')}\n`
+      }
+      if (char.designer) {
+        markdown += `- **Costume Designer:** ${char.designer}\n`
+      }
+      if (char.appearance.length > 0) {
+        markdown += `- **Appearance:** ${char.appearance.join(', ')}\n`
+      }
+      if (char.personality.length > 0) {
+        markdown += `- **Personality:** ${char.personality.join(', ')}\n`
+      }
+      if (char.costumeStyle.length > 0) {
+        markdown += `- **Costume Style:** ${char.costumeStyle.join(', ')}\n`
+      }
+      if (char.fabrics.length > 0) {
+        markdown += `- **Fabrics:** ${char.fabrics.join(', ')}\n`
+      }
+      if (char.colorPalette.length > 0) {
+        markdown += `- **Color Palette:** ${char.colorPalette.join(', ')}\n`
+      }
+      if (char.description) {
+        markdown += `\n**Description:** ${char.description}\n`
+      }
+      if (char.costumeNotes) {
+        markdown += `\n**Costume Notes:** ${char.costumeNotes}\n`
+      }
+      markdown += `\n---\n\n`
+    })
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `character-costumes-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+  }, [filteredCharacters, summary])
+
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
+  useEffect(() => {
+    filteredCharactersRef.current = filteredCharacters
+  }, [filteredCharacters])
+
+  // Clear all filters and sort
   const clearFilters = () => {
     setFilterRole('all')
     setFilterStatus('all')
+    setSortBy('name')
+    setSortOrder('asc')
   }
 
   const roleData = summary ? Object.entries(summary.byRole).map(([name, value]) => ({
@@ -663,6 +961,55 @@ export default function CharacterCostumePage() {
             </h1>
             <p className="text-slate-400 mt-1">Design and track character costumes for your film</p>
           </div>
+          
+          {/* View Mode Tabs */}
+          <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-lg">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'list' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'analytics' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </button>
+            <button
+              onClick={() => setViewMode('conflicts')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'conflicts' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Conflicts
+              {conflicts.length > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-medium ${
+                  highSeverityConflicts.length > 0 
+                    ? 'bg-red-500 text-white' 
+                    : mediumSeverityConflicts.length > 0 
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-blue-500 text-white'
+                }`}>
+                  {conflicts.length}
+                </span>
+              )}
+            </button>
+          </div>
+          
           <div className="flex items-center gap-3">
             <button
               onClick={() => fetchDataRef.current?.()}
@@ -695,6 +1042,13 @@ export default function CharacterCostumePage() {
                   >
                     <Download className="w-4 h-4 text-purple-400" />
                     Export JSON
+                  </button>
+                  <button
+                    onClick={handleExportMarkdown}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-cyan-400" />
+                    Export Markdown
                   </button>
                 </div>
               )}
@@ -746,11 +1100,11 @@ export default function CharacterCostumePage() {
                   </span>
                 )}
               </button>
-              {/* Filter Panel */}
+              {/* Filter & Sort Panel */}
               {showFilters && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-medium">Filters</span>
+                    <span className="text-sm font-medium">Filter & Sort</span>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
@@ -760,22 +1114,69 @@ export default function CharacterCostumePage() {
                       </button>
                     )}
                   </div>
-                  <div className="p-4">
-                    <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Role</label>
-                    <select
-                      value={filterRole}
-                      onChange={(e) => setFilterRole(e.target.value)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="all">All Roles</option>
-                      <option value="protagonist">Protagonist</option>
-                      <option value="antagonist">Antagonist</option>
-                      <option value="supporting">Supporting</option>
-                      <option value="comic">Comic</option>
-                      <option value="romantic">Romantic</option>
-                      <option value="mentor">Mentor</option>
-                      <option value="tragic">Tragic</option>
-                    </select>
+                  <div className="p-4 space-y-4">
+                    {/* Role Filter */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Role</label>
+                      <select
+                        value={filterRole}
+                        onChange={(e) => setFilterRole(e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="all">All Roles</option>
+                        <option value="protagonist">Protagonist</option>
+                        <option value="antagonist">Antagonist</option>
+                        <option value="supporting">Supporting</option>
+                        <option value="comic">Comic</option>
+                        <option value="romantic">Romantic</option>
+                        <option value="mentor">Mentor</option>
+                        <option value="tragic">Tragic</option>
+                      </select>
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2">Status</label>
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="planning">Planning</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                    
+                    {/* Sort Options */}
+                    <div className="border-t border-slate-700 pt-4">
+                      <label className="text-xs text-purple-400 uppercase tracking-wider block mb-2">Sort By</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="name">Name</option>
+                          <option value="role">Role</option>
+                          <option value="status">Status</option>
+                          <option value="budget">Budget</option>
+                          <option value="gender">Gender</option>
+                        </select>
+                        <button
+                          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            sortOrder === 'asc' 
+                              ? 'bg-purple-600 text-white' 
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                          title="Toggle sort order (S)"
+                        >
+                          {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -848,6 +1249,77 @@ export default function CharacterCostumePage() {
             </div>
           </div>
         )}
+
+        {/* Budget Tracking Card */}
+        <div className={`rounded-xl p-4 border mb-6 ${
+          budgetStatus === 'over' ? 'bg-red-950/30 border-red-800' :
+          budgetStatus === 'warning' ? 'bg-amber-950/30 border-amber-800' :
+          'bg-emerald-950/30 border-emerald-800'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {budgetStatus === 'over' ? (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              ) : budgetStatus === 'warning' ? (
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+              )}
+              <span className={`font-semibold ${
+                budgetStatus === 'over' ? 'text-red-400' :
+                budgetStatus === 'warning' ? 'text-amber-400' :
+                'text-emerald-400'
+              }`}>
+                {budgetStatus === 'over' ? 'Over Budget' : budgetStatus === 'warning' ? 'Budget Warning' : 'Budget On Track'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-sm">Budget Limit:</span>
+              <input
+                type="number"
+                value={budgetLimit}
+                onChange={(e) => setBudgetLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-32 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white"
+                placeholder="Enter limit"
+              />
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="mb-3">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-slate-400">₹{(totalEstimatedBudget / 100000).toFixed(1)}L used</span>
+              <span className="text-slate-400">₹{(budgetLimit / 100000).toFixed(1)}L limit</span>
+            </div>
+            <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-300 ${
+                  budgetStatus === 'over' ? 'bg-red-500' :
+                  budgetStatus === 'warning' ? 'bg-amber-500' :
+                  'bg-emerald-500'
+                }`}
+                style={{ width: `${budgetUsedPercent}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Status Message */}
+          <div className="text-sm">
+            {budgetStatus === 'over' ? (
+              <span className="text-red-400">
+                ⚠️ Over budget by ₹{Math.abs(budgetRemaining).toLocaleString('en-IN')} ({((totalEstimatedBudget / budgetLimit) * 100).toFixed(1)}% used)
+              </span>
+            ) : budgetStatus === 'warning' ? (
+              <span className="text-amber-400">
+                ⚠️ Approaching budget limit - ₹{budgetRemaining.toLocaleString('en-IN')} remaining ({budgetUsedPercent.toFixed(1)}% used)
+              </span>
+            ) : (
+              <span className="text-emerald-400">
+                ✓ ₹{budgetRemaining.toLocaleString('en-IN')} remaining ({budgetUsedPercent.toFixed(1)}% used)
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Charts */}
         {characters.length > 0 && (
@@ -954,7 +1426,11 @@ export default function CharacterCostumePage() {
           </div>
         )}
 
-        {/* Filters */}
+        {/* List View Content */}
+        {(viewMode === 'list' || viewMode === 'analytics') && (
+        <>
+        {/* Filters - only show in list mode */}
+        {viewMode === 'list' && (
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1035,6 +1511,7 @@ export default function CharacterCostumePage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Characters Grid */}
         {loading ? (
@@ -1518,6 +1995,93 @@ export default function CharacterCostumePage() {
             </div>
           </div>
         )}
+        </>
+        )}
+
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-red-950/30 border border-red-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                  <span className="text-red-400 font-semibold">High Severity</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{highSeverityConflicts.length}</p>
+                <p className="text-slate-400 text-sm">Issues requiring immediate attention</p>
+              </div>
+              <div className="bg-amber-950/30 border border-amber-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <span className="text-amber-400 font-semibold">Medium Severity</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{mediumSeverityConflicts.length}</p>
+                <p className="text-slate-400 text-sm">Issues to address soon</p>
+              </div>
+              <div className="bg-blue-950/30 border border-blue-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-blue-400" />
+                  <span className="text-blue-400 font-semibold">Low Severity</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{lowSeverityConflicts.length}</p>
+                <p className="text-slate-400 text-sm">Minor improvements</p>
+              </div>
+            </div>
+
+            {/* Conflict List */}
+            {conflicts.length === 0 ? (
+              <div className="bg-emerald-950/30 border border-emerald-800 rounded-xl p-8 text-center">
+                <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-emerald-400 mb-2">All Clear!</h3>
+                <p className="text-slate-400">No costume issues detected. Everything looks good.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {conflicts.map((conflict) => (
+                  <div 
+                    key={conflict.id}
+                    className={`rounded-xl p-4 border ${
+                      conflict.severity === 'high' 
+                        ? 'bg-red-950/30 border-red-800' 
+                        : conflict.severity === 'medium'
+                          ? 'bg-amber-950/30 border-amber-800'
+                          : 'bg-blue-950/30 border-blue-800'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {conflict.severity === 'high' ? (
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                        ) : conflict.severity === 'medium' ? (
+                          <AlertTriangle className="w-5 h-5 text-amber-400" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5 text-blue-400" />
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          conflict.severity === 'high' 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : conflict.severity === 'medium'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {conflict.severity.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <h4 className="text-white font-semibold mb-1">{conflict.title}</h4>
+                    <p className="text-slate-400 text-sm mb-3">{conflict.description}</p>
+                    <div className="pt-2 border-t border-slate-700">
+                      <p className="text-purple-400 text-xs">
+                        <span className="text-slate-500">→</span> {conflict.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Keyboard Help Modal */}
         {showKeyboardHelp && (
@@ -1537,6 +2101,19 @@ export default function CharacterCostumePage() {
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-300">List view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">1</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Analytics view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">2</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Conflicts view</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">3</kbd>
+                </div>
+                <div className="border-t border-slate-700 my-3"></div>
+                <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
                 </div>
@@ -1545,16 +2122,20 @@ export default function CharacterCostumePage() {
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Toggle sort order</span>
+                  <kbd className="px-2 py-1 bg-purple-600 text-white rounded text-sm">S</kbd>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-slate-300">Focus search</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">/</kbd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300">Toggle filters</span>
-                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-slate-300">Export data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">E</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Export as Markdown</span>
+                  <kbd className="px-2 py-1 bg-cyan-600 text-white rounded text-sm">M</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Print report</span>

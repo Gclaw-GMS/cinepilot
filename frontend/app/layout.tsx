@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Sidebar from './sidebar'
 import ChatWidget from './components/ChatWidget'
 import KeyboardShortcuts from './components/KeyboardShortcuts'
+import { ThemeProvider } from './components/ThemeProvider'
 
 // Force dynamic rendering for all pages to ensure fresh data
 export const dynamic = 'force-dynamic'
@@ -18,16 +19,18 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="bg-cinepilot-dark text-white font-mono">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 min-h-screen overflow-auto ml-64">
-            {children}
-          </main>
-        </div>
-        <ChatWidget />
-        <KeyboardShortcuts />
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-mono">
+        <ThemeProvider>
+          <div className="flex min-h-screen">
+            <Sidebar />
+            <main className="flex-1 min-h-screen overflow-auto ml-64">
+              {children}
+            </main>
+          </div>
+          <ChatWidget />
+          <KeyboardShortcuts />
+        </ThemeProvider>
       </body>
     </html>
   )

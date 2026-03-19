@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   StickyNote, Plus, Search, Edit2, Trash2, X, Save, 
   Calendar, Tag, User, Clock, CheckCircle, AlertCircle,
-  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle, Copy, Printer, ChevronDown
+  FolderOpen, Filter, RefreshCw, Loader2, BarChart3, TrendingUp, Download, HelpCircle, Copy, Printer, ChevronDown, AlertTriangle
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
@@ -166,10 +166,17 @@ export default function NotesPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
   
+  // Bulk selection state
+  const [selectedNotes, setSelectedNotes] = useState<Set<string>>(new Set())
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [showBulkCategoryMenu, setShowBulkCategoryMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
   // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const bulkCategoryMenuRef = useRef<HTMLDivElement>(null)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -211,15 +218,25 @@ export default function NotesPage() {
   const handleTogglePinRef = useRef<((note: Note) => Promise<void>) | null>(null)
   const handleDuplicateRef = useRef<((note: Note) => Promise<void>) | null>(null)
   const handleRefreshRef = useRef<() => void>(() => {})
+  const handleExportRef = useRef<((format: 'csv' | 'json' | 'markdown') => Promise<void>) | null>(null)
   const printNotesReportRef = useRef<() => void>(() => {})
   const notesLengthRef = useRef(0)
   const notesRef = useRef<Note[]>([])
   const filteredNotesRef = useRef<Note[]>([])
+  const selectedNotesRef = useRef<Set<string>>(new Set())
+  const showBulkActionsRef = useRef<boolean>(false)
+  const selectedNotesSetRef = useRef<Set<string>>(new Set())
+  const handleSelectAllRef = useRef<() => void>(() => {})
 
   // Update refs when values change
   useEffect(() => {
     selectedNoteRef.current = selectedNote
   }, [selectedNote])
+
+  useEffect(() => {
+    selectedNotesRef.current = selectedNotes
+    showBulkActionsRef.current = showBulkActions
+  }, [selectedNotes, showBulkActions])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -239,6 +256,23 @@ export default function NotesPage() {
           }
         }
         return
+      }
+
+      // Ctrl+A: Select all notes
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'a') {
+          e.preventDefault()
+          handleSelectAllRef.current()
+          return
+        }
+        // Ctrl+D: Delete selected notes
+        if (e.key.toLowerCase() === 'd') {
+          e.preventDefault()
+          if (selectedNotes.size > 0) {
+            setShowDeleteConfirm(true)
+          }
+          return
+        }
       }
 
       switch (e.key.toLowerCase()) {
@@ -268,6 +302,12 @@ export default function NotesPage() {
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
           break
+        case 'm':
+          e.preventDefault()
+          if (notesLengthRef.current > 0) {
+            handleExportRef.current?.('markdown')
+          }
+          break
         case 's':
           e.preventDefault()
           toggleSortOrder()
@@ -290,6 +330,20 @@ export default function NotesPage() {
             handleDuplicateRef.current(selectedNoteRef.current)
           }
           break
+        // Number keys 1-6 for quick category filter
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+          e.preventDefault()
+          const categoryKeys = ['general', 'production', 'creative', 'technical', 'logistics', 'budget']
+          const numIndex = parseInt(e.key) - 1
+          if (numIndex >= 0 && numIndex < categoryKeys.length) {
+            setFilterCategory(filterCategory === categoryKeys[numIndex] ? 'all' : categoryKeys[numIndex])
+          }
+          break
         case 'escape':
           e.preventDefault()
           if (showKeyboardHelp) {
@@ -303,6 +357,11 @@ export default function NotesPage() {
             setShowPrintMenu(false)
           } else if (showFilterPanel) {
             setShowFilterPanel(false)
+          } else if (showBulkActions) {
+            setSelectedNotes(new Set())
+            setShowBulkActions(false)
+          } else if (selectedNotes.size > 0) {
+            setSelectedNotes(new Set())
           } else {
             setSearch('')
             setFilterCategory('all')
@@ -313,7 +372,7 @@ export default function NotesPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu, showFilterPanel, showPrintMenu])
+  }, [showForm, showKeyboardHelp, search, filterCategory, showExportMenu, showFilterPanel, showPrintMenu, showBulkActions, selectedNotes])
 
   // Click outside to close export, print menus, and filter panel
   useEffect(() => {
@@ -463,7 +522,7 @@ export default function NotesPage() {
     setShowForm(true)
   }
 
-  const handleExport = async (format: 'csv' | 'json') => {
+  const handleExport = useCallback(async (format: 'csv' | 'json' | 'markdown') => {
     setExporting(true)
     setShowExportMenu(false)
     
@@ -490,7 +549,56 @@ export default function NotesPage() {
       })
     })
     
-    if (format === 'json') {
+    if (format === 'markdown') {
+      // Generate Markdown format
+      let markdown = `# Production Notes Report\n\n`
+      markdown += `**Export Date:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+      markdown += `## Summary\n\n`
+      markdown += `- **Total Notes:** ${notes.length}\n`
+      markdown += `- **Filtered Notes:** ${filteredNotes.length}\n`
+      markdown += `- **Pinned Notes:** ${pinnedNotes.length}\n`
+      markdown += `- **Categories:** ${Object.keys(categoryCounts).length}\n`
+      markdown += `- **Unique Tags:** ${Object.keys(tagCounts).length}\n\n`
+      
+      if (Object.keys(categoryCounts).length > 0) {
+        markdown += `## Category Breakdown\n\n`
+        Object.entries(categoryCounts).forEach(([cat, count]) => {
+          markdown += `- **${cat}:** ${count} notes\n`
+        })
+        markdown += `\n`
+      }
+      
+      if (Object.keys(tagCounts).length > 0) {
+        markdown += `## Top Tags\n\n`
+        const topTags = Object.entries(tagCounts).sort(([,a], [,b]) => b - a).slice(0, 10)
+        topTags.forEach(([tag, count]) => {
+          markdown += `- \`${tag}\`: ${count}\n`
+        })
+        markdown += `\n`
+      }
+      
+      markdown += `---\n\n`
+      markdown += `## Notes\n\n`
+      
+      filteredNotesRef.current.forEach((note, idx) => {
+        if (note.isPinned) markdown += `📌 **PINNED**\n\n`
+        markdown += `### ${idx + 1}. ${note.title}\n\n`
+        markdown += `**Category:** ${note.category}  \n`
+        markdown += `**Tags:** ${note.tags.join(', ') || 'None'}  \n`
+        markdown += `**Created:** ${new Date(note.createdAt).toLocaleDateString('en-IN')}  \n`
+        markdown += `**Updated:** ${new Date(note.updatedAt).toLocaleDateString('en-IN')}\n\n`
+        markdown += `${note.content}\n\n`
+        markdown += `---\n\n`
+      })
+      
+      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `production-notes-${new Date().toISOString().split('T')[0]}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else if (format === 'json') {
       const exportData = {
         exportDate: new Date().toISOString(),
         summary: {
@@ -527,7 +635,7 @@ export default function NotesPage() {
       URL.revokeObjectURL(url)
     }
     setExporting(false)
-  }
+  }, [notes, filteredNotes, pinnedNotes])
 
   // Print Notes Report
   const printNotesReport = useCallback(() => {
@@ -666,6 +774,74 @@ export default function NotesPage() {
     }
   }
 
+  // Bulk selection handlers
+  const handleSelectNote = (noteId: string) => {
+    setSelectedNotes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(noteId)) {
+        newSet.delete(noteId)
+      } else {
+        newSet.add(noteId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = useCallback(() => {
+    const allIds = filteredNotes.map(n => n.id)
+    setSelectedNotes(new Set(allIds))
+    setShowBulkActions(true)
+  }, [filteredNotes])
+
+  // Update ref for keyboard shortcuts
+  useEffect(() => {
+    handleSelectAllRef.current = handleSelectAll
+  }, [handleSelectAll])
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedNotes(new Set())
+    setShowBulkActions(false)
+  }, [])
+
+  const handleBulkDelete = async () => {
+    if (selectedNotes.size === 0) return
+    if (!confirm(`Delete ${selectedNotes.size} selected notes?`)) return
+    
+    try {
+      const deletePromises = Array.from(selectedNotes).map(id => 
+        fetch(`/api/notes?id=${id}`, { method: 'DELETE' })
+      )
+      await Promise.all(deletePromises)
+      setSelectedNotes(new Set())
+      setShowBulkActions(false)
+      setShowDeleteConfirm(false)
+      fetchNotes()
+    } catch (err) {
+      console.error('Failed to delete notes:', err)
+    }
+  }
+
+  const handleBulkChangeCategory = async (category: string) => {
+    if (selectedNotes.size === 0) return
+    
+    try {
+      const updatePromises = Array.from(selectedNotes).map(id => 
+        fetch('/api/notes', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, category })
+        })
+      )
+      await Promise.all(updatePromises)
+      setSelectedNotes(new Set())
+      setShowBulkActions(false)
+      setShowBulkCategoryMenu(false)
+      fetchNotes()
+    } catch (err) {
+      console.error('Failed to update notes:', err)
+    }
+  }
+
   const handleTogglePin = useCallback(async (note: Note) => {
     try {
       await fetch('/api/notes', {
@@ -712,6 +888,11 @@ export default function NotesPage() {
   useEffect(() => {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
+
+  // Update ref when handleExport changes
+  useEffect(() => {
+    handleExportRef.current = handleExport
+  }, [handleExport])
 
   // Update ref when printNotesReport changes
   useEffect(() => {
@@ -839,8 +1020,8 @@ export default function NotesPage() {
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="all">All Categories</option>
-                        {CATEGORIES.map(cat => (
-                          <option key={cat.value} value={cat.value}>{cat.label}</option>
+                        {CATEGORIES.map((cat, idx) => (
+                          <option key={cat.value} value={cat.value}>{cat.label} ({idx + 1})</option>
                         ))}
                       </select>
                     </div>
@@ -905,6 +1086,14 @@ export default function NotesPage() {
                   >
                     <Download className="w-3 h-3" />
                     Export as JSON
+                  </button>
+                  <button
+                    onClick={() => handleExport('markdown')}
+                    disabled={exporting}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 transition-colors whitespace-nowrap flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export as Markdown
                   </button>
                 </div>
               )}
@@ -986,10 +1175,34 @@ export default function NotesPage() {
               className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
             >
               <option value="all">All Categories</option>
-              {CATEGORIES.map(cat => (
-                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              {CATEGORIES.map((cat, idx) => (
+                <option key={cat.value} value={cat.value}>{cat.label} ({idx + 1})</option>
               ))}
             </select>
+          </div>
+          {/* Bulk Selection Buttons */}
+          <div className="flex items-center gap-2">
+            {selectedNotes.size > 0 ? (
+              <>
+                <span className="text-sm text-indigo-400 font-medium">
+                  {selectedNotes.size} selected
+                </span>
+                <button
+                  onClick={handleDeselectAll}
+                  className="px-3 py-2 text-sm text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg transition-colors"
+                >
+                  Clear
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleSelectAll}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500 rounded-lg transition-colors"
+              >
+                <input type="checkbox" className="w-4 h-4 rounded" readOnly />
+                Select All
+              </button>
+            )}
           </div>
         </div>
 
@@ -1175,6 +1388,8 @@ export default function NotesPage() {
                       searchTerm={search}
                       isSelected={selectedNote?.id === note.id}
                       onSelect={setSelectedNote}
+                      isNoteSelected={selectedNotes.has(note.id)}
+                      onNoteSelect={handleSelectNote}
                     />
                   ))}
                 </div>
@@ -1198,6 +1413,8 @@ export default function NotesPage() {
                       searchTerm={search}
                       isSelected={selectedNote?.id === note.id}
                       onSelect={setSelectedNote}
+                      isNoteSelected={selectedNotes.has(note.id)}
+                      onNoteSelect={handleSelectNote}
                     />
                   ))}
                 </div>
@@ -1304,6 +1521,100 @@ export default function NotesPage() {
         </div>
       )}
 
+      {/* Bulk Actions Floating Toolbar */}
+      {showBulkActions && selectedNotes.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <div className="flex items-center gap-3 bg-slate-900 border border-indigo-500/50 rounded-xl px-4 py-3 shadow-2xl shadow-indigo-500/20">
+            <span className="bg-indigo-600 text-white text-sm font-medium px-3 py-1 rounded-full">
+              {selectedNotes.size} selected
+            </span>
+            
+            {/* Change Category Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBulkCategoryMenu(!showBulkCategoryMenu)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <Tag className="w-4 h-4" />
+                Change Category
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showBulkCategoryMenu && (
+                <div className="absolute bottom-full mb-2 left-0 bg-slate-800 border border-slate-700 rounded-lg py-2 min-w-[160px] shadow-xl">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat.value}
+                      onClick={() => handleBulkChangeCategory(cat.value)}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Delete Button */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-6 bg-slate-700" />
+
+            {/* Clear Selection */}
+            <button
+              onClick={handleDeselectAll}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-red-500/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl shadow-red-500/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Delete {selectedNotes.size} Notes?</h3>
+                <p className="text-sm text-slate-400">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+              >
+                Delete {selectedNotes.size} Notes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Keyboard Help Modal */}
       {showKeyboardHelp && (
         <div 
@@ -1333,9 +1644,13 @@ export default function NotesPage() {
                 { key: 'P', action: 'Pin/unpin selected note' },
                 { key: 'D', action: 'Duplicate selected note' },
                 { key: 'E', action: 'Export notes' },
+                { key: 'M', action: 'Export as Markdown' },
                 { key: 'O', action: 'Print notes report' },
+                { key: '1-6', action: 'Filter by category' },
                 { key: '?', action: 'Show shortcuts' },
-                { key: 'Esc', action: 'Close modal / Clear filters' },
+                { key: 'Ctrl+A', action: 'Select all notes' },
+                { key: 'Ctrl+D', action: 'Delete selected notes' },
+                { key: 'Esc', action: 'Close modal / Clear selection' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
                   <span className="text-slate-400 text-sm">{shortcut.action}</span>
@@ -1361,7 +1676,9 @@ function NoteCard({
   formatDate,
   searchTerm = '',
   isSelected = false,
-  onSelect
+  onSelect,
+  isNoteSelected,
+  onNoteSelect
 }: { 
   note: Note
   onEdit: (note: Note) => void
@@ -1372,20 +1689,36 @@ function NoteCard({
   searchTerm?: string
   isSelected?: boolean
   onSelect?: (note: Note) => void
+  isNoteSelected?: boolean
+  onNoteSelect?: (noteId: string) => void
 }) {
   return (
     <div 
       className={`bg-slate-900 border rounded-xl p-4 transition-colors group cursor-pointer ${
-        isSelected 
-          ? 'border-cyan-500 ring-1 ring-cyan-500/30' 
-          : 'border-slate-800 hover:border-slate-600'
+        isNoteSelected
+          ? 'border-indigo-500 ring-1 ring-indigo-500/30' 
+          : isSelected 
+            ? 'border-cyan-500 ring-1 ring-cyan-500/30' 
+            : 'border-slate-800 hover:border-slate-600'
       }`}
       onClick={() => onSelect?.(note)}
     >
       <div className="flex items-start justify-between mb-2">
-        <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryStyle(note.category)}`}>
-          {note.category}
-        </span>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isNoteSelected || false}
+            onChange={(e) => {
+              e.stopPropagation()
+              onNoteSelect?.(note.id)
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer"
+          />
+          <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryStyle(note.category)}`}>
+            {note.category}
+          </span>
+        </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onTogglePin(note)}

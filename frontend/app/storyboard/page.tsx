@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter } from 'lucide-react'
+import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter, FileText } from 'lucide-react'
 
 interface FrameData {
   id: string
@@ -79,6 +79,7 @@ export default function StoryboardPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     selectedScriptRef.current = selectedScript
@@ -199,6 +200,178 @@ export default function StoryboardPage() {
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleExportMarkdown = () => {
+    // Compute filtered scenes inline (same logic as filteredScenes useMemo)
+    let filtered = scenes
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(scene => 
+        scene.sceneNumber.toString().includes(query) ||
+        (scene.heading?.toLowerCase().includes(query)) ||
+        scene.frames.some(frame => 
+          frame.shot.shotText?.toLowerCase().includes(query) ||
+          frame.shot.shotSize?.toLowerCase().includes(query) ||
+          frame.directorNotes?.toLowerCase().includes(query)
+        )
+      )
+    }
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(scene => {
+        if (statusFilter === 'approved') {
+          return scene.frames.some(f => f.isApproved)
+        } else if (statusFilter === 'pending') {
+          return scene.frames.some(f => !f.isApproved && f.status !== 'failed')
+        } else if (statusFilter === 'failed') {
+          return scene.frames.some(f => f.status === 'failed')
+        }
+        return true
+      })
+    }
+    if (sceneFilter !== 'all') {
+      filtered = filtered.filter(scene => scene.sceneId === sceneFilter)
+    }
+    // Sort
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'scene':
+          comparison = a.sceneNumber - b.sceneNumber
+          break
+        case 'shot':
+          const aShot = a.frames[0]?.shot.shotIndex || 0
+          const bShot = b.frames[0]?.shot.shotIndex || 0
+          comparison = aShot - bShot
+          break
+        case 'status':
+          comparison = (a.frames[0]?.status || '').localeCompare(b.frames[0]?.status || '')
+          break
+        case 'approved':
+          comparison = (a.frames.some(f => f.isApproved) ? 1 : 0) - (b.frames.some(f => f.isApproved) ? 1 : 0)
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+    if (filtered.length === 0) return
+
+    // Calculate summary stats
+    const totalFrames = filtered.reduce((sum, s) => sum + s.frames.length, 0)
+    const approvedFrames = filtered.reduce((sum, s) => sum + s.frames.filter(f => f.isApproved).length, 0)
+    const pendingFrames = filtered.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'pending').length, 0)
+    const failedFrames = filtered.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'failed').length, 0)
+    const generatingFrames = filtered.reduce((sum, s) => sum + s.frames.filter(f => f.status === 'generating').length, 0)
+
+    // Build filter info
+    const filterInfo: string[] = []
+    if (searchQuery) filterInfo.push(`Search: "${searchQuery}"`)
+    if (statusFilter !== 'all') filterInfo.push(`Status: ${statusFilter}`)
+    if (sceneFilter !== 'all') filterInfo.push(`Scene: ${sceneFilter}`)
+    filterInfo.push(`Sort: ${sortBy} (${sortOrder})`)
+    filterInfo.push(`Style: ${selectedStyle}`)
+
+    // Get script title
+    const scriptTitle = scripts.find(s => s.id === selectedScript)?.title || 'Unknown Script'
+
+    let markdown = `# 🎬 CinePilot Storyboard Export
+
+> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 📋 Overview
+
+| Metric | Value |
+|--------|-------|
+| **Script** | ${scriptTitle} |
+| **Total Scenes** | ${filteredScenes.length} |
+| **Total Frames** | ${totalFrames} |
+| **Approved** | ${approvedFrames} |
+| **Pending** | ${pendingFrames} |
+| **Generating** | ${generatingFrames} |
+| **Failed** | ${failedFrames} |
+| **Export Date** | ${new Date().toLocaleDateString('en-IN')} |
+
+### Filters Applied
+${filterInfo.map(f => `- ${f}`).join('\n')}
+
+---
+
+## 🎨 Style: ${STYLES.find(s => s.key === selectedStyle)?.label || selectedStyle}
+
+---
+
+## 📽️ Scene Breakdown
+
+${filteredScenes.map(scene => {
+  const sceneApproved = scene.frames.filter(f => f.isApproved).length
+  const scenePending = scene.frames.filter(f => f.status === 'pending').length
+  const sceneGenerating = scene.frames.filter(f => f.status === 'generating').length
+  const sceneFailed = scene.frames.filter(f => f.status === 'failed').length
+  
+  return `### Scene ${scene.sceneNumber}: ${scene.heading || 'Untitled'}
+
+| Shot | Frame ID | Status | Approved | Style | Prompt |
+|------|----------|--------|----------|-------|--------|
+${scene.frames.map(frame => `| ${frame.shot.shotIndex} | ${frame.id.slice(0, 8)}... | ${frame.status} | ${frame.isApproved ? '✅' : '❌'} | ${frame.style} | ${frame.prompt ? frame.prompt.slice(0, 50) + (frame.prompt.length > 50 ? '...' : '') : '-'} |`).join('\n')}
+
+**Scene Summary:** ${sceneApproved} approved, ${scenePending} pending, ${sceneGenerating} generating, ${sceneFailed} failed
+`
+}).join('\n---\n\n')}
+
+---
+
+## 📝 Director Notes
+
+${filteredScenes.map(scene => 
+  scene.frames.filter(f => f.directorNotes).map(frame => 
+    `- **Scene ${scene.sceneNumber}, Shot ${frame.shot.shotIndex}:** ${frame.directorNotes}`
+  ).join('\n')
+).filter(n => n).join('\n') || '*No director notes recorded*'}
+
+---
+
+## 🔍 Frame Details
+
+${filteredScenes.map(scene => 
+  scene.frames.map(frame => 
+    `### Scene ${scene.sceneNumber} - Shot ${frame.shot.shotIndex} (${frame.id})
+
+- **Status:** ${frame.status}
+- **Approved:** ${frame.isApproved ? 'Yes' : 'No'}
+- **Style:** ${frame.style}
+- **Prompt:** ${frame.prompt || '*None*'}
+- **Director Notes:** ${frame.directorNotes || '*None*'}
+- **Shot Text:** ${frame.shot.shotText || '*None*'}
+- **Shot Size:** ${frame.shot.shotSize || '*None*'}
+- **Characters:** ${frame.shot.characters?.join(', ') || '*None*'}
+- **Scene Info:** ${frame.shot.scene.headingRaw || '*None*'} (${frame.shot.scene.intExt || '-'} / ${frame.shot.scene.timeOfDay || '-'})
+
+`
+  ).join('\n')
+).join('\n---\n\n')}
+
+---
+
+*Storyboard exported by CinePilot - Film Production Management System*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `storyboard-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Update ref when function changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   // Print functionality using filtered/sorted data
   const handlePrint = () => {
@@ -425,6 +598,10 @@ export default function StoryboardPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current()
           break
         case 'p':
           e.preventDefault()
@@ -811,6 +988,13 @@ export default function StoryboardPage() {
               {showExportMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <button
+                    onClick={handleExportMarkdown}
+                    className="w-full px-4 py-2.5 text-left text-sm hover:bg-[#222] transition-colors flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-cyan-400" />
+                    Export Markdown
+                  </button>
+                  <button
                     onClick={handleExportCSV}
                     className="w-full px-4 py-2.5 text-left text-sm hover:bg-[#222] transition-colors flex items-center gap-2"
                   >
@@ -1143,6 +1327,7 @@ export default function StoryboardPage() {
                   { key: '3', action: 'Switch to Marker & Ink style' },
                   { key: '4', action: 'Switch to Blueprint style' },
                   { key: 'E', action: 'Export menu' },
+                  { key: 'M', action: 'Export as Markdown' },
                   { key: '?', action: 'Show this help modal' },
                   { key: 'Esc', action: 'Close modal / Clear search' },
                 ].map(shortcut => (

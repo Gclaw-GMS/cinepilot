@@ -7,8 +7,13 @@ import {
   Calendar, Download, Plus, Layers, Grid3X3, 
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Target, CheckCircle, Zap, Clock, Film, MapPin,
-  Filter, RefreshCw, Search, X, HelpCircle, Printer
+  Filter, RefreshCw, Search, X, HelpCircle, Printer,
+  TrendingUp, BarChart3, FileText
 } from 'lucide-react';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
+  CartesianGrid, Tooltip, ResponsiveContainer, Legend 
+} from 'recharts';
 
 interface Project {
   id: string;
@@ -60,6 +65,7 @@ export default function TimelinePage() {
   // Refs for keyboard shortcuts to avoid dependency warnings
   const handleRefreshRef = useRef<() => Promise<void>>(async () => {});
   const handlePrintRef = useRef<() => void>(() => {});
+  const exportToMarkdownRef = useRef<() => void>(() => {});
   const exportingRef = useRef(exporting);
   const printingRef = useRef(printing);
   const showExportMenuRef = useRef(showExportMenu);
@@ -98,6 +104,30 @@ export default function TimelinePage() {
     shootDays: 20,
     scenes: 145,
   }), []);
+
+  // Chart data computations
+  const statusChartData = useMemo(() => {
+    const total = stats.total || 1;
+    return [
+      { name: 'Completed', value: stats.completed, color: '#22c55e' },
+      { name: 'In Progress', value: stats.inProgress, color: '#eab308' },
+      { name: 'Pending', value: stats.pending, color: '#64748b' },
+    ];
+  }, [stats]);
+
+  const progressChartData = useMemo(() => [
+    { week: 'Week 1', completed: 2, planned: 3 },
+    { week: 'Week 2', completed: 3, planned: 2 },
+    { week: 'Week 3', completed: 1, planned: 4 },
+    { week: 'Week 4', completed: 4, planned: 3 },
+  ], []);
+
+  const phaseTypeChartData = useMemo(() => [
+    { type: 'Pre-Prod', count: 3 },
+    { type: 'Production', count: 4 },
+    { type: 'Post-Prod', count: 2 },
+    { type: 'Distribution', count: 1 },
+  ], []);
 
   // Fetch real stats from API
   const fetchStats = useCallback(async (isInitial = false) => {
@@ -265,6 +295,174 @@ export default function TimelinePage() {
     setExporting(false);
   };
 
+  // Markdown Export - uses refs to avoid dependency issues
+  const exportToMarkdown = useCallback(async () => {
+    setExporting(true);
+    setShowExportMenu(false);
+    
+    try {
+      const projectId = selectedProject === 'all' ? 'default-project' : selectedProject;
+      const res = await fetch(`/api/schedule?projectId=${projectId}`);
+      const data = await res.json();
+      
+      let shootingDays = data.shootingDays || [];
+      
+      // Apply filters
+      if (filterType !== 'all') {
+        shootingDays = shootingDays.filter((d: any) => d.type === filterType);
+      }
+      
+      // Apply search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        shootingDays = shootingDays.filter((d: any) => 
+          d.location?.name?.toLowerCase().includes(query) ||
+          d.notes?.toLowerCase().includes(query) ||
+          d.dayNumber?.toString().includes(query)
+        );
+      }
+      
+      // Apply sorting
+      shootingDays = [...shootingDays].sort((a: any, b: any) => {
+        let comparison = 0;
+        switch (sortBy) {
+          case 'phase':
+            comparison = (a.dayNumber || 0) - (b.dayNumber || 0);
+            break;
+          case 'type':
+            comparison = (a.type || '').localeCompare(b.type || '');
+            break;
+          case 'status':
+            comparison = (a.status || '').localeCompare(b.status || '');
+            break;
+          case 'date':
+            comparison = new Date(a.scheduledDate || 0).getTime() - new Date(b.scheduledDate || 0).getTime();
+            break;
+          case 'scenes':
+            comparison = (a.dayScenes?.length || 0) - (b.dayScenes?.length || 0);
+            break;
+          case 'duration':
+            comparison = (a.estimatedHours || 0) - (b.estimatedHours || 0);
+            break;
+          default:
+            comparison = 0;
+        }
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+
+      if (shootingDays.length === 0) {
+        setExporting(false);
+        return;
+      }
+
+      // Calculate stats
+      const total = shootingDays.length;
+      const completed = shootingDays.filter((d: any) => d.status === 'completed').length;
+      const inProgress = shootingDays.filter((d: any) => d.status === 'in-progress').length;
+      const pending = shootingDays.filter((d: any) => d.status === 'pending').length;
+      
+      // Calculate by type
+      const byType = shootingDays.reduce((acc: Record<string, number>, d: any) => {
+        const type = d.type || 'Unknown';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
+      
+      // Calculate by status
+      const byStatus = shootingDays.reduce((acc: Record<string, number>, d: any) => {
+        const status = d.status || 'Unknown';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const getStatusEmoji = (status: string) => {
+        switch (status) {
+          case 'completed': return '✅';
+          case 'in-progress': return '🔄';
+          case 'pending': return '⏳';
+          default: return '❓';
+        }
+      };
+      
+      const getTypeEmoji = (type: string) => {
+        switch (type) {
+          case 'pre-production': return '🎬';
+          case 'production': return '📽️';
+          case 'post-production': return '🎞️';
+          default: return '📋';
+        }
+      };
+      
+      // Build markdown
+      let markdown = `# CinePilot Production Timeline
+
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+**Project:** ${projectId === 'default-project' ? 'All Projects' : projectId}
+
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Days | ${total} |
+| ✅ Completed | ${completed} |
+| 🔄 In Progress | ${inProgress} |
+| ⏳ Pending | ${pending} |
+
+---
+
+## By Status
+
+| Status | Count |
+|--------|-------|
+${Object.entries(byStatus).map(([status, count]) => `| ${getStatusEmoji(status)} ${status} | ${count} |`).join('\n')}
+
+---
+
+## By Type
+
+| Type | Count |
+|------|-------|
+${Object.entries(byType).map(([type, count]) => `| ${getTypeEmoji(type)} ${type} | ${count} |`).join('\n')}
+
+---
+
+## Shooting Days Detail
+
+| Day | Date | Location | Type | Status | Scenes | Call Time | Hours |
+|-----|------|----------|------|--------|--------|-----------|-------|
+${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDate || '-'} | ${day.location?.name || '-'} | ${getTypeEmoji(day.type)} ${day.type || '-'} | ${getStatusEmoji(day.status)} ${day.status || '-'} | ${day.dayScenes?.length || 0} | ${day.callTime || '-'} | ${day.estimatedHours || '-'} |`).join('\n')}
+
+---
+
+## Active Filters
+
+| Filter | Value |
+|--------|-------|
+| Type | ${filterType === 'all' ? 'All Types' : filterType} |
+| Search | ${searchQuery || 'None'} |
+| Sort By | ${sortBy} (${sortOrder}) |
+
+---
+
+*Generated by CinePilot Production Timeline*
+`;
+      
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `timeline-${new Date().toISOString().split('T')[0]}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Markdown export failed:', e);
+    }
+    
+    setExporting(false);
+  }, [selectedProject, filterType, searchQuery, sortBy, sortOrder]);
+
   // Print function
   const handlePrint = useCallback(() => {
     setPrinting(true);
@@ -418,6 +616,11 @@ export default function TimelinePage() {
     handlePrintRef.current = handlePrint;
   }, [handlePrint]);
 
+  // Update exportToMarkdownRef when exportToMarkdown changes
+  useEffect(() => {
+    exportToMarkdownRef.current = exportToMarkdown;
+  }, [exportToMarkdown]);
+
   // Update refs for keyboard shortcut checks
   useEffect(() => {
     exportingRef.current = exporting;
@@ -479,6 +682,11 @@ export default function TimelinePage() {
         case 'e':
           if (!exportingRef.current) {
             setShowExportMenu(!showExportMenuRef.current);
+          }
+          break;
+        case 'm':
+          if (!exportingRef.current) {
+            exportToMarkdownRef.current?.();
           }
           break;
         case 'p':
@@ -687,6 +895,111 @@ export default function TimelinePage() {
           </motion.div>
         </div>
 
+        {/* Charts Section */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          {/* Phase Status Distribution - Pie Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-5 h-5 text-purple-400" />
+              <h3 className="text-sm font-medium text-white">Phase Status Distribution</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={statusChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={45}
+                  outerRadius={70}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {statusChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(value) => <span className="text-slate-400 text-xs">{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </motion.div>
+
+          {/* Weekly Progress - Bar Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-green-400" />
+              <h3 className="text-sm font-medium text-white">Weekly Progress</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={progressChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Bar dataKey="completed" fill="#22c55e" name="Completed" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="planned" fill="#6366f1" name="Planned" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
+
+          {/* Phase Type Distribution - Bar Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Film className="w-5 h-5 text-indigo-400" />
+              <h3 className="text-sm font-medium text-white">Phases by Type</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={phaseTypeChartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <XAxis type="number" stroke="#94a3b8" fontSize={11} />
+                <YAxis dataKey="type" type="category" stroke="#94a3b8" fontSize={11} width={80} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Bar dataKey="count" fill="#8b5cf6" name="Phases" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
+        </div>
+
         {/* Controls Bar */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6">
           <div className="flex items-center justify-between">
@@ -781,18 +1094,27 @@ export default function TimelinePage() {
               
               {/* Export Dropdown Menu */}
               {showExportMenu && (
-                <div className="absolute right-0 mt-1 w-32 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
+                <div className="absolute right-0 mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-20">
                   <button
                     onClick={() => handleExport('csv')}
-                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-t-lg"
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-t-lg flex items-center gap-2"
                   >
+                    <FileText className="w-4 h-4 text-green-400" />
                     CSV
                   </button>
                   <button
                     onClick={() => handleExport('json')}
-                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-b-lg"
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 flex items-center gap-2"
                   >
+                    <FileText className="w-4 h-4 text-yellow-400" />
                     JSON
+                  </button>
+                  <button
+                    onClick={() => exportToMarkdownRef.current?.()}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-slate-700 rounded-b-lg flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-cyan-400" />
+                    Markdown
                   </button>
                 </div>
               )}
@@ -1045,6 +1367,10 @@ export default function TimelinePage() {
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Export timeline</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">E</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Export as Markdown</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">M</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Print timeline</span>

@@ -1,16 +1,24 @@
-# CinePilot Feature Verification - March 15, 2026
+# CinePilot Feature Verification - March 18, 2026
 
-## Today's Verification (March 15, 2026 - 2:48 PM)
+## Features Verified Complete
 
-### Weather Feature ✅ PERFECT
-- **API Connected**: Open-Meteo (free, no API key required)
-- **Real Data**: Returns actual weather forecasts for Chennai, Ooty, Madurai, etc.
-- **Build**: ✅ Passes
-- **TypeScript**: ✅ No errors
-- **UI**: Professional with location selection + production recommendations
+All features have been verified and enhanced:
 
-### Previous Features (March 15 AM)
-All 4 requested features have been verified:
+**Night Build (3:54 AM) - Notes Page Number Key Shortcuts**
+- Added number keys 1-6 for quick category filtering
+- Toggle behavior (press same number to clear filter)
+- Visual shortcut hints in dropdown menus
+- Updated keyboard shortcuts help modal
+- Build: ✅ 82 routes, TypeScript OK, Lint OK
+
+**Night Build (March 15, 11:58 PM) - Locations Page Enhanced Sorting**
+- Added more sort options: Score, Name, Type, Access, Locality
+- Added sort order toggle (ASC/DESC)
+- Added 'S' keyboard shortcut for sort toggle
+- Active filter count includes sort state
+- Build: ✅ 82 routes, 803 tests, TypeScript OK
+
+**Previous Features (All Verified):**
 
 1. **Travel Expenses** - Full UI with dashboard, charts, filtering, CRUD
    - Sidebar: `/travel` 

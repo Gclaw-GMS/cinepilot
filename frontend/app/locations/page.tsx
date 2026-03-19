@@ -5,7 +5,7 @@ import {
   MapPin, Search, Filter, RefreshCw, Loader2, 
   Star, ExternalLink, TrendingUp, AlertTriangle,
   Building2, Trees, Warehouse, Waves, Users,
-  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer
+  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer, FileText
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -42,6 +42,36 @@ interface CandidateData {
   isFavorite?: boolean
 }
 
+// Place type filter options with keyboard shortcuts
+const PLACE_TYPE_OPTIONS = [
+  { value: 'all', label: 'All Types (0)', shortcut: '0' },
+  { value: 'beach', label: 'Beach (1)', shortcut: '1' },
+  { value: 'restaurant', label: 'Restaurant (2)', shortcut: '2' },
+  { value: 'park', label: 'Park (3)', shortcut: '3' },
+  { value: 'warehouse', label: 'Warehouse (4)', shortcut: '4' },
+  { value: 'hotel', label: 'Hotel (5)', shortcut: '5' },
+  { value: 'temple', label: 'Temple (6)', shortcut: '6' },
+  { value: 'office', label: 'Office (7)', shortcut: '7' },
+  { value: 'resort', label: 'Resort (8)', shortcut: '8' },
+  { value: 'mountain', label: 'Mountain (9)', shortcut: '9' },
+  { value: 'forest', label: 'Forest', shortcut: '' },
+  { value: 'studio', label: 'Studio', shortcut: '' },
+]
+
+// Map number keys to place types
+const PLACE_TYPE_SHORTCUTS: Record<string, string> = {
+  '1': 'beach',
+  '2': 'restaurant',
+  '3': 'park',
+  '4': 'warehouse',
+  '5': 'hotel',
+  '6': 'temple',
+  '7': 'office',
+  '8': 'resort',
+  '9': 'mountain',
+}
+
+// Place type icons mapping
 const PLACE_TYPE_ICONS: Record<string, typeof Building2> = {
   'restaurant': Building2,
   'park': Trees,
@@ -119,7 +149,8 @@ export default function LocationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [filterScore, setFilterScore] = useState<number>(0)
-  const [sortBy, setSortBy] = useState<'score' | 'name'>('score')
+  const [sortBy, setSortBy] = useState<'score' | 'name' | 'type' | 'access' | 'locality'>('score')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<'cards' | 'chart'>('cards')
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -137,16 +168,30 @@ export default function LocationsPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Refs for keyboard shortcuts to avoid dependency issues
+  const filtersRef = useRef(filters)
+  const showFiltersRef = useRef(showFilters)
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+  
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
 
-  // Calculate active filter count
+  // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.placeType !== 'all') count++
     if (filters.intExt !== 'all') count++
     if (filters.timeOfDay !== 'all') count++
     if (filters.favoritesOnly) count++
+    if (sortBy !== 'score' || sortOrder !== 'desc') count++
     return count
-  }, [filters])
+  }, [filters, sortBy, sortOrder])
 
   const fetchScenes = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -194,13 +239,83 @@ export default function LocationsPage() {
           searchInputRef.current?.focus()
           break
         case '1':
-          setViewMode('cards')
+          // Toggle cards view OR filter by beach if filters open
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'beach' ? 'all' : 'beach' }))
+          } else {
+            setViewMode('cards')
+          }
           break
         case '2':
-          setViewMode('chart')
+          // Toggle chart view OR filter by restaurant if filters open
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'restaurant' ? 'all' : 'restaurant' }))
+          } else {
+            setViewMode('chart')
+          }
+          break
+        case '3':
+          // Filter by park
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'park' ? 'all' : 'park' }))
+          }
+          break
+        case '4':
+          // Filter by warehouse
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'warehouse' ? 'all' : 'warehouse' }))
+          }
+          break
+        case '5':
+          // Filter by hotel
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'hotel' ? 'all' : 'hotel' }))
+          }
+          break
+        case '6':
+          // Filter by temple
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'temple' ? 'all' : 'temple' }))
+          }
+          break
+        case '7':
+          // Filter by office
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'office' ? 'all' : 'office' }))
+          }
+          break
+        case '8':
+          // Filter by resort
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'resort' ? 'all' : 'resort' }))
+          }
+          break
+        case '9':
+          // Filter by mountain
+          if (showFiltersRef.current) {
+            const current = filtersRef.current.placeType
+            setFilters(prev => ({ ...prev, placeType: current === 'mountain' ? 'all' : 'mountain' }))
+          }
+          break
+        case '0':
+          // Clear all filters
+          if (showFiltersRef.current) {
+            setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })
+          }
           break
         case 'f':
           setShowFilters(prev => !prev)
+          break
+        case 's':
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case 'e':
           setShowExportMenu(prev => !prev)
@@ -223,7 +338,7 @@ export default function LocationsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh])
+  }, [handleRefresh, sortOrder])
 
   const handleSelectScene = async (sceneId: string) => {
     setSelectedSceneId(sceneId)
@@ -338,6 +453,97 @@ export default function LocationsPage() {
     const a = document.createElement('a')
     a.href = url
     a.download = `locations-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // Markdown export handler
+  const handleExportMarkdown = () => {
+    if (filteredCandidates.length === 0) return
+    
+    // Build summary statistics
+    const totalCandidates = filteredCandidates.length
+    const favoritesCount = filteredCandidates.filter((c: CandidateData) => favorites.has(c.id || '')).length
+    const avgScore = filteredCandidates.reduce((sum: number, c: CandidateData) => sum + (c.scoreTotal || 0), 0) / totalCandidates
+    
+    // Group by place type
+    const byPlaceType = filteredCandidates.reduce((acc: Record<string, number>, c: CandidateData) => {
+      const type = c.placeType || 'unknown'
+      acc[type] = (acc[type] || 0) + 1
+      return acc
+    }, {})
+    
+    // Top scored locations
+    const topLocations = [...filteredCandidates]
+      .sort((a: CandidateData, b: CandidateData) => b.scoreTotal - a.scoreTotal)
+      .slice(0, 5)
+    
+    // Build markdown content
+    let markdown = `# CinePilot Location Report
+
+**Generated:** ${new Date().toISOString().split('T')[0]}
+
+${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
+- **Heading:** ${selectedScene.headingRaw || 'N/A'}
+- **Location:** ${selectedScene.location || 'N/A'}
+- **Int/Ext:** ${selectedScene.intExt || 'N/A'}
+- **Time of Day:** ${selectedScene.timeOfDay || 'N/A'}
+
+` : ''}## Summary
+
+- **Total Candidates:** ${totalCandidates}
+- **Favorites:** ${favoritesCount}
+- **Average Score:** ${avgScore.toFixed(1)}
+- **Scenes with Intents:** ${scenes.length}
+
+### By Place Type
+
+`
+    
+    // Add place type breakdown
+    Object.entries(byPlaceType).forEach(([type, count]) => {
+      markdown += `- **${type}:** ${count}\n`
+    })
+    
+    markdown += `\n## Top Locations (by score)
+
+| Rank | Name | Type | Score | Access | Locality | Favorite |
+|------|------|------|-------|--------|----------|----------|
+`
+    
+    topLocations.forEach((c: CandidateData, idx: number) => {
+      const isFav = favorites.has(c.id || '') ? '⭐' : ''
+      markdown += `| ${idx + 1} | ${c.name || 'Unknown'} | ${c.placeType || 'N/A'} | ${c.scoreTotal} | ${c.scoreAccess || 'N/A'} | ${c.scoreLocality || 'N/A'} | ${isFav} |\n`
+    })
+    
+    markdown += `\n## All Locations
+
+`
+    
+    // Add all candidates sorted by score
+    const sortedCandidates = [...filteredCandidates].sort((a: CandidateData, b: CandidateData) => b.scoreTotal - a.scoreTotal)
+    sortedCandidates.forEach((c: CandidateData) => {
+      const isFav = favorites.has(c.id || '') ? '⭐ ' : ''
+      markdown += `### ${isFav}${c.name || 'Unknown'}\n`
+      markdown += `- **Type:** ${c.placeType || 'N/A'}\n`
+      markdown += `- **Score:** ${c.scoreTotal} (Access: ${c.scoreAccess || 'N/A'}, Locality: ${c.scoreLocality || 'N/A'})\n`
+      if (c.riskFlags && c.riskFlags.length > 0) {
+        markdown += `- **Risk Flags:** ${c.riskFlags.join(', ')}\n`
+      }
+      if (c.explanation) {
+        markdown += `- **Notes:** ${c.explanation}\n`
+      }
+      markdown += '\n'
+    })
+    
+    markdown += `---\n*Generated by CinePilot - Film Production Management*\n`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `locations-${new Date().toISOString().split('T')[0]}.md`
     a.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
@@ -568,10 +774,31 @@ export default function LocationsPage() {
     }
     
     if (sortBy === 'score') {
-      return result.sort((a, b) => b.scoreTotal - a.scoreTotal)
+      return result.sort((a, b) => sortOrder === 'desc' ? b.scoreTotal - a.scoreTotal : a.scoreTotal - b.scoreTotal)
     }
-    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-  }, [candidates, filterScore, sortBy, filters, favorites])
+    if (sortBy === 'access') {
+      return result.sort((a, b) => {
+        const aVal = a.scoreAccess || 0
+        const bVal = b.scoreAccess || 0
+        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal
+      })
+    }
+    if (sortBy === 'locality') {
+      return result.sort((a, b) => {
+        const aVal = a.scoreLocality || 0
+        const bVal = b.scoreLocality || 0
+        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal
+      })
+    }
+    if (sortBy === 'type') {
+      return result.sort((a, b) => {
+        const aVal = a.placeType || ''
+        const bVal = b.placeType || ''
+        return sortOrder === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal)
+      })
+    }
+    return result.sort((a, b) => sortOrder === 'desc' ? (b.name || '').localeCompare(a.name || '') : (a.name || '').localeCompare(b.name || ''))
+  }, [candidates, filterScore, sortBy, sortOrder, filters, favorites])
 
   // Statistics
   const stats = useMemo(() => {
@@ -709,6 +936,13 @@ export default function LocationsPage() {
                   <Download className="w-4 h-4 text-violet-400" />
                   Export JSON
                 </button>
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4 text-cyan-400" />
+                  Export Markdown
+                </button>
               </div>
             )}
           </div>
@@ -774,16 +1008,16 @@ export default function LocationsPage() {
                 onChange={(e) => setFilters(prev => ({ ...prev, placeType: e.target.value }))}
                 className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
               >
-                <option value="all">All Types</option>
-                <option value="beach">🏖️ Beach</option>
-                <option value="restaurant">🍽️ Restaurant</option>
-                <option value="park">🌳 Park</option>
-                <option value="warehouse">🏭 Warehouse</option>
-                <option value="hotel">🏨 Hotel</option>
-                <option value="temple">🛕 Temple</option>
-                <option value="office">🏢 Office</option>
-                <option value="resort">🏝️ Resort</option>
-                <option value="mountain">⛰️ Mountain</option>
+                <option value="all">All Types (0)</option>
+                <option value="beach">🏖️ Beach (1)</option>
+                <option value="restaurant">🍽️ Restaurant (2)</option>
+                <option value="park">🌳 Park (3)</option>
+                <option value="warehouse">🏭 Warehouse (4)</option>
+                <option value="hotel">🏨 Hotel (5)</option>
+                <option value="temple">🛕 Temple (6)</option>
+                <option value="office">🏢 Office (7)</option>
+                <option value="resort">🏝️ Resort (8)</option>
+                <option value="mountain">⛰️ Mountain (9)</option>
                 <option value="forest">🌲 Forest</option>
                 <option value="studio">🎬 Studio</option>
               </select>
@@ -830,7 +1064,11 @@ export default function LocationsPage() {
             </div>
             {activeFilterCount > 0 && (
               <button
-                onClick={() => setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })}
+                onClick={() => {
+                  setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false })
+                  setSortBy('score')
+                  setSortOrder('desc')
+                }}
                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
               >
                 Clear Filters
@@ -873,9 +1111,18 @@ export default function LocationsPage() {
               {[
                 { key: 'R', action: 'Refresh location data' },
                 { key: '/', action: 'Focus search input' },
-                { key: 'F', action: 'Toggle filters' },
-                { key: '1', action: 'Switch to Cards view' },
-                { key: '2', action: 'Switch to Analysis view' },
+                { key: 'F', action: 'Toggle filters panel' },
+                { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
+                { key: '1', action: 'Cards view / Filter by Beach (when filters open)' },
+                { key: '2', action: 'Chart view / Filter by Restaurant (when filters open)' },
+                { key: '3', action: 'Filter by Park' },
+                { key: '4', action: 'Filter by Warehouse' },
+                { key: '5', action: 'Filter by Hotel' },
+                { key: '6', action: 'Filter by Temple' },
+                { key: '7', action: 'Filter by Office' },
+                { key: '8', action: 'Filter by Resort' },
+                { key: '9', action: 'Filter by Mountain' },
+                { key: '0', action: 'Clear all filters (when filters open)' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Toggle print menu' },
                 { key: '?', action: 'Show keyboard shortcuts' },
@@ -1081,12 +1328,22 @@ export default function LocationsPage() {
                       <span className="text-sm text-slate-400">Sort:</span>
                       <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as 'score' | 'name')}
+                        onChange={(e) => setSortBy(e.target.value as 'score' | 'name' | 'type' | 'access' | 'locality')}
                         className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"
                       >
                         <option value="score">By Score</option>
                         <option value="name">By Name</option>
+                        <option value="type">By Type</option>
+                        <option value="access">By Access</option>
+                        <option value="locality">By Locality</option>
                       </select>
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        className="px-2 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400 transition-colors"
+                        title="Toggle sort order"
+                      >
+                        {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+                      </button>
                     </div>
                     <div className="ml-auto text-sm text-slate-500">
                       Showing {filteredCandidates.length} of {candidates.length} locations

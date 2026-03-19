@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
-  Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, X,
-  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, Printer, Filter
+  Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, CheckCircle, X,
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, FileJson, Printer, Filter
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -82,6 +82,7 @@ export default function CateringPage() {
   })
   const [sortBy, setSortBy] = useState<'date' | 'budget' | 'mealType' | 'people'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [viewMode, setViewMode] = useState<'calendar' | 'analytics' | 'conflicts'>('calendar')
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -90,6 +91,11 @@ export default function CateringPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const filtersRef = useRef(filters)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+  const showFiltersRef = useRef(showFilters)
+  const filterMealTypeRef = useRef(filters.mealType)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -125,6 +131,27 @@ export default function CateringPage() {
   useEffect(() => {
     planRef.current = plan
   }, [plan])
+
+  // Update filters ref when filters change
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+
+  // Update sort refs when sort changes
+  useEffect(() => {
+    sortByRef.current = sortBy
+    sortOrderRef.current = sortOrder
+  }, [sortBy, sortOrder])
+
+  // Update showFilters ref when showFilters changes
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+
+  // Update filterMealType ref when filters.mealType changes
+  useEffect(() => {
+    filterMealTypeRef.current = filters.mealType
+  }, [filters.mealType])
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -185,6 +212,140 @@ export default function CateringPage() {
     const a = document.createElement('a')
     a.href = url
     a.download = `catering-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const exportToMarkdown = () => {
+    if (!plan) return
+
+    // Calculate summary stats
+    const totalMeals = sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => sum + sd.meals.length, 0)
+    const totalSpent = sortedShootDays.reduce((sum: number, sd: ShootDayMeal) => 
+      sum + sd.meals.reduce((s: number, m: Meal) => s + (m.actualCost || m.budget), 0), 0)
+    const budgetRemaining = plan.totalBudget - totalSpent
+
+    // Calculate meal type breakdown
+    const mealTypeBreakdown: Record<string, { count: number; budget: number; spent: number }> = {}
+    sortedShootDays.forEach((sd: ShootDayMeal) => {
+      sd.meals.forEach((m: Meal) => {
+        if (!mealTypeBreakdown[m.type]) {
+          mealTypeBreakdown[m.type] = { count: 0, budget: 0, spent: 0 }
+        }
+        mealTypeBreakdown[m.type].count++
+        mealTypeBreakdown[m.type].budget += m.budget
+        mealTypeBreakdown[m.type].spent += (m.actualCost || m.budget)
+      })
+    })
+
+    // Calculate dietary breakdown
+    const dietaryBreakdown: Record<string, number> = {}
+    sortedShootDays.forEach((sd: ShootDayMeal) => {
+      sd.meals.forEach((m: Meal) => {
+        m.dietary.forEach(d => {
+          dietaryBreakdown[d] = (dietaryBreakdown[d] || 0) + 1
+        })
+      })
+    })
+
+    // Get caterer info if available
+    const selectedCaterer = caterers.find(c => c.id === plan.catererId)
+
+    // Generate Markdown
+    let markdown = `# CinePilot - Catering Report
+
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Shoot Days | ${sortedShootDays.length} |
+| Total Meals | ${totalMeals} |
+| Total Budget | ₹${plan.totalBudget.toLocaleString('en-IN')} |
+| Total Spent | ₹${totalSpent.toLocaleString('en-IN')} |
+| Budget Remaining | ₹${budgetRemaining.toLocaleString('en-IN')} |
+| Budget Used | ${((totalSpent / plan.totalBudget) * 100).toFixed(1)}% |
+
+`
+
+    // Meal Type Breakdown
+    markdown += `## Meal Type Breakdown
+
+| Meal Type | Count | Budget | Spent |
+|-----------|-------|--------|-------|
+`
+    Object.entries(mealTypeBreakdown).forEach(([type, data]) => {
+      markdown += `| ${type.charAt(0).toUpperCase() + type.slice(1)} | ${data.count} | ₹${data.budget.toLocaleString('en-IN')} | ₹${data.spent.toLocaleString('en-IN')} |\n`
+    })
+    markdown += `\n`
+
+    // Dietary Restrictions
+    if (Object.keys(dietaryBreakdown).length > 0) {
+      markdown += `## Dietary Restrictions
+
+`
+      Object.entries(dietaryBreakdown)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([diet, count]) => {
+          markdown += `- **${diet}:** ${count} meals\n`
+        })
+      markdown += `\n`
+    }
+
+    // Caterer Info
+    if (selectedCaterer) {
+      markdown += `## Caterer Information
+
+- **Name:** ${selectedCaterer.name}
+- **Contact:** ${selectedCaterer.contactPerson}
+- **Phone:** ${selectedCaterer.phone}
+- **Email:** ${selectedCaterer.email}
+- **Specialty:** ${selectedCaterer.specialty}
+- **Rating:** ${'★'.repeat(selectedCaterer.rating)}${'☆'.repeat(5 - selectedCaterer.rating)}
+
+`
+    }
+
+    // Daily Breakdown
+    markdown += `---
+
+## Daily Meal Plan
+
+`
+    sortedShootDays.forEach((sd: ShootDayMeal, idx: number) => {
+      const dayTotal = sd.meals.reduce((s, m) => s + (m.actualCost || m.budget), 0)
+      markdown += `### Day ${idx + 1}: ${new Date(sd.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+
+- **Total Crew:** ${sd.totalCrew}
+- **Total Cast:** ${sd.totalCast}
+- **Total People:** ${sd.totalCrew + sd.totalCast}
+- **Day Total:** ₹${dayTotal.toLocaleString('en-IN')}
+
+| Meal | Menu | Dietary | Budget | Actual |
+|------|------|---------|--------|--------|
+`
+      sd.meals.forEach((m: Meal) => {
+        markdown += `| ${m.type.charAt(0).toUpperCase() + m.type.slice(1)} | ${m.menu.join(', ')} | ${m.dietary.join(', ') || '-'} | ₹${m.budget.toLocaleString('en-IN')} | ₹${(m.actualCost || m.budget).toLocaleString('en-IN')} |\n`
+      })
+      markdown += `\n`
+    })
+
+    // Footer
+    markdown += `---
+
+*Report generated by CinePilot - Film Production Management*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `catering-${new Date().toISOString().split('T')[0]}.md`
     a.click()
     URL.revokeObjectURL(url)
     setShowExportMenu(false)
@@ -332,6 +493,10 @@ export default function CateringPage() {
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          if (planRef.current) exportToMarkdown()
+          break
         case 'p':
           e.preventDefault()
           if (planRef.current) setShowPrintMenu(prev => !prev)
@@ -340,12 +505,83 @@ export default function CateringPage() {
           e.preventDefault()
           toggleSortOrder()
           break
+        case '1':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter panel open: show all meal types
+            setFilters(prev => ({ ...prev, mealType: 'all' }))
+          } else {
+            // Filter panel closed: switch to calendar view
+            setViewMode('calendar')
+          }
+          break
+        case '2':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter panel open: filter by breakfast
+            setFilters(prev => ({
+              ...prev,
+              mealType: prev.mealType === 'breakfast' ? 'all' : 'breakfast'
+            }))
+          } else {
+            // Filter panel closed: switch to analytics view
+            setViewMode('analytics')
+          }
+          break
+        case '3':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter panel open: filter by lunch
+            setFilters(prev => ({
+              ...prev,
+              mealType: prev.mealType === 'lunch' ? 'all' : 'lunch'
+            }))
+          } else {
+            // Filter panel closed: switch to conflicts view
+            setViewMode('conflicts')
+          }
+          break
+        case '4':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter panel open: filter by snacks
+            setFilters(prev => ({
+              ...prev,
+              mealType: prev.mealType === 'snacks' ? 'all' : 'snacks'
+            }))
+          }
+          // When filter panel closed, 4 does nothing
+          break
+        case '5':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // Filter panel open: filter by dinner
+            setFilters(prev => ({
+              ...prev,
+              mealType: prev.mealType === 'dinner' ? 'all' : 'dinner'
+            }))
+          }
+          // When filter panel closed, 5 does nothing
+          break
+        case '6':
+        case '7':
+          // These keys only work when filter panel is open
+          if (showFiltersRef.current) {
+            e.preventDefault()
+            // Reserved for future meal types
+          }
+          break
+        case '0':
+          e.preventDefault()
+          // Clear meal type filter (works in both contexts)
+          setFilters(prev => ({ ...prev, mealType: 'all' }))
+          break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh])
+  }, [handleRefresh, exportToMarkdown])
 
   // Filter shoot days by search query and filters
   const filteredShootDays = useMemo(() => {
@@ -427,6 +663,135 @@ export default function CateringPage() {
     meals: filteredShootDays.reduce((sum, sd) => sum + sd.meals.length, 0),
     totalPeople: filteredShootDays.length > 0 ? filteredShootDays.reduce((sum, sd) => sum + sd.totalCast + sd.totalCrew, 0) : 0,
   }
+
+  // Conflict detection for catering
+  interface CateringConflict {
+    id: string
+    type: 'budget_overrun' | 'dietary_mismatch' | 'missing_meal' | 'low_attendance' | 'high_cost'
+    severity: 'high' | 'medium' | 'low'
+    day?: string
+    title: string
+    description: string
+  }
+
+  const detectedConflicts = useMemo((): CateringConflict[] => {
+    if (!plan) return []
+    
+    const conflictList: CateringConflict[] = []
+    
+    // Check budget overrun (actual cost > budget)
+    plan.shootDays.forEach(sd => {
+      const dayBudget = sd.meals.reduce((sum, m) => sum + m.budget, 0)
+      const dayActual = sd.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+      const overrunPercent = dayBudget > 0 ? ((dayActual - dayBudget) / dayBudget) * 100 : 0
+      
+      if (overrunPercent > 20) {
+        conflictList.push({
+          id: `budget-${sd.date}`,
+          type: 'budget_overrun',
+          severity: overrunPercent > 50 ? 'high' : 'medium',
+          day: sd.date,
+          title: `Budget Overrun: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+          description: `Actual cost (₹${dayActual.toLocaleString('en-IN')}) exceeds budget (₹${dayBudget.toLocaleString('en-IN')}) by ${overrunPercent.toFixed(0)}%`
+        })
+      }
+    })
+    
+    // Check for missing meals on shoot days
+    plan.shootDays.forEach(sd => {
+      const mealTypes = sd.meals.map(m => m.type)
+      const hasBreakfast = mealTypes.includes('breakfast')
+      const hasLunch = mealTypes.includes('lunch')
+      const hasDinner = mealTypes.includes('dinner')
+      const totalPeople = sd.totalCrew + sd.totalCast
+      
+      if (totalPeople > 20) {
+        if (!hasBreakfast || !hasLunch || !hasDinner) {
+          const missing = []
+          if (!hasBreakfast) missing.push('breakfast')
+          if (!hasLunch) missing.push('lunch')
+          if (!hasDinner) missing.push('dinner')
+          
+          conflictList.push({
+            id: `meal-${sd.date}`,
+            type: 'missing_meal',
+            severity: 'high',
+            day: sd.date,
+            title: `Missing Meals: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+            description: `${totalPeople} crew members but missing: ${missing.join(', ')}`
+          })
+        }
+      }
+    })
+    
+    // Check for high per-person cost
+    plan.shootDays.forEach(sd => {
+      const totalCost = sd.meals.reduce((sum, m) => sum + (m.actualCost || m.budget), 0)
+      const totalPeople = sd.totalCrew + sd.totalCast
+      const costPerPerson = totalPeople > 0 ? totalCost / totalPeople : 0
+      
+      if (costPerPerson > 500 && totalPeople > 10) {
+        conflictList.push({
+          id: `cost-${sd.date}`,
+          type: 'high_cost',
+          severity: costPerPerson > 1000 ? 'high' : 'medium',
+          day: sd.date,
+          title: `High Meal Cost: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+          description: `₹${costPerPerson.toFixed(0)} per person (${totalPeople} people, total: ₹${totalCost.toLocaleString('en-IN')})`
+        })
+      }
+    })
+    
+    // Check for low attendance days (meals scheduled but low crew)
+    plan.shootDays.forEach(sd => {
+      const totalMeals = sd.meals.length
+      const totalPeople = sd.totalCrew + sd.totalCast
+      
+      if (totalMeals > 0 && totalPeople < 5) {
+        conflictList.push({
+          id: `attendance-${sd.date}`,
+          type: 'low_attendance',
+          severity: 'low',
+          day: sd.date,
+          title: `Low Attendance: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+          description: `Only ${totalPeople} people scheduled but ${totalMeals} meals planned`
+        })
+      }
+    })
+    
+    // Check dietary requirements are being met
+    if (plan.dietaryRestrictions) {
+      plan.shootDays.forEach(sd => {
+        const totalPeople = sd.totalCrew + sd.totalCast
+        const vegCount = plan.dietaryRestrictions['Vegetarian'] || 0
+        
+        // If more than 30% are vegetarian, check for veg options
+        if (totalPeople > 10 && vegCount / totalPeople > 0.3) {
+          const hasVegOption = sd.meals.some(m => m.dietary.includes('Vegetarian'))
+          if (!hasVegOption) {
+            conflictList.push({
+              id: `dietary-${sd.date}`,
+              type: 'dietary_mismatch',
+              severity: 'medium',
+              day: sd.date,
+              title: `Dietary Gap: ${new Date(sd.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`,
+              description: `${vegCount} vegetarian crew but no vegetarian-specific meal option listed`
+            })
+          }
+        }
+      })
+    }
+    
+    return conflictList
+  }, [plan])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: detectedConflicts.length,
+    high: detectedConflicts.filter(c => c.severity === 'high').length,
+    medium: detectedConflicts.filter(c => c.severity === 'medium').length,
+    low: detectedConflicts.filter(c => c.severity === 'low').length,
+  }), [detectedConflicts])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -586,8 +951,27 @@ export default function CateringPage() {
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
               <ShortcutRow keys={['F']} description="Toggle filters" />
               <ShortcutRow keys={['S']} description="Toggle sort order" />
+              <div className="my-2 pt-2 border-t border-white/10">
+                <p className="text-xs text-slate-400 mb-2">When Filters Panel CLOSED:</p>
+              </div>
+              <ShortcutRow keys={['1']} description="Switch to Calendar view" />
+              <ShortcutRow keys={['2']} description="Switch to Analytics view" />
+              <ShortcutRow keys={['3']} description="Switch to Conflicts view" />
+              <div className="my-2 pt-2 border-t border-white/10">
+                <p className="text-xs text-cyan-400 mb-2">When Filters Panel OPEN:</p>
+              </div>
+              <ShortcutRow keys={['1']} description="Filter to All Meal Types" highlight />
+              <ShortcutRow keys={['2']} description="Filter by Breakfast (toggle)" highlight />
+              <ShortcutRow keys={['3']} description="Filter by Lunch (toggle)" highlight />
+              <ShortcutRow keys={['4']} description="Filter by Snacks (toggle)" highlight />
+              <ShortcutRow keys={['5']} description="Filter by Dinner (toggle)" highlight />
+              <ShortcutRow keys={['0']} description="Clear meal type filter" highlight />
+              <div className="my-2 pt-2 border-t border-white/10">
+                <p className="text-xs text-slate-400 mb-2">Actions</p>
+              </div>
               <ShortcutRow keys={['N']} description="Add new shoot day" />
               <ShortcutRow keys={['E']} description="Export menu" />
+              <ShortcutRow keys={['M']} description="Export Markdown" />
               <ShortcutRow keys={['P']} description="Print catering report" />
               <ShortcutRow keys={['?']} description="Show this help modal" />
               <ShortcutRow keys={['Esc']} description="Close modal / Clear search" />
@@ -636,6 +1020,45 @@ export default function CateringPage() {
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
 
+              {/* View Mode Switcher */}
+              <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'calendar' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Calendar view (1)"
+                >
+                  Calendar
+                </button>
+                <button
+                  onClick={() => setViewMode('analytics')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'analytics' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Analytics view (2)"
+                >
+                  Analytics
+                </button>
+                <button
+                  onClick={() => setViewMode('conflicts')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'conflicts' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Conflicts view (3)"
+                >
+                  Conflicts
+                  {conflictStats.total > 0 && (
+                    <span className={`px-1.5 py-0.5 text-xs font-bold rounded-full ${
+                      conflictStats.high > 0 ? 'bg-red-500 text-white' : 
+                      conflictStats.medium > 0 ? 'bg-amber-500 text-white' : 'bg-slate-500 text-white'
+                    }`}>
+                      {conflictStats.total}
+                    </span>
+                  )}
+                </button>
+              </div>
+
               {/* Filter Toggle Button */}
               <div className="relative" ref={filterPanelRef}>
                 <button
@@ -658,7 +1081,7 @@ export default function CateringPage() {
                 {showFilters && (
                   <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
                     <div className="p-4 border-b border-slate-700">
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between mb-1">
                         <h3 className="text-sm font-medium text-white">Filter & Sort</h3>
                         {activeFilterCount > 0 && (
                           <button
@@ -669,6 +1092,7 @@ export default function CateringPage() {
                           </button>
                         )}
                       </div>
+                      <p className="text-xs text-cyan-400 mb-3">(1-5 for meal type, 0 to clear)</p>
                       
                       {/* Sort Options */}
                       <div className="mb-4 p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">
@@ -702,11 +1126,11 @@ export default function CateringPage() {
                           onChange={(e) => setFilters(prev => ({ ...prev, mealType: e.target.value as typeof filters.mealType }))}
                           className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"
                         >
-                          <option value="all">All Meal Types</option>
-                          <option value="breakfast">Breakfast</option>
-                          <option value="lunch">Lunch</option>
-                          <option value="snacks">Snacks</option>
-                          <option value="dinner">Dinner</option>
+                          <option value="all">All Meal Types (0)</option>
+                          <option value="breakfast">Breakfast (4)</option>
+                          <option value="lunch">Lunch (5)</option>
+                          <option value="snacks">Snacks (6)</option>
+                          <option value="dinner">Dinner (7)</option>
                         </select>
                       </div>
                       
@@ -752,8 +1176,15 @@ export default function CateringPage() {
                       onClick={() => { exportToJSON(); setShowExportMenu(false) }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
                     >
-                      <FileText className="w-4 h-4 text-slate-400" />
+                      <FileJson className="w-4 h-4 text-slate-400" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={() => { exportToMarkdown(); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -875,7 +1306,101 @@ export default function CateringPage() {
               </div>
             </div>
 
-            {/* Charts */}
+            {/* Conflicts View */}
+            {viewMode === 'conflicts' && (
+              <div className="space-y-6">
+                {/* Conflict Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-red-500/20"><AlertCircle className="w-4 h-4 text-red-400" /></div>
+                      <span className="text-sm text-slate-400">High Priority</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-red-400">{conflictStats.high}</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-amber-500/20"><AlertCircle className="w-4 h-4 text-amber-400" /></div>
+                      <span className="text-sm text-slate-400">Medium Priority</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-amber-400">{conflictStats.medium}</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-slate-500/20"><AlertCircle className="w-4 h-4 text-slate-400" /></div>
+                      <span className="text-sm text-slate-400">Low Priority</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-slate-400">{conflictStats.low}</p>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 rounded-lg bg-blue-500/20"><AlertCircle className="w-4 h-4 text-blue-400" /></div>
+                      <span className="text-sm text-slate-400">Total Issues</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-white">{conflictStats.total}</p>
+                  </div>
+                </div>
+
+                {/* Conflicts List */}
+                {detectedConflicts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {detectedConflicts.map((conflict) => (
+                      <div
+                        key={conflict.id}
+                        className={`bg-slate-900 border rounded-xl p-5 ${
+                          conflict.severity === 'high' ? 'border-red-500/30' :
+                          conflict.severity === 'medium' ? 'border-amber-500/30' :
+                          'border-slate-700/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg shrink-0 ${
+                            conflict.severity === 'high' ? 'bg-red-500/20' :
+                            conflict.severity === 'medium' ? 'bg-amber-500/20' :
+                            'bg-slate-500/20'
+                          }`}>
+                            {conflict.severity === 'high' ? (
+                              <AlertCircle className="w-5 h-5 text-red-400" />
+                            ) : conflict.severity === 'medium' ? (
+                              <AlertCircle className="w-5 h-5 text-amber-400" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                                conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-slate-500/20 text-slate-400'
+                              }`}>
+                                {conflict.severity.toUpperCase()}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {conflict.type.replace('_', ' ')}
+                              </span>
+                            </div>
+                            <h4 className="font-medium text-white text-sm mb-1">{conflict.title}</h4>
+                            <p className="text-xs text-slate-400">{conflict.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 mb-4">
+                      <CheckCircle className="w-8 h-8 text-emerald-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Catering Plan Looks Good!</h3>
+                    <p className="text-slate-400 max-w-md mx-auto">No catering issues detected. Your meal planning is on track.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Calendar/Analytics View - show charts for calendar and analytics modes */}
+            {viewMode !== 'conflicts' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><Leaf className="w-5 h-5 text-emerald-400" /> Dietary Restrictions</h3>
@@ -918,6 +1443,7 @@ export default function CateringPage() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Caterer */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -1140,13 +1666,13 @@ export default function CateringPage() {
   )
 }
 
-function ShortcutRow({ keys, description }: { keys: string[], description: string }) {
+function ShortcutRow({ keys, description, highlight }: { keys: string[], description: string, highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
-      <span className="text-slate-300">{description}</span>
+      <span className={highlight ? "text-cyan-300" : "text-slate-300"}>{description}</span>
       <div className="flex gap-1">
         {keys.map((key, i) => (
-          <kbd key={i} className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono text-cyan-400">
+          <kbd key={i} className={`px-3 py-1.5 bg-slate-800 border rounded-md text-sm font-mono ${highlight ? 'border-cyan-600 text-cyan-400' : 'border-slate-600 text-cyan-400'}`}>
             {key}
           </kbd>
         ))}

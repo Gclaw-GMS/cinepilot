@@ -36,6 +36,7 @@ const EXPORT_CATEGORIES = [
       { id: 'call_sheets', name: 'Call Sheets', format: 'PDF', icon: ClipboardList, description: 'Daily call sheets for crew' },
       { id: 'shot_list', name: 'Shot List', format: 'CSV', icon: Clapperboard, description: 'Complete shot breakdown' },
       { id: 'storyboard', name: 'Storyboard Frames', format: 'JSON', icon: Film, description: 'All storyboard frames' },
+      { id: 'daily_rush', name: 'Daily Rush', format: 'PDF', icon: Film, description: 'Daily footage summary and rush review' },
     ]
   },
   {
@@ -130,6 +131,27 @@ export default function ExportsPage() {
   const [formatFilter, setFormatFilter] = useState('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts
+  const categoryFilterRef = useRef(categoryFilter)
+  const formatFilterRef = useRef(formatFilter)
+  const showFiltersRef = useRef(showFilters)
+  
+  // Keep refs in sync
+  useEffect(() => { categoryFilterRef.current = categoryFilter }, [categoryFilter])
+  useEffect(() => { formatFilterRef.current = formatFilter }, [formatFilter])
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'format' | 'category'>('category')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // Export menu state
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  
+  // Ref for keyboard shortcut access
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
+  
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,13 +173,89 @@ export default function ExportsPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
+        case 'm':
+          e.preventDefault()
+          handleExportMarkdownRef.current?.()
+          break
+        case 'e':
+          e.preventDefault()
+          setShowExportMenu(prev => !prev)
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        // Number keys 1-4 for category filtering (toggle)
+        case '1':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'production' ? 'all' : 'production')
+          }
+          break
+        case '2':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'financial' ? 'all' : 'financial')
+          }
+          break
+        case '3':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'creative' ? 'all' : 'creative')
+          }
+          break
+        case '4':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setCategoryFilter(categoryFilterRef.current === 'admin' ? 'all' : 'admin')
+          }
+          break
+        case '0':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setCategoryFilter('all')
+            setFormatFilter('all')
+          }
+          break
+        // Shift+number for format filtering (toggle)
+        case '1':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setFormatFilter(formatFilterRef.current === 'pdf' ? 'all' : 'pdf')
+          }
+          break
+        case '2':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setFormatFilter(formatFilterRef.current === 'xlsx' ? 'all' : 'xlsx')
+          }
+          break
+        case '3':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setFormatFilter(formatFilterRef.current === 'csv' ? 'all' : 'csv')
+          }
+          break
+        case '4':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setFormatFilter(formatFilterRef.current === 'json' ? 'all' : 'json')
+          }
+          break
+        case '5':
+          if (e.shiftKey) {
+            e.preventDefault()
+            setFormatFilter(formatFilterRef.current === 'zip' ? 'all' : 'zip')
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
+          setShowExportMenu(false)
           setSearchQuery('')
           setShowFilters(false)
           break
@@ -183,8 +281,8 @@ export default function ExportsPage() {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
 
-  // Count active filters
-  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length
+  // Count active filters (includes sort state)
+  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
   
   // Filter categories by search query and filters
   const filteredCategories = useMemo(() => {
@@ -217,8 +315,29 @@ export default function ExportsPage() {
       })).filter(category => category.exports.length > 0)
     }
     
+    // Apply sorting
+    if (sortBy === 'name') {
+      categories = categories.map(category => ({
+        ...category,
+        exports: [...category.exports].sort((a, b) => 
+          sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+        )
+      }))
+    } else if (sortBy === 'format') {
+      categories = categories.map(category => ({
+        ...category,
+        exports: [...category.exports].sort((a, b) => 
+          sortOrder === 'asc' ? a.format.localeCompare(b.format) : b.format.localeCompare(a.format)
+        )
+      }))
+    } else if (sortBy === 'category') {
+      categories = [...categories].sort((a, b) => 
+        sortOrder === 'asc' ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label)
+      )
+    }
+    
     return categories
-  }, [searchQuery, categoryFilter, formatFilter])
+  }, [searchQuery, categoryFilter, formatFilter, sortBy, sortOrder])
   
   // Get total export count
   const totalExports = filteredCategories.reduce((sum, cat) => sum + cat.exports.length, 0)
@@ -342,7 +461,7 @@ export default function ExportsPage() {
     const handleClickOutside = (e: MouseEvent) => {
       if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
         // Check if click is on filter button
-        const filterButton = document.querySelector('[title="Toggle filters (F)"]')
+        const filterButton = document.querySelector('[title="Toggle filters & sort (F)"]')
         if (filterButton && !filterButton.contains(e.target as Node)) {
           setShowFilters(false)
         }
@@ -355,6 +474,118 @@ export default function ExportsPage() {
     
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showFilters])
+
+  // Click outside to close export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        // Check if click is on export button
+        const exportButton = document.querySelector('[title="Export menu (E)"]')
+        if (exportButton && !exportButton.contains(e.target as Node)) {
+          setShowExportMenu(false)
+        }
+      }
+    }
+    
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
+  const handleExportMarkdown = useCallback(() => {
+    // Get filtered categories
+    const filtered = filteredCategories
+    
+    // Count exports by format
+    const formatCounts: Record<string, number> = {}
+    const categoryCounts: Record<string, number> = {}
+    let totalExports = 0
+    
+    filtered.forEach(cat => {
+      categoryCounts[cat.label] = cat.exports.length
+      totalExports += cat.exports.length
+      cat.exports.forEach(exp => {
+        formatCounts[exp.format] = (formatCounts[exp.format] || 0) + 1
+      })
+    })
+    
+    // Build markdown content
+    let markdown = `# 🎬 CinePilot Export Center Report
+
+> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 📊 Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Export Types** | ${totalExports} |
+| **Categories** | ${filtered.length} |
+| **Active Filters** | ${activeFilterCount} |
+| **Search Query** | ${searchQuery || '—'} |
+
+---
+
+## 📦 Exports by Category
+
+| Category | Export Count |
+|----------|--------------|
+${filtered.map(cat => `| ${cat.label} | ${cat.exports.length} |`).join('\n')}
+
+---
+
+## 📄 Exports by Format
+
+| Format | Count |
+|--------|-------|
+${Object.entries(formatCounts).map(([fmt, count]) => `| ${fmt} | ${count} |`).join('\n')}
+
+---
+
+## 🎯 Export Details
+
+${filtered.map(cat => `### ${cat.label}
+
+| Name | Format | Description |
+|------|--------|-------------|
+${cat.exports.map(exp => `| ${exp.name} | ${exp.format} | ${exp.description || '—'} |`).join('\n')}
+
+`).join('\n')}
+
+---
+
+## 🕐 Recent Exports
+
+| Name | Type | Timestamp | Status |
+|------|------|-----------|--------|
+${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date(exp.timestamp).toLocaleString('en-IN')} | ${exp.status === 'success' ? '✅' : '❌'} |`).join('\n')}
+
+---
+
+*Generated by CinePilot - Production Export Center*
+`
+    
+    // Create and download blob
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `cinepilot-exports-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    
+    setMessage({ type: 'success', text: 'Export Center report exported to Markdown!' })
+  }, [filteredCategories, activeFilterCount, searchQuery, recentExports])
+
+  // Update ref for keyboard shortcut
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp)
@@ -401,7 +632,7 @@ export default function ExportsPage() {
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600 pointer-events-none">/</span>
             </div>
             
-            {/* Filter Toggle Button */}
+            {/* Filter & Sort Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
@@ -409,10 +640,10 @@ export default function ExportsPage() {
                   ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
               }`}
-              title="Toggle filters (F)"
+              title="Toggle filters & sort (F)"
             >
               <Filter className="w-4 h-4" />
-              <span className="hidden sm:inline">Filters</span>
+              <span className="hidden sm:inline">Filter & Sort</span>
               {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
                   {activeFilterCount}
@@ -440,6 +671,34 @@ export default function ExportsPage() {
               <span className="text-xs">?</span>
             </button>
             
+            {/* Export Dropdown */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+                title="Export menu (E)"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      handleExportMarkdown()
+                      setShowExportMenu(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-cyan-400" />
+                    Export Markdown
+                  </button>
+                </div>
+              )}
+            </div>
+            
             {selectedExports.length > 0 && (
               <button
                 onClick={handleBatchExport}
@@ -462,7 +721,7 @@ export default function ExportsPage() {
           </div>
         </div>
 
-        {/* Filter Panel */}
+        {/* Filter & Sort Panel */}
         {showFilters && (
           <div className="mb-6 p-4 bg-slate-900 border border-slate-800 rounded-xl" ref={filterPanelRef}>
             <div className="flex flex-wrap items-center gap-4">
@@ -476,11 +735,12 @@ export default function ExportsPage() {
                   className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 >
                   <option value="all">All Categories</option>
-                  <option value="production">Production</option>
-                  <option value="financial">Financial</option>
-                  <option value="creative">Creative</option>
-                  <option value="admin">Administrative</option>
+                  <option value="production">1. Production</option>
+                  <option value="financial">2. Financial</option>
+                  <option value="creative">3. Creative</option>
+                  <option value="admin">4. Administrative</option>
                 </select>
+                <span className="text-xs text-slate-600">[1-4]</span>
               </div>
               
               {/* Format Filter */}
@@ -492,25 +752,55 @@ export default function ExportsPage() {
                   className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 >
                   <option value="all">All Formats</option>
-                  <option value="pdf">PDF</option>
-                  <option value="xlsx">XLSX</option>
-                  <option value="csv">CSV</option>
-                  <option value="json">JSON</option>
-                  <option value="zip">ZIP</option>
+                  <option value="pdf">1. PDF</option>
+                  <option value="xlsx">2. XLSX</option>
+                  <option value="csv">3. CSV</option>
+                  <option value="json">4. JSON</option>
+                  <option value="zip">5. ZIP</option>
+                </select>
+                <span className="text-xs text-slate-600">[⇧1-5]</span>
+              </div>
+              
+              {/* Sort By */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  <option value="category">Category</option>
+                  <option value="name">Name</option>
+                  <option value="format">Format</option>
                 </select>
               </div>
               
-              {/* Clear Filters */}
+              {/* Sort Order Toggle */}
+              <button
+                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                  sortBy !== 'category' || sortOrder !== 'asc'
+                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+                title="Toggle sort order (S)"
+              >
+                {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+              </button>
+              
+              {/* Clear Filters & Sort */}
               {activeFilterCount > 0 && (
                 <button
                   onClick={() => {
                     setCategoryFilter('all')
                     setFormatFilter('all')
+                    setSortBy('category')
+                    setSortOrder('asc')
                   }}
                   className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors"
                 >
                   <X className="w-4 h-4" />
-                  Clear Filters
+                  Clear Filters & Sort
                 </button>
               )}
               
@@ -740,6 +1030,14 @@ export default function ExportsPage() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Export menu</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Refresh data</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
               </div>
@@ -750,6 +1048,50 @@ export default function ExportsPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Toggle sort order</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter: Production</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter: Financial</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter: Creative</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Filter: Admin</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Clear filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Format: PDF</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">⇧1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Format: XLSX</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">⇧2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Format: CSV</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">⇧3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Format: JSON</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">⇧4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Format: ZIP</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">⇧5</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Show shortcuts</span>

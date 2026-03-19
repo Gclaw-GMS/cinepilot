@@ -22,7 +22,15 @@ import {
   Search,
   Printer,
   Copy,
-  CheckCircle
+  CheckCircle,
+  Activity,
+  Zap,
+  Moon,
+  Sun,
+  Battery,
+  AlertOctagon,
+  Target,
+  Gauge
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -126,7 +134,7 @@ export default function DOODPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [selectedProject, setSelectedProject] = useState('default-project')
   const [refreshing, setRefreshing] = useState(false)
-  const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'analytics'>('analytics')
+  const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'analytics' | 'workload'>('analytics')
   const [filterRole, setFilterRole] = useState<'all' | 'main' | 'supporting'>('all')
   const [filterSearch, setFilterSearch] = useState('')
   
@@ -142,7 +150,11 @@ export default function DOODPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handlePrintRef = useRef<() => void>()
+  const exportToMarkdownRef = useRef<() => void>(() => {})
   const showKeyboardHelpRef = useRef(showKeyboardHelp)
+  const showFiltersRef = useRef(showFilters)
+  const filterRoleRef = useRef(filterRole)
+  const setFilterRoleRef = useRef(setFilterRole)
   
   // Active filter count for badge (includes sort as active filter)
   const activeFilterCount = (filterRole !== 'all' ? 1 : 0) + (filterSearch.trim() ? 1 : 0) + (sortBy !== 'character' || sortOrder !== 'asc' ? 1 : 0)
@@ -151,6 +163,14 @@ export default function DOODPage() {
   useEffect(() => {
     showKeyboardHelpRef.current = showKeyboardHelp
   }, [showKeyboardHelp])
+
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+
+  useEffect(() => {
+    filterRoleRef.current = filterRole
+  }, [filterRole])
 
   const loadDOOD = useCallback(async () => {
     setLoading(true)
@@ -224,16 +244,45 @@ export default function DOODPage() {
           searchInputRef.current?.focus()
           break
         case '1':
-          e.preventDefault()
-          setViewMode('analytics')
-          break
         case '2':
-          e.preventDefault()
-          setViewMode('calendar')
-          break
         case '3':
+        case '4':
+        case '0':
           e.preventDefault()
-          setViewMode('list')
+          if (showFiltersRef.current) {
+            // When filters panel is OPEN: number keys filter by role
+            const keyNum = parseInt(e.key)
+            if (keyNum === 0) {
+              // 0 clears the role filter
+              setFilterRoleRef.current('all')
+            } else if (keyNum >= 1 && keyNum <= 3) {
+              // 1 = All, 2 = Main, 3 = Supporting
+              const roleOptions: Array<'all' | 'main' | 'supporting'> = ['all', 'main', 'supporting']
+              const selectedRole = roleOptions[keyNum - 1]
+              // Toggle: if same role is already selected, clear it
+              if (filterRoleRef.current === selectedRole) {
+                setFilterRoleRef.current('all')
+              } else {
+                setFilterRoleRef.current(selectedRole)
+              }
+            }
+          } else {
+            // When filters panel is CLOSED: number keys switch view mode (backward compatible)
+            switch (e.key) {
+              case '1':
+                setViewMode('analytics')
+                break
+              case '2':
+                setViewMode('calendar')
+                break
+              case '3':
+                setViewMode('list')
+                break
+              case '4':
+                setViewMode('workload')
+                break
+            }
+          }
           break
         case '?':
           e.preventDefault()
@@ -258,6 +307,10 @@ export default function DOODPage() {
         case 'p':
           e.preventDefault()
           handlePrintRef.current?.()
+          break
+        case 'm':
+          e.preventDefault()
+          exportToMarkdownRef.current?.()
           break
         case 's':
           e.preventDefault()
@@ -401,6 +454,70 @@ export default function DOODPage() {
       URL.revokeObjectURL(url)
     }
   }
+
+  // Export to Markdown
+  const exportToMarkdown = useCallback(() => {
+    const exportData = filteredReport
+    
+    // Calculate stats
+    const totalCharacters = exportData.length
+    const mainCast = exportData.filter(r => r.isMain)
+    const supportingCast = exportData.filter(r => !r.isMain)
+    const mainCastDays = mainCast.reduce((sum, r) => sum + r.total_days, 0)
+    const supportingCastDays = supportingCast.reduce((sum, r) => sum + r.total_days, 0)
+    
+    // Build markdown content
+    const markdown = `# DOOD Report - Day Out of Days
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Characters | ${totalCharacters} |
+| Total Shooting Days | ${stats.totalShootingDays} |
+| Total Calls | ${stats.totalCalls} |
+| Avg Days/Actor | ${stats.avgDaysPerActor.toFixed(1)} |
+| Main Cast Days | ${mainCastDays} |
+| Supporting Cast Days | ${supportingCastDays} |
+
+## Cast Breakdown
+
+### Main Cast (${mainCast.length})
+
+| Character | Tamil | Actor | Total Days | % of Shoot | Days |
+|-----------|-------|-------|------------|------------|------|
+${mainCast.map(r => `| ${r.character} | ${r.characterTamil} | ${r.actorName || 'TBA'} | ${r.total_days} | ${r.percentage}% | ${r.days.join(', ')} |`).join('\n')}
+
+### Supporting Cast (${supportingCast.length})
+
+| Character | Tamil | Actor | Total Days | % of Shoot | Days |
+|-----------|-------|-------|------------|------------|------|
+${supportingCast.map(r => `| ${r.character} | ${r.characterTamil} | ${r.actorName || 'TBA'} | ${r.total_days} | ${r.percentage}% | ${r.days.join(', ')} |`).join('\n')}
+
+## Filters Applied
+
+- Role Filter: ${filterRole === 'all' ? 'All' : filterRole === 'main' ? 'Main Cast' : 'Supporting Cast'}
+- Search: ${filterSearch || 'None'}
+- Sort By: ${sortBy} (${sortOrder})
+
+---
+
+*Generated by CinePilot on ${new Date().toLocaleString()}*
+`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dood-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [filteredReport, stats, filterRole, filterSearch, sortBy, sortOrder])
+
+  // Update ref for keyboard shortcut
+  useEffect(() => {
+    exportToMarkdownRef.current = exportToMarkdown
+  }, [exportToMarkdown])
 
   // Copy report to clipboard
   const handleCopyToClipboard = async () => {
@@ -921,6 +1038,17 @@ Generated by CinePilot`
               <List className="w-4 h-4" />
               List
             </button>
+            <button
+              onClick={() => setViewMode('workload')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
+                viewMode === 'workload' 
+                  ? 'bg-cyan-400 text-black' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Gauge className="w-4 h-4" />
+              Workload
+            </button>
           </div>
 
           {/* Filter Toggle Button */}
@@ -966,6 +1094,7 @@ Generated by CinePilot`
                   <option value="main">Main Cast</option>
                   <option value="supporting">Supporting</option>
                 </select>
+                <span className="text-xs text-slate-500">(1-3, 0 to clear)</span>
               </div>
               {/* Search Filter */}
               <div className="flex items-center gap-2">
@@ -1237,6 +1366,320 @@ Generated by CinePilot`
       {/* Analytics View */}
       {viewMode === 'analytics' && renderAnalytics()}
 
+      {/* Workload Analysis View */}
+      {viewMode === 'workload' && (
+        <div className="space-y-6">
+          {/* Workload Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(() => {
+              // Calculate workload metrics
+              const workloadMetrics = report.map(r => {
+                const sorted = [...r.days].sort((a, b) => a - b)
+                const gaps: number[] = []
+                let maxConsecutive = 0
+                let currentConsecutive = 1
+                
+                for (let i = 1; i < sorted.length; i++) {
+                  const gap = sorted[i] - sorted[i-1]
+                  gaps.push(gap)
+                  if (gap === 1) {
+                    currentConsecutive++
+                    maxConsecutive = Math.max(maxConsecutive, currentConsecutive)
+                  } else {
+                    currentConsecutive = 1
+                  }
+                }
+                
+                const avgGap = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0
+                const hasOverwork = maxConsecutive >= 5 // 5+ consecutive days = overwork warning
+                const hasInsufficientRest = gaps.some(g => g < 2) // Less than 2 days rest = insufficient
+                
+                return {
+                  ...r,
+                  maxConsecutive,
+                  avgGap: avgGap.toFixed(1),
+                  hasOverwork,
+                  hasInsufficientRest,
+                  gaps
+                }
+              })
+              
+              const overworkedActors = workloadMetrics.filter(m => m.hasOverwork)
+              const insufficientRest = workloadMetrics.filter(m => m.hasInsufficientRest)
+              const maxConsecutiveRecord = Math.max(...workloadMetrics.map(m => m.maxConsecutive), 0)
+              const avgRestDays = (workloadMetrics.reduce((acc, m) => acc + parseFloat(m.avgGap), 0) / workloadMetrics.length || 0).toFixed(1)
+              
+              return (
+                <>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-red-500/20 rounded-lg">
+                        <AlertOctagon className="w-5 h-5 text-red-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-red-400">{overworkedActors.length}</div>
+                        <div className="text-xs text-slate-500">Overworked Actors</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">
+                      5+ consecutive shooting days
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-amber-500/20 rounded-lg">
+                        <Moon className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-amber-400">{insufficientRest.length}</div>
+                        <div className="text-xs text-slate-500">Insufficient Rest</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">
+                      Less than 2 days between calls
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-purple-500/20 rounded-lg">
+                        <Zap className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-purple-400">{maxConsecutiveRecord}</div>
+                        <div className="text-xs text-slate-500">Max Consecutive Days</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">
+                      Longest continuous shoot streak
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-emerald-500/20 rounded-lg">
+                        <Battery className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-emerald-400">{avgRestDays}</div>
+                        <div className="text-xs text-slate-500">Avg Rest Days</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2">
+                      Average gap between calls
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+          
+          {/* Workload Analysis Table */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-800">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Activity className="w-5 h-5 text-cyan-400" />
+                Actor Workload Analysis
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Actor</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Character</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Total Days</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Max Consecutive</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Avg Rest</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Warnings</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {report.map(row => {
+                    const sorted = [...row.days].sort((a, b) => a - b)
+                    const gaps: number[] = []
+                    let maxConsecutive = 0
+                    let currentConsecutive = 1
+                    
+                    for (let i = 1; i < sorted.length; i++) {
+                      const gap = sorted[i] - sorted[i-1]
+                      gaps.push(gap)
+                      if (gap === 1) {
+                        currentConsecutive++
+                        maxConsecutive = Math.max(maxConsecutive, currentConsecutive)
+                      } else {
+                        currentConsecutive = 1
+                      }
+                    }
+                    
+                    const avgGap = gaps.length > 0 ? (gaps.reduce((a, b) => a + b, 0) / gaps.length) : 0
+                    const hasOverwork = maxConsecutive >= 5
+                    const hasInsufficientRest = gaps.some(g => g < 2)
+                    const isLightWorkload = row.percentage <= 30
+                    
+                    return (
+                      <tr key={row.characterId} className="hover:bg-slate-800/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${row.isMain ? 'bg-cyan-400' : 'bg-purple-400'}`}></div>
+                            <span className="font-medium">{row.actorName || 'TBA'}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-400">
+                          <div>{row.character}</div>
+                          <div className="text-xs text-slate-600">{row.characterTamil}</div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`font-semibold ${row.percentage >= 70 ? 'text-red-400' : row.percentage >= 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {row.total_days}
+                          </span>
+                          <span className="text-slate-500 text-xs ml-1">/ {stats.totalShootingDays}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            maxConsecutive >= 5 ? 'bg-red-500/20 text-red-400' :
+                            maxConsecutive >= 3 ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>
+                            <Zap className="w-3 h-3" />
+                            {maxConsecutive} days
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`text-sm ${avgGap < 2 ? 'text-red-400' : avgGap < 3 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {avgGap.toFixed(1)} days
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {hasOverwork ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-medium">
+                              <AlertOctagon className="w-3 h-3" />
+                              Overworked
+                            </span>
+                          ) : hasInsufficientRest ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500/20 text-amber-400 rounded-full text-xs font-medium">
+                              <Moon className="w-3 h-3" />
+                              Needs Rest
+                            </span>
+                          ) : isLightWorkload ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 text-slate-400 rounded-full text-xs font-medium">
+                              Light
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">
+                              <CheckCircle className="w-3 h-3" />
+                              Normal
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {hasOverwork && (
+                              <span className="text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
+                                ⚠️ {maxConsecutive} consecutive days
+                              </span>
+                            )}
+                            {hasInsufficientRest && gaps.filter(g => g < 2).length > 0 && (
+                              <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                                ⚠️ {gaps.filter(g => g < 2).length}x insufficient rest
+                              </span>
+                            )}
+                            {!hasOverwork && !hasInsufficientRest && (
+                              <span className="text-xs text-slate-500">No warnings</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Rest Days Distribution Chart */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+              <Moon className="w-4 h-4 text-amber-400" />
+              Rest Days Distribution
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={(() => {
+                  // Calculate rest day distribution
+                  const restDistribution: Record<number, number> = {}
+                  report.forEach(r => {
+                    const sorted = [...r.days].sort((a, b) => a - b)
+                    for (let i = 1; i < sorted.length; i++) {
+                      const gap = sorted[i] - sorted[i-1] - 1 // Rest days = gap - 1
+                      restDistribution[gap] = (restDistribution[gap] || 0) + 1
+                    }
+                  })
+                  
+                  return Object.entries(restDistribution)
+                    .map(([days, count]) => ({ days: parseInt(days), count }))
+                    .sort((a, b) => a.days - b.days)
+                })()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis 
+                    dataKey="days" 
+                    stroke="#64748b" 
+                    fontSize={11}
+                    label={{ value: 'Rest Days', position: 'insideBottom', offset: -5, fill: '#64748b' }}
+                  />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #334155', 
+                      borderRadius: '8px',
+                      color: '#f1f5f9'
+                    }}
+                    formatter={(value: number, name: string) => [`${value} instances`, 'Count']}
+                  />
+                  <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Workload Balance Chart */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+              <Target className="w-4 h-4 text-purple-400" />
+              Workload Balance (Days vs Percentage)
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={report.map(r => ({
+                  name: r.character.length > 10 ? r.character.slice(0, 10) + '...' : r.character,
+                  days: r.total_days,
+                  percentage: r.percentage,
+                  isMain: r.isMain
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={10} />
+                  <YAxis yAxisId="left" stroke="#64748b" fontSize={11} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={11} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      border: '1px solid #334155', 
+                      borderRadius: '8px',
+                      color: '#f1f5f9'
+                    }}
+                  />
+                  <Bar yAxisId="left" dataKey="days" fill="#06b6d4" name="Shooting Days" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="right" dataKey="percentage" fill="#8b5cf6" name="Percentage %" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content - Table View */}
       {(viewMode === 'calendar' || viewMode === 'list') && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -1285,6 +1728,13 @@ Generated by CinePilot`
                     >
                       <Share2 className="w-4 h-4 text-purple-400" />
                       JSON
+                    </button>
+                    <button
+                      onClick={() => { exportToMarkdown(); setShowExportMenu(false) }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Markdown
                     </button>
                   </div>
                 )}
@@ -1477,6 +1927,10 @@ Generated by CinePilot`
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">P</kbd>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-gray-400">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">M</kbd>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-gray-400">Focus search</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">/</kbd>
               </div>
@@ -1487,6 +1941,9 @@ Generated by CinePilot`
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Toggle sort order</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">S</kbd>
+              </div>
+              <div className="border-t border-slate-700 my-2 pt-2">
+                <span className="text-xs text-slate-500">When filters closed:</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Analytics view</span>
@@ -1499,6 +1956,25 @@ Generated by CinePilot`
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">List view</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="border-t border-slate-700 my-2 pt-2">
+                <span className="text-xs text-slate-500">When filters open (F):</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Filter: All Cast</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Filter: Main Cast</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Filter: Supporting</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Clear role filter</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">0</kbd>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Show help</span>

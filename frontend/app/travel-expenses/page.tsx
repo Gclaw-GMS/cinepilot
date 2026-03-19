@@ -5,7 +5,8 @@ import {
   Plane, Train, Bus, Car, Building, Wallet, Plus, Edit2, Trash2,
   DollarSign, Calendar, MapPin, Search, X, HelpCircle,
   Clock, CreditCard, Receipt, Filter, BarChart3, PieChart as PieChartIcon,
-  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet
+  Loader2, RefreshCw, Download, Printer, ChevronDown, FileJson, FileSpreadsheet,
+  AlertCircle, CheckCircle, FileText
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -57,6 +58,16 @@ interface CategorySummary {
   approved: number
 }
 
+interface TravelExpenseConflict {
+  id: string
+  type: 'budget' | 'duplicate' | 'missing-receipt' | 'pending-too-long' | 'high-value' | 'suspicious' | 'missing-info'
+  severity: 'high' | 'medium' | 'low'
+  expenseId: string
+  title: string
+  description: string
+  recommendation: string
+}
+
 export default function TravelExpensesPage() {
   const [expenses, setExpenses] = useState<TravelExpense[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,7 +83,8 @@ export default function TravelExpensesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'category' | 'status' | 'vendor'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('dashboard')
+  const [viewMode, setViewMode] = useState<'list' | 'dashboard' | 'conflicts'>('dashboard')
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default ₹5L budget
 
   // Calculate active filter count using useMemo for efficiency
   const activeFilterCount = useMemo(() => {
@@ -98,6 +110,8 @@ export default function TravelExpensesPage() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const handleExportMarkdownRef = useRef<(() => void) | null>(null)
+  const viewModeRef = useRef(viewMode)
 
   const [formData, setFormData] = useState({
     category: 'flight',
@@ -155,6 +169,11 @@ export default function TravelExpensesPage() {
   }, [handleRefresh])
 
   useEffect(() => { loadExpenses() }, [loadExpenses])
+
+  // Keep viewModeRef in sync with viewMode state
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Click outside handlers for dropdowns and filter panel
   useEffect(() => {
@@ -232,6 +251,155 @@ export default function TravelExpensesPage() {
     value: expenses.filter(e => e.status === s.key).reduce((sum, e) => sum + e.amount, 0),
     color: s.color
   })).filter(d => d.value > 0)
+
+  // Budget tracking calculations
+  const budgetUsedPercent = Math.round((totalExpenses / budgetLimit) * 100)
+  const budgetRemaining = budgetLimit - totalExpenses
+  const isOverBudget = totalExpenses > budgetLimit
+  const isWarning = budgetUsedPercent >= 80 && !isOverBudget
+  const budgetStatus = isOverBudget ? 'over' : isWarning ? 'warning' : 'ok'
+
+  // Conflict detection
+  const expenseConflicts = useMemo((): TravelExpenseConflict[] => {
+    const conflicts: TravelExpenseConflict[] = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // 1. Budget Overrun: Total expenses exceed budget limit
+    if (totalExpenses > budgetLimit) {
+      const overrun = totalExpenses - budgetLimit
+      conflicts.push({
+        id: 'budget-overrun',
+        type: 'budget',
+        severity: overrun > budgetLimit * 0.5 ? 'high' : 'medium',
+        expenseId: 'budget',
+        title: 'Budget Overrun',
+        description: `Total travel expenses (₹${totalExpenses.toLocaleString()}) exceed budget limit (₹${budgetLimit.toLocaleString()}) by ₹${overrun.toLocaleString()}`,
+        recommendation: 'Review expenses and reduce non-essential travel or request budget increase'
+      })
+    }
+
+    // 2. Duplicate Expenses: Same amount, same date, same category
+    const expenseMap: Record<string, TravelExpense[]> = {}
+    expenses.forEach(exp => {
+      const key = `${exp.date}-${exp.amount}-${exp.category}`
+      if (!expenseMap[key]) expenseMap[key] = []
+      expenseMap[key].push(exp)
+    })
+    Object.entries(expenseMap).forEach(([key, exps]) => {
+      if (exps.length > 1) {
+        exps.forEach(exp => {
+          conflicts.push({
+            id: `duplicate-${exp.id}`,
+            type: 'duplicate',
+            severity: 'medium',
+            expenseId: exp.id,
+            title: 'Possible Duplicate',
+            description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} may be a duplicate`,
+            recommendation: 'Verify this expense is unique and not a duplicate entry'
+          })
+        })
+      }
+    })
+
+    // 3. Missing Receipts: Expenses over ₹10,000 without notes
+    expenses.forEach(exp => {
+      if (exp.amount > 10000 && (!exp.notes || exp.notes.trim() === '')) {
+        conflicts.push({
+          id: `missing-receipt-${exp.id}`,
+          type: 'missing-receipt',
+          severity: 'high',
+          expenseId: exp.id,
+          title: 'Missing Receipt Documentation',
+          description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} has no notes/receipt reference`,
+          recommendation: 'Add receipt details or note explaining the expense'
+        })
+      }
+    })
+
+    // 4. Pending Too Long: Pending expenses older than 30 days
+    expenses.forEach(exp => {
+      if (exp.status === 'pending') {
+        const expenseDate = new Date(exp.date)
+        const daysPending = Math.floor((today.getTime() - expenseDate.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysPending > 30) {
+          conflicts.push({
+            id: `pending-${exp.id}`,
+            type: 'pending-too-long',
+            severity: daysPending > 60 ? 'high' : 'medium',
+            expenseId: exp.id,
+            title: 'Pending Expense Overdue',
+            description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} has been pending for ${daysPending} days`,
+            recommendation: 'Follow up with finance to process this pending expense'
+          })
+        }
+      }
+    })
+
+    // 5. High Value Items: Single expense over ₹50,000
+    expenses.forEach(exp => {
+      if (exp.amount > 50000) {
+        conflicts.push({
+          id: `high-value-${exp.id}`,
+          type: 'high-value',
+          severity: exp.amount > 100000 ? 'high' : 'medium',
+          expenseId: exp.id,
+          title: 'High Value Expense',
+          description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} exceeds ₹50,000 threshold`,
+          recommendation: 'Ensure proper approval and documentation for this high-value expense'
+        })
+      }
+    })
+
+    // 6. Missing Person Info: Expenses without person name for cast/crew
+    expenses.forEach(exp => {
+      if ((exp.category === 'flight' || exp.category === 'hotel' || exp.category === 'per_diem' || exp.category === 'daily_allowance') && 
+          (!exp.personName || exp.personName.trim() === '')) {
+        conflicts.push({
+          id: `missing-info-${exp.id}`,
+          type: 'missing-info',
+          severity: 'low',
+          expenseId: exp.id,
+          title: 'Missing Person Information',
+          description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} has no person name`,
+          recommendation: 'Add the person name who incurred this expense'
+        })
+      }
+    })
+
+    // 7. Suspicious Amount: Unusually high for the category
+    const categoryAverages: Record<string, number> = {}
+    EXPENSE_CATEGORIES.forEach(cat => {
+      const catExpenses = expenses.filter(e => e.category === cat.key)
+      if (catExpenses.length > 0) {
+        categoryAverages[cat.key] = catExpenses.reduce((sum, e) => sum + e.amount, 0) / catExpenses.length
+      }
+    })
+    expenses.forEach(exp => {
+      const avg = categoryAverages[exp.category]
+      if (avg && exp.amount > avg * 3) {
+        conflicts.push({
+          id: `suspicious-${exp.id}`,
+          type: 'suspicious',
+          severity: 'medium',
+          expenseId: exp.id,
+          title: 'Unusually High Amount',
+          description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} is 3x the average (₹${Math.round(avg).toLocaleString()})`,
+          recommendation: 'Verify this expense is correct and not a data entry error'
+        })
+      }
+    })
+
+    return conflicts
+  }, [expenses, budgetLimit, totalExpenses])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: expenseConflicts.length,
+    high: expenseConflicts.filter(c => c.severity === 'high').length,
+    medium: expenseConflicts.filter(c => c.severity === 'medium').length,
+    low: expenseConflicts.filter(c => c.severity === 'low').length,
+  }), [expenseConflicts])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -390,6 +558,96 @@ export default function TravelExpensesPage() {
     setShowExportMenu(false)
   }
 
+  // Markdown export function
+  const handleExportMarkdown = useCallback(() => {
+    if (filteredExpenses.length === 0) {
+      alert('No expenses to export')
+      return
+    }
+
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount)
+    }
+
+    // Generate markdown content
+    let markdown = `# Travel Expenses Report - CinePilot
+
+**Generated:** ${new Date().toLocaleString()}
+
+---
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Expenses | ${expenses.length} |
+| Total Amount | ${formatCurrency(totalExpenses)} |
+| Pending Amount | ${formatCurrency(pendingExpenses)} |
+| Approved Amount | ${formatCurrency(approvedExpenses)} |
+| Reimbursed Amount | ${formatCurrency(reimbursedExpenses)} |
+| Budget Limit | ${formatCurrency(budgetLimit)} |
+| Budget Remaining | ${formatCurrency(budgetLimit - totalExpenses)} |
+
+---
+
+## Category Breakdown
+
+| Category | Count | Total Amount |
+|----------|-------|--------------|
+${EXPENSE_CATEGORIES.map(cat => {
+  const count = expenses.filter(e => e.category === cat.key).length
+  const total = expenses.filter(e => e.category === cat.key).reduce((sum, e) => sum + e.amount, 0)
+  return `| ${cat.label} | ${count} | ${formatCurrency(total)} |`
+}).join('\n')}
+
+---
+
+## Status Breakdown
+
+| Status | Count | Total Amount |
+|--------|-------|--------------|
+${STATUS_OPTIONS.map(s => {
+  const count = expenses.filter(e => e.status === s.key).length
+  const total = expenses.filter(e => e.status === s.key).reduce((sum, e) => sum + e.amount, 0)
+  return `| ${s.label} | ${count} | ${formatCurrency(total)} |`
+}).join('\n')}
+
+---
+
+## Expense Details
+
+| Date | Category | Person | Description | Amount | Status |
+|------|----------|--------|-------------|--------|--------|
+${filteredExpenses.map(e => {
+  const cat = EXPENSE_CATEGORIES.find(c => c.key === e.category)?.label || e.category
+  const status = STATUS_OPTIONS.find(s => s.key === e.status)?.label || e.status
+  return `| ${e.date} | ${cat} | ${e.personName || '-'} | ${e.description} | ${formatCurrency(e.amount)} | ${status} |`
+}).join('\n')}
+
+${searchQuery || categoryFilter !== 'all' || statusFilter !== 'all' ? `---
+
+*Filters applied: ${searchQuery ? `search="${searchQuery}" ` : ''}${categoryFilter !== 'all' ? `category=${categoryFilter} ` : ''}${statusFilter !== 'all' ? `status=${statusFilter}` : ''}*` : ''}
+
+---
+
+*Generated by CinePilot - Travel Expenses Manager*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [filteredExpenses, expenses, totalExpenses, pendingExpenses, approvedExpenses, reimbursedExpenses, budgetLimit, searchQuery, categoryFilter, statusFilter])
+
+  // Store handleExportMarkdown in ref for keyboard shortcuts
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
   // Print function
   const handlePrint = () => {
     const printWindow = window.open('', '_blank')
@@ -465,9 +723,17 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === '?' || (e.shiftKey && e.key === '/')) { setShowHelp(true) }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
       if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
+      // Number keys for view mode switching (using ref for current state)
+      if (e.key === '1' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('dashboard') }
+      if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('list') }
+      if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setViewMode('conflicts') }
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); searchInputRef.current?.focus() }
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         handleRefreshRef.current?.()
+      }
+      if (e.key === 'm' && !e.metaKey && !e.ctrlKey && !e.altKey && !showForm) {
+        e.preventDefault()
+        handleExportMarkdownRef.current?.()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -532,6 +798,10 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
                       <FileJson className="w-4 h-4 text-amber-500" />
                       <div><div className="text-sm font-medium">Export JSON</div><div className="text-xs text-slate-400">Full data export</div></div>
                     </button>
+                    <button onClick={handleExportMarkdown} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition text-left">
+                      <FileText className="w-4 h-4 text-cyan-500" />
+                      <div><div className="text-sm font-medium">Export Markdown</div><div className="text-xs text-slate-400">Formatted report</div></div>
+                    </button>
                   </div>
                 )}
               </div>
@@ -568,8 +838,9 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
 
               {/* View Mode Toggle */}
               <div className="flex bg-slate-700 rounded-lg p-1">
-                <button onClick={() => setViewMode('dashboard')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'dashboard' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><BarChart3 className="w-4 h-4 inline mr-1" />Dashboard</button>
-                <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'list' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><Receipt className="w-4 h-4 inline mr-1" />List</button>
+                <button onClick={() => setViewMode('dashboard')} title="Press 1" className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'dashboard' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><BarChart3 className="w-4 h-4 inline mr-1" />Dashboard <span className="ml-1 text-xs opacity-50">(1)</span></button>
+                <button onClick={() => setViewMode('list')} title="Press 2" className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'list' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><Receipt className="w-4 h-4 inline mr-1" />List <span className="ml-1 text-xs opacity-50">(2)</span></button>
+                <button onClick={() => setViewMode('conflicts')} title="Press 3" className={`px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1 ${viewMode === 'conflicts' ? 'bg-amber-500 text-slate-900' : 'text-slate-300 hover:text-white'}`}><AlertCircle className="w-4 h-4" />Conflicts {conflictStats.total > 0 && <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${conflictStats.high > 0 ? 'bg-red-500 text-white' : 'bg-amber-500 text-slate-900'}`}>{conflictStats.total}</span>} <span className="text-xs opacity-50">(3)</span></button>
               </div>
 
               {/* Add Button */}
@@ -598,6 +869,91 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-2"><span className="text-slate-400 text-sm">Reimbursed</span><CreditCard className="w-5 h-5 text-blue-500" /></div>
             <p className="text-2xl font-bold text-blue-500">{formatCurrency(reimbursedExpenses)}</p>
+          </div>
+        </div>
+
+        {/* Budget Tracking Card */}
+        <div className={`mb-6 rounded-xl border p-5 ${
+          budgetStatus === 'over' ? 'bg-red-900/20 border-red-700/50' :
+          budgetStatus === 'warning' ? 'bg-amber-900/20 border-amber-700/50' :
+          'bg-slate-800/50 border-slate-700'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${
+                budgetStatus === 'over' ? 'bg-red-500/20' :
+                budgetStatus === 'warning' ? 'bg-amber-500/20' :
+                'bg-emerald-500/20'
+              }`}>
+                <Wallet className={`w-5 h-5 ${
+                  budgetStatus === 'over' ? 'text-red-400' :
+                  budgetStatus === 'warning' ? 'text-amber-400' :
+                  'text-emerald-400'
+                }`} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Travel Budget</h3>
+                <p className="text-sm text-slate-400">Budget limit: {formatCurrency(budgetLimit)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className={`text-lg font-bold ${
+                  budgetStatus === 'over' ? 'text-red-400' :
+                  budgetStatus === 'warning' ? 'text-amber-400' :
+                  'text-emerald-400'
+                }`}>
+                  {budgetUsedPercent}%
+                </p>
+                <p className="text-xs text-slate-500">used</p>
+              </div>
+              {/* Budget input */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400">Limit:</span>
+                <input
+                  type="number"
+                  value={budgetLimit}
+                  onChange={(e) => setBudgetLimit(parseInt(e.target.value) || 0)}
+                  className="w-28 px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="Budget limit"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="relative h-3 bg-slate-700 rounded-full overflow-hidden mb-3">
+            <div 
+              className={`absolute left-0 top-0 h-full transition-all duration-500 ${
+                budgetStatus === 'over' ? 'bg-red-500' :
+                budgetStatus === 'warning' ? 'bg-amber-500' :
+                'bg-emerald-500'
+              }`}
+              style={{ width: `${Math.min(budgetUsedPercent, 100)}%` }}
+            />
+            {budgetStatus === 'over' && (
+              <div className="absolute left-0 top-0 h-full bg-red-500 animate-pulse" style={{ width: `${Math.min(budgetUsedPercent, 100)}%` }} />
+            )}
+          </div>
+          
+          {/* Budget Status Messages */}
+          <div className="flex items-center justify-between">
+            <div className={`flex items-center gap-2 text-sm ${
+              budgetStatus === 'over' ? 'text-red-400' :
+              budgetStatus === 'warning' ? 'text-amber-400' :
+              'text-emerald-400'
+            }`}>
+              {budgetStatus === 'over' ? (
+                <><AlertCircle className="w-4 h-4" /> Over budget by {formatCurrency(Math.abs(budgetRemaining))}</>
+              ) : budgetStatus === 'warning' ? (
+                <><AlertCircle className="w-4 h-4" /> Warning: Approaching budget limit</>
+              ) : (
+                <><CheckCircle className="w-4 h-4" /> Within budget - {formatCurrency(budgetRemaining)} remaining</>
+              )}
+            </div>
+            <div className="text-sm text-slate-500">
+              Remaining: <span className={budgetRemaining < 0 ? 'text-red-400' : 'text-white'}>{formatCurrency(budgetRemaining)}</span>
+            </div>
           </div>
         </div>
 
@@ -747,7 +1103,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               </div>
             </div>
           </div>
-        ) : (
+        ) : viewMode === 'list' ? (
           <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -806,6 +1162,120 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               </table>
             </div>
           </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Total Conflicts</span>
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="text-2xl font-bold text-white">{conflictStats.total}</div>
+              </div>
+              <div className="bg-slate-800/50 border border-red-900/30 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">High Priority</span>
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                </div>
+                <div className="text-2xl font-bold text-red-400">{conflictStats.high}</div>
+              </div>
+              <div className="bg-slate-800/50 border border-amber-900/30 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Medium Priority</span>
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="text-2xl font-bold text-amber-400">{conflictStats.medium}</div>
+              </div>
+              <div className="bg-slate-800/50 border border-slate-600 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-sm">Low Priority</span>
+                  <AlertCircle className="w-5 h-5 text-slate-500" />
+                </div>
+                <div className="text-2xl font-bold text-slate-400">{conflictStats.low}</div>
+              </div>
+            </div>
+
+            {/* Budget Limit Input */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="text-sm text-slate-400 mb-2 block">Budget Limit (₹)</label>
+                  <input
+                    type="number"
+                    value={budgetLimit}
+                    onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm text-slate-400 mb-2 block">Current Status</label>
+                  <div className={`px-4 py-2 rounded-lg border ${
+                    isOverBudget ? 'bg-red-500/20 border-red-500/30 text-red-400' :
+                    isWarning ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' :
+                    'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  }`}>
+                    {isOverBudget ? `Over Budget by ₹${Math.abs(budgetRemaining).toLocaleString()}` :
+                     isWarning ? `Warning: ${budgetUsedPercent}% used` :
+                     `${budgetUsedPercent}% used - ₹${budgetRemaining.toLocaleString()} remaining`}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Conflicts List */}
+            {expenseConflicts.length === 0 ? (
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-12 text-center">
+                <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">All Clear!</h3>
+                <p className="text-slate-400">No conflicts detected in your travel expenses.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {expenseConflicts.map(conflict => (
+                  <div key={conflict.id} className={`bg-slate-800/50 border rounded-xl p-5 ${
+                    conflict.severity === 'high' ? 'border-red-500/30' :
+                    conflict.severity === 'medium' ? 'border-amber-500/30' :
+                    'border-slate-600'
+                  }`}>
+                    <div className="flex items-start gap-4">
+                      <div className={`p-2 rounded-lg ${
+                        conflict.severity === 'high' ? 'bg-red-500/20' :
+                        conflict.severity === 'medium' ? 'bg-amber-500/20' :
+                        'bg-slate-700'
+                      }`}>
+                        <AlertCircle className={`w-5 h-5 ${
+                          conflict.severity === 'high' ? 'text-red-400' :
+                          conflict.severity === 'medium' ? 'text-amber-400' :
+                          'text-slate-400'
+                        }`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h4 className="font-semibold text-white">{conflict.title}</h4>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            conflict.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                            conflict.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>
+                            {conflict.severity.toUpperCase()}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
+                            {conflict.type.replace('-', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="text-slate-300 mb-3">{conflict.description}</p>
+                        <div className="bg-slate-700/50 rounded-lg p-3">
+                          <span className="text-sm text-slate-400">Recommendation: </span>
+                          <span className="text-sm text-amber-400">{conflict.recommendation}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -818,10 +1288,16 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-700 rounded-lg transition"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
+              <div className="text-sm font-medium text-amber-400 mb-2">View Modes</div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to Dashboard</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">1</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to List</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">2</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Switch to Conflicts</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">3</kbd></div>
+              <div className="border-t border-slate-700 my-2"></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle sort order</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">S</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Refresh data</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">R</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Export Markdown</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">M</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Add new expense</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+N</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Export menu</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+E</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Close modal / Clear</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Esc</kbd></div>

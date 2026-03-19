@@ -125,6 +125,27 @@ export default function CrewPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null);
   const fetchDataRef = useRef<() => void | Promise<void>>();
   const handlePrintRef = useRef<() => void>();
+  const deptFilterRef = useRef(deptFilter);
+  const showFiltersRef = useRef(showFilters);
+  const setDeptFilterRef = useRef(setDeptFilter);
+  const setShowFiltersRef = useRef(setShowFilters);
+
+  // Sync refs with state
+  useEffect(() => {
+    deptFilterRef.current = deptFilter;
+  }, [deptFilter]);
+
+  useEffect(() => {
+    showFiltersRef.current = showFilters;
+  }, [showFilters]);
+
+  useEffect(() => {
+    setDeptFilterRef.current = setDeptFilter;
+  }, [setDeptFilter]);
+
+  useEffect(() => {
+    setShowFiltersRef.current = setShowFilters;
+  }, [setShowFilters]);
 
   const [form, setForm] = useState({
     name: '',
@@ -140,12 +161,21 @@ export default function CrewPage() {
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'dailyRate'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'skills'>('list');
+
   // Sort options for UI
   const sortOptions = [
     { key: 'name', label: 'Name' },
     { key: 'role', label: 'Role' },
     { key: 'department', label: 'Department' },
     { key: 'dailyRate', label: 'Daily Rate' },
+  ];
+
+  // View mode options
+  const viewModeOptions = [
+    { key: 'list', label: 'List View', icon: Users },
+    { key: 'skills', label: 'Skills Matrix', icon: Briefcase },
   ];
 
   const fetchCrew = useCallback(async () => {
@@ -239,6 +269,52 @@ export default function CrewPage() {
           e.preventDefault()
           handlePrintRef.current?.()
           break
+        case 'v':
+          e.preventDefault()
+          setViewMode(prev => prev === 'list' ? 'skills' : 'list')
+          break
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            // When filters panel is OPEN: number keys filter by department
+            const keyNum = parseInt(e.key)
+            if (keyNum === 0) {
+              // 0 clears the filter
+              setDeptFilterRef.current?.('all')
+            } else if (keyNum >= 1 && keyNum <= 9) {
+              // 1-9 maps to departments (array is 0-indexed)
+              const deptIndex = keyNum - 1
+              if (deptIndex < DEPARTMENTS.length) {
+                const selectedDept = DEPARTMENTS[deptIndex]
+                // Toggle: if same dept is already selected, clear it
+                if (deptFilterRef.current === selectedDept) {
+                  setDeptFilterRef.current?.('all')
+                } else {
+                  setDeptFilterRef.current?.(selectedDept)
+                }
+              }
+            }
+          } else {
+            // When filters panel is CLOSED: number keys switch view mode (backward compatible)
+            switch (e.key) {
+              case '1':
+                setViewMode('list')
+                break
+              case '2':
+                setViewMode('skills')
+                break
+            }
+          }
+          break
       }
     }
     
@@ -252,7 +328,11 @@ export default function CrewPage() {
         !search.trim() ||
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         (c.role && c.role.toLowerCase().includes(search.toLowerCase())) ||
-        (c.department && c.department.toLowerCase().includes(search.toLowerCase()));
+        (c.department && c.department.toLowerCase().includes(search.toLowerCase())) ||
+        (c.email && c.email.toLowerCase().includes(search.toLowerCase())) ||
+        (c.phone && c.phone.replace(/\D/g, '').includes(search.replace(/\D/g, ''))) ||
+        (c.notes && c.notes.toLowerCase().includes(search.toLowerCase())) ||
+        (c.skills && c.skills.some(s => s.toLowerCase().includes(search.toLowerCase())));
       const matchDept = deptFilter === 'all' || c.department === deptFilter;
       return matchSearch && matchDept;
     });
@@ -323,6 +403,30 @@ export default function CrewPage() {
         return sum + (isNaN(r) ? 0 : r);
       }, 0) / 1000,
     })).filter(d => d.rate > 0).sort((a, b) => b.rate - a.rate);
+  }, [crew]);
+
+  // Skills Matrix data computation
+  const skillsMatrix = useMemo(() => {
+    // Extract all unique skills from crew
+    const allSkills = new Set<string>();
+    crew.forEach(c => {
+      if (c.skills && Array.isArray(c.skills)) {
+        c.skills.forEach(s => allSkills.add(s));
+      }
+    });
+    const sortedSkills = Array.from(allSkills).sort();
+    
+    // Build matrix: crew member -> skills
+    const matrix = crew.map(c => ({
+      id: c.id,
+      name: c.name,
+      role: c.role,
+      department: c.department || 'Unassigned',
+      skills: c.skills || [],
+      hasSkill: (skill: string) => (c.skills || []).includes(skill),
+    }));
+    
+    return { skills: sortedSkills, matrix };
   }, [crew]);
 
   const openAddModal = () => {
@@ -547,6 +651,106 @@ export default function CrewPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
+  const handleExportMarkdown = () => {
+    setExporting(true)
+    
+    // Calculate stats
+    const totalDailyRate = crew.reduce((sum, c) => {
+      const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
+      return sum + (isNaN(rate) ? 0 : rate)
+    }, 0)
+    
+    const deptCounts = crew.reduce<Record<string, number>>((acc, c) => {
+      const d = c.department || 'Unassigned'
+      acc[d] = (acc[d] ?? 0) + 1
+      return acc
+    }, {})
+    
+    // Group crew by department
+    const deptGroups = DEPARTMENTS.map(dept => ({
+      name: dept,
+      members: crew.filter(c => c.department === dept)
+    })).filter(d => d.members.length > 0)
+    
+    // Top paid crew
+    const topPaid = [...crew]
+      .filter(c => c.dailyRate)
+      .sort((a, b) => {
+        const aRate = typeof a.dailyRate === 'string' ? parseFloat(a.dailyRate) : Number(a.dailyRate)
+        const bRate = typeof b.dailyRate === 'string' ? parseFloat(b.dailyRate) : Number(b.dailyRate)
+        return bRate - aRate
+      })
+      .slice(0, 5)
+    
+    // Build markdown
+    let markdown = `# CinePilot Crew Report
+
+**Generated:** ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Crew Members | ${crew.length} |
+| Total Daily Rate | ₹${totalDailyRate.toLocaleString('en-IN')} |
+| Average Rate | ₹${(totalDailyRate / crew.length || 0).toLocaleString('en-IN')} |
+| Departments | ${Object.keys(deptCounts).length} |
+
+---
+
+## Department Breakdown
+
+`
+    
+    // Add department counts
+    Object.entries(deptCounts)
+      .sort(([,a], [,b]) => b - a)
+      .forEach(([dept, count]) => {
+        markdown += `- **${dept}:** ${count} member${count !== 1 ? 's' : ''}\n`
+      })
+    
+    markdown += `\n---\n\n## Top 5 Highest Paid\n\n| Rank | Name | Role | Department | Daily Rate |\n|------|------|------|------------|------------|\n`
+    
+    topPaid.forEach((member, i) => {
+      const rate = member.dailyRate ? (typeof member.dailyRate === 'string' ? parseFloat(member.dailyRate) : Number(member.dailyRate)) : 0
+      markdown += `| ${i + 1} | ${member.name} | ${member.role} | ${member.department || '—'} | ₹${rate.toLocaleString('en-IN')} |\n`
+    })
+    
+    markdown += `\n---\n\n## Crew Directory\n\n`
+    
+    // Add each department's crew
+    deptGroups.forEach(group => {
+      markdown += `### ${group.name}\n\n`
+      markdown += `| Name | Role | Contact | Daily Rate |\n`
+      markdown += `|------|------|---------|------------|\n`
+      
+      group.members.forEach(member => {
+        const rate = member.dailyRate ? (typeof member.dailyRate === 'string' ? parseFloat(member.dailyRate) : Number(member.dailyRate)) : 0
+        const contact = member.phone || member.email || '—'
+        markdown += `| ${member.name} | ${member.role} | ${contact} | ₹${rate.toLocaleString('en-IN')} |\n`
+      })
+      
+      markdown += `\n`
+    })
+    
+    markdown += `---\n\n*Generated by CinePilot - Film Production Management*\n`
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `crew-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    
+    setShowExportMenu(false)
+    setExporting(false)
+    setSuccess('Crew exported to Markdown!')
+    setTimeout(() => setSuccess(null), 3000)
+  }
+
   const handlePrint = useCallback(() => {
     const totalDailyRate = crew.reduce((sum, c) => {
       const rate = c.dailyRate ? (typeof c.dailyRate === 'string' ? parseFloat(c.dailyRate) : Number(c.dailyRate)) : 0
@@ -694,7 +898,7 @@ export default function CrewPage() {
                   <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
                 </button>
                 {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-20">
                     <button
                       onClick={handleExportCSV}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
@@ -708,6 +912,13 @@ export default function CrewPage() {
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4 text-cyan-400" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -733,6 +944,28 @@ export default function CrewPage() {
                     </button>
                   </div>
                 )}
+              </div>
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1 border border-slate-700">
+                {viewModeOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isActive = viewMode === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => setViewMode(option.key as typeof viewMode)}
+                      className={`px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
+                        isActive 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                      title={`${option.label} (${option.key === 'list' ? '1' : '2'})`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="hidden md:inline">{option.label}</span>
+                    </button>
+                  );
+                })}
               </div>
               <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium transition-colors">
                 <Plus className="w-4 h-4" />
@@ -884,7 +1117,7 @@ export default function CrewPage() {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search crew by name, role, or department... (/)"
+              placeholder="Search by name, role, dept, skills, email, phone... (/)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-12 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -928,8 +1161,8 @@ export default function CrewPage() {
                   onChange={(e) => setDeptFilter(e.target.value)}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
                 >
-                  <option value="all">All Departments</option>
-                  {DEPARTMENTS.map((d) => (<option key={d} value={d}>{d}</option>))}
+                  <option value="all">All Departments (0)</option>
+                  {DEPARTMENTS.map((d, idx) => (<option key={d} value={d}>{d} ({idx + 1})</option>))}
                 </select>
               </div>
               <button
@@ -977,7 +1210,91 @@ export default function CrewPage() {
           </div>
         )}
 
+        {/* Skills Matrix View */}
+        {viewMode === 'skills' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden mb-6">
+            <div className="p-4 border-b border-slate-800">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-emerald-400" />
+                Skills Matrix
+              </h3>
+              <p className="text-sm text-slate-400 mt-1">Visual overview of crew skills across all departments</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-900">
+                      Crew Member
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Department
+                    </th>
+                    {skillsMatrix.skills.map(skill => (
+                      <th key={skill} className="text-center px-2 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[80px]">
+                        <span className="transform -rotate-45 origin-center block" title={skill}>
+                          {skill.length > 10 ? skill.substring(0, 10) + '...' : skill}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(member => (
+                    <tr key={member.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                      <td className="px-4 py-3 sticky left-0 bg-slate-900">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-medium text-xs">
+                            {getInitials(member.name)}
+                          </div>
+                          <div>
+                            <p className="font-medium text-white text-sm">{member.name}</p>
+                            <p className="text-xs text-slate-500">{member.role}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {member.department ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${DEPT_COLORS[member.department] || '#64748b'}20`, color: DEPT_COLORS[member.department] || '#94a3b8' }}>
+                            {member.department}
+                          </span>
+                        ) : (<span className="text-slate-500 text-sm">—</span>)}
+                      </td>
+                      {skillsMatrix.skills.map(skill => {
+                        const hasSkill = (member.skills || []).includes(skill);
+                        return (
+                          <td key={skill} className="text-center px-2 py-3">
+                            {hasSkill ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-800 text-slate-600">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {skillsMatrix.skills.length === 0 && (
+              <div className="p-8 text-center text-slate-500">
+                No skills data available. Add skills to crew members to see the matrix.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Crew Table */}
+        {viewMode === 'list' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full">
             <thead>
@@ -1078,6 +1395,7 @@ export default function CrewPage() {
             </tbody>
           </table>
         </div>
+        )}
       </main>
 
       {/* Modal */}
@@ -1207,6 +1525,66 @@ export default function CrewPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Print crew report</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle view mode</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">V</kbd>
+              </div>
+              {/* When filters panel is OPEN */}
+              <div className="mt-3 mb-1 px-2">
+                <span className="text-xs font-medium text-cyan-400 uppercase tracking-wider">When Filters Open:</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Camera dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Lighting dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Sound dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Art dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Makeup dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">5</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Costume dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">6</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Direction dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">7</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by Production dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">8</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by VFX dept</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">9</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Clear department filter</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">0</kbd>
+              </div>
+              {/* When filters panel is CLOSED */}
+              <div className="mt-3 mb-1 px-2">
+                <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">When Filters Closed:</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">List view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Skills matrix view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>

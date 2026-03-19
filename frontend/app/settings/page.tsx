@@ -20,6 +20,7 @@ import {
   X,
   Printer,
   Download,
+  Filter,
 } from 'lucide-react';
 import { MODELS } from '@/lib/ai/config';
 import type { ModelKey } from '@/lib/ai/config';
@@ -113,14 +114,22 @@ export default function SettingsPage() {
   const [local, setLocal] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetting, setResetting] = useState(false);
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>('all');
   const printMenuRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSettings = useCallback(async () => {
@@ -157,6 +166,7 @@ export default function SettingsPage() {
   // Refs for keyboard shortcuts
   const saveRef = useRef<() => void>(() => {});
   const handlePrintRef = useRef<() => void>(() => {});
+  const handleExportMarkdownRef = useRef<() => void>(() => {});
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -198,20 +208,57 @@ export default function SettingsPage() {
         handlePrintRef.current?.();
       }
 
+      // E: Export menu
+      if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        setShowExportMenu(!showExportMenu);
+      }
+
+      // M: Direct Markdown export
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        handleExportMarkdownRef.current?.();
+      }
+
+      // F: Toggle filters
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        setShowFilterPanel(!showFilterPanel);
+      }
+
       // Escape: Close modal
       if (e.key === 'Escape') {
         setShowShortcuts(false);
         setShowPrintMenu(false);
+        setShowExportMenu(false);
+        setShowFilterPanel(false);
+        setShowResetConfirm(false);
+      }
+
+      // X: Reset to defaults (with Ctrl/Cmd for safety)
+      if ((e.key === 'x' || e.key === 'X') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setShowResetConfirm(true);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchSettings]);
+  }, [fetchSettings, showFilterPanel, showExportMenu]);
 
   const set = useCallback((key: string, value: unknown) => {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-  }, []);
+    setLocal((prev) => ({ ...prev, [key]: value }))
+    
+    // Immediately apply theme change
+    if (key === 'theme') {
+      const theme = value as 'dark' | 'light' | 'system'
+      // Call global theme setter if available
+      const globalSetTheme = (window as Window & { __setTheme?: (theme: string) => void }).__setTheme
+      if (globalSetTheme) {
+        globalSetTheme(theme)
+      }
+    }
+  }, [])
 
   const get = useCallback((key: string): unknown => {
     return local[key] ?? settings[key];
@@ -246,6 +293,34 @@ export default function SettingsPage() {
       setSaving(false);
     }
   }, [local]);
+
+  // Reset to defaults
+  const resetToDefaults = useCallback(async () => {
+    setResetting(true);
+    setShowResetConfirm(false);
+    
+    // Reset to default settings
+    const resetSettings = { ...DEFAULT_SETTINGS };
+    setSettings(resetSettings);
+    saveToStorage(resetSettings);
+    
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk', settings: resetSettings }),
+      });
+      if (res.ok) {
+        setDbConnected(true);
+      }
+    } catch (err) {
+      console.warn('Failed to reset in database, using local storage only');
+    }
+    
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    setResetting(false);
+  }, []);
 
   // Update saveRef when save changes
   useEffect(() => {
@@ -343,16 +418,124 @@ export default function SettingsPage() {
     handlePrintRef.current = handlePrint;
   }, [handlePrint]);
 
-  // Click outside to close print menu
+  // Export settings to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    setExporting(true);
+    setShowExportMenu(false);
+    
+    // Capture current settings values
+    const currentSettings = { ...settings, ...local };
+    const currentGet = (key: string): unknown => currentSettings[key];
+    
+    const formatValue = (value: unknown): string => {
+      if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
+      if (value === null || value === undefined) return '-';
+      return String(value);
+    };
+    
+    const markdown = `# ⚙️ CinePilot Settings Report
+
+**Generated:** ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 🌐 Language & Region
+
+| Setting | Value |
+|---------|-------|
+| Language | ${formatValue(currentGet('language'))} |
+| Default Currency | ${formatValue(currentGet('defaultCurrency'))} |
+
+---
+
+## 🤖 AI Settings
+
+| Setting | Value |
+|---------|-------|
+| Tamil Cinema Features | ${formatValue(currentGet('tamilCinemaEnabled'))} |
+| AI Model | ${formatValue(currentGet('aiModel'))} |
+
+---
+
+## 🎨 Appearance
+
+| Setting | Value |
+|---------|-------|
+| Theme | ${formatValue(currentGet('theme'))} |
+
+---
+
+## 🔔 Notifications
+
+| Setting | Value |
+|---------|-------|
+| Push Notifications | ${formatValue(currentGet('notificationsPush'))} |
+| Email Alerts | ${formatValue(currentGet('notificationsEmail'))} |
+| Budget Alerts | ${formatValue(currentGet('budgetAlerts'))} |
+| Schedule Reminders | ${formatValue(currentGet('scheduleReminders'))} |
+
+---
+
+## 📊 Data & Privacy
+
+| Setting | Value |
+|---------|-------|
+| Analytics | ${formatValue(currentGet('analyticsEnabled'))} |
+
+---
+
+## 🎬 Production
+
+| Setting | Value |
+|---------|-------|
+| Censor Mode | ${formatValue(currentGet('censorMode'))} |
+| Auto-Save | ${formatValue(currentGet('autoSave'))} |
+| Auto-Save Interval | ${formatValue(currentGet('autoSaveInterval'))} seconds |
+
+---
+
+## Summary
+
+- **Total Settings:** 13
+- **Database:** ${dbConnected === true ? 'Connected' : dbConnected === false ? 'Local Mode' : 'Unknown'}
+- **Last Updated:** ${localStorage ? new Date().toLocaleDateString() : '-'}
+
+---
+
+*CinePilot — AI Pre-Production Assistant for South Indian Cinema*
+`;
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cinepilot-settings-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExporting(false);
+  }, [local, settings, dbConnected]);
+
+  // Update handleExportMarkdownRef when handleExportMarkdown changes
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown;
+  }, [handleExportMarkdown]);
+
+  // Click outside to close print menu, export menu, and filter panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
         setShowPrintMenu(false);
       }
+      if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+      if (showFilterPanel && filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilterPanel(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPrintMenu]);
+  }, [showPrintMenu, showExportMenu, showFilterPanel]);
 
   if (loading) {
     return (
@@ -394,6 +577,91 @@ export default function SettingsPage() {
                 </button>
               )}
             </div>
+            {/* Filter Toggle Button */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                  activeFilter !== 'all'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                }`}
+                title="Toggle filters (F)"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="text-sm">Filters</span>
+                {activeFilter !== 'all' && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-white text-emerald-500 text-xs rounded-full">1</span>
+                )}
+              </button>
+              {showFilterPanel && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-3 border-b border-slate-700">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">Filter Settings</span>
+                      {activeFilter !== 'all' && (
+                        <button
+                          onClick={() => setActiveFilter('all')}
+                          className="text-xs text-emerald-400 hover:text-emerald-300"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <button
+                      onClick={() => { setActiveFilter('all'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'all' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      All Settings
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('language'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'language' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Language & Region
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('ai'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'ai' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      AI & Language
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('appearance'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'appearance' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Appearance
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('notifications'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'notifications' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Notifications
+                    </button>
+                    <button
+                      onClick={() => { setActiveFilter('production'); setShowFilterPanel(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeFilter === 'production' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Production
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => {
                 setRefreshing(true);
@@ -412,6 +680,29 @@ export default function SettingsPage() {
             >
               <Keyboard className="w-5 h-5" />
             </button>
+            {/* Export Button */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-indigo-900/30 border border-slate-700 hover:border-indigo-700/50 rounded-lg text-sm text-slate-400 hover:text-indigo-400 transition-colors"
+                title="Export settings (E)"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={handleExportMarkdown}
+                    disabled={exporting}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    {exporting ? 'Exporting...' : 'Export Markdown'}
+                  </button>
+                </div>
+              )}
+            </div>
             {/* Print Button */}
             <div className="relative" ref={printMenuRef}>
               <button
@@ -683,6 +974,14 @@ export default function SettingsPage() {
               </>
             )}
           </button>
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resetting}
+            className="flex items-center gap-2 px-4 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-800 disabled:opacity-50 rounded text-sm font-medium text-red-400"
+          >
+            <RefreshCw className={`h-4 w-4 ${resetting ? 'animate-spin' : ''}`} />
+            {resetting ? 'Resetting...' : 'Reset to Defaults'}
+          </button>
           {saved && (
             <span className="text-sm text-green-500 flex items-center gap-1">
               <Check className="h-4 w-4" />
@@ -717,8 +1016,12 @@ export default function SettingsPage() {
             <div className="space-y-2">
               {[
                 { key: '/', action: 'Focus search' },
+                { key: 'F', action: 'Toggle filters' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
+                { key: 'Ctrl+X', action: 'Reset to defaults' },
+                { key: 'E', action: 'Export menu' },
+                { key: 'M', action: 'Export Markdown' },
                 { key: 'P', action: 'Print settings' },
                 { key: '?', action: 'Show shortcuts' },
                 { key: 'Esc', action: 'Close modal' },
@@ -734,6 +1037,50 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 mt-4 text-center">
               Press Esc or click outside to close
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirm && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-red-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-red-400">
+                <AlertCircle className="w-5 h-5" />
+                Reset Settings
+              </h2>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="text-slate-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to reset all settings to their default values? This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={resetToDefaults}
+                disabled={resetting}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded text-sm font-medium text-white"
+              >
+                {resetting ? 'Resetting...' : 'Reset to Defaults'}
+              </button>
+            </div>
           </div>
         </div>
       )}

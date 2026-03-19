@@ -24,10 +24,12 @@ import {
   Search,
   Keyboard,
   FileJson,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PieChart,
+  BarChart3
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell, PieChart as RePieChart, Pie
 } from 'recharts'
 
 interface CensorSceneFlag {
@@ -169,34 +171,8 @@ export default function CensorPage() {
   const [sortBy, setSortBy] = useState<'scene' | 'category' | 'severity'>('severity')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   
-  // Sort options
-  const sortOptions = [
-    { key: 'severity', label: 'Severity' },
-    { key: 'scene', label: 'Scene Number' },
-    { key: 'category', label: 'Category' },
-  ]
-  
-  // Toggle sort order
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }
-  
-  // Calculate active filter count (includes sort as active filter)
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (filterCategory !== 'all') count++
-    if (filterSeverity !== 'all') count++
-    if (sortBy !== 'severity' || sortOrder !== 'desc') count++
-    return count
-  }, [filterCategory, filterSeverity, sortBy, sortOrder])
-  
-  // Clear filters (including sort)
-  const clearFilters = useCallback(() => {
-    setFilterCategory('all')
-    setFilterSeverity('all')
-    setSortBy('severity')
-    setSortOrder('desc')
-  }, [])
+  // View mode state - press 1, 2, 3, 4 to switch views
+  const [viewMode, setViewMode] = useState<'summary' | 'flags' | 'suggestions' | 'analytics'>('summary')
   
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -218,6 +194,9 @@ export default function CensorPage() {
   const showFiltersRef = useRef(showFilters)
   const showExportDropdownRef = useRef(showExportDropdown)
   const handlePrintRef = useRef<() => void>(() => {})
+  const handleExportMarkdownRef = useRef<() => void>()
+  const sortOrderRef = useRef(sortOrder)
+  const viewModeRef = useRef(viewMode)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -232,6 +211,22 @@ export default function CensorPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
+        case '1':
+          e.preventDefault()
+          setViewMode('summary')
+          break
+        case '2':
+          e.preventDefault()
+          setViewMode('flags')
+          break
+        case '3':
+          e.preventDefault()
+          setViewMode('suggestions')
+          break
+        case '4':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -242,11 +237,17 @@ export default function CensorPage() {
           break
         case 's':
           e.preventDefault()
-          toggleSortOrder()
+          setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc')
           break
         case 'e':
           e.preventDefault()
           setShowExportDropdown(!showExportDropdownRef.current)
+          break
+        case 'm':
+          e.preventDefault()
+          if (analysisRef.current) {
+            handleExportMarkdownRef.current?.()
+          }
           break
         case 'p':
           e.preventDefault()
@@ -264,14 +265,18 @@ export default function CensorPage() {
           setShowExportDropdown(false)
           setShowFilters(false)
           setSearchQuery('')
-          clearFilters()
+          setFilterCategory('all')
+          setFilterSeverity('all')
+          setSortBy('severity')
+          setSortOrder('desc')
+          setViewMode('summary')
           break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [clearFilters])
+  }, [])
 
   // Update refs when state changes
   useEffect(() => {
@@ -285,6 +290,14 @@ export default function CensorPage() {
   useEffect(() => {
     showExportDropdownRef.current = showExportDropdown
   }, [showExportDropdown])
+
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
+
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Click outside handlers
   useEffect(() => {
@@ -375,15 +388,7 @@ export default function CensorPage() {
         confidence: analysis.confidence,
         topDrivers: analysis.topDrivers,
         highRiskScenes: analysis.highRiskScenes,
-        // Include filter and sort metadata
-        filters: {
-          searchQuery,
-          filterCategory,
-          filterSeverity,
-          sortBy,
-          sortOrder,
-        },
-        sceneFlags: filteredFlags,
+        sceneFlags: analysis.sceneFlags || [],
         suggestions: analysis.suggestions || [],
         uncertainties: analysis.uncertainties || [],
       }
@@ -406,7 +411,7 @@ export default function CensorPage() {
 <div class="stats"><div class="stat"><div class="stat-value">${Math.round(analysis.deterministicScore * 100)}%</div><div class="stat-label">Sensitivity Score</div></div><div class="stat"><div class="stat-value">${analysis._count?.sceneFlags || 0}</div><div class="stat-label">Risk Flags</div></div><div class="stat"><div class="stat-value">${analysis._count?.suggestions || 0}</div><div class="stat-label">Suggestions</div></div><div class="stat"><div class="stat-value">${analysis.confidence}</div><div class="stat-label">Confidence</div></div></div>
 <h3>🚨 Risk Flags</h3>
 <table><thead><tr><th>Scene</th><th>Category</th><th>Severity</th><th>Context</th></tr></thead>
-<tbody>${filteredFlags.map(f => `<tr><td>${f.scene.sceneNumber}</td><td>${f.category}</td><td class="severity-${f.severity >= 6 ? 'high' : f.severity >= 4 ? 'medium' : 'low'}">${f.severity}/10</td><td>${f.context}</td></tr>`).join('')}</tbody></table>
+<tbody>${(analysis.sceneFlags || []).map(f => `<tr><td>${f.scene.sceneNumber}</td><td>${f.category}</td><td class="severity-${f.severity >= 6 ? 'high' : f.severity >= 4 ? 'medium' : 'low'}">${f.severity}/10</td><td>${f.context}</td></tr>`).join('')}</tbody></table>
 <h3>💡 Suggestions</h3>
 ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.sceneNumber}: ${s.issue}</h4><p><strong>Change:</strong> ${s.suggestedChange}</p><p><strong>Why:</strong> ${s.why}</p></div>`).join('')}
 <div class="footer">Generated by CinePilot • For reference only</div>
@@ -426,6 +431,124 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
       }
     }
   }
+
+  // Markdown Export function
+  const handleExportMarkdown = useCallback(() => {
+    if (!analysis) return
+
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+
+    const certInfo = CERTIFICATE_INFO[analysis.predictedCertificate.replace(/\d+/g, '').trim()] || CERTIFICATE_INFO['UA']
+
+    // Calculate severity distribution
+    const severityCounts = { high: 0, medium: 0, low: 0 }
+    ;(analysis.sceneFlags || []).forEach(flag => {
+      if (flag.severity >= 6) severityCounts.high++
+      else if (flag.severity >= 4) severityCounts.medium++
+      else severityCounts.low++
+    })
+
+    // Calculate category distribution
+    const categoryCounts: Record<string, number> = {}
+    ;(analysis.sceneFlags || []).forEach(flag => {
+      categoryCounts[flag.category] = (categoryCounts[flag.category] || 0) + 1
+    })
+
+    // Build markdown
+    let md = `# 📊 Censor Certification Analysis - CinePilot
+
+**Generated:** ${timestamp}
+**Project:** ${selectedProject}
+
+---
+
+## 🎬 Certificate Prediction
+
+| Metric | Value |
+|--------|-------|
+| **Predicted Certificate** | ${analysis.predictedCertificate} |
+| **Certificate Label** | ${certInfo.label} |
+| **Age Rating** | ${certInfo.age} |
+| **Sensitivity Score** | ${Math.round(analysis.deterministicScore * 100)}% |
+| **Confidence** | ${analysis.confidence} |
+
+**Description:** ${certInfo.description}
+
+---
+
+## 📈 Analysis Summary
+
+| Metric | Count |
+|--------|-------|
+| **Total Risk Flags** | ${analysis._count?.sceneFlags || analysis.sceneFlags?.length || 0} |
+| **Suggestions** | ${analysis._count?.suggestions || analysis.suggestions?.length || 0} |
+| **High Severity** | ${severityCounts.high} |
+| **Medium Severity** | ${severityCounts.medium} |
+| **Low Severity** | ${severityCounts.low} |
+
+---
+
+## 🚨 Top Risk Drivers
+
+${analysis.topDrivers.map((driver, i) => `${i + 1}. ${driver}`).join('\n')}
+
+---
+
+## ⚠️ High Risk Scenes
+
+${analysis.highRiskScenes.map(scene => `- ${scene}`).join('\n')}
+
+---
+
+## 🏷️ Risk Flags by Category
+
+| Category | Count |
+|----------|-------|
+${Object.entries(categoryCounts).map(([cat, count]) => `| ${cat} | ${count} |`).join('\n')}
+
+---
+
+## 🚩 Scene Flags Detail
+
+| Scene | Category | Severity | Context |
+|-------|----------|----------|---------|
+${(analysis.sceneFlags || []).map(flag => `| ${flag.scene.sceneNumber} | ${flag.category} | ${flag.severity}/10 | ${flag.context} |`).join('\n')}
+
+---
+
+## 💡 Suggestions
+
+${(analysis.suggestions || []).map(s => 
+`### Scene ${s.sceneNumber}: ${s.issue}
+
+- **Suggested Change:** ${s.suggestedChange}
+- **Why:** ${s.why}
+- **Expected Impact:** ${s.expectedSeverityDelta > 0 ? '+' : ''}${s.expectedSeverityDelta} severity points
+
+`).join('\n')}
+
+---
+
+## ❓ Uncertainties
+
+${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
+
+---
+
+*Generated by CinePilot • For reference only*
+`
+
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `censor-analysis-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [analysis, selectedProject])
 
   // Print functionality
   const handlePrint = useCallback(() => {
@@ -555,6 +678,11 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
     handlePrintRef.current = handlePrint
   }, [handlePrint])
 
+  // Update ref after handleExportMarkdown is defined
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
+
   const certInfo = analysis?.predictedCertificate 
     ? CERTIFICATE_INFO[analysis.predictedCertificate.replace(/\d+/g, '').trim()] || CERTIFICATE_INFO['UA']
     : CERTIFICATE_INFO['UA']
@@ -581,40 +709,44 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
       }))
     : []
 
-  const filteredFlags = analysis?.sceneFlags?.filter(flag => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const matchesSearch = 
-        flag.category.toLowerCase().includes(query) ||
-        flag.context.toLowerCase().includes(query) ||
-        flag.scene.sceneNumber.toLowerCase().includes(query) ||
-        flag.scene.headingRaw.toLowerCase().includes(query)
-      if (!matchesSearch) return false
-    }
-    // Category filter
-    if (filterCategory !== 'all' && flag.category !== filterCategory) return false
-    // Severity filter
-    if (filterSeverity === 'high' && flag.severity < 6) return false
-    if (filterSeverity === 'medium' && (flag.severity < 4 || flag.severity >= 6)) return false
-    if (filterSeverity === 'low' && flag.severity >= 4) return false
-    return true
-  }).sort((a, b) => {
-    // Sorting logic
-    let comparison = 0
-    switch (sortBy) {
-      case 'severity':
-        comparison = a.severity - b.severity
-        break
-      case 'scene':
-        comparison = parseInt(a.scene.sceneNumber) - parseInt(b.scene.sceneNumber)
-        break
-      case 'category':
-        comparison = a.category.localeCompare(b.category)
-        break
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  }) || []
+  const filteredFlags = useMemo(() => {
+    const flags = analysis?.sceneFlags?.filter(flag => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesSearch = 
+          flag.category.toLowerCase().includes(query) ||
+          flag.context.toLowerCase().includes(query) ||
+          flag.scene.sceneNumber.toLowerCase().includes(query) ||
+          flag.scene.headingRaw.toLowerCase().includes(query)
+        if (!matchesSearch) return false
+      }
+      // Category filter
+      if (filterCategory !== 'all' && flag.category !== filterCategory) return false
+      // Severity filter
+      if (filterSeverity === 'high' && flag.severity < 6) return false
+      if (filterSeverity === 'medium' && (flag.severity < 4 || flag.severity >= 6)) return false
+      if (filterSeverity === 'low' && flag.severity >= 4) return false
+      return true
+    }) || []
+    
+    // Sorting
+    return [...flags].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'scene':
+          comparison = a.scene.sceneNumber.localeCompare(b.scene.sceneNumber, undefined, { numeric: true })
+          break
+        case 'category':
+          comparison = a.category.localeCompare(b.category)
+          break
+        case 'severity':
+          comparison = a.severity - b.severity
+          break
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [analysis?.sceneFlags, searchQuery, filterCategory, filterSeverity, sortBy, sortOrder])
 
   const confidenceLevel = analysis?.confidence || stats?.confidence || 'medium'
   const confidenceColors: Record<string, string> = {
@@ -684,53 +816,24 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                showFilters || activeFilterCount > 0
+                showFilters || filterCategory !== 'all' || filterSeverity !== 'all'
                   ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
                   : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
               }`}
             >
               <Filter className="w-4 h-4" />
               Filter & Sort
-              {activeFilterCount > 0 && (
+              {(filterCategory !== 'all' || filterSeverity !== 'all' || sortBy !== 'severity' || sortOrder !== 'desc') && (
                 <span className="ml-1 px-1.5 py-0.5 bg-cyan-500 text-black text-xs font-medium rounded">
-                  {activeFilterCount}
+                  {([filterCategory !== 'all', filterSeverity !== 'all', sortBy !== 'severity', sortOrder !== 'desc'].filter(Boolean)).length}
                 </span>
               )}
             </button>
             
-            {/* Filter Panel */}
+            {/* Filter & Sort Panel */}
             {showFilters && (
               <div className="absolute right-0 top-full mt-2 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
                 <div className="space-y-4">
-                  {/* Sort Options */}
-                  <div className="pb-3 border-b border-gray-700">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs text-gray-400">Sort By</label>
-                      <button
-                        onClick={toggleSortOrder}
-                        className="flex items-center gap-1 px-2 py-1 text-xs bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30 transition-colors"
-                      >
-                        {sortOrder === 'asc' ? 'ASC' : 'DESC'}
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      {sortOptions.map(option => (
-                        <button
-                          key={option.key}
-                          onClick={() => setSortBy(option.key as typeof sortBy)}
-                          className={`px-2 py-1.5 text-xs rounded transition-colors ${
-                            sortBy === option.key 
-                              ? 'bg-cyan-500 text-white' 
-                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Filter Options */}
                   <div>
                     <label className="text-xs text-gray-400 mb-2 block">Category</label>
                     <select
@@ -760,11 +863,43 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                       <option value="low">Low (1-3)</option>
                     </select>
                   </div>
+                  
+                  {/* Sort Options */}
+                  <div className="border-t border-gray-700 pt-4">
+                    <label className="text-xs text-gray-400 mb-2 block">Sort By</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as 'scene' | 'category' | 'severity')}
+                        className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
+                      >
+                        <option value="severity">Severity</option>
+                        <option value="scene">Scene #</option>
+                        <option value="category">Category</option>
+                      </select>
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          sortOrder === 'asc'
+                            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                            : 'bg-gray-900 text-gray-400 border border-gray-700 hover:border-cyan-500/50'
+                        }`}
+                      >
+                        {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+                      </button>
+                    </div>
+                  </div>
+                  
                   <button
-                    onClick={clearFilters}
+                    onClick={() => { 
+                      setFilterCategory('all'); 
+                      setFilterSeverity('all');
+                      setSortBy('severity');
+                      setSortOrder('desc');
+                    }}
                     className="w-full py-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
                   >
-                    Clear Filters & Sort
+                    Clear All
                   </button>
                 </div>
               </div>
@@ -814,6 +949,17 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                   <div>
                     <div className="text-sm text-white">PDF</div>
                     <div className="text-xs text-gray-500">Print-ready report</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { handleExportMarkdown(); setShowExportDropdown(false) }}
+                  disabled={!analysis}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 transition-colors text-left disabled:opacity-50"
+                >
+                  <FileText className="w-4 h-4 text-cyan-400" />
+                  <div>
+                    <div className="text-sm text-white">Markdown</div>
+                    <div className="text-xs text-gray-500">Formatted document</div>
                   </div>
                 </button>
               </div>
@@ -893,8 +1039,68 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
         </div>
       )}
 
-      {/* Main Certificate Display */}
-      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
+      {/* View Mode Tabs */}
+      <div className="flex items-center gap-2 bg-gray-800/50 p-1 rounded-xl border border-gray-700/50 w-fit">
+        <button
+          onClick={() => setViewMode('summary')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'summary' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Summary
+          <span className="ml-1 text-xs opacity-70">(1)</span>
+        </button>
+        <button
+          onClick={() => setViewMode('flags')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'flags' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" />
+          Scene Flags
+          <span className="ml-1 px-1.5 py-0.5 bg-gray-700 text-white text-xs rounded">
+            {analysis?.sceneFlags?.length || 0}
+          </span>
+          <span className="text-xs opacity-70">(2)</span>
+        </button>
+        <button
+          onClick={() => setViewMode('suggestions')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'suggestions' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <Lightbulb className="w-4 h-4" />
+          Suggestions
+          <span className="ml-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded">
+            {analysis?.suggestions?.length || 0}
+          </span>
+          <span className="text-xs opacity-70">(3)</span>
+        </button>
+        <button
+          onClick={() => setViewMode('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === 'analytics' 
+              ? 'bg-cyan-500 text-black shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Analytics
+          <span className="text-xs opacity-70">(4)</span>
+        </button>
+      </div>
+
+      {/* Summary & Analytics View - Certificate Display */}
+      {(viewMode === 'summary' || viewMode === 'analytics') && (
+        <>
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className={`px-8 py-6 rounded-2xl border-2 ${certInfo.bg} text-center`}>
@@ -945,7 +1151,7 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
             <span className="text-sm text-gray-400">High Risk Flags</span>
           </div>
           <p className="text-2xl font-bold text-white">
-            {filteredFlags.filter(f => f.severity >= 6).length || analysis?._count?.sceneFlags || stats?.highRiskCount || 0}
+            {analysis?.sceneFlags?.filter(f => f.severity >= 6).length || analysis?._count?.sceneFlags || stats?.highRiskCount || 0}
           </p>
         </div>
 
@@ -1040,9 +1246,12 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
           </div>
         </div>
       </div>
+        </>
+      )}
 
-      {/* Scene Flags Detail */}
-      <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+      {/* Scene Flags Detail - Only in flags view */}
+      {viewMode === 'flags' && (
+        <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <Eye className="w-5 h-5 text-amber-400" />
@@ -1119,9 +1328,10 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
           </div>
         )}
       </div>
+      )}
 
-      {/* Suggestions */}
-      {analysis?.suggestions && analysis.suggestions.length > 0 && (
+      {/* Suggestions - Only in suggestions view */}
+      {viewMode === 'suggestions' && analysis?.suggestions && analysis.suggestions.length > 0 && (
         <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Lightbulb className="w-5 h-5 text-amber-400" />
@@ -1139,6 +1349,105 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
                 <p className="text-xs text-gray-500"><strong>Why:</strong> {suggestion.why}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Analytics View - Detailed Charts */}
+      {viewMode === 'analytics' && (
+        <div className="space-y-6">
+          {/* Analytics Header */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-cyan-400" />
+              Censor Analytics Dashboard
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Detailed breakdown of content sensitivity, risk factors, and certification metrics
+            </p>
+          </div>
+
+          {/* Category Breakdown Chart */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-cyan-400" />
+              Risk by Category
+            </h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categoryData.length > 0 ? categoryData : riskData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={true} vertical={false} />
+                  <XAxis type="number" stroke="#6b7280" fontSize={11} />
+                  <YAxis type="category" dataKey="name" stroke="#6b7280" fontSize={12} width={80} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    labelStyle={{ color: '#fff' }}
+                  />
+                  <Bar dataKey="count" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Severity Distribution */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              Severity Distribution
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-red-400">
+                  {analysis?.sceneFlags?.filter(f => f.severity >= 7).length || 0}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">Critical (7-10)</div>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-amber-400">
+                  {analysis?.sceneFlags?.filter(f => f.severity >= 4 && f.severity < 7).length || 0}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">Medium (4-6)</div>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-blue-400">
+                  {analysis?.sceneFlags?.filter(f => f.severity < 4).length || 0}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">Low (1-3)</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pie Chart - Flag Categories */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <PieChart className="w-5 h-5 text-purple-400" />
+              Flag Category Distribution
+            </h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={categoryData.length > 0 ? categoryData : riskData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="count"
+                    nameKey="name"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={true}
+                  >
+                    {(categoryData.length > 0 ? categoryData : riskData).map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={Object.values(CATEGORY_COLORS)[index % Object.keys(CATEGORY_COLORS).length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  />
+                </RePieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
@@ -1181,6 +1490,22 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Summary view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Scene Flags view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Suggestions view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Analytics view</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Refresh analysis</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>
               </div>
@@ -1199,6 +1524,10 @@ ${(analysis.suggestions || []).map(s => `<div class="suggestion"><h4>Scene ${s.s
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">M</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Print report</span>

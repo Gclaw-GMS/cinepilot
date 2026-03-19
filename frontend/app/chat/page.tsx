@@ -77,6 +77,8 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const initialLoadDone = useRef(false)
+  // Ref for Markdown export keyboard shortcut
+  const exportToMarkdownRef = useRef<() => void>(() => {})
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -257,6 +259,101 @@ What would you like to know about your production?`,
     setShowExportMenu(false)
     setExporting(false)
   }
+
+  // Markdown Export function
+  const handleExportMarkdown = useCallback(() => {
+    if (messages.length === 0) return
+    
+    const formatTime = (timestamp?: string) => {
+      if (!timestamp) return ''
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    const formatContent = (content: string) => {
+      return content
+        .replace(/\*\*(.*?)\*\*/g, '**$1**')
+        .replace(/\*(.*?)\*/g, '*$1*')
+    }
+
+    const userMessages = messages.filter(m => m.role === 'user').length
+    const aiMessages = messages.filter(m => m.role === 'assistant').length
+
+    let markdown = `# 🎬 CinePilot AI Chat Transcript
+
+**Generated:** ${new Date().toLocaleString('en-US', { 
+  weekday: 'long', 
+  year: 'numeric', 
+  month: 'long', 
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit'
+})}
+
+---
+
+## 📊 Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Messages | ${messages.length} |
+| Your Messages | ${userMessages} |
+| AI Responses | ${aiMessages} |
+
+`
+
+    // Add context if available
+    if (context) {
+      markdown += `## 📈 Production Context
+
+| Metric | Value |
+|--------|-------|
+| Scripts | ${context.scriptsCount} |
+| Scenes | ${context.scenesCount} |
+| Budget | ₹${(context.budgetTotal / 100000).toFixed(1)}L |
+| Schedule Days | ${context.scheduleDays} |
+| Crew Members | ${context.crewCount} |
+| Warnings | ${context.warningsCount} |
+
+`
+    }
+
+    markdown += `## 💬 Conversation
+
+`
+
+    // Add each message
+    messages.forEach((msg, idx) => {
+      const role = msg.role === 'user' ? '👤 You' : '🤖 CinePilot AI'
+      const time = formatTime(msg.timestamp)
+      markdown += `### ${role} ${time ? `• ${time}` : ''}
+
+${formatContent(msg.content)}
+
+---
+`
+    })
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setExporting(false)
+  }, [messages, context])
+
+  // Keep exportToMarkdownRef in sync
+  useEffect(() => {
+    exportToMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handlePrintChat = useCallback(() => {
     const formatTime = (timestamp?: string) => {
@@ -450,6 +547,12 @@ What would you like to know about your production?`,
           e.preventDefault()
           setShowExportMenu(prev => !prev)
           break
+        case 'm':
+          e.preventDefault()
+          if (messagesLengthRef.current > 0) {
+            exportToMarkdownRef.current?.()
+          }
+          break
         case 'p':
           e.preventDefault()
           if (messagesLengthRef.current > 0) {
@@ -595,6 +698,13 @@ What would you like to know about your production?`,
                     >
                       <FileText className="w-4 h-4" />
                       Export JSON
+                    </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-400 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export Markdown
                     </button>
                   </div>
                 )}
@@ -889,6 +999,10 @@ What would you like to know about your production?`,
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Export chat</span>
                 <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">E</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                <span className="text-slate-300">Export Markdown</span>
+                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">M</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
                 <span className="text-slate-300">Print chat</span>

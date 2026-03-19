@@ -24,10 +24,13 @@ import {
   Filter,
   HelpCircle,
   ChevronDown,
+  ChevronRight,
   FileText,
   FileJson,
   Printer,
   Clock,
+  Lightbulb,
+  Film,
 } from 'lucide-react';
 import {
   LineChart,
@@ -204,6 +207,184 @@ function getScoreLabel(score: number): { label: string; color: string; bg: strin
   return { label: 'Poor', color: 'text-red-400', bg: 'bg-red-500/20' };
 }
 
+// Weather Alert System
+interface WeatherAlert {
+  id: string;
+  type: 'thunderstorm' | 'rain' | 'extreme_heat' | 'extreme_cold' | 'wind' | 'humidity' | 'visibility' | 'general';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  date: string;
+  affectedDay?: number;
+}
+
+function generateWeatherAlerts(forecast: WeatherDay[], shootingDays?: ScheduledDay[]): WeatherAlert[] {
+  const alerts: WeatherAlert[] = [];
+  const today = new Date();
+  
+  forecast.forEach((day, index) => {
+    const date = new Date(day.date);
+    const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Thunderstorm alerts
+    if (day.condition.toLowerCase().includes('thunderstorm') || day.condition.toLowerCase().includes('thunder')) {
+      alerts.push({
+        id: `thunder-${index}`,
+        type: 'thunderstorm',
+        severity: day.precipitation > 20 ? 'critical' : day.precipitation > 10 ? 'high' : 'medium',
+        title: 'Thunderstorm Expected',
+        description: `${day.condition} forecasted with ${day.precipitation}mm precipitation. Consider indoor alternatives or rescheduling.`,
+        date: day.date,
+      });
+    }
+    
+    // Heavy rain alerts
+    if (day.precipitation > 15 && !day.condition.toLowerCase().includes('thunderstorm')) {
+      alerts.push({
+        id: `rain-${index}`,
+        type: 'rain',
+        severity: day.precipitation > 30 ? 'critical' : day.precipitation > 20 ? 'high' : 'medium',
+        title: 'Heavy Rain Expected',
+        description: `${day.precipitation}mm rainfall expected. Outdoor shoots may be affected.`,
+        date: day.date,
+      });
+    }
+    
+    // Extreme heat alerts
+    if (day.tempHigh > 40) {
+      alerts.push({
+        id: `heat-${index}`,
+        type: 'extreme_heat',
+        severity: day.tempHigh > 45 ? 'critical' : 'high',
+        title: 'Extreme Heat Warning',
+        description: `Temperature expected to reach ${day.tempHigh}°C. Ensure crew hydration and shade provisions.`,
+        date: day.date,
+      });
+    }
+    
+    // Extreme cold alerts  
+    if (day.tempLow < 5) {
+      alerts.push({
+        id: `cold-${index}`,
+        type: 'extreme_cold',
+        severity: day.tempLow < 0 ? 'critical' : 'high',
+        title: 'Cold Weather Alert',
+        description: `Temperature dropping to ${day.tempLow}°C. Plan for heating equipment and warm breaks.`,
+        date: day.date,
+      });
+    }
+    
+    // High wind alerts
+    if (day.windSpeed > 40) {
+      alerts.push({
+        id: `wind-${index}`,
+        type: 'wind',
+        severity: day.windSpeed > 60 ? 'critical' : day.windSpeed > 50 ? 'high' : 'medium',
+        title: 'High Wind Warning',
+        description: `Wind speeds up to ${day.windSpeed} km/h expected. Grip and lighting equipment may need extra stabilization.`,
+        date: day.date,
+      });
+    }
+    
+    // High humidity alerts
+    if (day.humidity > 85) {
+      alerts.push({
+        id: `humidity-${index}`,
+        type: 'humidity',
+        severity: day.humidity > 95 ? 'high' : 'medium',
+        title: 'High Humidity Advisory',
+        description: `Humidity at ${day.humidity}%. Equipment may be affected; allow for acclimatization.`,
+        date: day.date,
+      });
+    }
+    
+    // Low visibility alerts (can be from fog)
+    if (day.condition.toLowerCase().includes('fog') || day.condition.toLowerCase().includes('mist')) {
+      alerts.push({
+        id: `visibility-${index}`,
+        type: 'visibility',
+        severity: 'medium',
+        title: 'Low Visibility Conditions',
+        description: `${day.condition} expected. May affect exterior shots and safety.`,
+        date: day.date,
+      });
+    }
+    
+    // General production score alerts for scheduled days
+    if (shootingDays) {
+      const matchingDay = shootingDays.find(sd => {
+        if (!sd.scheduledDate) return false;
+        return sd.scheduledDate.split('T')[0] === day.date;
+      });
+      
+      if (matchingDay && day.productionScore < 40) {
+        alerts.push({
+          id: `production-${index}`,
+          type: 'general',
+          severity: 'critical',
+          title: `Poor Production Conditions - Day ${matchingDay.dayNumber}`,
+          description: `Production score is only ${day.productionScore}%. Consider rescheduling or planning indoor scenes.`,
+          date: day.date,
+          affectedDay: matchingDay.dayNumber,
+        });
+      } else if (matchingDay && day.productionScore < 60) {
+        alerts.push({
+          id: `production-${index}`,
+          type: 'general',
+          severity: 'medium',
+          title: `Moderate Production Conditions - Day ${matchingDay.dayNumber}`,
+          description: `Production score is ${day.productionScore}%. Plan backup indoor scenes.`,
+          date: day.date,
+          affectedDay: matchingDay.dayNumber,
+        });
+      }
+    }
+  });
+  
+  // Sort by severity (critical first) then by date
+  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  return alerts.sort((a, b) => {
+    if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+      return severityOrder[a.severity] - severityOrder[b.severity];
+    }
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
+  });
+}
+
+function getAlertIcon(type: WeatherAlert['type']) {
+  switch (type) {
+    case 'thunderstorm':
+      return '⛈️';
+    case 'rain':
+      return '🌧️';
+    case 'extreme_heat':
+      return '🌡️';
+    case 'extreme_cold':
+      return '🥶';
+    case 'wind':
+      return '💨';
+    case 'humidity':
+      return '💧';
+    case 'visibility':
+      return '🌫️';
+    default:
+      return '⚠️';
+  }
+}
+
+function getSeverityColor(severity: WeatherAlert['severity']) {
+  switch (severity) {
+    case 'critical':
+      return { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', badge: 'bg-red-500' };
+    case 'high':
+      return { bg: 'bg-orange-500/20', border: 'border-orange-500/50', text: 'text-orange-400', badge: 'bg-orange-500' };
+    case 'medium':
+      return { bg: 'bg-amber-500/20', border: 'border-amber-500/50', text: 'text-amber-400', badge: 'bg-amber-500' };
+    case 'low':
+      return { bg: 'bg-slate-500/20', border: 'border-slate-500/50', text: 'text-slate-400', badge: 'bg-slate-500' };
+  }
+}
+
 export default function WeatherPage() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -214,7 +395,7 @@ export default function WeatherPage() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'forecast' | 'hourly' | 'analytics' | 'schedule'>('forecast');
+  const [viewMode, setViewMode] = useState<'forecast' | 'hourly' | 'analytics' | 'schedule' | 'alerts'>('forecast');
   const [showCustomLocation, setShowCustomLocation] = useState(false);
   const [customLocationInput, setCustomLocationInput] = useState('');
   const [customLocationLoading, setCustomLocationLoading] = useState(false);
@@ -318,9 +499,14 @@ export default function WeatherPage() {
   const refreshWeatherRef = useRef<() => void>(() => {});
   const exportToCSVRef = useRef<() => void>(() => {});
   const exportToJSONRef = useRef<() => void>(() => {});
+  const exportToMarkdownRef = useRef<() => void>(() => {});
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const handlePrintRef = useRef<() => void>(() => {});
   const printingRef = useRef(false);
+  // Refs for filters to avoid dependency issues in keyboard shortcuts
+  const filtersRef = useRef(filters);
+  const sortByRef = useRef(sortBy);
+  const sortOrderRef = useRef(sortOrder);
 
   // Fetch schedule data for integration
   const fetchScheduleData = useCallback(async () => {
@@ -421,6 +607,19 @@ export default function WeatherPage() {
     refreshWeatherRef.current = refreshWeather;
   }, [refreshWeather]);
 
+  // Keep filter refs in sync with state
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  useEffect(() => {
+    sortByRef.current = sortBy;
+  }, [sortBy]);
+
+  useEffect(() => {
+    sortOrderRef.current = sortOrder;
+  }, [sortOrder]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -454,6 +653,82 @@ export default function WeatherPage() {
           e.preventDefault()
           setViewMode('schedule')
           break
+        case '5':
+          e.preventDefault()
+          setViewMode('alerts')
+          break
+        // Number keys 0-6 for condition filter (when not in input)
+        case '0':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, condition: 'all' }))
+          }
+          break
+        case '6':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            const currentFilters = filtersRef.current
+            const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+            // Toggle: if already selected, clear it
+            setFilters(prev => ({
+              ...prev,
+              condition: prev.condition === conditions[0] ? 'all' : conditions[0]
+            }))
+          }
+          break
+        case '7':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+            setFilters(prev => ({
+              ...prev,
+              condition: prev.condition === conditions[1] ? 'all' : conditions[1]
+            }))
+          }
+          break
+        case '8':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+            setFilters(prev => ({
+              ...prev,
+              condition: prev.condition === conditions[2] ? 'all' : conditions[2]
+            }))
+          }
+          break
+        case '9':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            const conditions = ['sunny', 'partly_cloudy', 'cloudy', 'rain', 'thunderstorm']
+            setFilters(prev => ({
+              ...prev,
+              condition: prev.condition === conditions[3] ? 'all' : conditions[3]
+            }))
+          }
+          break
+        // Shift+number for date range filter
+        case 'Shift':
+          // Handled in the key press, not here
+          break
+        // Date range filter with Shift+number
+        default:
+          if (e.shiftKey && ['1', '2', '3', '4', '0'].includes(e.key)) {
+            e.preventDefault()
+            const dateRanges: Record<string, string> = {
+              '1': '3',
+              '2': '5',
+              '3': 'weekend',
+              '4': 'all', // Clear
+              '0': 'all'
+            }
+            const newRange = dateRanges[e.key]
+            if (newRange === 'all') {
+              setFilters(prev => ({ ...prev, dateRange: 'all' }))
+            } else {
+              setFilters(prev => ({ ...prev, dateRange: newRange }))
+            }
+          }
+          break
         case 'e':
           e.preventDefault()
           if (weatherData?.forecast?.length) {
@@ -483,6 +758,12 @@ export default function WeatherPage() {
           e.preventDefault()
           if (weatherData?.forecast?.length && !printingRef.current) {
             handlePrintRef.current()
+          }
+          break
+        case 'm':
+          e.preventDefault()
+          if (weatherData?.forecast?.length) {
+            exportToMarkdownRef.current()
           }
           break
       }
@@ -605,11 +886,121 @@ export default function WeatherPage() {
     URL.revokeObjectURL(url);
   }, [filteredForecast, weatherData, filters, sortBy, sortOrder]);
 
+  // Export forecast to Markdown (uses filtered/sorted data)
+  const exportToMarkdown = useCallback(() => {
+    if (!filteredForecast.length) return;
+    
+    const forecast = filteredForecast;
+    const avgScore = Math.round(forecast.reduce((sum, d) => sum + d.productionScore, 0) / forecast.length);
+    const bestDay = forecast.reduce((best, d) => d.productionScore > best.productionScore ? d : best, forecast[0]);
+    const worstDay = forecast.reduce((worst, d) => d.productionScore < worst.productionScore ? d : worst, forecast[0]);
+    const totalPrecip = forecast.reduce((sum, d) => sum + d.precipitation, 0);
+    
+    // Calculate condition breakdown
+    const conditions = forecast.reduce((acc, day) => {
+      const cond = day.condition;
+      acc[cond] = (acc[cond] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Get score distribution
+    const goodDays = forecast.filter(d => d.productionScore >= 80).length;
+    const moderateDays = forecast.filter(d => d.productionScore >= 60 && d.productionScore < 80).length;
+    const badDays = forecast.filter(d => d.productionScore < 60).length;
+    
+    const getScoreLabel = (score: number) => {
+      if (score >= 80) return '🟢 Excellent';
+      if (score >= 60) return '🟡 Good';
+      return '🔴 Poor';
+    };
+    
+    const getConditionEmoji = (condition: string) => {
+      const c = condition.toLowerCase();
+      if (c.includes('rain')) return '🌧️';
+      if (c.includes('cloud')) return '☁️';
+      if (c.includes('thunder')) return '⛈️';
+      if (c.includes('clear') || c.includes('sun')) return '☀️';
+      return '🌤️';
+    };
+    
+    let markdown = `# Weather Forecast - CinePilot
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| **Location** | ${weatherData?.location || 'Unknown'} |
+| **Coordinates** | ${weatherData?.lat?.toFixed(2) || '0'}, ${weatherData?.lng?.toFixed(2) || '0'} |
+| **Total Days** | ${forecast.length} |
+| **Average Score** | ${avgScore}/100 |
+| **Best Day** | ${bestDay.date} (${bestDay.productionScore}/100) |
+| **Worst Day** | ${worstDay.date} (${worstDay.productionScore}/100) |
+| **Total Precipitation** | ${totalPrecip.toFixed(1)} mm |
+
+## Production Score Distribution
+
+| Rating | Days | Percentage |
+|--------|------|------------|
+| 🟢 Excellent (80-100) | ${goodDays} | ${Math.round((goodDays / forecast.length) * 100)}% |
+| 🟡 Good (60-79) | ${moderateDays} | ${Math.round((moderateDays / forecast.length) * 100)}% |
+| 🔴 Poor (<60) | ${badDays} | ${Math.round((badDays / forecast.length) * 100)}% |
+
+## Condition Breakdown
+
+`;
+    
+    // Add condition breakdown table
+    markdown += `| Condition | Days | Percentage |\n|------------|------|------------|\n`;
+    Object.entries(conditions).forEach(([cond, count]) => {
+      markdown += `| ${getConditionEmoji(cond)} ${cond} | ${count} | ${Math.round((count / forecast.length) * 100)}% |\n`;
+    });
+    
+    markdown += `
+## Daily Forecast
+
+| Date | Condition | Temp (°C) | Humidity | Wind | Precip | Score | Recommendation |
+|------|-----------|-----------|----------|------|--------|-------|----------------|
+`;
+    
+    forecast.forEach(day => {
+      markdown += `| ${day.date} | ${getConditionEmoji(day.condition)} ${day.condition} | ${day.tempHigh}°/${day.tempLow}° | ${day.humidity}% | ${day.windSpeed} km/h | ${day.precipitation} mm | ${getScoreLabel(day.productionScore)} | ${day.recommendation} |\n`;
+    });
+    
+    // Add filters info if active
+    const activeFilters = [];
+    if (filters.condition !== 'all') activeFilters.push(`Condition: ${filters.condition}`);
+    if (filters.dateRange !== 'all') activeFilters.push(`Date Range: ${filters.dateRange}`);
+    if (sortBy !== 'date' || sortOrder !== 'asc') activeFilters.push(`Sort: ${sortBy} (${sortOrder})`);
+    
+    if (activeFilters.length > 0) {
+      markdown += `
+## Filters Applied
+
+- ${activeFilters.join('\n- ')}
+
+`;
+    }
+    
+    markdown += `
+---
+*Generated by CinePilot on ${new Date().toLocaleString()}*
+`;
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `weather-forecast-${weatherData?.location || 'forecast'}-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filteredForecast, weatherData, filters, sortBy, sortOrder]);
+
   // Set up export ref for keyboard shortcuts
   useEffect(() => {
     exportToCSVRef.current = exportToCSV;
     exportToJSONRef.current = exportToJSON;
-  }, [exportToCSV, exportToJSON]);
+    exportToMarkdownRef.current = exportToMarkdown;
+  }, [exportToCSV, exportToJSON, exportToMarkdown]);
 
   // Print forecast report
   const handlePrint = useCallback(() => {
@@ -902,9 +1293,26 @@ export default function WeatherPage() {
                 <ShortcutRow keys={['2']} description="Switch to Hourly view" />
                 <ShortcutRow keys={['3']} description="Switch to Analytics view" />
                 <ShortcutRow keys={['4']} description="Switch to Schedule view" />
+                <ShortcutRow keys={['5']} description="Switch to Alerts view" />
+                <div className="pt-2 pb-1 border-t border-white/10">
+                  <span className="text-xs text-blue-400 font-medium">Condition Filter</span>
+                </div>
+                <ShortcutRow keys={['0']} description="All Conditions (clear)" />
+                <ShortcutRow keys={['6']} description="Filter by Sunny (toggle)" />
+                <ShortcutRow keys={['7']} description="Filter by Partly Cloudy (toggle)" />
+                <ShortcutRow keys={['8']} description="Filter by Cloudy (toggle)" />
+                <ShortcutRow keys={['9']} description="Filter by Rain (toggle)" />
+                <div className="pt-2 pb-1 border-t border-white/10">
+                  <span className="text-xs text-blue-400 font-medium">Date Range Filter</span>
+                </div>
+                <ShortcutRow keys={['⇧1']} description="Filter: Next 3 Days (toggle)" />
+                <ShortcutRow keys={['⇧2']} description="Filter: Next 5 Days (toggle)" />
+                <ShortcutRow keys={['⇧3']} description="Filter: This Weekend (toggle)" />
+                <ShortcutRow keys={['⇧0']} description="Clear date range filter" />
                 <ShortcutRow keys={['F']} description="Toggle filters" />
                 <ShortcutRow keys={['S']} description="Toggle sort order" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
+                <ShortcutRow keys={['M']} description="Export Markdown" />
                 <ShortcutRow keys={['P']} description="Print forecast report" />
                 <ShortcutRow keys={['?']} description="Show keyboard shortcuts" />
                 <ShortcutRow keys={['Esc']} description="Close modal" />
@@ -980,6 +1388,26 @@ export default function WeatherPage() {
                     <Calendar className="w-3.5 h-3.5" />
                     Schedule
                   </button>
+                  <button
+                    onClick={() => setViewMode('alerts')}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      viewMode === 'alerts'
+                        ? 'bg-red-500 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Alerts
+                    {weatherData && (() => {
+                      const alerts = generateWeatherAlerts(weatherData.forecast, scheduleData?.shootingDays || scheduleData?.days);
+                      const criticalCount = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
+                      return criticalCount > 0 ? (
+                        <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-red-500 text-white">
+                          {criticalCount}
+                        </span>
+                      ) : null;
+                    })()}
+                  </button>
                 </div>
                 <button
                   onClick={refreshWeather}
@@ -1050,6 +1478,16 @@ export default function WeatherPage() {
                         <div>
                           <div className="font-medium">Export as JSON</div>
                           <div className="text-xs text-slate-500">Full data with summary</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { exportToMarkdown(); setShowExportMenu(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors border-t border-slate-700"
+                      >
+                        <FileText className="w-4 h-4 text-cyan-400" />
+                        <div>
+                          <div className="font-medium">Export as Markdown</div>
+                          <div className="text-xs text-slate-500">Formatted report</div>
                         </div>
                       </button>
                     </div>
@@ -1128,11 +1566,11 @@ export default function WeatherPage() {
                   onChange={(e) => setFilters(prev => ({ ...prev, condition: e.target.value }))}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="all">All Conditions</option>
-                  <option value="sunny">☀️ Sunny</option>
-                  <option value="partly_cloudy">⛅ Partly Cloudy</option>
-                  <option value="cloudy">☁️ Cloudy</option>
-                  <option value="rain">🌧️ Rain</option>
+                  <option value="all">All Conditions (0)</option>
+                  <option value="sunny">☀️ Sunny (6)</option>
+                  <option value="partly_cloudy">⛅ Partly Cloudy (7)</option>
+                  <option value="cloudy">☁️ Cloudy (8)</option>
+                  <option value="rain">🌧️ Rain (9)</option>
                   <option value="thunderstorm">⛈️ Thunderstorm</option>
                 </select>
               </div>
@@ -1143,10 +1581,10 @@ export default function WeatherPage() {
                   onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value }))}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="all">All Days</option>
-                  <option value="3">Next 3 Days</option>
-                  <option value="5">Next 5 Days</option>
-                  <option value="weekend">This Weekend</option>
+                  <option value="all">All Days (⇧0)</option>
+                  <option value="3">Next 3 Days (⇧1)</option>
+                  <option value="5">Next 5 Days (⇧2)</option>
+                  <option value="weekend">This Weekend (⇧3)</option>
                 </select>
               </div>
             </div>
@@ -2015,6 +2453,171 @@ export default function WeatherPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Weather Alerts View */}
+            {viewMode === 'alerts' && weatherData && (
+              <div className="space-y-6">
+                {/* Alert Summary Stats */}
+                {(() => {
+                  const allAlerts = generateWeatherAlerts(weatherData.forecast, scheduleData?.shootingDays || scheduleData?.days);
+                  const criticalAlerts = allAlerts.filter(a => a.severity === 'critical');
+                  const highAlerts = allAlerts.filter(a => a.severity === 'high');
+                  const mediumAlerts = allAlerts.filter(a => a.severity === 'medium');
+                  const lowAlerts = allAlerts.filter(a => a.severity === 'low');
+                  
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-slate-900 border border-red-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-2xl">🔴</span>
+                          <p className="text-xs text-slate-400 uppercase">Critical</p>
+                        </div>
+                        <p className="text-3xl font-bold text-red-400">{criticalAlerts.length}</p>
+                      </div>
+                      <div className="bg-slate-900 border border-orange-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-2xl">🟠</span>
+                          <p className="text-xs text-slate-400 uppercase">High</p>
+                        </div>
+                        <p className="text-3xl font-bold text-orange-400">{highAlerts.length}</p>
+                      </div>
+                      <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-2xl">🟡</span>
+                          <p className="text-xs text-slate-400 uppercase">Medium</p>
+                        </div>
+                        <p className="text-3xl font-bold text-amber-400">{mediumAlerts.length}</p>
+                      </div>
+                      <div className="bg-slate-900 border border-slate-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-2xl">⚪</span>
+                          <p className="text-xs text-slate-400 uppercase">Low</p>
+                        </div>
+                        <p className="text-3xl font-bold text-slate-400">{lowAlerts.length}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Alert List */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    Weather Alerts for Production
+                  </h3>
+                  <p className="text-sm text-slate-400 mb-6">
+                    Automatically detected weather risks based on forecast data
+                  </p>
+
+                  {(() => {
+                    const alerts = generateWeatherAlerts(weatherData.forecast, scheduleData?.shootingDays || scheduleData?.days);
+                    
+                    if (alerts.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+                            <CheckCircle className="w-8 h-8 text-emerald-400" />
+                          </div>
+                          <h4 className="text-lg font-semibold text-white mb-2">All Clear!</h4>
+                          <p className="text-slate-400 max-w-md">
+                            No significant weather alerts for the next 7 days. Conditions look favorable for production.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {alerts.map((alert) => {
+                          const colors = getSeverityColor(alert.severity);
+                          const alertDate = new Date(alert.date);
+                          const today = new Date();
+                          const daysUntil = Math.ceil((alertDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          return (
+                            <div
+                              key={alert.id}
+                              className={`p-4 rounded-lg border ${colors.bg} ${colors.border}`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-3">
+                                  <span className="text-2xl mt-0.5">{getAlertIcon(alert.type)}</span>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className={`font-semibold ${colors.text}`}>
+                                        {alert.title}
+                                      </h4>
+                                      <span className={`px-2 py-0.5 text-xs rounded-full ${colors.badge} text-white`}>
+                                        {alert.severity.toUpperCase()}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-slate-300 mt-1">
+                                      {alert.description}
+                                    </p>
+                                    <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                                      <span className="flex items-center gap-1">
+                                        <Calendar className="w-3 h-3" />
+                                        {alertDate.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                      </span>
+                                      {daysUntil === 0 && (
+                                        <span className="text-red-400 font-medium">Today</span>
+                                      )}
+                                      {daysUntil === 1 && (
+                                        <span className="text-orange-400 font-medium">Tomorrow</span>
+                                      )}
+                                      {daysUntil > 1 && (
+                                        <span>In {daysUntil} days</span>
+                                      )}
+                                      {alert.affectedDay && (
+                                        <span className="flex items-center gap-1 text-blue-400">
+                                          <Film className="w-3 h-3" />
+                                          Shoot Day {alert.affectedDay}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Recommended Actions */}
+                {(() => {
+                  const alerts = generateWeatherAlerts(weatherData.forecast, scheduleData?.shootingDays || scheduleData?.days);
+                  const hasCriticalOrHigh = alerts.some(a => a.severity === 'critical' || a.severity === 'high');
+                  
+                  if (!hasCriticalOrHigh) return null;
+                  
+                  return (
+                    <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <Lightbulb className="w-5 h-5 text-amber-400" />
+                        Recommended Actions
+                      </h3>
+                      <div className="space-y-3">
+                        {alerts.filter(a => a.severity === 'critical' || a.severity === 'high').slice(0, 5).map((alert, idx) => (
+                          <div key={idx} className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg">
+                            <ChevronRight className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-slate-300">
+                              {alert.affectedDay ? (
+                                <>Consider rescheduling or preparing indoor alternatives for Day {alert.affectedDay}</>
+                              ) : (
+                                <>Review {alert.date} plans - {alert.title.toLowerCase()}</>
+                              )}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

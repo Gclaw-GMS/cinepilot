@@ -26,6 +26,8 @@ import {
   FileText,
   Keyboard,
   Printer,
+  AlertTriangle,
+  CheckCircle,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
@@ -75,6 +77,16 @@ const EMPTY_SUMMARY: Summary = {
   byStatus: {},
 }
 
+interface TravelConflict {
+  id: string
+  type: 'budget' | 'duplicate' | 'missing-receipt' | 'pending-too-long' | 'high-value'
+  severity: 'high' | 'medium' | 'low'
+  expenseId: string
+  title: string
+  description: string
+  recommendation: string
+}
+
 export default function TravelExpensesPage() {
   const [expenses, setExpenses] = useState<TravelExpense[]>([])
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY)
@@ -86,6 +98,7 @@ export default function TravelExpensesPage() {
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' })
   const [showDateFilter, setShowDateFilter] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const showFiltersRef = useRef(showFilters)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -112,6 +125,14 @@ export default function TravelExpensesPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
+  const exportToMarkdownRef = useRef<() => void>(() => {})
+  const filterCategoryRef = useRef(filterCategory)
+  const filterStatusRef = useRef(filterStatus)
+  
+  // View mode for tabs
+  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
+  // Budget limit for conflict detection
+  const [budgetLimit, setBudgetLimit] = useState<number>(500000)
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
@@ -150,6 +171,21 @@ export default function TravelExpensesPage() {
     expensesLengthRef.current = expenses.length
   }, [expenses.length])
 
+  // Store filter category in ref for keyboard shortcuts
+  useEffect(() => {
+    filterCategoryRef.current = filterCategory
+  }, [filterCategory])
+
+  // Store filter status in ref for keyboard shortcuts
+  useEffect(() => {
+    filterStatusRef.current = filterStatus
+  }, [filterStatus])
+
+  // Store showFilters state in ref for keyboard shortcuts
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -174,6 +210,12 @@ export default function TravelExpensesPage() {
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          if (expensesLengthRef.current > 0) {
+            exportToMarkdownRef.current()
+          }
           break
         case '?':
           e.preventDefault()
@@ -201,6 +243,72 @@ export default function TravelExpensesPage() {
         case 's':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
+        case 'l':
+          e.preventDefault()
+          setViewMode('list')
+          break
+        case 'a':
+          e.preventDefault()
+          setViewMode('analytics')
+          break
+        case 'c':
+          e.preventDefault()
+          setViewMode('conflicts')
+          break
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
+          e.preventDefault()
+          const num = parseInt(e.key)
+          if (showFiltersRef.current) {
+            // When filter panel is OPEN: number keys filter by status
+            // Status options: all, pending, approved, rejected, reimbursed
+            const statusOptions = ['all', 'pending', 'approved', 'rejected', 'reimbursed']
+            if (num >= 1 && num <= 5) {
+              const statusIndex = num - 1
+              const status = statusOptions[statusIndex]
+              // Toggle: if same status selected, clear to all
+              setFilterStatus(filterStatusRef.current === status ? 'all' : status)
+            } else if (num === 0) {
+              // 0 clears status filter
+              setFilterStatus('all')
+            }
+          } else {
+            // When filter panel is CLOSED: number keys switch view modes (1-3) or filter categories (1-9)
+            if (num >= 1 && num <= 3) {
+              // View mode switching
+              switch (num) {
+                case 1:
+                  setViewMode('list')
+                  break
+                case 2:
+                  setViewMode('analytics')
+                  break
+                case 3:
+                  setViewMode('conflicts')
+                  break
+              }
+            } else if (num >= 4 && num <= 9) {
+              // Categories 4-9 map to CATEGORIES array indices 3-8
+              const catIndex = num - 1
+              if (catIndex < CATEGORIES.length) {
+                const catKey = CATEGORIES[catIndex].key
+                // Toggle: if same category selected, clear to all
+                setFilterCategory(filterCategoryRef.current === catKey ? 'all' : catKey)
+              }
+            } else if (num === 0) {
+              // 0 clears category filter when panel is closed
+              setFilterCategory('all')
+            }
+          }
           break
       }
     }
@@ -296,6 +404,91 @@ export default function TravelExpensesPage() {
     link.click()
     URL.revokeObjectURL(url)
   }
+
+  // Markdown Export function (uses sorted/filtered data)
+  const exportToMarkdown = () => {
+    if (filteredExpenses.length === 0) return
+
+    // Build summary statistics
+    const totalExpenses = filteredExpenses.length
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0)
+    
+    // Category breakdown
+    const byCategory: Record<string, number> = {}
+    const categoryCount: Record<string, number> = {}
+    filteredExpenses.forEach(exp => {
+      byCategory[exp.category] = (byCategory[exp.category] || 0) + exp.amount
+      categoryCount[exp.category] = (categoryCount[exp.category] || 0) + 1
+    })
+    
+    // Status breakdown
+    const byStatus: Record<string, number> = {}
+    filteredExpenses.forEach(exp => {
+      byStatus[exp.status] = (byStatus[exp.status] || 0) + 1
+    })
+
+    // Build markdown content
+    let markdown = `# CinePilot Travel Expenses Report
+
+**Generated:** ${new Date().toISOString().split('T')[0]}
+
+## Summary
+
+- **Total Expenses:** ${totalExpenses}
+- **Total Amount:** ₹${totalAmount.toLocaleString('en-IN')}
+- **Average per Expense:** ₹${Math.round(totalAmount / totalExpenses).toLocaleString('en-IN')}
+
+### By Category
+
+| Category | Count | Amount |
+|----------|-------|--------|
+`
+    Object.entries(byCategory).forEach(([category, amount]) => {
+      markdown += `| ${category} | ${categoryCount[category]} | ₹${amount.toLocaleString('en-IN')} |\n`
+    })
+
+    markdown += `
+### By Status
+
+| Status | Count |
+|--------|-------|
+`
+    Object.entries(byStatus).forEach(([status, count]) => {
+      const emoji = status === 'approved' ? '✅' : status === 'pending' ? '⏳' : status === 'rejected' ? '❌' : '💰'
+      markdown += `| ${emoji} ${status.charAt(0).toUpperCase() + status.slice(1)} | ${count} |\n`
+    })
+
+    markdown += `
+## Expenses Detail
+
+| Date | Person | Category | Description | Vendor | Amount | Status |
+|------|--------|----------|-------------|--------|--------|--------|
+`
+    filteredExpenses.forEach(exp => {
+      const match = exp.description.match(/^([^:]+):\s*(.*)$/)
+      const personName = match ? match[1] : ''
+      const description = match ? match[2] : exp.description
+      const statusEmoji = exp.status === 'approved' ? '✅' : exp.status === 'pending' ? '⏳' : exp.status === 'rejected' ? '❌' : '💰'
+      markdown += `| ${new Date(exp.date).toLocaleDateString('en-IN')} | ${personName || '-'} | ${exp.category} | ${description} | ${exp.vendor || '-'} | ₹${exp.amount.toLocaleString('en-IN')} | ${statusEmoji} ${exp.status} |\n`
+    })
+
+    markdown += `
+---
+
+*Generated by CinePilot - Film Production Management*
+`
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `travel-expenses-${new Date().toISOString().split('T')[0]}.md`
+    link.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }
+  
+  // Assign to ref for keyboard shortcuts
+  exportToMarkdownRef.current = exportToMarkdown
 
   // Print function
   const handlePrint = () => {
@@ -569,6 +762,110 @@ export default function TravelExpensesPage() {
     return count
   }, [filterCategory, filterStatus, dateRange, sortBy])
 
+  // Conflict detection
+  const travelConflicts = useMemo(() => {
+    const conflicts: TravelConflict[] = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // 1. Budget Overrun: Total expenses exceed budget limit
+    const totalExpenses = expenses.reduce((acc, exp) => acc + exp.amount, 0)
+    if (totalExpenses > budgetLimit) {
+      const overrun = totalExpenses - budgetLimit
+      conflicts.push({
+        id: 'budget-overrun',
+        type: 'budget',
+        severity: overrun > budgetLimit * 0.5 ? 'high' : 'medium',
+        expenseId: 'budget',
+        title: 'Budget Overrun',
+        description: `Total travel expenses (₹${totalExpenses.toLocaleString()}) exceed budget limit (₹${budgetLimit.toLocaleString()}) by ₹${overrun.toLocaleString()}`,
+        recommendation: 'Review expenses and reduce non-essential travel or upgrade to higher budget'
+      })
+    }
+
+    // 2. Duplicate Expenses: Same amount, same date, same vendor/category
+    const expenseMap: Record<string, TravelExpense[]> = {}
+    expenses.forEach(exp => {
+      const key = `${exp.date}-${exp.amount}-${exp.category}`
+      if (!expenseMap[key]) expenseMap[key] = []
+      expenseMap[key].push(exp)
+    })
+    Object.entries(expenseMap).forEach(([key, exps]) => {
+      if (exps.length > 1) {
+        exps.forEach(exp => {
+          conflicts.push({
+            id: `duplicate-${exp.id}`,
+            type: 'duplicate',
+            severity: 'medium',
+            expenseId: exp.id,
+            title: 'Possible Duplicate',
+            description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} may be a duplicate`,
+            recommendation: 'Verify this expense is unique and not a duplicate entry'
+          })
+        })
+      }
+    })
+
+    // 3. Missing Receipts: Expenses over ₹10,000 without notes
+    expenses.forEach(exp => {
+      if (exp.amount > 10000 && (!exp.notes || exp.notes.trim() === '')) {
+        conflicts.push({
+          id: `missing-receipt-${exp.id}`,
+          type: 'missing-receipt',
+          severity: 'high',
+          expenseId: exp.id,
+          title: 'Missing Receipt Documentation',
+          description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} has no notes/receipt reference`,
+          recommendation: 'Add receipt details or note explaining the expense'
+        })
+      }
+    })
+
+    // 4. Pending Too Long: Pending expenses older than 30 days
+    expenses.forEach(exp => {
+      if (exp.status === 'pending') {
+        const expenseDate = new Date(exp.date)
+        const daysPending = Math.floor((today.getTime() - expenseDate.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysPending > 30) {
+          conflicts.push({
+            id: `pending-${exp.id}`,
+            type: 'pending-too-long',
+            severity: daysPending > 60 ? 'high' : 'medium',
+            expenseId: exp.id,
+            title: 'Pending Expense Overdue',
+            description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} has been pending for ${daysPending} days`,
+            recommendation: 'Follow up with finance to process this pending expense'
+          })
+        }
+      }
+    })
+
+    // 5. High Value Items: Single expense over ₹50,000
+    expenses.forEach(exp => {
+      if (exp.amount > 50000) {
+        conflicts.push({
+          id: `high-value-${exp.id}`,
+          type: 'high-value',
+          severity: exp.amount > 100000 ? 'high' : 'medium',
+          expenseId: exp.id,
+          title: 'High Value Expense',
+          description: `${exp.category} expense of ₹${exp.amount.toLocaleString()} on ${exp.date} exceeds ₹50,000 threshold`,
+          recommendation: 'Ensure proper approval and documentation for this high-value expense'
+        })
+      }
+    })
+
+    return conflicts
+  }, [expenses, budgetLimit])
+
+  // Conflict stats
+  const conflictStats = useMemo(() => ({
+    total: travelConflicts.length,
+    high: travelConflicts.filter(c => c.severity === 'high').length,
+    medium: travelConflicts.filter(c => c.severity === 'medium').length,
+    low: travelConflicts.filter(c => c.severity === 'low').length,
+  }), [travelConflicts])
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
@@ -667,6 +964,7 @@ export default function TravelExpensesPage() {
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-cyan-400" />
                 <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
+                <span className="text-xs text-cyan-400/70">(1-5 for status, 0 to clear)</span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-slate-400">Category:</label>
@@ -675,9 +973,9 @@ export default function TravelExpensesPage() {
                   onChange={(e) => setFilterCategory(e.target.value)}
                   className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="all">All Categories</option>
-                  {CATEGORIES.map(cat => (
-                    <option key={cat.key} value={cat.key}>{cat.label}</option>
+                  <option value="all">All Categories (0)</option>
+                  {CATEGORIES.map((cat, idx) => (
+                    <option key={cat.key} value={cat.key}>{cat.label} ({idx + 1})</option>
                   ))}
                 </select>
               </div>
@@ -758,6 +1056,52 @@ export default function TravelExpensesPage() {
           </div>
         )}
 
+        {/* View Mode Tabs */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'list'
+                ? 'bg-cyan-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Plane className="w-4 h-4 inline-block mr-2" />
+            List
+          </button>
+          <button
+            onClick={() => setViewMode('analytics')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'analytics'
+                ? 'bg-cyan-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 inline-block mr-2" />
+            Analytics
+          </button>
+          <button
+            onClick={() => setViewMode('conflicts')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+              viewMode === 'conflicts'
+                ? 'bg-cyan-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4 inline-block" />
+            Conflicts
+            {conflictStats.high > 0 && (
+              <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {conflictStats.high}
+              </span>
+            )}
+          </button>
+          <span className="text-xs text-slate-500 ml-2">Press 1, 2, 3 to switch views</span>
+        </div>
+
+        {/* List/Analytics Views */}
+        {(viewMode === 'list' || viewMode === 'analytics') && (
+        <>
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
@@ -930,9 +1274,9 @@ export default function TravelExpensesPage() {
               onChange={(e) => setFilterCategory(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="all">All Categories</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.key} value={c.key}>{c.label}</option>
+              <option value="all">All Categories (0)</option>
+              {CATEGORIES.map((c, idx) => (
+                <option key={c.key} value={c.key}>{c.label} ({idx + 1})</option>
               ))}
             </select>
             <select
@@ -1011,6 +1355,14 @@ export default function TravelExpensesPage() {
                   >
                     <FileText className="w-4 h-4" />
                     Export JSON
+                  </button>
+                  <button
+                    onClick={() => { exportToMarkdown(); setShowExportMenu(false); }}
+                    disabled={filteredExpenses.length === 0}
+                    className="w-full px-4 py-2 text-left text-sm text-cyan-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export Markdown
                   </button>
                 </div>
               )}
@@ -1154,6 +1506,118 @@ export default function TravelExpensesPage() {
             </div>
           )}
         </div>
+        </>
+        )}
+
+        {/* Conflicts View */}
+        {viewMode === 'conflicts' && (
+          <div className="space-y-6">
+            {/* Budget Limit Input */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Budget Limit</h3>
+                  <p className="text-sm text-slate-400">Set threshold for budget alerts</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    value={budgetLimit}
+                    onChange={(e) => setBudgetLimit(Number(e.target.value))}
+                    className="w-40 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Conflict Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Total Issues</p>
+                <p className="text-3xl font-bold mt-1">{conflictStats.total}</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-xs text-red-400 uppercase tracking-wider">High Priority</p>
+                <p className="text-3xl font-bold text-red-400 mt-1">{conflictStats.high}</p>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                <p className="text-xs text-amber-400 uppercase tracking-wider">Medium</p>
+                <p className="text-3xl font-bold text-amber-400 mt-1">{conflictStats.medium}</p>
+              </div>
+              <div className="bg-slate-500/10 border border-slate-500/20 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Low</p>
+                <p className="text-3xl font-bold text-slate-400 mt-1">{conflictStats.low}</p>
+              </div>
+            </div>
+
+            {/* Conflicts List */}
+            {travelConflicts.length > 0 ? (
+              <div className="space-y-3">
+                {travelConflicts.map((conflict) => (
+                  <div
+                    key={conflict.id}
+                    className={`bg-slate-900 border rounded-xl p-4 ${
+                      conflict.severity === 'high'
+                        ? 'border-red-500/30'
+                        : conflict.severity === 'medium'
+                        ? 'border-amber-500/30'
+                        : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        conflict.severity === 'high'
+                          ? 'bg-red-500/20'
+                          : conflict.severity === 'medium'
+                          ? 'bg-amber-500/20'
+                          : 'bg-slate-500/20'
+                      }`}>
+                        <AlertTriangle className={`w-5 h-5 ${
+                          conflict.severity === 'high'
+                            ? 'text-red-400'
+                            : conflict.severity === 'medium'
+                            ? 'text-amber-400'
+                            : 'text-slate-400'
+                        }`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold">{conflict.title}</h4>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            conflict.severity === 'high'
+                              ? 'bg-red-500/20 text-red-400'
+                              : conflict.severity === 'medium'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {conflict.severity}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-500/20 text-cyan-400 capitalize">
+                            {conflict.type.replace(/-/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-400 mb-2">{conflict.description}</p>
+                        <p className="text-sm text-emerald-400">
+                          <span className="text-slate-500">Recommendation: </span>
+                          {conflict.recommendation}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+                <div className="p-4 rounded-full bg-emerald-500/20 w-fit mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-emerald-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">All Clear!</h3>
+                <p className="text-slate-400">No travel conflicts detected. Your expenses are in good shape.</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Add/Edit Modal */}
@@ -1310,6 +1774,10 @@ export default function TravelExpensesPage() {
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">M</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Print report</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">P</kbd>
               </div>
@@ -1321,9 +1789,49 @@ export default function TravelExpensesPage() {
                 <span className="text-slate-300">Show shortcuts</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>
               </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-slate-300">Close modal</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">Esc</kbd>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Switch to List view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Switch to Analytics view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Switch to Conflicts view</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Filter by category (1-9, when filters closed)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">1-9</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Clear category filter</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-indigo-400">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Filter to All Status (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Filter to Pending (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Filter to Approved (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Filter to Rejected (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Filter to Reimbursed (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">5</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Clear status filter (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">0</kbd>
               </div>
             </div>
           </div>

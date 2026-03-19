@@ -95,16 +95,22 @@ export default function ReportsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [tabFilter, setTabFilter] = useState<string>('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'date' | 'value'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const fetchReportRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>(() => {})
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (tabFilter !== 'all') count++
     if (searchQuery) count++
+    if (sortBy !== 'date' || sortOrder !== 'desc') count++
     return count
-  }, [tabFilter, searchQuery])
+  }, [tabFilter, searchQuery, sortBy, sortOrder])
 
   const fetchReport = useCallback(async () => {
     try {
@@ -179,6 +185,10 @@ export default function ReportsPage() {
           e.preventDefault()
           if (reportData) handlePrintRef.current?.()
           break
+        case 'm':
+          e.preventDefault()
+          if (reportData) handleExportMarkdownRef.current?.()
+          break
         case 'g':
           e.preventDefault()
           handleGenerate()
@@ -186,6 +196,10 @@ export default function ReportsPage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
         case 'escape':
           e.preventDefault()
@@ -195,6 +209,8 @@ export default function ReportsPage() {
           setShowFilters(false)
           setSearchQuery('')
           setTabFilter('all')
+          setSortBy('date')
+          setSortOrder('desc')
           break
       }
     }
@@ -306,6 +322,155 @@ export default function ReportsPage() {
     a.click()
     setExporting(false)
   }
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!reportData) return
+    setExporting(true)
+    setShowExportMenu(false)
+    
+    const formatCurrency = (amount: number) => {
+      if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`
+      if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)}L`
+      if (amount >= 1000) return `₹${(amount / 1000).toFixed(2)}K`
+      return `₹${amount}`
+    }
+
+    const markdown = `# CinePilot Production Report
+Generated: ${new Date().toLocaleDateString('en-IN', { 
+  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+})}
+
+---
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Scenes | ${reportData.production.totalScenes} |
+| Total Characters | ${reportData.production.totalCharacters} |
+| Total Locations | ${reportData.production.totalLocations} |
+| Shooting Days | ${reportData.production.shootingDays} |
+| Total Budget | ${formatCurrency(reportData.production.budget)} |
+| Total Spent | ${formatCurrency(reportData.production.spent)} |
+| Remaining | ${formatCurrency(reportData.production.budget - reportData.production.spent)} |
+| Budget Used | ${((reportData.production.spent / reportData.production.budget) * 100).toFixed(1)}% |
+
+---
+
+## Production Details
+
+### Overview
+- **Total Scenes:** ${reportData.production.totalScenes}
+- **Total Characters:** ${reportData.production.totalCharacters}
+- **Total Locations:** ${reportData.production.totalLocations}
+- **Shooting Days:** ${reportData.production.shootingDays}
+${reportData.production.vfxShots ? `- **VFX Shots:** ${reportData.production.vfxShots}` : ''}
+${reportData.production.totalShots ? `- **Total Shots:** ${reportData.production.totalShots}` : ''}
+
+---
+
+## Schedule Status
+
+| Metric | Value |
+|--------|-------|
+| Completed Days | ${reportData.schedule.completedDays} |
+| Total Days | ${reportData.schedule.totalDays} |
+| Scenes Shot | ${reportData.schedule.scenesShot} |
+| Total Scenes | ${reportData.schedule.totalScenes} |
+| Progress | ${((reportData.schedule.completedDays / reportData.schedule.totalDays) * 100).toFixed(1)}% |
+
+---
+
+## Crew Overview
+
+| Metric | Value |
+|--------|-------|
+| Total Members | ${reportData.crew.totalMembers} |
+| Departments | ${reportData.crew.departments} |
+| Total Daily Rate | ${formatCurrency(reportData.crew.totalDailyRate)} |
+
+${reportData.crew.departmentBreakdown ? `### Department Breakdown
+
+| Department | Members | Daily Rate |
+|------------|---------|------------|
+${reportData.crew.departmentBreakdown.map(d => `| ${d.name} | ${d.count} | ${formatCurrency(d.dailyRate)} |`).join('\n')}
+
+` : ''}---
+
+## Censor Certification
+
+| Metric | Value |
+|--------|-------|
+| Certificate | ${reportData.censor.certificate} |
+| Score | ${reportData.censor.score}/100 |
+| Issues | ${reportData.censor.issues} |
+
+${reportData.censor.flags ? `### Issue Breakdown
+
+| Category | Count |
+|----------|-------|
+${reportData.censor.flags.map(f => `| ${f.category} | ${f.count} |`).join('\n')}
+
+` : ''}---
+
+## Budget Summary
+
+| Category | Budget | Spent | Remaining |
+|----------|--------|-------|-----------|
+| Production | ${formatCurrency(reportData.production.budget)} | ${formatCurrency(reportData.production.spent)} | ${formatCurrency(reportData.production.budget - reportData.production.spent)} |
+
+---
+
+## VFX Status
+
+${reportData.vfx ? `| Metric | Value |
+|--------|-------|
+| Total Shots | ${reportData.vfx.totalShots} |
+| Completed | ${reportData.vfx.completed} |
+| Pending | ${reportData.vfx.pending} |
+
+### Complexity Breakdown
+
+| Level | Count |
+|-------|-------|
+${reportData.vfx.complexityBreakdown.map(c => `| ${c.level} | ${c.count} |`).join('\n')}
+
+` : '*No VFX data available*'}
+
+---
+
+## Locations Summary
+
+${reportData.locations ? `| Metric | Value |
+|--------|-------|
+| Total | ${reportData.locations.total} |
+| Indoor | ${reportData.locations.indoor} |
+| Outdoor | ${reportData.locations.outdoor} |
+
+### By Type
+
+| Type | Count |
+|------|-------|
+${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
+
+` : '*No location data available*'}
+
+---
+
+*Report generated by CinePilot*`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `production-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    setExporting(false)
+  }, [reportData])
+
+  // Update refs for keyboard shortcuts after function is defined
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown;
+  }, [handleExportMarkdown]);
 
   const handlePrint = useCallback(() => {
     if (!reportData) return
@@ -509,7 +674,7 @@ export default function ReportsPage() {
               className="pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 hover:border-gray-600 text-gray-300 rounded-lg text-sm w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             />
           </div>
-          {/* Filter Toggle Button */}
+          {/* Filter & Sort Toggle Button */}
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
@@ -517,10 +682,10 @@ export default function ReportsPage() {
                 ? 'bg-indigo-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
-            title="Toggle Filters (F)"
+            title="Toggle Filter & Sort (F)"
           >
             <Filter className="w-4 h-4" />
-            Filters
+            Filter & Sort
             {activeFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
                 {activeFilterCount}
@@ -552,6 +717,13 @@ export default function ReportsPage() {
                 >
                   <Download className="w-4 h-4 text-green-400" />
                   Export as CSV
+                </button>
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  Export as Markdown
                 </button>
               </div>
             )}
@@ -604,7 +776,7 @@ export default function ReportsPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm font-medium text-slate-300">Filters:</span>
+              <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Report Tab:</label>
@@ -621,8 +793,30 @@ export default function ReportsPage() {
                 <option value="censor">Censor</option>
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-400">Sort By:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="date">Date</option>
+                <option value="name">Name</option>
+                <option value="value">Value</option>
+              </select>
+            </div>
             <button
-              onClick={() => { setTabFilter('all'); setSearchQuery('') }}
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                sortBy !== 'date' || sortOrder !== 'desc'
+                  ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
+                  : 'bg-slate-700 border-slate-600 text-slate-400'
+              }`}
+            >
+              {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+            </button>
+            <button
+              onClick={() => { setTabFilter('all'); setSearchQuery(''); setSortBy('date'); setSortOrder('desc') }}
               className={`px-3 py-1.5 text-sm transition-colors ${
                 activeFilterCount > 0 
                   ? 'text-red-400 hover:text-red-300' 
@@ -630,7 +824,7 @@ export default function ReportsPage() {
               }`}
               disabled={activeFilterCount === 0}
             >
-              Clear Filters
+              Clear Filters & Sort
             </button>
           </div>
         </div>
@@ -954,8 +1148,12 @@ export default function ReportsPage() {
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">/</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Toggle filters</span>
+                <span className="text-gray-300">Toggle filters & sort</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">F</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Toggle sort order</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">S</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle export menu</span>
@@ -964,6 +1162,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Print report</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">P</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Export Markdown</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">M</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Generate report</span>

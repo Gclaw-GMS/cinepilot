@@ -58,6 +58,27 @@ const ANGLES = ['high', 'low', 'eye', 'dutch', 'bird', 'worm']
 const MOVEMENTS = ['static', 'pan', 'tilt', 'dolly', 'track', 'crane', 'handheld', 'steadicam', 'drone']
 const LENSES = [16, 24, 35, 50, 85, 100, 135, 200]
 
+// Demo data fallback for when database is not connected
+const DEMO_SHOTS: ShotData[] = [
+  { id: 'demo-1', shotIndex: 1, beatIndex: 1, shotText: 'Close-up of ARJUN looking at the photograph', characters: ['Arjun'], shotSize: 'CU', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 85, lensType: 'prime', keyStyle: 'motivated', colorTemp: 'warm', durationEstSec: 4, confidenceCamera: 0.95, confidenceLens: 0.9, confidenceLight: 0.85, confidenceDuration: 0.8, isLocked: false, userEdited: false, scene: { id: 's1', sceneNumber: '1', headingRaw: 'INT. ARJUN HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Arjun House' } },
+  { id: 'demo-2', shotIndex: 2, beatIndex: 2, shotText: 'Wide shot of the crowded market', characters: [], shotSize: 'WS', cameraAngle: 'eye', cameraMovement: 'steadicam', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'documentary', colorTemp: 'neutral', durationEstSec: 8, confidenceCamera: 0.88, confidenceLens: 0.82, confidenceLight: 0.9, confidenceDuration: 0.75, isLocked: false, userEdited: false, scene: { id: 's2', sceneNumber: '2', headingRaw: 'EXT. MARKET - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Market' } },
+  { id: 'demo-3', shotIndex: 3, beatIndex: 1, shotText: 'Medium shot of PRIYA entering the temple', characters: ['Priya'], shotSize: 'MS', cameraAngle: 'low', cameraMovement: 'dolly', focalLengthMm: 50, lensType: 'prime', keyStyle: 'classical', colorTemp: 'warm', durationEstSec: 6, confidenceCamera: 0.92, confidenceLens: 0.88, confidenceLight: 0.8, confidenceDuration: 0.85, isLocked: false, userEdited: false, scene: { id: 's3', sceneNumber: '3', headingRaw: 'EXT. TEMPLE - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Temple' } },
+  { id: 'demo-4', shotIndex: 4, beatIndex: 2, shotText: 'Over-the-shoulder of ARJUN talking to MAHENDRA', characters: ['Arjun', 'Mahendra'], shotSize: 'OTS', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 75, lensType: 'prime', keyStyle: 'conversational', colorTemp: 'neutral', durationEstSec: 12, confidenceCamera: 0.9, confidenceLens: 0.85, confidenceLight: 0.88, confidenceDuration: 0.7, isLocked: false, userEdited: false, scene: { id: 's4', sceneNumber: '4', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
+  { id: 'demo-5', shotIndex: 5, beatIndex: 1, shotText: 'Extreme close-up of eyes filling with tears', characters: ['Priya'], shotSize: 'ECU', cameraAngle: 'close', cameraMovement: 'static', focalLengthMm: 100, lensType: 'macro', keyStyle: 'emotional', colorTemp: 'cool', durationEstSec: 3, confidenceCamera: 0.97, confidenceLens: 0.95, confidenceLight: 0.92, confidenceDuration: 0.9, isLocked: false, userEdited: false, scene: { id: 's5', sceneNumber: '5', headingRaw: 'INT. BEDROOM - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'Bedroom' } },
+  { id: 'demo-6', shotIndex: 6, beatIndex: 2, shotText: 'Tracking shot following SATHYA through the forest', characters: ['Sathya'], shotSize: 'MWS', cameraAngle: 'eye', cameraMovement: 'track', focalLengthMm: 40, lensType: 'zoom', keyStyle: 'adventure', colorTemp: 'mixed', durationEstSec: 15, confidenceCamera: 0.85, confidenceLens: 0.8, confidenceLight: 0.75, confidenceDuration: 0.65, isLocked: false, userEdited: false, scene: { id: 's6', sceneNumber: '6', headingRaw: 'EXT. FOREST - DUSK', intExt: 'EXT', timeOfDay: 'DUSK', location: 'Forest' } },
+]
+
+const DEMO_SCENES: SceneInfo[] = [
+  { id: 's1', sceneNumber: '1', headingRaw: 'INT. ARJUN HOUSE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Arjun House', _count: { shots: 1 } },
+  { id: 's2', sceneNumber: '2', headingRaw: 'EXT. MARKET - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Market', _count: { shots: 1 } },
+  { id: 's3', sceneNumber: '3', headingRaw: 'EXT. TEMPLE - DAY', intExt: 'EXT', timeOfDay: 'DAY', location: 'Temple', _count: { shots: 1 } },
+  { id: 's4', sceneNumber: '4', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office', _count: { shots: 1 } },
+  { id: 's5', sceneNumber: '5', headingRaw: 'INT. BEDROOM - NIGHT', intExt: 'INT', timeOfDay: 'NIGHT', location: 'Bedroom', _count: { shots: 1 } },
+  { id: 's6', sceneNumber: '6', headingRaw: 'EXT. FOREST - DUSK', intExt: 'EXT', timeOfDay: 'DUSK', location: 'Forest', _count: { shots: 1 } },
+]
+
+const DEMO_STATS = { totalShots: 6, totalDuration: 48, missingFields: 2 }
+
 export default function ShotHubPage() {
   const [shots, setShots] = useState<ShotData[]>([])
   const [scenes, setScenes] = useState<SceneInfo[]>([])
@@ -74,6 +95,7 @@ export default function ShotHubPage() {
   const [sceneFilter, setSceneFilter] = useState('')
 
   const [scriptId, setScriptId] = useState<string | null>(null)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -136,7 +158,28 @@ export default function ShotHubPage() {
   const handleGenerateAllRef = useRef<() => Promise<void>>()
   const handleSaveShotsRef = useRef<() => Promise<void>>()
   const handlePrintRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
   const printingRef = useRef(printing)
+  
+  // Refs for keyboard shortcuts to avoid dependency issues
+  const showFilterPanelRef = useRef(showFilterPanel)
+  const filtersRef = useRef(filters)
+  const activeFilterCountRef = useRef(activeFilterCount)
+  const setFiltersRef = useRef(setFilters)
+  const clearFiltersRef = useRef(clearFilters)
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    showFilterPanelRef.current = showFilterPanel
+  }, [showFilterPanel])
+  
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
+  
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   const fetchScriptId = useCallback(async () => {
     try {
@@ -156,11 +199,27 @@ export default function ShotHubPage() {
     try {
       const res = await fetch(`/api/shots?scriptId=${sId}`)
       const data = await res.json()
-      setShots(data.shots || [])
-      setScenes(data.scenes || [])
-      setStats(data.stats || { totalShots: 0, totalDuration: 0, missingFields: 0 })
+      // Use demo data if API returns empty or error
+      if (!data.shots || data.shots.length === 0) {
+        console.log('[Shot-List] No data from API, using demo data')
+        setShots(DEMO_SHOTS)
+        setScenes(DEMO_SCENES)
+        setStats(DEMO_STATS)
+        setIsDemoMode(true)
+      } else {
+        setShots(data.shots || [])
+        setScenes(data.scenes || [])
+        setStats(data.stats || { totalShots: 0, totalDuration: 0, missingFields: 0 })
+        setIsDemoMode(false)
+      }
     } catch (e) {
-      console.error(e)
+      console.error('[Shot-List] Error fetching shots:', e)
+      // Fall back to demo data on error
+      console.log('[Shot-List] Using demo data due to error')
+      setShots(DEMO_SHOTS)
+      setScenes(DEMO_SCENES)
+      setStats(DEMO_STATS)
+      setIsDemoMode(true)
     } finally {
       setLoading(false)
     }
@@ -170,7 +229,15 @@ export default function ShotHubPage() {
     (async () => {
       const id = await fetchScriptId()
       if (id) await fetchShots(id)
-      else setLoading(false)
+      else {
+        // No script found, use demo data
+        console.log('[Shot-List] No script found, using demo data')
+        setShots(DEMO_SHOTS)
+        setScenes(DEMO_SCENES)
+        setStats(DEMO_STATS)
+        setIsDemoMode(true)
+        setLoading(false)
+      }
     })()
   }, [fetchScriptId, fetchShots])
 
@@ -226,6 +293,12 @@ export default function ShotHubPage() {
             setShowExportMenu(prev => !prev)
           }
           break
+        case 'm':
+          e.preventDefault()
+          if (shots.length > 0) {
+            handleExportMarkdownRef.current?.()
+          }
+          break
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
@@ -251,12 +324,42 @@ export default function ShotHubPage() {
             handlePrintRef.current?.()
           }
           break
+        // Number key shortcuts for filtering (when filter panel is open)
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            // Map number keys to shot size filters (1-8 for SHOT_SIZES)
+            const sizeIndex = parseInt(e.key) - 1
+            const size = SHOT_SIZES[sizeIndex]
+            if (size) {
+              const currentFilters = filtersRef.current
+              if (currentFilters.shotSize === size) {
+                setFilters(prev => ({ ...prev, shotSize: 'all' }))
+              } else {
+                setFilters(prev => ({ ...prev, shotSize: size }))
+              }
+            }
+          }
+          break
+        case '0':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            clearFiltersRef.current()
+          }
+          break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [scriptId, generating, saving, exporting, shots.length, showFilterPanel, activeFilterCount, sortOrder, sortBy])
+  }, [scriptId, generating, saving, exporting, shots.length, showFilterPanel, activeFilterCount, sortOrder, sortBy, filters, setFilters, clearFilters])
 
   // Click outside to close menus
   useEffect(() => {
@@ -422,6 +525,127 @@ export default function ShotHubPage() {
     setTimeout(() => setSaveMessage(null), 3000)
   }
 
+  // Export to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    // Compute filtered shots locally (same logic as filteredShots useMemo)
+    const activeSceneShots = selectedSceneId
+      ? shots.filter(s => s.scene.id === selectedSceneId)
+      : shots
+    
+    const locallyFiltered = activeSceneShots.filter(shot => {
+      if (filters.sceneId !== 'all' && shot.scene.id !== filters.sceneId) return false
+      if (filters.shotSize !== 'all' && shot.shotSize !== filters.shotSize) return false
+      if (filters.cameraAngle !== 'all' && shot.cameraAngle !== filters.cameraAngle) return false
+      if (filters.cameraMovement !== 'all' && shot.cameraMovement !== filters.cameraMovement) return false
+      return true
+    })
+
+    if (!locallyFiltered.length) return
+    setExporting(true)
+    setShowExportMenu(false)
+
+    const totalDuration = locallyFiltered.reduce((sum, s) => sum + (s.durationEstSec || 0), 0)
+    const avgConfidence = locallyFiltered.length > 0
+      ? locallyFiltered.reduce((sum, s) => {
+          const conf = ((s.confidenceCamera || 0) + (s.confidenceLens || 0) + (s.confidenceLight || 0) + (s.confidenceDuration || 0)) / 4
+          return sum + conf
+        }, 0) / locallyFiltered.length
+      : 0
+
+    const scenesBreakdown = locallyFiltered.reduce((acc, shot) => {
+      const sceneNum = shot.scene.sceneNumber || 'Unknown'
+      if (!acc[sceneNum]) acc[sceneNum] = { count: 0, shots: [] }
+      acc[sceneNum].count++
+      acc[sceneNum].shots.push(shot.shotIndex)
+      return acc
+    }, {} as Record<string, { count: number, shots: number[] }>)
+
+    const shotSizeBreakdown = locallyFiltered.reduce((acc, shot) => {
+      const size = shot.shotSize || 'Unspecified'
+      acc[size] = (acc[size] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const cameraMovementBreakdown = locallyFiltered.reduce((acc, shot) => {
+      const movement = shot.cameraMovement || 'Unspecified'
+      acc[movement] = (acc[movement] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const formatDuration = (sec: number) => {
+      const m = Math.floor(sec / 60)
+      const s = Math.round(sec % 60)
+      return m > 0 ? `${m}m ${s}s` : `${s}s`
+    }
+
+    let markdown = `# Shot List Report - CinePilot
+
+> Generated: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Shots | ${locallyFiltered.length} |
+| Total Scenes | ${Object.keys(scenesBreakdown).length} |
+| Total Duration | ${formatDuration(totalDuration)} |
+| Avg Confidence | ${(avgConfidence * 100).toFixed(1)}% |
+| Locked Shots | ${locallyFiltered.filter(s => s.isLocked).length} |
+
+## Filters Applied
+
+- **Scene Filter:** ${filters.sceneId === 'all' ? 'All Scenes' : scenes.find(s => s.id === filters.sceneId)?.sceneNumber || filters.sceneId}
+- **Shot Size:** ${filters.shotSize === 'all' ? 'All' : filters.shotSize}
+- **Camera Angle:** ${filters.cameraAngle === 'all' ? 'All' : filters.cameraAngle}
+- **Camera Movement:** ${filters.cameraMovement === 'all' ? 'All' : filters.cameraMovement}
+- **Sort By:** ${sortBy} (${sortOrder})
+
+## Shot Size Breakdown
+
+| Shot Size | Count |
+|-----------|-------|
+${Object.entries(shotSizeBreakdown).map(([size, count]) => `| ${size} | ${count} |`).join('\n')}
+
+## Camera Movement Breakdown
+
+| Movement | Count |
+|---------|-------|
+${Object.entries(cameraMovementBreakdown).map(([movement, count]) => `| ${movement} | ${count} |`).join('\n')}
+
+## Scenes Overview
+
+| Scene | Shot Count | Shot Numbers |
+|-------|------------|--------------|
+${Object.entries(scenesBreakdown).map(([scene, data]) => `| ${scene} | ${data.count} | ${data.shots.join(', ')} |`).join('\n')}
+
+## Detailed Shot List
+
+| # | Scene | Shot Size | Angle | Movement | Duration | Confidence | Locked |
+|---|-------|-----------|-------|----------|----------|-------------|--------|
+${locallyFiltered.map(shot => {
+  const confidence = ((shot.confidenceCamera || 0) + (shot.confidenceLens || 0) + (shot.confidenceLight || 0) + (shot.confidenceDuration || 0)) / 4
+  return `| ${shot.shotIndex} | ${shot.scene.sceneNumber || '-'} | ${shot.shotSize || '-'} | ${shot.cameraAngle || '-'} | ${shot.cameraMovement || '-'} | ${shot.durationEstSec ? formatDuration(shot.durationEstSec) : '-'} | ${(confidence * 100).toFixed(0)}% | ${shot.isLocked ? '🔒' : '🔓'} |`
+}).join('\n')}
+
+---
+
+*Report generated by CinePilot - Film Production Management*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const downloadUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = `shot-list-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(downloadUrl)
+    setSaveMessage({ type: 'success', text: `Exported ${locallyFiltered.length} shots to Markdown` })
+    setExporting(false)
+    setTimeout(() => setSaveMessage(null), 3000)
+  }, [shots, filters, sortBy, sortOrder, scenes, selectedSceneId])
+
   // Print shot list
   const handlePrint = useCallback(() => {
     if (!shots.length) return
@@ -548,6 +772,11 @@ export default function ShotHubPage() {
   useEffect(() => {
     handlePrintRef.current = handlePrint
   }, [handlePrint])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   useEffect(() => {
     printingRef.current = printing
@@ -724,10 +953,15 @@ export default function ShotHubPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg text-gray-400">&#8592;</Link>
-          <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">Shot Hub</h1>
-            <p className="text-gray-500 text-sm mt-0.5">AI-powered shot breakdown engine</p>
+            {isDemoMode && (
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded">
+                DEMO
+              </span>
+            )}
           </div>
+          <p className="text-gray-500 text-sm mt-0.5">AI-powered shot breakdown engine</p>
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -763,7 +997,7 @@ export default function ShotHubPage() {
               <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-36 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+              <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
                 <button
                   onClick={() => { handleExportShots('csv'); setShowExportMenu(false) }}
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
@@ -775,6 +1009,12 @@ export default function ShotHubPage() {
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
                 >
                   Export JSON
+                </button>
+                <button
+                  onClick={() => { handleExportMarkdown(); setShowExportMenu(false) }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700 text-cyan-400"
+                >
+                  Export Markdown
                 </button>
               </div>
             )}
@@ -1232,6 +1472,15 @@ export default function ShotHubPage() {
                 <span className="text-gray-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">F</kbd>
               </div>
+              {/* Number key shortcuts - shown only when filter panel is open */}
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-cyan-300">Filter by shot size (when F open)</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-300">1-8</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-cyan-300">Clear all filters (when F open)</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-300">0</kbd>
+              </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Toggle sort order</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">S</kbd>
@@ -1247,6 +1496,10 @@ export default function ShotHubPage() {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Export menu</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">E</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Export Markdown</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">M</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Print shot list</span>

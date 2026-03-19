@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
@@ -181,15 +181,91 @@ export default function AnalyticsPage() {
     timePeriod: 'all',
     department: 'all',
   })
-  const [sortBy, setSortBy] = useState<'name' | 'efficiency' | 'utilization'>('name')
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'category' | 'allocated' | 'spent' | 'name' | 'efficiency' | 'utilization' | 'timestamp' | 'type'>('category')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  // Sort options
+  const sortOptions = [
+    { key: 'category', label: 'Category' },
+    { key: 'allocated', label: 'Allocated' },
+    { key: 'spent', label: 'Spent' },
+    { key: 'name', label: 'Department' },
+    { key: 'efficiency', label: 'Efficiency' },
+    { key: 'utilization', label: 'Utilization' },
+    { key: 'timestamp', label: 'Timestamp' },
+    { key: 'type', label: 'Type' },
+  ]
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   // Calculate active filter count
-  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'name' || sortOrder !== 'asc' ? 1 : 0)
+  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
+
+  // Sorted data using useMemo
+  const sortedBudgetData = useMemo(() => {
+    if (!dashboard?.budget_breakdown) return []
+    const data = [...dashboard.budget_breakdown]
+    return data.sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'category') {
+        comparison = a.category.localeCompare(b.category)
+      } else if (sortBy === 'allocated') {
+        comparison = a.allocated - b.allocated
+      } else if (sortBy === 'spent') {
+        comparison = a.spent - b.spent
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [dashboard?.budget_breakdown, sortBy, sortOrder])
+
+  const sortedDepartmentData = useMemo(() => {
+    if (!metrics?.department_stats) return []
+    const data = [...metrics.department_stats]
+    return data.sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'name') {
+        comparison = a.name.localeCompare(b.name)
+      } else if (sortBy === 'efficiency') {
+        comparison = a.efficiency - b.efficiency
+      } else if (sortBy === 'utilization') {
+        comparison = a.utilization - b.utilization
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [metrics?.department_stats, sortBy, sortOrder])
+
+  const sortedActivitiesData = useMemo(() => {
+    if (!dashboard?.recent_activities) return []
+    const data = [...dashboard.recent_activities]
+    return data.sort((a, b) => {
+      let comparison = 0
+      if (sortBy === 'timestamp') {
+        comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      } else if (sortBy === 'type') {
+        comparison = a.type.localeCompare(b.type)
+      } else if (sortBy === 'category') {
+        comparison = a.type.localeCompare(b.type)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [dashboard?.recent_activities, sortBy, sortOrder])
+
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+
+  // Clear filters and sort
+  const handleClearFilters = () => {
+    setFilters({ timePeriod: 'all', department: 'all' })
+    setSortBy('category')
+    setSortOrder('asc')
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -260,11 +336,16 @@ export default function AnalyticsPage() {
           break
         case 's':
           e.preventDefault()
-          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          toggleSortOrder()
           break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
+          break
+        case 'm':
+          e.preventDefault()
+          // Use ref to avoid dependency issues - refs are always available
+          handleExportMarkdownRef.current?.()
           break
         case 'p':
           e.preventDefault()
@@ -277,12 +358,14 @@ export default function AnalyticsPage() {
           setShowPrintMenu(false)
           setShowFilterPanel(false)
           setSearchQuery('')
+          handleClearFilters()
           break
       }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Click outside to close menus
@@ -327,7 +410,7 @@ export default function AnalyticsPage() {
       [],
       ['Budget Breakdown'],
       ['Category', 'Allocated', 'Spent'],
-      ...dashboard.budget_breakdown.map(b => [b.category, b.allocated.toString(), b.spent.toString()]),
+      ...sortedBudgetData.map(b => [b.category, b.allocated.toString(), b.spent.toString()]),
     ]
 
     const csv = rows.map(r => r.join(',')).join('\n')
@@ -346,24 +429,23 @@ export default function AnalyticsPage() {
 
     const exportData = {
       exportDate: new Date().toISOString(),
-      filters: {
-        timePeriod: filters.timePeriod,
-        department: filters.department,
-        searchQuery,
-      },
-      sort: {
-        sortBy,
-        sortOrder,
-      },
       overview: dashboard.overview,
       timeline: metrics.timeline,
       performance: metrics.performance,
       predictions: metrics.predictions,
-      budgetBreakdown: dashboard.budget_breakdown,
+      budgetBreakdown: sortedBudgetData,
       scheduleProgress: dashboard.schedule_progress,
-      departmentStats: sortedDeptStats,
-      recentActivities: dashboard.recent_activities,
+      departmentStats: sortedDepartmentData,
+      recentActivities: sortedActivitiesData,
       upcomingShoots: dashboard.upcoming_shoots,
+      sortMetadata: {
+        sortBy,
+        sortOrder,
+      },
+      filterMetadata: {
+        timePeriod: filters.timePeriod,
+        department: filters.department,
+      },
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -373,6 +455,180 @@ export default function AnalyticsPage() {
     a.click()
     setExporting(false)
   }
+
+  // Markdown export function
+  const handleExportMarkdown = useCallback(() => {
+    if (!dashboard || !metrics) return
+    setExporting(true)
+    setShowExportMenu(false)
+
+    const overview = dashboard.overview
+    const timeline = metrics.timeline
+    const performance = metrics.performance
+    const predictions = metrics.predictions
+
+    // Build Markdown content
+    let markdown = `# CinePilot Analytics Report
+
+> Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+---
+
+## 📊 Production Overview
+
+| Metric | Value |
+|--------|-------|
+| Total Scenes | ${overview.total_scenes} |
+| Completed Scenes | ${overview.completed_scenes} |
+| Completion | ${((overview.completed_scenes / overview.total_scenes) * 100).toFixed(1)}% |
+| Total Locations | ${overview.total_locations} |
+| Total Characters | ${overview.total_characters} |
+| Shooting Days | ${overview.shooting_days_completed} / ${overview.shooting_days_total} |
+| Crew Members | ${overview.crew_members} |
+
+---
+
+## 💰 Budget Summary
+
+| Metric | Amount |
+|--------|--------|
+| Total Budget | ₹${(overview.budget_total / 10000000).toFixed(2)} Cr |
+| Spent | ₹${(overview.budget_spent / 10000000).toFixed(2)} Cr |
+| Remaining | ₹${(overview.budget_remaining / 10000000).toFixed(2)} Cr |
+| Utilization | ${overview.budget_total > 0 ? ((overview.budget_spent / overview.budget_total) * 100).toFixed(1) : 0}% |
+
+### Budget Breakdown
+
+| Category | Allocated | Spent | Remaining |
+|----------|-----------|-------|-----------|
+`
+
+    sortedBudgetData.forEach(b => {
+      const remaining = b.allocated - b.spent
+      markdown += `| ${b.category} | ₹${(b.allocated / 100000).toFixed(1)}L | ₹${(b.spent / 100000).toFixed(1)}L | ₹${(remaining / 100000).toFixed(1)}L |\n`
+    })
+
+    markdown += `
+
+---
+
+## 🎬 Shot & VFX Progress
+
+| Metric | Total | Completed | Remaining |
+|--------|-------|----------|-----------|
+| Total Shots | ${overview.total_shots} | ${overview.completed_shots} | ${overview.total_shots - overview.completed_shots} |
+| VFX Shots | ${overview.vfx_shots} | ${overview.completed_vfx} | ${overview.vfx_shots - overview.completed_vfx} |
+
+---
+
+## 📈 Timeline Metrics
+
+| Metric | Value |
+|--------|-------|
+| Overall Progress | ${timeline.overall_progress}% |
+| Days Remaining | ${timeline.days_remaining} |
+| Scenes Remaining | ${timeline.scenes_remaining} |
+| Budget Utilization | ${timeline.budget_utilization.toFixed(1)}% |
+
+---
+
+## ⚡ Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| Avg Scenes/Day | ${performance.avg_scenes_per_day.toFixed(1)} |
+| Avg Shots/Scene | ${performance.avg_shots_per_scene.toFixed(1)} |
+| Budget Burn Rate | ₹${(performance.budget_burn_rate / 100000).toFixed(1)}L/day |
+| Efficiency Score | ${performance.efficiency_score}% |
+
+---
+
+## 🔮 Predictions
+
+| Metric | Value |
+|--------|-------|
+| Projected Completion | ${new Date(predictions.projected_completion).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} |
+| Projected Budget Overrun | ₹${(predictions.projected_budget_overrun / 100000).toFixed(1)}L |
+| Risk Level | ${predictions.risk_level.charAt(0).toUpperCase() + predictions.risk_level.slice(1)} |
+
+---
+
+## 👥 Department Efficiency
+
+| Department | Efficiency | Utilization |
+|------------|------------|-------------|
+`
+
+    sortedDepartmentData.forEach(d => {
+      markdown += `| ${d.name} | ${d.efficiency}% | ${d.utilization}% |\n`
+    })
+
+    markdown += `
+
+---
+
+## 📅 Upcoming Shoots
+
+| Date | Location | Scenes | Call Time |
+|------|----------|--------|-----------|
+`
+
+    dashboard.upcoming_shoots.forEach(shoot => {
+      markdown += `| ${new Date(shoot.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} | ${shoot.location} | ${shoot.scenes.join(', ')} | ${shoot.call_time} |\n`
+    })
+
+    markdown += `
+
+---
+
+## 🔄 Recent Activities
+
+| Time | User | Activity |
+|------|------|----------|
+`
+
+    sortedActivitiesData.slice(0, 10).forEach(activity => {
+      const time = new Date(activity.timestamp).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      let activityDesc = ''
+      switch (activity.type) {
+        case 'scene_shot': activityDesc = `Shot scene ${activity.scene}`; break;
+        case 'schedule_updated': activityDesc = 'Updated schedule'; break;
+        case 'budget_approved': activityDesc = `Approved budget: ₹${(activity.amount! / 100000).toFixed(1)}L`; break;
+        case 'location_added': activityDesc = `Added location: ${activity.location}`; break;
+        case 'crew_assigned': activityDesc = `Assigned crew: ${activity.crew}`; break;
+        default: activityDesc = activity.type;
+      }
+      markdown += `| ${time} | ${activity.user} | ${activityDesc} |\n`
+    })
+
+    markdown += `
+
+---
+
+## 📋 Filters Applied
+
+- **Time Period**: ${filters.timePeriod === 'all' ? 'All Time' : filters.timePeriod}
+- **Department**: ${filters.department === 'all' ? 'All Departments' : filters.department}
+- **Sort By**: ${sortBy} (${sortOrder})
+
+---
+
+*Report generated by CinePilot - Film Production Management*
+`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    setExporting(false)
+  }, [dashboard, metrics, sortedBudgetData, sortedDepartmentData, sortedActivitiesData, filters, sortBy, sortOrder])
+
+  // Ref for keyboard shortcut
+  const handleExportMarkdownRef = useRef(handleExportMarkdown)
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -388,7 +644,7 @@ export default function AnalyticsPage() {
 
   const clearFilters = () => {
     setFilters({ timePeriod: 'all', department: 'all' })
-    setSortBy('name')
+    setSortBy('category')
     setSortOrder('asc')
   }
 
@@ -411,8 +667,8 @@ export default function AnalyticsPage() {
     const timeline = metrics.timeline
     const performance = metrics.performance
     
-    // Build budget breakdown rows
-    const budgetRows = dashboard.budget_breakdown.map(b => {
+    // Build budget breakdown rows (using sorted data)
+    const budgetRows = sortedBudgetData.map(b => {
       const variance = b.allocated - b.spent
       const varianceClass = variance >= 0 ? 'positive' : 'negative'
       return `<tr>
@@ -433,8 +689,8 @@ export default function AnalyticsPage() {
       </tr>`
     }).join('')
     
-    // Build department stats rows
-    const deptRows = metrics.department_stats.map(d => {
+    // Build department stats rows (using sorted data)
+    const deptRows = sortedDepartmentData.map(d => {
       return `<tr>
         <td>${d.name}</td>
         <td>${d.efficiency}%</td>
@@ -608,12 +864,12 @@ export default function AnalyticsPage() {
   const budgetPercent = dashboard ? Math.round((dashboard.overview.budget_spent / dashboard.overview.budget_total) * 100) : 0
   const scenePercent = dashboard ? Math.round((dashboard.overview.completed_scenes / dashboard.overview.total_scenes) * 100) : 0
 
-  const budgetData = dashboard?.budget_breakdown.map(item => ({
+  const budgetData = sortedBudgetData.map(item => ({
     ...item,
     utilization: Math.round((item.spent / item.allocated) * 100),
   })) || []
 
-  const deptData = metrics?.department_stats || []
+  const deptData = sortedDepartmentData
 
   // Filter data based on search query
   const filteredActivities = dashboard?.recent_activities.filter(activity => {
@@ -638,28 +894,11 @@ export default function AnalyticsPage() {
     )
   }) || []
 
-  const filteredDeptStats = metrics?.department_stats.filter(dept => {
+  const filteredDeptStats = sortedDepartmentData.filter(dept => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return dept.name.toLowerCase().includes(query)
   }) || []
-
-  // Sort department stats
-  const sortedDeptStats = [...filteredDeptStats].sort((a, b) => {
-    let comparison = 0
-    switch (sortBy) {
-      case 'name':
-        comparison = a.name.localeCompare(b.name)
-        break
-      case 'efficiency':
-        comparison = a.efficiency - b.efficiency
-        break
-      case 'utilization':
-        comparison = a.utilization - b.utilization
-        break
-    }
-    return sortOrder === 'asc' ? comparison : -comparison
-  })
 
   if (loading) {
     return (
@@ -722,10 +961,10 @@ export default function AnalyticsPage() {
             <button
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-              title="Filters (F)"
+              title="Filter & Sort (F)"
             >
               <Filter className="w-4 h-4" />
-              Filters
+              Filter & Sort
               {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-xs rounded-full">
                   {activeFilterCount}
@@ -733,9 +972,43 @@ export default function AnalyticsPage() {
               )}
             </button>
             {showFilterPanel && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-700">
                   <h3 className="text-white font-medium mb-3">Filter & Sort</h3>
+                  
+                  {/* Sort Options */}
+                  <div className="mb-4 p-3 bg-indigo-900/30 rounded-lg border border-indigo-700/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-indigo-300 font-medium">Sort By</label>
+                      <button
+                        onClick={toggleSortOrder}
+                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded transition-colors"
+                        title="Toggle sort order (S)"
+                      >
+                        {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                      </button>
+                    </div>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <optgroup label="Budget">
+                        <option value="category">Category</option>
+                        <option value="allocated">Allocated</option>
+                        <option value="spent">Spent</option>
+                      </optgroup>
+                      <optgroup label="Department">
+                        <option value="name">Department</option>
+                        <option value="efficiency">Efficiency</option>
+                        <option value="utilization">Utilization</option>
+                      </optgroup>
+                      <optgroup label="Activities">
+                        <option value="timestamp">Timestamp</option>
+                        <option value="type">Type</option>
+                      </optgroup>
+                    </select>
+                  </div>
                   
                   {/* Time Period Filter */}
                   <div className="mb-4">
@@ -770,36 +1043,13 @@ export default function AnalyticsPage() {
                     </select>
                   </div>
                   
-                  {/* Sort Options */}
-                  <div className="mb-4">
-                    <label className="block text-sm text-slate-400 mb-2">Sort By (Dept Stats)</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="name">Name</option>
-                        <option value="efficiency">Efficiency</option>
-                        <option value="utilization">Utilization</option>
-                      </select>
-                      <button
-                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
-                        title="Toggle sort order"
-                      >
-                        {sortOrder === 'asc' ? '↑' : '↓'}
-                      </button>
-                    </div>
-                  </div>
-                  
                   {/* Clear Filters */}
                   {activeFilterCount > 0 && (
                     <button
-                      onClick={clearFilters}
+                      onClick={handleClearFilters}
                       className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
                     >
-                      Clear Filters
+                      Clear Filters & Sort
                     </button>
                   )}
                 </div>
@@ -823,6 +1073,13 @@ export default function AnalyticsPage() {
             </button>
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  Export as Markdown
+                </button>
                 <button
                   onClick={handleExportJSON}
                   className="w-full flex items-center gap-2 px-4 py-3 text-left text-slate-200 hover:bg-slate-700 transition-colors"
@@ -1167,15 +1424,15 @@ export default function AnalyticsPage() {
               Department Performance
               {searchQuery && (
                 <span className="ml-2 text-sm text-slate-400">
-                  ({sortedDeptStats.length} of {deptData.length})
+                  ({filteredDeptStats.length} of {deptData.length})
                 </span>
               )}
             </h3>
-            {sortedDeptStats.length === 0 && searchQuery ? (
+            {filteredDeptStats.length === 0 && searchQuery ? (
               <p className="text-slate-500 text-center py-8">No departments match "{searchQuery}"</p>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sortedDeptStats}>
+                <BarChart data={filteredDeptStats}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="name" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" domain={[0, 100]} />
@@ -1341,16 +1598,17 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh analytics data' },
-                { key: 'F', description: 'Toggle filters panel' },
+                { key: 'F', description: 'Toggle filter & sort panel' },
                 { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'E', description: 'Toggle export dropdown' },
+                { key: 'M', description: 'Export as Markdown' },
                 { key: 'P', description: 'Print analytics report' },
                 { key: '/', description: 'Focus search input' },
                 { key: '1', description: 'Switch to Overview view' },
                 { key: '2', description: 'Switch to Performance view' },
                 { key: '3', description: 'Switch to Forecast view' },
                 { key: '?', description: 'Show this help modal' },
-                { key: 'Esc', description: 'Close modal, menus, or clear search' },
+                { key: 'Esc', description: 'Close modal, menus, or clear filters & sort' },
               ].map((shortcut) => (
                 <div 
                   key={shortcut.key}

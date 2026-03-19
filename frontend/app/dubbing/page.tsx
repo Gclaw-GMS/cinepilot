@@ -73,6 +73,10 @@ export default function DubbingPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [languageFilter, setLanguageFilter] = useState('all')
   
+  // Refs for keyboard shortcuts (to avoid dependency issues)
+  const languageFilterRef = useRef(languageFilter)
+  const showFilterPanelRef = useRef(showFilterPanel)
+  
   // Sort state
   const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -111,10 +115,20 @@ export default function DubbingPage() {
   // Active filter count (includes sort as active filter)
   const activeFilterCount = (languageFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
   
+  // Keep refs in sync with state
+  useEffect(() => {
+    languageFilterRef.current = languageFilter
+  }, [languageFilter])
+  
+  useEffect(() => {
+    showFilterPanelRef.current = showFilterPanel
+  }, [showFilterPanel])
+  
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
   const printDubbingReportRef = useRef<() => void>()
+  const handleExportMarkdownRef = useRef<() => void>()
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -141,6 +155,27 @@ export default function DubbingPage() {
           e.preventDefault()
           setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
           break
+        // Number keys for language filtering (when filter panel is open)
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            const langIndex = parseInt(e.key) - 1
+            const languages = ['telugu', 'hindi', 'malayalam', 'kannada', 'english']
+            const targetLang = languages[langIndex]
+            const current = languageFilterRef.current
+            setLanguageFilter(current === targetLang ? 'all' : targetLang)
+          }
+          break
+        case '0':
+          if (showFilterPanelRef.current) {
+            e.preventDefault()
+            setLanguageFilter('all')
+          }
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(!showExportMenu)
@@ -149,6 +184,12 @@ export default function DubbingPage() {
           e.preventDefault()
           if (dubbedVersions.length > 0) {
             printDubbingReportRef.current?.()
+          }
+          break
+        case 'm':
+          e.preventDefault()
+          if (dubbedVersions.length > 0) {
+            handleExportMarkdownRef.current?.()
           }
           break
         case '?':
@@ -307,6 +348,82 @@ export default function DubbingPage() {
     setShowExportMenu(false)
   }
 
+  // Markdown Export function
+  const handleExportMarkdown = useCallback(() => {
+    const dataToExport = filteredVersions.length > 0 ? filteredVersions : dubbedVersions
+    
+    if (dataToExport.length === 0) {
+      setError('No dubbed versions to export')
+      return
+    }
+    
+    const languageLabels: Record<string, string> = {
+      telugu: 'Telugu',
+      hindi: 'Hindi',
+      malayalam: 'Malayalam',
+      kannada: 'Kannada',
+      english: 'English'
+    }
+    
+    // Calculate stats
+    const languages = [...new Set(dataToExport.map(d => d.language))]
+    const byLanguage = languages.map(lang => ({
+      language: lang,
+      label: languageLabels[lang] || lang,
+      count: dataToExport.filter(d => d.language === lang).length
+    }))
+    
+    // Build markdown
+    let md = `# CinePilot - Dubbed Scripts Report\n\n`
+    md += `**Generated:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\n`
+    
+    // Summary stats
+    md += `## Summary\n\n`
+    md += `- **Total Dubbed Versions:** ${dataToExport.length}\n`
+    md += `- **Languages:** ${languages.length}\n`
+    md += `- **Preview Scenes:** ${preview.length}\n`
+    if (languageFilter !== 'all') {
+      md += `- **Filter Applied:** ${languageLabels[languageFilter] || languageFilter}\n`
+    }
+    
+    // By Language breakdown
+    md += `\n## By Language\n\n`
+    md += `| Language | Versions |\n|----------|----------|\n`
+    byLanguage.forEach(item => {
+      md += `| ${item.label} | ${item.count} |\n`
+    })
+    
+    // Dubbed versions table
+    md += `\n## Dubbed Versions\n\n`
+    md += `| # | Title | Language | Created |\n`
+    md += `|---|-------|----------|--------|\n`
+    dataToExport.forEach((d, idx) => {
+      md += `| ${idx + 1} | ${d.title} | ${languageLabels[d.language] || d.language} | ${new Date(d.createdAt).toLocaleDateString()} |\n`
+    })
+    
+    // Preview scenes (if any)
+    if (preview.length > 0) {
+      md += `\n## Preview Scenes\n\n`
+      preview.forEach(scene => {
+        md += `### Scene ${scene.sceneNumber}\n\n`
+        md += `\`\`\`\n${scene.translatedDialogue}\n\`\`\`\n`
+        if (scene.notes) {
+          md += `*Note: ${scene.notes}*\n`
+        }
+        md += `\n`
+      })
+    }
+    
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dubbed-scripts-${new Date().toISOString().split('T')[0]}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+  }, [filteredVersions, dubbedVersions, preview, languageFilter])
+
   // Print function
   const printDubbingReport = useCallback(() => {
     if (dubbedVersions.length === 0) return
@@ -443,6 +560,10 @@ export default function DubbingPage() {
   useEffect(() => {
     printDubbingReportRef.current = printDubbingReport
   }, [printDubbingReport])
+
+  useEffect(() => {
+    handleExportMarkdownRef.current = handleExportMarkdown
+  }, [handleExportMarkdown])
 
   useEffect(() => {
     if (selectedScriptId) {
@@ -587,9 +708,9 @@ export default function DubbingPage() {
                         onChange={(e) => setLanguageFilter(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                       >
-                        <option value="all">All Languages</option>
-                        {TARGET_LANGUAGES.map(lang => (
-                          <option key={lang.value} value={lang.value}>{lang.label}</option>
+                        <option value="all">All Languages (0)</option>
+                        {TARGET_LANGUAGES.map((lang, index) => (
+                          <option key={lang.value} value={lang.value}>{lang.label} ({index + 1})</option>
                         ))}
                       </select>
                     </div>
@@ -659,6 +780,13 @@ export default function DubbingPage() {
                   >
                     <Download className="w-4 h-4" />
                     Export JSON
+                  </button>
+                  <button
+                    onClick={handleExportMarkdown}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-cyan-400 hover:bg-slate-700 transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Export Markdown
                   </button>
                 </div>
               )}
@@ -982,6 +1110,34 @@ export default function DubbingPage() {
                   <span className="text-slate-300">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
                 </div>
+                {/* Language filter shortcuts - shown only when filters open */}
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-slate-400 text-xs">Filter by language (when filters open):</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-cyan-400 text-sm">Filter by Telugu</span>
+                  <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400">1</kbd>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-cyan-400 text-sm">Filter by Hindi</span>
+                  <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400">2</kbd>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-cyan-400 text-sm">Filter by Malayalam</span>
+                  <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400">3</kbd>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-cyan-400 text-sm">Filter by Kannada</span>
+                  <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400">4</kbd>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-cyan-400 text-sm">Filter by English</span>
+                  <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400">5</kbd>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-cyan-400 text-sm">Clear language filter</span>
+                  <kbd className="px-2 py-0.5 bg-slate-800 rounded text-xs text-cyan-400">0</kbd>
+                </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Toggle sort order</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
@@ -989,6 +1145,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-cyan-400">Export Markdown</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">M</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Print report</span>

@@ -254,8 +254,22 @@ export default function SchedulePage() {
     { value: 'hours', label: 'Hours' },
   ]
   
-  // Calculate active filter count (including sort)
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'dayNumber' || sortOrder !== 'asc' ? 1 : 0)
+  // Clear all filters and sort
+  const clearFilters = useCallback(() => {
+    setFilterStatus('all')
+    setFilterLocation('all')
+    setSortBy('dayNumber')
+    setSortOrder('asc')
+    setSearchQuery('')
+  }, [])
+
+  // Calculate active filter count (including sort) - using useMemo for stable reference
+  const activeFilterCount = useMemo(() => {
+    return (filterStatus !== 'all' ? 1 : 0) + 
+           (filterLocation !== 'all' ? 1 : 0) + 
+           (sortBy !== 'dayNumber' || sortOrder !== 'asc' ? 1 : 0) +
+           (searchQuery ? 1 : 0)
+  }, [filterStatus, filterLocation, sortBy, sortOrder, searchQuery])
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -271,11 +285,21 @@ export default function SchedulePage() {
   
   // Refs for keyboard shortcuts - filter status
   const filterStatusRef = useRef(filterStatus)
+  const filterLocationRef = useRef(filterLocation)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
   const showFiltersRef = useRef(showFilters)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef(clearFilters)
   
   // Keep refs in sync with state
   useEffect(() => { filterStatusRef.current = filterStatus }, [filterStatus])
+  useEffect(() => { filterLocationRef.current = filterLocation }, [filterLocation])
+  useEffect(() => { sortByRef.current = sortBy }, [sortBy])
+  useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -380,6 +404,13 @@ export default function SchedulePage() {
           setShowPrintMenu(false)
           setSearchQuery('')
           setShowFilters(false)
+          break
+        case 'x':
+          e.preventDefault()
+          // Clear all filters when filter panel is open and there are active filters
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current?.()
+          }
           break
         case 'e':
           e.preventDefault()
@@ -1345,7 +1376,7 @@ export default function SchedulePage() {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
               <span className="text-sm font-medium text-gray-300">Filters & Sort:</span>
-              <span className="text-xs text-cyan-400 ml-1">(1-5 for status, 0 to clear)</span>
+              <span className="text-xs text-cyan-400 ml-1">(1-5 for status, 0 to clear, X to clear all)</span>
             </div>
             {/* Sort Options */}
             <div className="flex items-center gap-2">
@@ -1401,15 +1432,14 @@ export default function SchedulePage() {
               </select>
             </div>
             <button
-              onClick={() => { 
-                setFilterStatus('all'); 
-                setFilterLocation('all');
-                setSortBy('dayNumber');
-                setSortOrder('asc');
-              }}
-              className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              onClick={clearFilters}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeFilterCount > 0
+                  ? 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 border border-amber-600/50'
+                  : 'text-gray-400 hover:text-white'
+              }`}
             >
-              Clear Filters & Sort
+              Clear {activeFilterCount > 0 && `(${activeFilterCount})`}
             </button>
           </div>
         </div>
@@ -1979,7 +2009,7 @@ export default function SchedulePage() {
                 { key: '/', desc: 'Focus search input' },
                 { key: 'F', desc: 'Toggle filters & sort panel' },
                 { key: 'S', desc: 'Toggle sort order (asc/desc)' },
-                { key: 'X', desc: 'Clear all filters & search', highlight: 'emerald' },
+                { key: 'X', desc: 'Clear all filters & search (when filters open)', highlight: 'amber' },
                 { key: '1', desc: 'Filter: All Status / Timeline view', highlight: 'cyan' },
                 { key: '2', desc: 'Filter: Scheduled / Chart view', highlight: 'cyan' },
                 { key: '3', desc: 'Filter: In Progress / Conflicts view', highlight: 'cyan' },
@@ -1995,7 +2025,11 @@ export default function SchedulePage() {
               ].map(({ key, desc, highlight }) => (
                 <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-700/50 transition-colors">
                   <span className="text-gray-300">{desc}</span>
-                  <span className={`text-sm font-mono bg-gray-900 px-3 py-1.5 rounded border border-gray-700 ${highlight === 'cyan' ? 'text-cyan-400' : 'text-indigo-400'}`}>{key}</span>
+                  <span className={`text-sm font-mono bg-gray-900 px-3 py-1.5 rounded border border-gray-700 ${
+                    highlight === 'cyan' ? 'text-cyan-400' : 
+                    highlight === 'amber' ? 'text-amber-400' : 
+                    'text-indigo-400'
+                  }`}>{key}</span>
                 </div>
               ))}
             </div>

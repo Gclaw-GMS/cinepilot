@@ -5,7 +5,8 @@ import {
   FileText, BarChart3, Download, RefreshCw, Loader2, 
   ChevronRight, TrendingUp, Target, Film, Users, 
   MapPin, DollarSign, Calendar, PieChart, Shield,
-  AlertTriangle, CheckCircle, Keyboard, Search, Printer, Filter
+  AlertTriangle, CheckCircle, Keyboard, Search, Printer, Filter,
+  Clock
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -83,6 +84,7 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>('overview')
   const [error, setError] = useState<string | null>(null)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -142,6 +144,7 @@ export default function ReportsPage() {
         setReportData(data.data)
         setIsDemoMode(data.isDemoMode === true)
         setDataSources(data.dataSources || null)
+        setLastUpdated(new Date())
       }
     } catch (e) {
       console.error(e)
@@ -731,6 +734,12 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
                 <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-medium flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" />
                   Live Data
+                </span>
+              )}
+              {lastUpdated && (
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Updated: {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
             </div>

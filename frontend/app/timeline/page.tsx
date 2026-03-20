@@ -99,7 +99,20 @@ export default function TimelinePage() {
   useEffect(() => {
     sortOrderRef.current = sortOrder;
   }, [sortOrder]);
-  
+
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setFilterType('all')
+    setSearchQuery('')
+  }, [])
+
+  // Ref for active filter count (for keyboard shortcut)
+  const activeFilterCountRef = useRef(0)
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+
   // Real stats from API
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -744,6 +757,12 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
             handlePrintRef.current?.();
           }
           break;
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFilters()
+          }
+          break
         // Shift+Number keys for sorting options (when filters open)
         case '!':
         case '@':
@@ -778,6 +797,7 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Click outside to close menus and filter panel
@@ -1295,10 +1315,10 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                   </button>
                   
                   <button
-                    onClick={() => { setFilterType('all'); setSearchQuery(''); setSortBy('phase'); setSortOrder('asc'); }}
+                    onClick={clearFilters}
                     className="text-sm text-purple-400 hover:text-purple-300"
                   >
-                    Clear Filters
+                    Clear Filters (X)
                   </button>
                 </div>
               </motion.div>
@@ -1521,6 +1541,10 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Print timeline</span>
                     <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-purple-400">P</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                    <span className="text-slate-300">Clear all filters</span>
+                    <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-amber-400">X</kbd>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-800">
                     <span className="text-slate-300">Show keyboard shortcuts</span>

@@ -163,7 +163,13 @@ export default function ExportsPage() {
   
   // Export menu state
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  
+  // Set initial timestamp on mount
+  useEffect(() => {
+    setLastUpdated(new Date())
+  }, [])
   
   // Ref for keyboard shortcut access
   const handleExportMarkdownRef = useRef<() => void>(() => {})
@@ -295,6 +301,7 @@ export default function ExportsPage() {
     setMessage(null)
     setDownloadUrl(null)
     setSelectedExports([])
+    setLastUpdated(new Date())
     setTimeout(() => setRefreshing(false), 500)
   }, [])
 
@@ -646,6 +653,12 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
                 <Download className="w-5 h-5 text-white" />
               </div>
               Export Center
+              {lastUpdated && (
+                <span className="ml-2 text-xs text-slate-500 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Updated: {lastUpdated.toLocaleTimeString('en-GB')}
+                </span>
+              )}
             </h1>
             <p className="text-slate-400 text-sm mt-1">
               Download production data in various formats

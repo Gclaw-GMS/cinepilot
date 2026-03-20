@@ -401,6 +401,15 @@ export default function SchedulePage() {
           e.preventDefault()
           handleExportMarkdownRef.current?.()
           break
+        case 'x':
+          e.preventDefault()
+          // Clear all filters and search
+          setSearchQuery('')
+          setFilterStatus('all')
+          setFilterLocation('all')
+          setSortBy('dayNumber')
+          setSortOrder('asc')
+          break
         // Number keys 1-5 for status filter (when filter panel is open or when using number keys)
         case '1':
           e.preventDefault()
@@ -1970,6 +1979,7 @@ export default function SchedulePage() {
                 { key: '/', desc: 'Focus search input' },
                 { key: 'F', desc: 'Toggle filters & sort panel' },
                 { key: 'S', desc: 'Toggle sort order (asc/desc)' },
+                { key: 'X', desc: 'Clear all filters & search', highlight: 'emerald' },
                 { key: '1', desc: 'Filter: All Status / Timeline view', highlight: 'cyan' },
                 { key: '2', desc: 'Filter: Scheduled / Chart view', highlight: 'cyan' },
                 { key: '3', desc: 'Filter: In Progress / Conflicts view', highlight: 'cyan' },

@@ -106,6 +106,10 @@ export default function CollaborationPage() {
   const filteredMembersRef = useRef<TeamMember[]>([])
   const filterStatusRef = useRef(filters.status)
   const showFiltersRef = useRef(showFilters)
+  
+  // Refs for clear filters
+  const clearFiltersRef = useRef<() => void>(() => {})
+  const activeFilterCountRef = useRef(0)
 
   // Keep refs in sync
   useEffect(() => { filterStatusRef.current = filters.status }, [filters.status])
@@ -114,6 +118,21 @@ export default function CollaborationPage() {
   // Calculate active filter count (including sort)
   const hasActiveSort = sortBy !== 'name' || sortOrder !== 'asc'
   const activeFilterCount = (filters.department !== 'all' ? 1 : 0) + (filters.status !== 'all' ? 1 : 0) + (hasActiveSort ? 1 : 0)
+  
+  // Sync activeFilterCountRef
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilters({ department: 'all', status: 'all' })
+    setSortBy('name')
+    setSortOrder('asc')
+  }, [])
+
+  // Connect clearFilters to ref for keyboard shortcut
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -196,6 +215,13 @@ export default function CollaborationPage() {
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
+          break
+        case 'x':
+          // Clear all filters when filter panel is open and filters are active
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current?.()
+          }
           break
         case 'f':
           e.preventDefault()
@@ -916,14 +942,11 @@ export default function CollaborationPage() {
                   {/* Clear Filters & Sort */}
                   {activeFilterCount > 0 && (
                     <button
-                      onClick={() => {
-                        setFilters({ department: 'all', status: 'all' })
-                        setSortBy('name')
-                        setSortOrder('asc')
-                      }}
-                      className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                      onClick={clearFilters}
+                      className="w-full px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
                     >
-                      Clear Filters & Sort ({activeFilterCount})
+                      <X className="w-4 h-4" />
+                      Clear Filters (X)
                     </button>
                   )}
                 </div>
@@ -1395,6 +1418,10 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-cyan-400">Clear status filter</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">0</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Clear all filters (when filters open)</span>
+                <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-cyan-400">X</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle sort order</span>

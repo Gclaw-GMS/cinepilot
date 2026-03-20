@@ -176,6 +176,7 @@ export default function EquipmentPage() {
   const clearSelectionRef = useRef<() => void>(() => {})
   const selectAllEquipmentRef = useRef<() => void>(() => {})
   const filteredLengthRef = useRef<number>(0)
+  const activeFilterCountRef = useRef<number>(0)
 
   // Keep refs in sync with state for keyboard shortcuts
   useEffect(() => {
@@ -185,6 +186,10 @@ export default function EquipmentPage() {
   useEffect(() => {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -683,6 +688,14 @@ export default function EquipmentPage() {
           e.preventDefault()
           if (equipment.length > 0) {
             handlePrintRef.current?.()
+          }
+          break
+        case 'x':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+              clearFilters()
+            }
           }
           break
         case 'escape':
@@ -2121,6 +2134,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">F</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Clear all filters</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">X</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Focus search input</span>

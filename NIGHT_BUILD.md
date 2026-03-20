@@ -10236,3 +10236,64 @@ Added clear filters functionality to the Dubbing page:
 - **TypeScript:** No errors ✅
 - **Lint:** No warnings or errors ✅
 - **Tests:** 803 passing, 0 failing ✅
+
+---
+
+## Build Status: ✅ PASSING (8:35 AM) - Shots Page Context-Aware Keyboard Shortcuts IMPLEMENTED
+
+### 8:35 AM - Shots Page - Context-Aware Number Key Shortcuts with Shift+Number (IMPLEMENTED)
+
+Added context-aware behavior for number keys with Shift and Ctrl modifiers:
+
+- **Number Keys 1-8 (Filters Open)**: Filter by shot size (EWS→OTS) with toggle behavior
+- **Shift+1-3 (Filters Open)**: Filter by scene with toggle behavior
+- **Shift+4-9 (Filters Open)**: Filter by camera angle with toggle behavior
+- **Ctrl+1-9 (Filters Open)**: Filter by camera movement with toggle behavior
+- **Key 0 (Filters Open)**: Clear shot size filter
+- **Shift+0 (Filters Open)**: Clear scene filter
+- **Number Keys 1-2 (Filters Closed)**: Switch view mode (Cards/Table)
+- **Toggle Behavior**: Press same filter again to clear the filter
+- **Visual Enhancement**: Filter panel header shows color-coded shortcut hints (amber for size/scene/angle/movement, emerald for clear)
+- **Keyboard Help Updated**: Updated with all new shortcuts including Shift and Ctrl modifiers
+
+### Features Perfected This Build
+1. **Context-Aware Keyboard Shortcuts** - Full implementation with Shift+Number and Ctrl+Number for all filter types
+2. **Ref Pattern** - Added sortByRef and sortOrderRef for proper ref pattern (consistent with other pages)
+3. **Visual Shortcuts** - Color-coded hints in filter panel header
+
+### Technical Implementation
+- Added sortByRef and sortOrderRef using useRef pattern
+- Added useEffect hooks to sync refs with state
+- Modified keyboard handler to support context-aware behavior with Shift and Ctrl modifiers
+- Uses filterSceneRef, filterAngleRef, filterMovementRef to check current filter before setting new one
+- Toggle behavior: if same filter is already selected, it clears to 'all'
+- Updated filter panel header with comprehensive shortcut hints
+- Uses color coding: amber for filters, emerald for clear actions
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** Pre-existing warning in travel/page.tsx (unrelated) ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### Shots Page Context-Aware Number Key Shortcuts Feature Checklist
+- [x] Feature works 100% (context-aware number keys functional)
+- [x] Number keys 1-8 filter by shot size when filter panel open
+- [x] Toggle behavior when filter panel open (press again to clear)
+- [x] Number key 0 clears size filter
+- [x] Shift+1-3 filter by scene when filter panel open
+- [x] Shift+4-9 filter by angle when filter panel open
+- [x] Ctrl+1-9 filter by movement when filter panel open
+- [x] Shift+0 clears scene filter
+- [x] Number keys 1-2 switch view mode when filter panel closed
+- [x] Visual shortcut hint in filter panel header (color coded)
+- [x] Keyboard help modal updated with all new shortcuts
+- [x] Added sortByRef and sortOrderRef for proper ref pattern
+- [x] Fixed S key to use sortOrderRef.current
+- [x] Consistent with other pages (vfx, projects, scripts, travel)
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/master ✅

@@ -128,6 +128,7 @@ export default function TravelExpensesPage() {
   const exportToMarkdownRef = useRef<() => void>(() => {})
   const filterCategoryRef = useRef(filterCategory)
   const filterStatusRef = useRef(filterStatus)
+  const activeFilterCountRef = useRef(0)
   
   // View mode for tabs
   const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
@@ -236,7 +237,7 @@ export default function TravelExpensesPage() {
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current && activeFilterCount > 0) {
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
             clearFiltersRef.current()
           }
           break
@@ -765,6 +766,7 @@ export default function TravelExpensesPage() {
     if (filterStatus !== 'all') count++
     if (dateRange.start || dateRange.end) count++
     if (sortBy) count++ // Count sort as an active filter
+    activeFilterCountRef.current = count
     return count
   }, [filterCategory, filterStatus, dateRange, sortBy])
 

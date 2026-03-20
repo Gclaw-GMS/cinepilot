@@ -1,5 +1,48 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (11:43 PM) - Exports Page Last Updated Timestamp IMPLEMENTED
+
+### 11:43 PM - Exports Page - Last Updated Timestamp (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Exports Page - Last Updated Timestamp**: Added timestamp display showing when data was last refreshed
+
+### Feature Details
+- **Clock Icon**: Uses Clock icon from lucide-react (already imported)
+- **lastUpdated State**: Tracks Date when data was last loaded
+- **Timestamp Display**: Shows "Updated: HH:MM:SS" format in header next to page title
+- **Two Update Points**: Timestamp updates on initial mount and on refresh button click
+- **Consistent with Other Pages**: Matches pattern from DOOD, Equipment, Dubbing, Catering, and Reports pages
+
+### Technical Implementation
+- Added lastUpdated useState<Date | null>(null) state declaration
+- Added useEffect to setLastUpdated(new Date()) on initial mount
+- Updated handleRefresh callback to setLastUpdated(new Date()) on refresh
+- Added conditional display: {lastUpdated && (...)} with Clock icon and formatted time (en-GB locale)
+
+### Build Verification
+- **Build:** Clean build with 84 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### Exports Page Last Updated Timestamp Feature Checklist
+- [x] Clock icon displayed in timestamp ✅
+- [x] lastUpdated state tracks Date when data was loaded ✅
+- [x] Timestamp updates on initial mount ✅
+- [x] Timestamp updates on refresh button click ✅
+- [x] Header displays timestamp with Clock icon ✅
+- [x] Format shows "Updated: HH:MM:SS" ✅
+- [x] Consistent with other pages (dood, equipment, dubbing, catering, reports) ✅
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (11:23 PM) - Dubbing Page Last Updated Timestamp IMPLEMENTED
 
 ### 11:23 PM - Dubbing Page - Last Updated Timestamp (IMPLEMENTED)

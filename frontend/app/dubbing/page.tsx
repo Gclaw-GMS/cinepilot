@@ -115,6 +115,14 @@ export default function DubbingPage() {
   // Active filter count (includes sort as active filter)
   const activeFilterCount = (languageFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
   
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setLanguageFilter('all')
+    setSortBy('date')
+    setSortOrder('desc')
+    setSearchQuery('')
+  }, [])
+  
   // Keep refs in sync with state
   useEffect(() => {
     languageFilterRef.current = languageFilter
@@ -201,6 +209,12 @@ export default function DubbingPage() {
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'x':
+          if (activeFilterCount > 0) {
+            e.preventDefault()
+            clearFilters()
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -214,7 +228,7 @@ export default function DubbingPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length, sortOrder])
+  }, [showExportMenu, showPrintMenu, showFilterPanel, dubbedVersions.length, sortOrder, activeFilterCount, clearFilters])
 
   // Click outside handler for export menu
   useEffect(() => {
@@ -747,14 +761,10 @@ export default function DubbingPage() {
                   {activeFilterCount > 0 && (
                     <div className="px-4 py-3 border-t border-slate-700 bg-slate-800/50">
                       <button
-                        onClick={() => {
-                          setLanguageFilter('all')
-                          setSortBy('date')
-                          setSortOrder('desc')
-                        }}
+                        onClick={clearFilters}
                         className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                       >
-                        Clear Filters & Sort
+                        Clear Filters & Sort (X)
                       </button>
                     </div>
                   )}
@@ -1147,6 +1157,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Toggle sort order</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Clear all filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">X</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>

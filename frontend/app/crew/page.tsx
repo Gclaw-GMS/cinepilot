@@ -116,7 +116,7 @@ export default function CrewPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Calculate active filter count
-  const activeFilterCount = deptFilter !== 'all' ? 1 : 0;
+  const activeFilterCount = (deptFilter !== 'all' ? 1 : 0) + (search.trim() ? 1 : 0);
 
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +146,19 @@ export default function CrewPage() {
   useEffect(() => {
     setShowFiltersRef.current = setShowFilters;
   }, [setShowFilters]);
+
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setDeptFilter('all')
+    setSearch('')
+  }, []) // Empty deps: setDeptFilter and setSearch are stable
+
+  // Ref for active filter count (for keyboard shortcut)
+  const activeFilterCountRef = useRef(0)
+
+  useEffect(() => {
+    activeFilterCountRef.current = (deptFilter !== 'all' ? 1 : 0) + (search.trim() ? 1 : 0)
+  }, [deptFilter, search])
 
   const [form, setForm] = useState({
     name: '',
@@ -277,6 +290,12 @@ export default function CrewPage() {
           e.preventDefault()
           setViewMode(prev => prev === 'list' ? 'skills' : 'list')
           break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFilters()
+          }
+          break
         case '1':
         case '2':
         case '3':
@@ -324,6 +343,7 @@ export default function CrewPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalOpen])
 
   const filtered = useMemo(() => {
@@ -1170,10 +1190,10 @@ export default function CrewPage() {
                 </select>
               </div>
               <button
-                onClick={() => setDeptFilter('all')}
+                onClick={clearFilters}
                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
               >
-                Clear Filters
+                Clear Filters (X)
               </button>
               
               {/* Sort Controls */}
@@ -1537,6 +1557,10 @@ export default function CrewPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle view mode</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">V</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Clear all filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-amber-400">X</kbd>
               </div>
               {/* When filters panel is OPEN */}
               <div className="mt-3 mb-1 px-2">

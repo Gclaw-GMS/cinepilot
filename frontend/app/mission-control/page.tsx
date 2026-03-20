@@ -171,6 +171,8 @@ export default function MissionControl() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const showFilterPanelRef = useRef(showFilterPanel)
+  const clearFiltersRef = useRef<() => void>(() => {})
+  const activeFilterCountRef = useRef<number>(0)
   
   // Unique filter values (computed from data) - wrapped in useMemo to avoid re-computation
   const uniqueDepartments = useMemo(() => data?.departments.map(d => d.name) ?? [], [data])
@@ -218,6 +220,14 @@ export default function MissionControl() {
     setRefreshing(true)
     fetchData()
   }
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilterDepartment('all')
+    setFilterRiskLevel('all')
+    setFilterLocation('all')
+    setSearchQuery('')
+  }, [])
 
   // Export functions
   const handleExportCSV = () => {
@@ -770,6 +780,14 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
+        case 'x':
+          if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            e.preventDefault()
+            if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+              clearFiltersRef.current()
+            }
+          }
+          break
         // Number keys for quick filtering (when filter panel is open)
         case '0':
           if (showFilterPanelRef.current) {
@@ -969,6 +987,10 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
   useEffect(() => { filterRiskLevelRef.current = filterRiskLevel }, [filterRiskLevel])
   useEffect(() => { filterLocationRef.current = filterLocation }, [filterLocation])
   useEffect(() => { showFilterPanelRef.current = showFilterPanel }, [showFilterPanel])
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+  useEffect(() => { 
+    activeFilterCountRef.current = (filterDepartment !== 'all' ? 1 : 0) + (filterRiskLevel !== 'all' ? 1 : 0) + (filterLocation !== 'all' ? 1 : 0) + (sortBy !== 'health' || sortOrder !== 'desc' ? 1 : 0)
+  }, [filterDepartment, filterRiskLevel, filterLocation, sortBy, sortOrder])
   
   // Update unique filter values refs when data changes
   useEffect(() => { uniqueDepartmentsRef.current = uniqueDepartments }, [uniqueDepartments])
@@ -1207,15 +1229,13 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
                     <div className="px-4 py-3 border-t border-white/10 bg-slate-800/50">
                       <button
                         onClick={() => { 
-                          setFilterDepartment('all'); 
-                          setFilterRiskLevel('all'); 
-                          setFilterLocation('all'); 
+                          clearFilters()
                           setSortBy('health');
                           setSortOrder('desc');
                         }}
                         className="w-full text-center text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
                       >
-                        Clear All Filters & Sort
+                        Clear All Filters & Sort (X)
                       </button>
                     </div>
                   )}
@@ -1338,6 +1358,7 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
               <ShortcutRow keys={['/']} description="Focus search input" />
               <ShortcutRow keys={['F']} description="Toggle filters panel" />
               <ShortcutRow keys={['S']} description="Toggle sort order (asc/desc)" />
+              <ShortcutRow keys={['X']} description="Clear all filters (when filters active)" />
               <ShortcutRow keys={['E']} description="Export dropdown menu" />
               <ShortcutRow keys={['M']} description="Export Markdown" />
               <ShortcutRow keys={['P']} description="Print mission report" />

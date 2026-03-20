@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, Check } from 'lucide-react'
+import { Plus, Package, DollarSign, Camera, Clapperboard, Search, X, Loader2, AlertCircle, Trash2, Edit2, RefreshCw, HelpCircle, Filter, AlertTriangle, Download, Printer, Keyboard, ChevronRight, Check, Clock } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 interface EquipmentRental {
@@ -147,6 +147,7 @@ export default function EquipmentPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
   const [budgetLimit, setBudgetLimit] = useState<number>(50000) // Daily budget limit for rentals
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -381,6 +382,7 @@ export default function EquipmentPage() {
       calculateStats(DEMO_EQUIPMENT)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -1142,6 +1144,12 @@ export default function EquipmentPage() {
               <HelpCircle className="w-4 h-4" />
               <span className="text-xs">?</span>
             </button>
+            {lastUpdated && (
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
             {/* Filter Toggle Button */}
             <div className="relative filter-menu">
               <button

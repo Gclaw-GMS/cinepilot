@@ -125,8 +125,20 @@ export default function AudienceSentimentPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Calculate active filter count
-  const activeFilterCount = (platformFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0) + (sortBy !== 'createdAt' || sortOrder !== 'desc' ? 1 : 0) + (regionalFilter !== 'all' ? 1 : 0)
+  // Calculate active filter count using useMemo for stable reference
+  const activeFilterCount = useMemo(() => {
+    return (platformFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0) + (sortBy !== 'createdAt' || sortOrder !== 'desc' ? 1 : 0) + (regionalFilter !== 'all' ? 1 : 0)
+  }, [platformFilter, statusFilter, searchQuery, sortBy, sortOrder, regionalFilter])
+  
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setPlatformFilter('all')
+    setStatusFilter('all')
+    setSearchQuery('')
+    setSortBy('createdAt')
+    setSortOrder('desc')
+    setRegionalFilter('all')
+  }, [])
   
   // Toggle sort order
   const toggleSortOrder = () => {
@@ -149,6 +161,8 @@ export default function AudienceSentimentPage() {
   const showFiltersRef = useRef(showFilters)
   const platformFilterRef = useRef(platformFilter)
   const statusFilterRef = useRef(statusFilter)
+  const clearFiltersRef = useRef(clearFilters)
+  const activeFilterCountRef = useRef(activeFilterCount)
   
   // Sync refs with state for context-aware shortcuts
   useEffect(() => {
@@ -162,6 +176,14 @@ export default function AudienceSentimentPage() {
   useEffect(() => {
     statusFilterRef.current = statusFilter
   }, [statusFilter])
+  
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+  
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   // Filter and sort analyses by platform, status, search query, regional cinema, and sort options
   const filteredAnalyses = useMemo(() => {
@@ -351,6 +373,12 @@ export default function AudienceSentimentPage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 'x':
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current()
+          }
           break
       }
     }
@@ -951,6 +979,9 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
                     <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">⇧1-4</kbd> Status
                     <kbd className="ml-1 px-1.5 py-0.5 bg-slate-700 rounded">⇧0</kbd> Clear
                   </span>
+                  <span className="text-amber-400">
+                    <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">X</kbd> Clear All
+                  </span>
                 </div>
               </div>
               {/* Status Filter */}
@@ -1013,20 +1044,14 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
                 </div>
               </div>
               
-              {/* Clear Filters */}
-              {(platformFilter !== 'all' || statusFilter !== 'all' || regionalFilter !== 'all' || searchQuery || sortBy !== 'createdAt' || sortOrder !== 'desc') && (
+              {/* Clear Filters Button */}
+              {activeFilterCount > 0 && (
                 <button
-                  onClick={() => {
-                    setPlatformFilter('all')
-                    setStatusFilter('all')
-                    setRegionalFilter('all')
-                    setSearchQuery('')
-                    setSortBy('createdAt')
-                    setSortOrder('desc')
-                  }}
-                  className="text-sm text-rose-400 hover:text-rose-300 transition-colors"
+                  onClick={clearFilters}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/50 rounded-lg text-sm text-amber-400 transition-colors"
+                  title="Clear all filters (X)"
                 >
-                  Clear filters
+                  Clear ({activeFilterCount})
                 </button>
               )}
               
@@ -1593,6 +1618,10 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-emerald-400">Toggle sort order</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-emerald-400">Clear all filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">X</kbd>
               </div>
               
               {/* Context-Aware: Filters Closed */}

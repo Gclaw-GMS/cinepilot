@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown } from 'lucide-react'
+import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown, Clock } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
 
 type ScriptOption = {
@@ -61,6 +61,7 @@ export default function DubbingPage() {
   const [loadingScripts, setLoadingScripts] = useState(true)
   const [loadingVersions, setLoadingVersions] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
@@ -282,6 +283,7 @@ export default function DubbingPage() {
         }
       } finally {
         setLoadingScripts(false)
+        setLastUpdated(new Date())
       }
     }
     loadScripts()
@@ -306,6 +308,7 @@ export default function DubbingPage() {
       setIsDemoMode(true)
     } finally {
       setLoadingVersions(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -696,6 +699,14 @@ export default function DubbingPage() {
               <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 rounded-lg px-3 py-1.5">
                 <Sparkles className="w-4 h-4 text-amber-400" />
                 <span className="text-xs font-medium text-amber-400">Demo Mode</span>
+              </div>
+            )}
+            {lastUpdated && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-400 text-xs">
+                  Updated: {lastUpdated.toLocaleTimeString()}
+                </span>
               </div>
             )}
             {/* Filter Toggle */}

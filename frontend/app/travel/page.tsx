@@ -325,6 +325,7 @@ export default function TravelExpensesPage() {
   }, [])
 
   // Click outside to close export menu
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showExportMenu && exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
@@ -770,6 +771,9 @@ export default function TravelExpensesPage() {
     return count
   }, [filterCategory, filterStatus, dateRange, sortBy])
 
+  // Ref for activeFilterCount to avoid dependency issues in keyboard handler
+  const activeFilterCountRef = useRef(activeFilterCount)
+
   // Clear all filters
   const clearFilters = useCallback(() => {
     setFilterCategory('all')
@@ -783,6 +787,9 @@ export default function TravelExpensesPage() {
   // Ref for clearFilters
   const clearFiltersRef = useRef(clearFilters)
   useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+
+  // Update activeFilterCount ref
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
 
   // Conflict detection
   const travelConflicts = useMemo(() => {

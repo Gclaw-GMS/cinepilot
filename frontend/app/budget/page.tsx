@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
@@ -247,7 +247,15 @@ export default function BudgetPage() {
   const [scenarioAdjustments, setScenarioAdjustments] = useState<ScenarioAdjustment[]>([])
 
   // Count active filters
-  const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0) + (searchQuery ? 1 : 0)
+  const activeFilterCount = useMemo(() => 
+    [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + 
+    (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0) + 
+    (searchQuery ? 1 : 0),
+    [categoryFilter, subcategoryFilter, sourceFilter, sortBy, sortOrder, searchQuery]
+  )
+
+  // Ref for activeFilterCount to avoid dependency issues in keyboard handler
+  const activeFilterCountRef = useRef(activeFilterCount)
 
   // Clear all filters function
   const clearFilters = useCallback(() => {
@@ -263,6 +271,11 @@ export default function BudgetPage() {
   useEffect(() => {
     clearFiltersRef.current = clearFilters
   }, [clearFilters])
+
+  // Update activeFilterCount ref
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   // Helper to sort items (used by exports) - wrapped in useCallback to fix dependency warning
   const sortItems = useCallback((itemsToSort: BudgetItemData[]) => {
@@ -787,7 +800,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current && activeFilterCount > 0) {
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
             clearFiltersRef.current()
           }
           break
@@ -857,6 +870,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
   }, [categories])
 
   // Click outside to close filter panel
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (showFilters && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {

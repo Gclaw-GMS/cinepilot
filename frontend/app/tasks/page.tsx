@@ -200,6 +200,7 @@ export default function TasksPage() {
   const showFiltersRef = useRef(showFilters)
   const filterStatusRef = useRef(filterStatus)
   const filterPriorityRef = useRef(filterPriority)
+  const viewModeRef = useRef(viewMode)
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -213,6 +214,10 @@ export default function TasksPage() {
   useEffect(() => {
     filterPriorityRef.current = filterPriority
   }, [filterPriority])
+
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
   const sortOrderRef = useRef(sortOrder)
   const selectedTasksSizeRef = useRef(selectedTasks.size)
 
@@ -334,50 +339,96 @@ export default function TasksPage() {
           setViewMode(prev => prev === 'list' ? 'board' : prev === 'board' ? 'calendar' : prev === 'calendar' ? 'conflicts' : 'list')
         }
         break
+      // Context-aware number keys: behave differently based on filter panel state
+      case '1':
+        e.preventDefault()
+        if (!showFiltersRef.current) {
+          // When filters closed: switch to List view
+          setViewMode('list')
+        } else {
+          // When filters open: filter by All Status (toggle)
+          setFilterStatus(prev => prev === 'all' ? 'all' : 'all')
+        }
+        break
+      case '2':
+        e.preventDefault()
+        if (!showFiltersRef.current) {
+          // When filters closed: switch to Board view
+          setViewMode('board')
+        } else {
+          // When filters open: filter by Overdue (toggle)
+          setFilterStatus(prev => prev === 'overdue' ? 'all' : 'overdue')
+        }
+        break
+      case '3':
+        e.preventDefault()
+        if (!showFiltersRef.current) {
+          // When filters closed: switch to Calendar view
+          setViewMode('calendar')
+        } else {
+          // When filters open: filter by Pending (toggle)
+          setFilterStatus(prev => prev === 'pending' ? 'all' : 'pending')
+        }
+        break
       case '4':
         e.preventDefault()
         if (!showFiltersRef.current) {
+          // When filters closed: switch to Conflicts view
           setViewMode('conflicts')
+        } else {
+          // When filters open: filter by In Progress (toggle)
+          setFilterStatus(prev => prev === 'in_progress' ? 'all' : 'in_progress')
         }
         break
-      // Number keys for status and priority filtering (when filters panel is open)
-      case '1':
-      case '2':
-      case '3':
       case '5':
+        if (showFiltersRef.current) {
+          e.preventDefault()
+          // When filters open: filter by Completed (toggle)
+          setFilterStatus(prev => prev === 'completed' ? 'all' : 'completed')
+        }
+        break
       case '6':
         if (showFiltersRef.current) {
           e.preventDefault()
-          const numIndex = parseInt(e.key) - 1
-          const statusOptions: FilterStatus[] = ['all', 'overdue', 'pending', 'in_progress', 'completed', 'blocked']
-          const newStatus = statusOptions[numIndex] || 'all'
-          // Toggle: if same status selected, clear it
-          setFilterStatus(prev => prev === newStatus ? 'all' : newStatus)
+          // When filters open: filter by Blocked (toggle)
+          setFilterStatus(prev => prev === 'blocked' ? 'all' : 'blocked')
         }
         break
       case '7':
         if (showFiltersRef.current) {
           e.preventDefault()
+          // Clear all filters
           setFilterStatus('all')
           setFilterPriority('all')
         }
         break
+      // Priority filtering with Shift (when filters panel is open)
       case '8':
-        if (showFiltersRef.current) {
+        if (e.shiftKey && showFiltersRef.current) {
           e.preventDefault()
+          // Filter by High priority (toggle)
           setFilterPriority(prev => prev === 'high' ? 'all' : 'high')
+        } else if (showFiltersRef.current) {
+          e.preventDefault()
+          // Filter by Low priority (toggle)
+          setFilterPriority(prev => prev === 'low' ? 'all' : 'low')
         }
         break
       case '9':
-        if (showFiltersRef.current) {
+        if (e.shiftKey && showFiltersRef.current) {
           e.preventDefault()
+          // Filter by Medium priority (toggle)
           setFilterPriority(prev => prev === 'medium' ? 'all' : 'medium')
         }
         break
       case '0':
         if (showFiltersRef.current) {
           e.preventDefault()
+          // Clear status filter
           setFilterStatus('all')
+        } else if (e.shiftKey && showFiltersRef.current) {
+          // Shift+0 clears priority filter
+          e.preventDefault()
           setFilterPriority('all')
         }
         break
@@ -1476,8 +1527,8 @@ export default function TasksPage() {
                     <Filter className="w-4 h-4 text-purple-400" />
                     <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
                   </div>
-                  <div className="text-xs text-slate-500">
-                    <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-indigo-400">1-6</kbd> status · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-indigo-400">8-9</kbd> priority · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-indigo-400">7</kbd> clear
+                  <div className="text-xs text-cyan-400">
+                    <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">1-6</kbd> status · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">⇧8-9</kbd> priority · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">0</kbd> clear
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2097,50 +2148,79 @@ export default function TasksPage() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="space-y-2">
-                {[
-                  { keys: ['↑', '↓'], desc: 'Navigate tasks', category: 'Navigation' },
-                  { keys: ['Home'], desc: 'Go to first task', category: 'Navigation' },
-                  { keys: ['End'], desc: 'Go to last task', category: 'Navigation' },
-                  { keys: ['N'], desc: 'New task', category: 'Actions' },
-                  { keys: ['F'], desc: 'Toggle filters', category: 'Actions' },
-                  { keys: ['S'], desc: 'Toggle sort order', category: 'Actions' },
-                  { keys: ['/'], desc: 'Focus search', category: 'Actions' },
-                  { keys: ['E'], desc: 'Export dropdown', category: 'Actions' },
-                  { keys: ['M'], desc: 'Export Markdown', category: 'Actions' },
-                  { keys: ['P'], desc: 'Print tasks', category: 'Actions' },
-                  { keys: ['V'], desc: 'Toggle view mode', category: 'View' },
-                  { keys: ['1-6'], desc: 'Filter by status (filters open)', category: 'Filters' },
-                  { keys: ['7'], desc: 'Clear all filters (filters open)', category: 'Filters' },
-                  { keys: ['8'], desc: 'Filter High priority (filters open)', category: 'Filters' },
-                  { keys: ['9'], desc: 'Filter Medium priority (filters open)', category: 'Filters' },
-                  { keys: ['Ctrl', 'A'], desc: 'Select all tasks', category: 'Selection' },
-                  { keys: ['Ctrl', 'D'], desc: 'Delete selected', category: 'Selection' },
-                  { keys: ['Esc'], desc: 'Clear selection', category: 'Selection' },
-                  { keys: ['?'], desc: 'Toggle this help', category: 'Help' },
-                ].map((shortcut, idx) => (
-                  <div 
-                    key={idx} 
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-slate-500 uppercase tracking-wider w-20">
-                        {shortcut.category}
-                      </span>
-                      <div className="flex items-center gap-1.5">
+              <div className="space-y-3">
+                {/* View Switching (When Filters Closed) - Amber section */}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-amber-400 uppercase tracking-wider mb-2 px-1">When Filters Closed (View Mode)</div>
+                  {[
+                    { keys: ['1'], desc: 'Switch to List view' },
+                    { keys: ['2'], desc: 'Switch to Board view' },
+                    { keys: ['3'], desc: 'Switch to Calendar view' },
+                    { keys: ['4'], desc: 'Switch to Conflicts view' },
+                  ].map((shortcut, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <kbd className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs font-mono text-amber-400">{shortcut.keys[0]}</kbd>
+                      </div>
+                      <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Status/Priority Filtering (When Filters Open) - Cyan section */}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-cyan-400 uppercase tracking-wider mb-2 px-1">When Filters Open (Filtering)</div>
+                  {[
+                    { keys: ['1'], desc: 'Filter: All Status (toggle)' },
+                    { keys: ['2'], desc: 'Filter: Overdue (toggle)' },
+                    { keys: ['3'], desc: 'Filter: Pending (toggle)' },
+                    { keys: ['4'], desc: 'Filter: In Progress (toggle)' },
+                    { keys: ['5'], desc: 'Filter: Completed (toggle)' },
+                    { keys: ['6'], desc: 'Filter: Blocked (toggle)' },
+                    { keys: ['8'], desc: 'Filter: Low Priority (toggle)' },
+                    { keys: ['⇧8'], desc: 'Filter: High Priority (toggle)' },
+                    { keys: ['⇧9'], desc: 'Filter: Medium Priority (toggle)' },
+                    { keys: ['0'], desc: 'Clear status filter' },
+                  ].map((shortcut, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center gap-2">
                         {shortcut.keys.map((key, i) => (
-                          <kbd 
-                            key={i} 
-                            className="px-2.5 py-1.5 bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600 rounded-md text-xs font-mono text-indigo-300 shadow-sm"
-                          >
-                            {key}
-                          </kbd>
+                          <kbd key={i} className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs font-mono text-cyan-400">{key}</kbd>
                         ))}
                       </div>
+                      <span className="text-slate-300 text-sm">{shortcut.desc}</span>
                     </div>
-                    <span className="text-slate-300 text-sm">{shortcut.desc}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {/* General Actions - Emerald section */}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-2 px-1">Actions</div>
+                  {[
+                    { keys: ['↑', '↓'], desc: 'Navigate tasks' },
+                    { keys: ['Home'], desc: 'Go to first task' },
+                    { keys: ['End'], desc: 'Go to last task' },
+                    { keys: ['N'], desc: 'New task' },
+                    { keys: ['F'], desc: 'Toggle filters' },
+                    { keys: ['S'], desc: 'Toggle sort order' },
+                    { keys: ['/'], desc: 'Focus search' },
+                    { keys: ['V'], desc: 'Toggle view mode' },
+                    { keys: ['E'], desc: 'Export dropdown' },
+                    { keys: ['M'], desc: 'Export Markdown' },
+                    { keys: ['P'], desc: 'Print tasks' },
+                    { keys: ['Ctrl', 'A'], desc: 'Select all tasks' },
+                    { keys: ['Ctrl', 'D'], desc: 'Delete selected' },
+                    { keys: ['Esc'], desc: 'Clear selection' },
+                    { keys: ['?'], desc: 'Toggle this help' },
+                  ].map((shortcut, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        {shortcut.keys.map((key, i) => (
+                          <kbd key={i} className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs font-mono text-emerald-400">{key}</kbd>
+                        ))}
+                      </div>
+                      <span className="text-slate-300 text-sm">{shortcut.desc}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-800">
                 <div className="flex items-center justify-between text-xs text-slate-500">

@@ -145,6 +145,24 @@ export default function AudienceSentimentPage() {
   const printSentimentReportRef = useRef<() => void>(() => {})
   const handleExportMarkdownRef = useRef(() => {})
 
+  // Refs for context-aware keyboard shortcuts
+  const showFiltersRef = useRef(showFilters)
+  const platformFilterRef = useRef(platformFilter)
+  const statusFilterRef = useRef(statusFilter)
+  
+  // Sync refs with state for context-aware shortcuts
+  useEffect(() => {
+    showFiltersRef.current = showFilters
+  }, [showFilters])
+  
+  useEffect(() => {
+    platformFilterRef.current = platformFilter
+  }, [platformFilter])
+  
+  useEffect(() => {
+    statusFilterRef.current = statusFilter
+  }, [statusFilter])
+
   // Filter and sort analyses by platform, status, search query, regional cinema, and sort options
   const filteredAnalyses = useMemo(() => {
     const filtered = analyses.filter(a => {
@@ -222,6 +240,76 @@ export default function AudienceSentimentPage() {
         return
       }
       
+      // Context-aware number keys for platform filtering
+      if (showFiltersRef.current) {
+        // When filter panel is OPEN: Number keys 1-4 toggle platform filter (toggle behavior)
+        const platformFilters: Record<string, string> = {
+          '1': 'all',
+          '2': 'youtube',
+          '3': 'instagram',
+          '4': 'twitter',
+        }
+        
+        if (platformFilters[e.key]) {
+          e.preventDefault()
+          const platform = platformFilters[e.key]
+          // Toggle behavior: if same platform is selected, clear to 'all'
+          if (platformFilterRef.current === platform) {
+            setPlatformFilter('all')
+          } else {
+            setPlatformFilter(platform)
+          }
+        }
+        
+        // 0: Clear platform filter
+        if (e.key === '0') {
+          e.preventDefault()
+          setPlatformFilter('all')
+        }
+        
+        // Shift+Number for status filter (when filter panel is OPEN)
+        if (e.shiftKey) {
+          const statusFilters: Record<string, typeof statusFilter> = {
+            '1': 'all',
+            '2': 'completed',
+            '3': 'analyzing',
+            '4': 'failed',
+          }
+          
+          if (statusFilters[e.key]) {
+            e.preventDefault()
+            const status = statusFilters[e.key]
+            // Toggle behavior: if same status is selected, clear to 'all'
+            if (statusFilterRef.current === status) {
+              setStatusFilter('all')
+            } else {
+              setStatusFilter(status)
+            }
+          }
+          
+          // Shift+0: Clear status filter
+          if (e.key === '0') {
+            e.preventDefault()
+            setStatusFilter('all')
+          }
+        }
+      } else {
+        // When filter panel is CLOSED: Number keys open filter panel and apply platform filter
+        const platformFilters: Record<string, string> = {
+          '1': 'all',
+          '2': 'youtube',
+          '3': 'instagram',
+          '4': 'twitter',
+        }
+        
+        if (platformFilters[e.key]) {
+          e.preventDefault()
+          setShowFilters(true)
+          const platform = platformFilters[e.key]
+          setPlatformFilter(platform)
+        }
+      }
+      
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
@@ -234,22 +322,6 @@ export default function AudienceSentimentPage() {
         case 'n':
           e.preventDefault()
           setShowForm(true)
-          break
-        case '1':
-          e.preventDefault()
-          setPlatformFilter('all')
-          break
-        case '2':
-          e.preventDefault()
-          setPlatformFilter('youtube')
-          break
-        case '3':
-          e.preventDefault()
-          setPlatformFilter('instagram')
-          break
-        case '4':
-          e.preventDefault()
-          setPlatformFilter('twitter')
           break
         case 'e':
           e.preventDefault()
@@ -279,10 +351,6 @@ export default function AudienceSentimentPage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
-          break
-          setShowForm(false)
-          setShowExportMenu(false)
-          setSearchQuery('')
           break
       }
     }
@@ -763,6 +831,7 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
                   }`}
                 >
                   All
+                  <span className="text-xs text-slate-500 ml-0.5">(1)</span>
                 </button>
               </div>
               <button
@@ -867,6 +936,23 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
         <div className="border-b border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div ref={filterPanelRef} className="flex flex-wrap items-center gap-4">
+              {/* Filter Panel Header with Shortcut Hints */}
+              <div className="w-full flex items-center justify-between mb-2 pb-2 border-b border-slate-700/50">
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-rose-400" />
+                  Filters
+                </h3>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-cyan-400">
+                    <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">1-4</kbd> Platform
+                    <kbd className="ml-1 px-1.5 py-0.5 bg-slate-700 rounded">0</kbd> Clear
+                  </span>
+                  <span className="text-emerald-400">
+                    <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">⇧1-4</kbd> Status
+                    <kbd className="ml-1 px-1.5 py-0.5 bg-slate-700 rounded">⇧0</kbd> Clear
+                  </span>
+                </div>
+              </div>
               {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-400">Status:</span>
@@ -875,10 +961,10 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
                   onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
                   className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
                 >
-                  <option value="all">All Status</option>
-                  <option value="completed">Completed</option>
-                  <option value="analyzing">Analyzing</option>
-                  <option value="failed">Failed</option>
+                  <option value="all">All Status (⇧1)</option>
+                  <option value="completed">Completed (⇧2)</option>
+                  <option value="analyzing">Analyzing (⇧3)</option>
+                  <option value="failed">Failed (⇧4)</option>
                 </select>
               </div>
 
@@ -1475,54 +1561,112 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
               </button>
             </div>
             <div className="space-y-2">
+              {/* General Shortcuts */}
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Refresh data</span>
+                <span className="text-emerald-400">Refresh data</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Search analyses</span>
+                <span className="text-emerald-400">Search analyses</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">New analysis</span>
+                <span className="text-emerald-400">New analysis</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">N</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Export menu</span>
+                <span className="text-emerald-400">Export menu</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">E</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Export Markdown</span>
+                <span className="text-emerald-400">Export Markdown</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">M</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Print report</span>
+                <span className="text-emerald-400">Print report</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">P</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Filter: All</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Filter: YouTube</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Filter: Instagram</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">3</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Filter: Twitter</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">4</kbd>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Toggle filters</span>
+                <span className="text-emerald-400">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Toggle sort order</span>
+                <span className="text-emerald-400">Toggle sort order</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
               </div>
+              
+              {/* Context-Aware: Filters Closed */}
+              <div className="mt-3 mb-1">
+                <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Filters Closed</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Open + Filter: All</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-amber-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Open + Filter: YouTube</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-amber-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Open + Filter: Instagram</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-amber-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Open + Filter: Twitter</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-amber-400">4</kbd>
+              </div>
+              
+              {/* Context-Aware: Filters Open */}
+              <div className="mt-3 mb-1">
+                <span className="text-cyan-400 text-xs font-semibold uppercase tracking-wider">Filters Open</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: All</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: YouTube</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: Instagram</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: Twitter</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Clear platform</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">0</kbd>
+              </div>
+              
+              {/* Status Filters */}
+              <div className="mt-3 mb-1">
+                <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">Shift+Number: Status Filter</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: All</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">⇧1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: Completed</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">⇧2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: Analyzing</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">⇧3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Toggle: Failed</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">⇧4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-slate-300">Clear status</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">⇧0</kbd>
+              </div>
+              
+              {/* General */}
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Show shortcuts</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">?</kbd>

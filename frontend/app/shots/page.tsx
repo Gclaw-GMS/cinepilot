@@ -124,14 +124,6 @@ export default function ShotsPage() {
 
   const toggleNote = (id: string) => setExpandedNotes(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  // Clear all filters function
-  const clearFilters = useCallback(() => {
-    setSearchQuery('')
-    setFilterScene('all')
-    setFilterSize('all')
-    setFilterAngle('all')
-    setFilterMovement('all')
-  }, [])
   const clearFiltersRef = useRef(clearFilters)
   useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
 

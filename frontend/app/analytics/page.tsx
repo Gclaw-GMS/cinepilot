@@ -224,7 +224,7 @@ export default function AnalyticsPage() {
   }, [viewMode])
 
   // Calculate active filter count
-  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
+  const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0) + (searchQuery ? 1 : 0)
 
   // Sorted data using useMemo
   const sortedBudgetData = useMemo(() => {
@@ -421,6 +421,12 @@ export default function AnalyticsPage() {
         case 'f':
           e.preventDefault()
           setShowFilterPanel(prev => !prev)
+          break
+        case 'x':
+          if (showFilterPanelRef.current && activeFilterCount > 0) {
+            e.preventDefault()
+            handleClearFilters()
+          }
           break
         case 's':
           e.preventDefault()
@@ -734,6 +740,7 @@ export default function AnalyticsPage() {
     setFilters({ timePeriod: 'all', department: 'all' })
     setSortBy('category')
     setSortOrder('asc')
+    setSearchQuery('')
   }
 
   const formatCurrency = (amount: number): string => {
@@ -1735,6 +1742,7 @@ export default function AnalyticsPage() {
                   { key: '8', description: 'Filter: Art (toggle)' },
                   { key: '9', description: 'Filter: VFX (toggle)' },
                   { key: '-', description: 'Clear department filter' },
+                  { key: 'X', description: 'Clear all filters & sort' },
                   { key: 'F', description: 'Close filter panel' },
                 ].map((shortcut) => (
                   <div 

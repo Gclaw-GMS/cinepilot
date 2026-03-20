@@ -598,6 +598,10 @@ export default function EquipmentPage() {
           e.preventDefault()
           fetchDataRef.current?.()
           break
+        case 's':
+          e.preventDefault()
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
@@ -2109,6 +2113,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh equipment data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Toggle sort order</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">S</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Toggle filters</span>

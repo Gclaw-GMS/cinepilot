@@ -196,16 +196,45 @@ export default function CensorPage() {
   const handlePrintRef = useRef<() => void>(() => {})
   const handleExportMarkdownRef = useRef<() => void>()
   const sortOrderRef = useRef(sortOrder)
+  const sortByRef = useRef(sortBy)
   const viewModeRef = useRef(viewMode)
   const filterCategoryRef = useRef(filterCategory)
   const filterSeverityRef = useRef(filterSeverity)
+  const searchQueryRef = useRef(searchQuery)
+  const clearFiltersRef = useRef<() => void>(() => {})
   
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
   useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
+  useEffect(() => { sortByRef.current = sortBy }, [sortBy])
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
   useEffect(() => { filterCategoryRef.current = filterCategory }, [filterCategory])
   useEffect(() => { filterSeverityRef.current = filterSeverity }, [filterSeverity])
+  useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
+  
+  // Active filter count (includes searchQuery)
+  const activeFilterCount = useMemo(() => {
+    return (
+      (filterCategory !== 'all' ? 1 : 0) +
+      (filterSeverity !== 'all' ? 1 : 0) +
+      (sortBy !== 'severity' || sortOrder !== 'desc' ? 1 : 0) +
+      (searchQuery ? 1 : 0)
+    )
+  }, [filterCategory, filterSeverity, sortBy, sortOrder, searchQuery])
+  
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setFilterCategory('all')
+    setFilterSeverity('all')
+    setSortBy('severity')
+    setSortOrder('desc')
+    setSearchQuery('')
+  }, [])
+  
+  // Update clearFilters ref
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -290,6 +319,12 @@ export default function CensorPage() {
           e.preventDefault()
           setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc')
           break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCount > 0) {
+            clearFiltersRef.current()
+          }
+          break
         case 'e':
           e.preventDefault()
           setShowExportDropdown(!showExportDropdownRef.current)
@@ -327,7 +362,7 @@ export default function CensorPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [activeFilterCount])
 
   // Update refs when state changes
   useEffect(() => {
@@ -867,16 +902,16 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                showFilters || filterCategory !== 'all' || filterSeverity !== 'all'
+                showFilters || activeFilterCount > 0
                   ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
                   : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
               }`}
             >
               <Filter className="w-4 h-4" />
               Filter & Sort
-              {(filterCategory !== 'all' || filterSeverity !== 'all' || sortBy !== 'severity' || sortOrder !== 'desc') && (
+              {activeFilterCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 bg-cyan-500 text-black text-xs font-medium rounded">
-                  {([filterCategory !== 'all', filterSeverity !== 'all', sortBy !== 'severity', sortOrder !== 'desc'].filter(Boolean)).length}
+                  {activeFilterCount}
                 </span>
               )}
             </button>
@@ -944,15 +979,15 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
                   </div>
                   
                   <button
-                    onClick={() => { 
-                      setFilterCategory('all'); 
-                      setFilterSeverity('all');
-                      setSortBy('severity');
-                      setSortOrder('desc');
-                    }}
-                    className="w-full py-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                    onClick={clearFilters}
+                    className={`w-full py-2 text-sm transition-colors ${
+                      activeFilterCount > 0 
+                        ? 'text-amber-400 hover:text-amber-300' 
+                        : 'text-gray-500 cursor-not-allowed'
+                    }`}
+                    disabled={activeFilterCount === 0}
                   >
-                    Clear All
+                    {activeFilterCount > 0 ? `Clear All (${activeFilterCount})` : 'Clear All'}
                   </button>
                 </div>
               </div>
@@ -1602,6 +1637,10 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Clear severity filter</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-400">⇧0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Clear all filters</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-amber-400">X</kbd>
               </div>
               
               {/* General Shortcuts */}

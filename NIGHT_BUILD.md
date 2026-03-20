@@ -1,5 +1,41 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (2:03 AM) - Equipment Page 'S' Keyboard Shortcut for Sort Toggle IMPLEMENTED
+
+### 2:03 AM - Equipment Page - 'S' Keyboard Shortcut for Sort Toggle (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Equipment Page - 'S' Keyboard Shortcut**: Added missing keyboard shortcut to toggle sort order
+
+### Feature Details
+- **Key 'S'**: Toggle between ascending/descending sort order
+- **UI Enhancement**: Updated keyboard help modal to show the new shortcut
+- **Consistency**: Now consistent with other pages that have sort functionality (crew, projects, settings, travel-expenses)
+
+### Technical Implementation
+- Added 's' case to handleKeyDown switch statement
+- setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+- Added keyboard help entry: "Toggle sort order | S" in the Actions section
+
+### Build Verification
+- **Build**: Clean build with 82 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### Equipment Page 'S' Sort Toggle Feature Checklist
+- [x] Feature works 100% ('s' key toggles sort order)
+- [x] Keyboard help modal updated with new shortcut
+- [x] Consistent with other pages
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (1:05 AM) - Audience Sentiment Page Context-Aware Number Key Shortcuts IMPLEMENTED
 
 ### 1:05 AM - Audience Sentiment Page - Context-Aware Number Key Shortcuts with Toggle Behavior (IMPLEMENTED)

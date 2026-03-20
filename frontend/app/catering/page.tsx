@@ -95,6 +95,8 @@ export default function CateringPage() {
   const sortByRef = useRef(sortBy)
   const sortOrderRef = useRef(sortOrder)
   const showFiltersRef = useRef(showFilters)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef<() => void>(() => {})
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -562,6 +564,13 @@ export default function CateringPage() {
             setFilters(prev => ({ ...prev, mealType: 'all' }))
           }
           break
+        case 'x':
+          e.preventDefault()
+          // Clear all filters (works when filter panel is open and filters are active)
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
+          }
+          break
       }
     }
     
@@ -637,11 +646,20 @@ export default function CateringPage() {
   }
   
   // Clear all filters
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({ mealType: 'all', dietary: 'all' })
     setSortBy('date')
     setSortOrder('asc')
-  }
+  }, [])
+
+  // Keep refs in sync with state/computed values
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+  
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   // Stats for filtered data
   const filteredStats = {
@@ -952,6 +970,7 @@ export default function CateringPage() {
               <ShortcutRow keys={['4']} description="Filter by Snacks (toggle)" />
               <ShortcutRow keys={['5']} description="Filter by Dinner (toggle)" />
               <ShortcutRow keys={['0']} description="Clear meal type filter" />
+              <ShortcutRow keys={['X']} description="Clear all filters" />
               <div className="my-2 pt-2 border-t border-white/10">
                 <p className="text-xs text-slate-400 mb-2">Actions</p>
               </div>
@@ -1072,13 +1091,13 @@ export default function CateringPage() {
                         {activeFilterCount > 0 && (
                           <button
                             onClick={clearFilters}
-                            className="text-xs text-amber-400 hover:text-amber-300"
+                            className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
                           >
-                            Clear All
+                            Clear ({activeFilterCount})
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-cyan-400/70">Press 1-5 for meal type, 0 to clear</p>
+                      <p className="text-xs text-cyan-400/70">Press 1-5 for meal type, 0 to clear, X to clear all</p>
                       
                       {/* Sort Options */}
                       <div className="mb-4 p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">

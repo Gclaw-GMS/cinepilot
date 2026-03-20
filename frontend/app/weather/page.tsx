@@ -433,6 +433,19 @@ export default function WeatherPage() {
     setSortOrder('asc');
   }, []);
 
+  // Refs for keyboard shortcuts (to avoid dependency issues)
+  const clearFiltersRef = useRef(() => {})
+  const activeFilterCountRef = useRef(0)
+
+  // Keep refs in sync with state for keyboard shortcuts
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+
   // Filtered and sorted weather forecast
   const filteredForecast = useMemo(() => {
     if (!weatherData?.forecast) return [];
@@ -842,6 +855,14 @@ export default function WeatherPage() {
         case 's':
           e.preventDefault()
           toggleSortOrder()
+          break
+        case 'x':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+              clearFiltersRef.current()
+            }
+          }
           break
         case 'p':
           e.preventDefault()
@@ -1406,6 +1427,7 @@ export default function WeatherPage() {
                 </div>
                 <ShortcutRow keys={['F']} description="Toggle filters panel" />
                 <ShortcutRow keys={['S']} description="Toggle sort order" />
+                <ShortcutRow keys={['X']} description="Clear all filters" />
                 <ShortcutRow keys={['E']} description="Toggle export menu" />
                 <ShortcutRow keys={['M']} description="Export Markdown" />
                 <ShortcutRow keys={['P']} description="Print forecast report" />

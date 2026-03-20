@@ -96,6 +96,14 @@ export default function ReportsPage() {
   const [tabFilter, setTabFilter] = useState<string>('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Refs for keyboard shortcuts
+  const showFiltersRef = useRef(showFilters)
+  const tabFilterRef = useRef(tabFilter)
+  const activeTabRef = useRef(activeTab)
+  const setTabFilterRef = useRef(setTabFilter)
+  const setShowFiltersRef = useRef(setShowFilters)
+  const setActiveTabRef = useRef(setActiveTab)
+  
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'value'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -136,6 +144,31 @@ export default function ReportsPage() {
     fetchReportRef.current = fetchReport;
   }, [fetchReport]);
 
+  // Sync refs with state for keyboard shortcuts
+  useEffect(() => {
+    showFiltersRef.current = showFilters;
+  }, [showFilters]);
+
+  useEffect(() => {
+    tabFilterRef.current = tabFilter;
+  }, [tabFilter]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    setTabFilterRef.current = setTabFilter;
+  }, [setTabFilter]);
+
+  useEffect(() => {
+    setShowFiltersRef.current = setShowFilters;
+  }, [setShowFilters]);
+
+  useEffect(() => {
+    setActiveTabRef.current = setActiveTab;
+  }, [setActiveTab]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -158,24 +191,54 @@ export default function ReportsPage() {
           setShowKeyboardHelp(true)
           break
         case '1':
-          e.preventDefault()
-          setActiveTab('overview')
-          break
         case '2':
-          e.preventDefault()
-          setActiveTab('production')
-          break
         case '3':
-          e.preventDefault()
-          setActiveTab('schedule')
-          break
         case '4':
-          e.preventDefault()
-          setActiveTab('crew')
-          break
         case '5':
+        case '0':
           e.preventDefault()
-          setActiveTab('censor')
+          if (showFiltersRef.current) {
+            // When filters panel is OPEN: number keys filter by tab
+            const keyNum = parseInt(e.key)
+            const tabs: Record<string, ReportTab> = {
+              '1': 'overview',
+              '2': 'production',
+              '3': 'schedule',
+              '4': 'crew',
+              '5': 'censor',
+            }
+            if (keyNum === 0) {
+              // 0 clears the filter
+              setTabFilterRef.current?.('all')
+            } else if (tabs[e.key]) {
+              const selectedTab = tabs[e.key]
+              // Toggle: if same tab is already selected, clear it
+              if (tabFilterRef.current === selectedTab) {
+                setTabFilterRef.current?.('all')
+              } else {
+                setTabFilterRef.current?.(selectedTab)
+              }
+            }
+          } else {
+            // When filters panel is CLOSED: number keys switch tabs
+            switch (e.key) {
+              case '1':
+                setActiveTabRef.current?.('overview')
+                break
+              case '2':
+                setActiveTabRef.current?.('production')
+                break
+              case '3':
+                setActiveTabRef.current?.('schedule')
+                break
+              case '4':
+                setActiveTabRef.current?.('crew')
+                break
+              case '5':
+                setActiveTabRef.current?.('censor')
+                break
+            }
+          }
           break
         case 'e':
           e.preventDefault()
@@ -777,6 +840,7 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-indigo-400" />
               <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
+              <span className="text-xs text-cyan-400 ml-1">(Press 1-5 to filter, 0 to clear)</span>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Report Tab:</label>
@@ -785,12 +849,12 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
                 onChange={(e) => setTabFilter(e.target.value)}
                 className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
               >
-                <option value="all">All Tabs</option>
-                <option value="overview">Overview</option>
-                <option value="production">Production</option>
-                <option value="schedule">Schedule</option>
-                <option value="crew">Crew</option>
-                <option value="censor">Censor</option>
+                <option value="all">All Tabs (0)</option>
+                <option value="overview">Overview (1)</option>
+                <option value="production">Production (2)</option>
+                <option value="schedule">Schedule (3)</option>
+                <option value="crew">Crew (4)</option>
+                <option value="censor">Censor (5)</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -1139,6 +1203,58 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
               </button>
             </div>
             <div className="space-y-3">
+              {/* Number keys - Filters closed (Tab switching) */}
+              <div className="text-xs font-medium text-amber-400 uppercase tracking-wide mt-2 mb-1">Number Keys (Filters Closed)</div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Overview tab</span>
+                <kbd className="px-2.5 py-1 bg-amber-900/50 border border-amber-700 rounded text-sm font-mono text-amber-300">1</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Production tab</span>
+                <kbd className="px-2.5 py-1 bg-amber-900/50 border border-amber-700 rounded text-sm font-mono text-amber-300">2</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Schedule tab</span>
+                <kbd className="px-2.5 py-1 bg-amber-900/50 border border-amber-700 rounded text-sm font-mono text-amber-300">3</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Crew tab</span>
+                <kbd className="px-2.5 py-1 bg-amber-900/50 border border-amber-700 rounded text-sm font-mono text-amber-300">4</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Switch to Censor tab</span>
+                <kbd className="px-2.5 py-1 bg-amber-900/50 border border-amber-700 rounded text-sm font-mono text-amber-300">5</kbd>
+              </div>
+
+              {/* Number keys - Filters open (Tab filtering) */}
+              <div className="text-xs font-medium text-cyan-400 uppercase tracking-wide mt-4 mb-1">Number Keys (Filters Open)</div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Filter: Overview (toggle)</span>
+                <kbd className="px-2.5 py-1 bg-cyan-900/50 border border-cyan-700 rounded text-sm font-mono text-cyan-300">1</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Filter: Production (toggle)</span>
+                <kbd className="px-2.5 py-1 bg-cyan-900/50 border border-cyan-700 rounded text-sm font-mono text-cyan-300">2</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Filter: Schedule (toggle)</span>
+                <kbd className="px-2.5 py-1 bg-cyan-900/50 border border-cyan-700 rounded text-sm font-mono text-cyan-300">3</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Filter: Crew (toggle)</span>
+                <kbd className="px-2.5 py-1 bg-cyan-900/50 border border-cyan-700 rounded text-sm font-mono text-cyan-300">4</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Filter: Censor (toggle)</span>
+                <kbd className="px-2.5 py-1 bg-cyan-900/50 border border-cyan-700 rounded text-sm font-mono text-cyan-300">5</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Clear filter</span>
+                <kbd className="px-2.5 py-1 bg-cyan-900/50 border border-cyan-700 rounded text-sm font-mono text-cyan-300">0</kbd>
+              </div>
+
+              {/* General shortcuts */}
+              <div className="text-xs font-medium text-emerald-400 uppercase tracking-wide mt-4 mb-1">General Shortcuts</div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Refresh data</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">R</kbd>
@@ -1170,26 +1286,6 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Generate report</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">G</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Overview tab</span>
-                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">1</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Production tab</span>
-                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">2</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Schedule tab</span>
-                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">3</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Crew tab</span>
-                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">4</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-gray-300">Censor tab</span>
-                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">5</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Show shortcuts</span>

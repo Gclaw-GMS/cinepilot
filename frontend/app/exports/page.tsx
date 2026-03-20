@@ -136,6 +136,10 @@ export default function ExportsPage() {
   const formatFilterRef = useRef(formatFilter)
   const showFiltersRef = useRef(showFilters)
   
+  // Refs for clear filters
+  const clearFiltersRef = useRef<() => void>(() => {})
+  const activeFilterCountRef = useRef(0)
+  
   // Keep refs in sync
   useEffect(() => { categoryFilterRef.current = categoryFilter }, [categoryFilter])
   useEffect(() => { formatFilterRef.current = formatFilter }, [formatFilter])
@@ -144,6 +148,18 @@ export default function ExportsPage() {
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'format' | 'category'>('category')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  
+  // Calculate active filter count (includes sort state)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (categoryFilter !== 'all') count++
+    if (formatFilter !== 'all') count++
+    if (sortBy !== 'category' || sortOrder !== 'asc') count++
+    return count
+  }, [categoryFilter, formatFilter, sortBy, sortOrder])
+  
+  // Sync activeFilterCountRef
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
   
   // Export menu state
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -188,6 +204,13 @@ export default function ExportsPage() {
         case '?':
           e.preventDefault()
           setShowKeyboardHelp(true)
+          break
+        case 'x':
+          // Clear all filters when filter panel is open and filters are active
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current?.()
+          }
           break
         // Number keys 1-4 for category filtering (toggle)
         case '1':
@@ -275,15 +298,26 @@ export default function ExportsPage() {
     setTimeout(() => setRefreshing(false), 500)
   }, [])
 
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setCategoryFilter('all')
+    setFormatFilter('all')
+    setSortBy('category')
+    setSortOrder('asc')
+    setSearchQuery('')
+  }, [])
+
   // Ref for keyboard shortcut access
   const handleRefreshRef = useRef(handleRefresh)
   useEffect(() => {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
 
-  // Count active filters (includes sort state)
-  const activeFilterCount = [categoryFilter, formatFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
-  
+  // Connect clearFilters to ref for keyboard shortcut
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+
   // Filter categories by search query and filters
   const filteredCategories = useMemo(() => {
     let categories = EXPORT_CATEGORIES
@@ -791,16 +825,11 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
               {/* Clear Filters & Sort */}
               {activeFilterCount > 0 && (
                 <button
-                  onClick={() => {
-                    setCategoryFilter('all')
-                    setFormatFilter('all')
-                    setSortBy('category')
-                    setSortOrder('asc')
-                  }}
+                  onClick={clearFilters}
                   className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors"
                 >
                   <X className="w-4 h-4" />
-                  Clear Filters & Sort
+                  Clear Filters (X)
                 </button>
               )}
               
@@ -1072,6 +1101,10 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Clear filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-slate-300">Clear all filters (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">X</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Format: PDF</span>

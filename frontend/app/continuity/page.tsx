@@ -111,13 +111,48 @@ export default function ContinuityPage() {
   const severityFilterRef = useRef(severityFilter);
   const typeFilterRef = useRef(typeFilter);
   const activeTabRef = useRef(activeTab);
+  const searchQueryRef = useRef(searchQuery);
+  const filterRef = useRef(filter);
+  const sortByRef = useRef(sortBy);
+  const sortOrderRef = useRef(sortOrder);
+  const clearFiltersRef = useRef<() => void>();
+  const activeFilterCountRef = useRef<number>(0);
 
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters; }, [showFilters]);
+  useEffect(() => { searchQueryRef.current = searchQuery; }, [searchQuery]);
+  useEffect(() => { filterRef.current = filter; }, [filter]);
+  useEffect(() => { sortByRef.current = sortBy; }, [sortBy]);
+  useEffect(() => { sortOrderRef.current = sortOrder; }, [sortOrder]);
   useEffect(() => { severityFilterRef.current = severityFilter; }, [severityFilter]);
   useEffect(() => { typeFilterRef.current = typeFilter; }, [typeFilter]);
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
-  
+
+  // Active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (typeFilter !== 'all') count++;
+    if (severityFilter !== 'all') count++;
+    if (sortBy !== 'severity' || sortOrder !== 'desc') count++;
+    if (searchQuery) count++;
+    if (filter) count++;
+    return count;
+  }, [typeFilter, severityFilter, sortBy, sortOrder, searchQuery, filter]);
+
+  // Clear filters function
+  const clearFilters = useCallback(() => {
+    setTypeFilter('all');
+    setSeverityFilter('all');
+    setSortBy('severity');
+    setSortOrder('desc');
+    setSearchQuery('');
+    setFilter('');
+  }, []);
+
+  // Sync refs with callbacks and computed values
+  useEffect(() => { clearFiltersRef.current = clearFilters; }, [clearFilters]);
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount; }, [activeFilterCount]);
+
   // Historical and breakdown data
   const [historicalData] = useState(DEMO_HISTORICAL_DATA);
   const [sceneBreakdown] = useState(DEMO_SCENE_BREAKDOWN);
@@ -360,6 +395,12 @@ export default function ContinuityPage() {
         case 'f':
           e.preventDefault();
           setShowFilters(!showFilters);
+          break;
+        case 'x':
+          if (showFilters && activeFilterCountRef.current > 0) {
+            e.preventDefault();
+            clearFiltersRef.current?.();
+          }
           break;
         case 's':
           e.preventDefault();
@@ -846,7 +887,7 @@ export default function ContinuityPage() {
               {showFilters && (
                 <div className="absolute right-0 top-full mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-4">
                   <div className="mb-3 pb-2 border-b border-slate-700">
-                    <span className="text-xs text-cyan-400">Filters (1-5 for severity, Shift+1-6 for type, 0 to clear)</span>
+                    <span className="text-xs text-cyan-400">Filters (1-5 severity, Shift+1-6 type, 0/X clear)</span>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -901,10 +942,10 @@ export default function ContinuityPage() {
                       </select>
                     </div>
                     <button
-                      onClick={() => { setTypeFilter('all'); setSeverityFilter('all'); setSortBy('severity'); setSortOrder('desc'); }}
-                      className="w-full py-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                      onClick={clearFilters}
+                      className="w-full py-2 text-sm text-amber-400 hover:text-amber-300 transition-colors"
                     >
-                      Clear Filters & Sort
+                      Clear {activeFilterCount > 0 && `(${activeFilterCount})`} Filters
                     </button>
                   </div>
                 </div>
@@ -1588,6 +1629,7 @@ export default function ContinuityPage() {
                   { key: 'Shift+4', description: 'Filter by Timeline (toggle)' },
                   { key: 'Shift+5', description: 'Filter by Dialogue (toggle)' },
                   { key: 'Shift+0', description: 'Clear type filter' },
+                  { key: 'X', description: 'Clear all filters' },
                 ].map((shortcut) => (
                   <div 
                     key={shortcut.key}

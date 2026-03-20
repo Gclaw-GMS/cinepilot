@@ -166,7 +166,13 @@ export default function BudgetPage() {
   
   // Refs for keyboard shortcuts (to avoid dependency issues in useEffect)
   const categoryFilterRef = useRef(categoryFilter)
+  const subcategoryFilterRef = useRef(subcategoryFilter)
+  const sourceFilterRef = useRef(sourceFilter)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+  const searchQueryRef = useRef(searchQuery)
   const showFiltersRef = useRef(showFilters)
+  const clearFiltersRef = useRef<() => void>(() => {})
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -176,6 +182,26 @@ export default function BudgetPage() {
   useEffect(() => {
     showFiltersRef.current = showFilters
   }, [showFilters])
+
+  useEffect(() => {
+    subcategoryFilterRef.current = subcategoryFilter
+  }, [subcategoryFilter])
+
+  useEffect(() => {
+    sourceFilterRef.current = sourceFilter
+  }, [sourceFilter])
+
+  useEffect(() => {
+    sortByRef.current = sortBy
+  }, [sortBy])
+
+  useEffect(() => {
+    sortOrderRef.current = sortOrder
+  }, [sortOrder])
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+  }, [searchQuery])
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -221,7 +247,22 @@ export default function BudgetPage() {
   const [scenarioAdjustments, setScenarioAdjustments] = useState<ScenarioAdjustment[]>([])
 
   // Count active filters
-  const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
+  const activeFilterCount = [categoryFilter, subcategoryFilter, sourceFilter].filter(f => f !== 'all').length + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0) + (searchQuery ? 1 : 0)
+
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setCategoryFilter('all')
+    setSubcategoryFilter('all')
+    setSourceFilter('all')
+    setSortBy('category')
+    setSortOrder('asc')
+    setSearchQuery('')
+  }, [])
+
+  // Update clearFilters ref
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   // Helper to sort items (used by exports) - wrapped in useCallback to fix dependency warning
   const sortItems = useCallback((itemsToSort: BudgetItemData[]) => {
@@ -743,6 +784,12 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
         case 's':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCount > 0) {
+            clearFiltersRef.current()
+          }
           break
         case '1':
         case '2':
@@ -1275,18 +1322,15 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
               </button>
             </div>
             
-            <button
-              onClick={() => {
-                setCategoryFilter('all')
-                setSubcategoryFilter('all')
-                setSourceFilter('all')
-                setSortBy('category')
-                setSortOrder('asc')
-              }}
-              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              Clear Filters
-            </button>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-amber-400 hover:text-amber-300 transition-colors bg-amber-500/10 hover:bg-amber-500/20 rounded-lg border border-amber-500/30"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear All ({activeFilterCount})
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1887,6 +1931,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
                 { key: '/', action: 'Search budget items' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
+                { key: 'X', action: 'Clear all filters (when filters open)' },
                 { key: 'N', action: 'Add new expense' },
                 { key: 'M', action: 'Export as Markdown' },
                 { key: 'E', action: 'Toggle export menu' },

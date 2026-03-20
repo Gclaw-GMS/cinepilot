@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Utensils, Plus, Edit2, Trash2, DollarSign, Users, Calendar, ChefHat,
   Phone, Mail, Star, Coffee, UtensilsCrossed, Leaf, AlertCircle, CheckCircle, X,
-  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, FileJson, Printer, Filter
+  TrendingUp, RefreshCw, Search, HelpCircle, Loader2, Download, FileText, FileJson, Printer, Filter, Clock
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -83,6 +83,7 @@ export default function CateringPage() {
   const [sortBy, setSortBy] = useState<'date' | 'budget' | 'mealType' | 'people'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [viewMode, setViewMode] = useState<'calendar' | 'analytics' | 'conflicts'>('calendar')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -116,6 +117,7 @@ export default function CateringPage() {
       if (data.error) throw new Error(data.error)
       setPlan(data.plan)
       setCaterers(data.caterers || [])
+      setLastUpdated(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
@@ -1024,6 +1026,14 @@ export default function CateringPage() {
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+
+              {/* Last Updated Timestamp */}
+              {lastUpdated && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5" />
+                  Updated: {lastUpdated.toLocaleTimeString()}
+                </div>
+              )}
 
               {/* View Mode Switcher */}
               <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">

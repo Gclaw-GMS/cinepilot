@@ -71,24 +71,32 @@ export default function HealthPage() {
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Refs for keyboard shortcuts
-  const filterStatusRef = useRef(filterStatus)
-  const showFiltersRef = useRef(showFilters)
-  
-  // Keep refs in sync
-  useEffect(() => { filterStatusRef.current = filterStatus }, [filterStatus])
-  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
-  
-  // Calculate active filter count (includes sort state)
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (sortBy !== 'component' || sortOrder !== 'asc' ? 1 : 0)
-  
-  // Clear all filters and sort
+  // Clear all filters and sort - defined first for ref usage
   const clearFilters = useCallback(() => {
     setFilterStatus('all')
     setSearchQuery('')
     setSortBy('component')
     setSortOrder('asc')
   }, [])
+  
+  // Calculate active filter count (includes sort state and search)
+  const activeFilterCount = useMemo(() => {
+    return (filterStatus !== 'all' ? 1 : 0) + 
+           (sortBy !== 'component' || sortOrder !== 'asc' ? 1 : 0) +
+           (searchQuery ? 1 : 0)
+  }, [filterStatus, sortBy, sortOrder, searchQuery])
+  
+  // Refs for keyboard shortcuts
+  const filterStatusRef = useRef(filterStatus)
+  const showFiltersRef = useRef(showFilters)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef(clearFilters)
+  
+  // Keep refs in sync
+  useEffect(() => { filterStatusRef.current = filterStatus }, [filterStatus])
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
   
   // Filtered and sorted checks
   const filteredChecks = useMemo(() => {
@@ -465,6 +473,13 @@ export default function HealthPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 'x':
+          e.preventDefault()
+          // Only clear when filter panel is open AND there are active filters
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current?.()
+          }
+          break
         case 's':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -732,9 +747,10 @@ export default function HealthPage() {
                     <div className="p-3 border-t border-slate-700">
                       <button
                         onClick={clearFilters}
-                        className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 text-sm bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 py-2 rounded-lg transition-colors"
                       >
-                        Clear All Filters
+                        <X className="w-4 h-4" />
+                        Clear ({activeFilterCount})
                       </button>
                     </div>
                   )}
@@ -1151,6 +1167,10 @@ export default function HealthPage() {
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">F</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-amber-400">Clear all filters (when open)</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">X</kbd>
               </div>
               {/* Number key shortcuts - context-aware */}
               <div className="border-t border-slate-700 pt-3 mt-3">

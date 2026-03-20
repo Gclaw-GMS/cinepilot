@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp } from 'lucide-react'
+import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, X } from 'lucide-react'
 
 interface Scene { id: string; sceneNumber: string; headingRaw: string; intExt: string; timeOfDay: string; location: string; _count?: { shots: number } }
 interface Shot { id: string; shotIndex: number; beatIndex: number; shotText: string; characters: string[]; shotSize: string; shotType: string; cameraAngle: string; cameraMovement: string; focalLengthMm: number; lensType: string; keyStyle: string; colorTemp: string; durationEstSec: number; confidenceCamera: number; confidenceLens: number; confidenceLight: number; confidenceDuration: number; isLocked: boolean; userEdited: boolean; notes: string; scene?: Scene }
@@ -53,9 +53,33 @@ export default function ShotsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const showFiltersRef = useRef(showFilters)
   const filterSizeRef = useRef(filterSize)
+  const filterSceneRef = useRef(filterScene)
+  const filterAngleRef = useRef(filterAngle)
+  const filterMovementRef = useRef(filterMovement)
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (searchQuery) count++
+    if (filterScene !== 'all') count++
+    if (filterSize !== 'all') count++
+    if (filterAngle !== 'all') count++
+    if (filterMovement !== 'all') count++
+    return count
+  }, [searchQuery, filterScene, filterSize, filterAngle, filterMovement])
+
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setFilterScene('all')
+    setFilterSize('all')
+    setFilterAngle('all')
+    setFilterMovement('all')
+  }, [])
 
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
   useEffect(() => { filterSizeRef.current = filterSize }, [filterSize])
+  useEffect(() => { filterSceneRef.current = filterScene }, [filterScene])
+  useEffect(() => { filterAngleRef.current = filterAngle }, [filterAngle])
+  useEffect(() => { filterMovementRef.current = filterMovement }, [filterMovement])
 
   const fetchShots = useCallback(async () => {
     setLoading(true)
@@ -98,10 +122,11 @@ export default function ShotsPage() {
       if (showFiltersRef.current && e.key >= '1' && e.key <= '8') { e.preventDefault(); const s = SHOT_SIZES; const i = parseInt(e.key) - 1; setFilterSize(filterSizeRef.current === s[i] ? 'all' : s[i]); return }
       if (!showFiltersRef.current) { if (e.key === '1') { setViewMode('cards'); return } if (e.key === '2') { setViewMode('table'); return } }
       if (showFiltersRef.current && e.key === '0') { e.preventDefault(); setFilterSize('all'); return }
+      if (showFiltersRef.current && e.key.toLowerCase() === 'x') { e.preventDefault(); clearFilters(); return }
       switch (e.key) { case '/': e.preventDefault(); searchInputRef.current?.focus(); break; case 'f': setShowFilters(p => !p); break; case 's': setSortOrder(p => p === 'asc' ? 'desc' : 'asc'); break; case 'r': fetchShots(); break; case 'e': setShowExportMenu(p => !p); break; case 'Escape': setShowExportMenu(false); setSearchQuery(''); break }
     }
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
-  }, [fetchShots])
+  }, [fetchShots, clearFilters])
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-slate-400">Loading shots...</p></div></div>
 
@@ -133,7 +158,8 @@ export default function ShotsPage() {
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Angle:</span><select value={filterAngle} onChange={e => setFilterAngle(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Angles</option>{CAMERA_ANGLES.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Movement:</span><select value={filterMovement} onChange={e => setFilterMovement(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Movements</option>{CAMERA_MOVEMENTS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Sort:</span><select value={sortBy} onChange={e => setSortBy(e.target.value as 'index'|'duration'|'focal')} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="index">Shot #</option><option value="duration">Duration</option><option value="focal">Focal Length</option></select><button onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="p-1.5 hover:bg-slate-700 rounded">{sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}</button></div>
-            <span className="text-xs text-cyan-400 ml-auto">(1-8 size filter, 0 clear)</span>
+            {activeFilterCount > 0 && <button onClick={clearFilters} className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm flex items-center gap-1"><X className="w-3 h-3" />Clear All ({activeFilterCount})</button>}
+            <span className="text-xs text-cyan-400 ml-auto">(1-8 size, X clear all)</span>
           </div>}
         </div>
       </header>

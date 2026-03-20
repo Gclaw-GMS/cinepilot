@@ -184,6 +184,18 @@ export default function LocationsPage() {
     showFiltersRef.current = showFilters
   }, [showFilters])
 
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setFilters({
+      placeType: 'all',
+      intExt: 'all',
+      timeOfDay: 'all',
+      favoritesOnly: false,
+      minScore: 0,
+      riskFree: false,
+    })
+  }, [])
+
   // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -196,6 +208,13 @@ export default function LocationsPage() {
     if (sortBy !== 'score' || sortOrder !== 'desc') count++
     return count
   }, [filters, sortBy, sortOrder])
+
+  // Ref for active filter count (for keyboard shortcut)
+  const activeFilterCountRef = useRef(0)
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   const fetchScenes = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -356,6 +375,12 @@ export default function LocationsPage() {
         case 'p':
           setShowPrintMenu(prev => !prev)
           break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFilters()
+          }
+          break
         case '?':
           setShowShortcuts(true)
           break
@@ -371,6 +396,7 @@ export default function LocationsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleRefresh, sortOrder])
 
   const handleSelectScene = async (sceneId: string) => {
@@ -1133,14 +1159,10 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
             </div>
             {activeFilterCount > 0 && (
               <button
-                onClick={() => {
-                  setFilters({ placeType: 'all', intExt: 'all', timeOfDay: 'all', favoritesOnly: false, minScore: 0, riskFree: false })
-                  setSortBy('score')
-                  setSortOrder('desc')
-                }}
+                onClick={clearFilters}
                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
               >
-                Clear Filters
+                Clear Filters (X)
               </button>
             )}
             <span className="text-sm text-slate-500 ml-auto">
@@ -1231,6 +1253,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },
                 { key: 'E', action: 'Toggle export menu' },
                 { key: 'P', action: 'Toggle print menu' },
+                { key: 'X', action: 'Clear all filters' },
                 { key: '?', action: 'Show keyboard shortcuts' },
                 { key: 'Esc', action: 'Close modal / Clear search' },
               ].map(({ key, action }) => (

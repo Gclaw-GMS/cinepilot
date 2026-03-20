@@ -418,6 +418,16 @@ export default function AIToolsPage() {
     fetchTools()
   }, [])
 
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setCategoryFilter('all')
+    setSortBy('name')
+    setSortOrder('asc')
+    setShowFilterPanel(false)
+    setShowSortPanel(false)
+  }, [])
+
   // Set up fetch tools ref for keyboard shortcut
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -768,6 +778,9 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
         setShowFilterPanel(!showFilterPanel)
+      } else if (e.key === 'x' || e.key === 'X') {
+        e.preventDefault()
+        clearFilters()
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -803,7 +816,7 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, showFilterPanel, sortOrder, toolCategories])
+  }, [handleRefresh, showFilterPanel, sortOrder, toolCategories, clearFilters])
 
   // Active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -943,12 +956,12 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                       <div className="p-4 border-b border-slate-700">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="font-semibold">Filter Tools</h3>
-                          {categoryFilter !== 'all' && (
+                          {activeFilterCount > 0 && (
                             <button 
-                              onClick={() => setCategoryFilter('all')}
-                              className="text-xs text-indigo-400 hover:text-indigo-300"
+                              onClick={clearFilters}
+                              className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
                             >
-                              Clear
+                              Clear All (X)
                             </button>
                           )}
                         </div>
@@ -1449,6 +1462,10 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">F</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-cyan-400">Clear all filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-cyan-400">X</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Toggle sort order</span>

@@ -197,6 +197,15 @@ export default function CensorPage() {
   const handleExportMarkdownRef = useRef<() => void>()
   const sortOrderRef = useRef(sortOrder)
   const viewModeRef = useRef(viewMode)
+  const filterCategoryRef = useRef(filterCategory)
+  const filterSeverityRef = useRef(filterSeverity)
+  
+  // Sync refs with state
+  useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
+  useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
+  useEffect(() => { filterCategoryRef.current = filterCategory }, [filterCategory])
+  useEffect(() => { filterSeverityRef.current = filterSeverity }, [filterSeverity])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -206,26 +215,68 @@ export default function CensorPage() {
         return
       }
       
+      // Context-aware number keys
+      if (e.key >= '0' && e.key <= '9') {
+        const num = parseInt(e.key)
+        
+        if (showFiltersRef.current) {
+          // When filter panel is OPEN: filter by category or severity
+          e.preventDefault()
+          
+          if (e.shiftKey) {
+            // Shift+1-3: Severity filter (toggle)
+            if (num >= 1 && num <= 3) {
+              const severityOptions = ['high', 'medium', 'low']
+              const severity = severityOptions[num - 1]
+              // Toggle: if same severity selected, clear to all
+              setFilterSeverity(filterSeverityRef.current === severity ? 'all' : severity)
+              return
+            }
+            // Shift+0 clears severity filter
+            if (num === 0) {
+              setFilterSeverity('all')
+              return
+            }
+          } else {
+            // 1-5: Category filter (toggle)
+            if (num >= 1 && num <= 5) {
+              const categoryOptions = ['all', 'content', 'language', 'technical', 'cultural']
+              const category = categoryOptions[num - 1]
+              // Toggle: if same category selected, clear to all
+              setFilterCategory(filterCategoryRef.current === category ? 'all' : category)
+              return
+            }
+            // 0 clears category filter
+            if (num === 0) {
+              setFilterCategory('all')
+              return
+            }
+          }
+        } else {
+          // When filter panel is CLOSED: switch view modes
+          e.preventDefault()
+          switch (num) {
+            case 1:
+              setViewMode('summary')
+              break
+            case 2:
+              setViewMode('flags')
+              break
+            case 3:
+              setViewMode('suggestions')
+              break
+            case 4:
+              setViewMode('analytics')
+              break
+          }
+        }
+        return
+      }
+      
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
           fetchDataRef.current?.()
-          break
-        case '1':
-          e.preventDefault()
-          setViewMode('summary')
-          break
-        case '2':
-          e.preventDefault()
-          setViewMode('flags')
-          break
-        case '3':
-          e.preventDefault()
-          setViewMode('suggestions')
-          break
-        case '4':
-          e.preventDefault()
-          setViewMode('analytics')
           break
         case '/':
           e.preventDefault()
@@ -834,35 +885,37 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
             {showFilters && (
               <div className="absolute right-0 top-full mt-2 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
                 <div className="space-y-4">
-                  <div>
+                  <div className="flex items-center justify-between">
                     <label className="text-xs text-gray-400 mb-2 block">Category</label>
-                    <select
-                      value={filterCategory}
-                      onChange={(e) => setFilterCategory(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
-                    >
-                      <option value="all">All Categories</option>
-                      <option value="Violence">Violence</option>
-                      <option value="Profanity">Profanity</option>
-                      <option value="Sexual Content">Sexual Content</option>
-                      <option value="Drugs/Alcohol">Drugs/Alcohol</option>
-                      <option value="Sensitive Theme">Sensitive Theme</option>
-                      <option value="Other">Other</option>
-                    </select>
+                    <span className="text-xs text-cyan-400">(1-5 to filter, 0 to clear)</span>
                   </div>
-                  <div>
+                  <select
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="Violence">Violence</option>
+                    <option value="Profanity">Profanity</option>
+                    <option value="Sexual Content">Sexual Content</option>
+                    <option value="Drugs/Alcohol">Drugs/Alcohol</option>
+                    <option value="Sensitive Theme">Sensitive Theme</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <div className="flex items-center justify-between">
                     <label className="text-xs text-gray-400 mb-2 block">Severity</label>
-                    <select
-                      value={filterSeverity}
-                      onChange={(e) => setFilterSeverity(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
-                    >
-                      <option value="all">All Severities</option>
-                      <option value="high">High (7-10)</option>
-                      <option value="medium">Medium (4-6)</option>
-                      <option value="low">Low (1-3)</option>
-                    </select>
+                    <span className="text-xs text-emerald-400">(⇧1-3 to filter, ⇧0 to clear)</span>
                   </div>
+                  <select
+                    value={filterSeverity}
+                    onChange={(e) => setFilterSeverity(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm"
+                  >
+                    <option value="all">All Severities</option>
+                    <option value="high">High (7-10)</option>
+                    <option value="medium">Medium (4-6)</option>
+                    <option value="low">Low (1-3)</option>
+                  </select>
                   
                   {/* Sort Options */}
                   <div className="border-t border-gray-700 pt-4">
@@ -1489,6 +1542,8 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
               </button>
             </div>
             <div className="space-y-2">
+              {/* Filters Panel CLOSED - View Switching */}
+              <div className="text-xs font-medium text-amber-400 uppercase tracking-wider mt-3 mb-2">When Filters Closed</div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Summary view</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">1</kbd>
@@ -1505,6 +1560,52 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
                 <span className="text-gray-300">Analytics view</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">4</kbd>
               </div>
+              
+              {/* Filters Panel OPEN - Category/Severity Filtering */}
+              <div className="text-xs font-medium text-cyan-400 uppercase tracking-wider mt-3 mb-2">When Filters Open</div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: All Categories</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-400">1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: Content</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-400">2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: Language</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-400">3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: Technical</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-400">4</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: Cultural</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-400">5</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Clear category filter</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-400">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: High Severity</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-400">⇧1</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: Medium Severity</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-400">⇧2</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Filter: Low Severity</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-400">⇧3</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Clear severity filter</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-400">⇧0</kbd>
+              </div>
+              
+              {/* General Shortcuts */}
+              <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 mb-2">General</div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Refresh analysis</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>

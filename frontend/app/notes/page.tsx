@@ -137,9 +137,34 @@ export default function NotesPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Calculate active filter count (including sort state and search) - MUST be before refs that use it
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterCategory !== 'all') count++
+    if (sortBy !== 'updatedAt' || sortOrder !== 'desc') count++
+    if (search.trim()) count++
+    return count
+  }, [filterCategory, sortBy, sortOrder, search])
+  
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+  
+  // Clear filters - MUST be before refs that use it
+  const clearFilters = useCallback(() => {
+    setFilterCategory('all')
+    setSortBy('updatedAt')
+    setSortOrder('desc')
+    setSearch('')
+  }, [])
+  
   // Refs for keyboard shortcuts (to avoid dependency issues)
   const showFilterPanelRef = useRef(showFilterPanel)
   const filterCategoryRef = useRef(filterCategory)
+  const searchRef = useRef(search)
+  const clearFiltersRef = useRef(clearFilters)
+  const activeFilterCountRef = useRef(activeFilterCount)
   
   // Keep refs in sync with state for keyboard shortcuts
   useEffect(() => {
@@ -149,26 +174,18 @@ export default function NotesPage() {
   useEffect(() => {
     filterCategoryRef.current = filterCategory
   }, [filterCategory])
-  
-  // Calculate active filter count (including sort state)
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (filterCategory !== 'all') count++
-    if (sortBy !== 'updatedAt' || sortOrder !== 'desc') count++
-    return count
-  }, [filterCategory, sortBy, sortOrder])
-  
-  // Toggle sort order
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-  }
-  
-  // Clear filters
-  const clearFilters = () => {
-    setFilterCategory('all')
-    setSortBy('updatedAt')
-    setSortOrder('desc')
-  }
+
+  useEffect(() => {
+    searchRef.current = search
+  }, [search])
+
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
   
   // Tab state for view switching
   const [activeTab, setActiveTab] = useState<'all' | 'pinned' | 'recent' | 'analytics'>('all')
@@ -248,6 +265,8 @@ export default function NotesPage() {
   const selectedNotesRef = useRef<Set<string>>(new Set())
   const showBulkActionsRef = useRef<boolean>(false)
   const selectedNotesSetRef = useRef<Set<string>>(new Set())
+  
+  // Refs for clear filters (already declared earlier)
   const handleSelectAllRef = useRef<() => void>(() => {})
 
   // Update refs when values change
@@ -333,6 +352,12 @@ export default function NotesPage() {
         case 's':
           e.preventDefault()
           toggleSortOrder()
+          break
+        case 'x':
+          e.preventDefault()
+          if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
+          }
           break
         case 'p':
           e.preventDefault()
@@ -1031,13 +1056,16 @@ export default function NotesPage() {
               {showFilterPanel && (
                 <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">Filter & Sort</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">Filter & Sort</span>
+                      <span className="text-xs text-amber-400">(X to clear)</span>
+                    </div>
                     {activeFilterCount > 0 && (
                       <button
                         onClick={clearFilters}
-                        className="text-xs text-indigo-400 hover:text-indigo-300"
+                        className="text-xs px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded transition-colors"
                       >
-                        Clear all
+                        Clear ({activeFilterCount})
                       </button>
                     )}
                   </div>
@@ -1866,6 +1894,7 @@ export default function NotesPage() {
               {[
                 { key: '1-6', action: 'Filter by category (toggle)', color: 'cyan' },
                 { key: '0', action: 'Clear category filter', color: 'cyan' },
+                { key: 'X', action: 'Clear all filters', color: 'cyan' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
                   <span className="text-slate-400 text-sm">{shortcut.action}</span>

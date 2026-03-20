@@ -191,16 +191,18 @@ export default function ScriptsPage() {
   const [sortBy, setSortBy] = useState<'sceneNumber' | 'location' | 'timeOfDay' | 'characters' | 'confidence'>('sceneNumber')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
-  // Compute active filter count (includes sort as active filter)
+  // Compute active filter count (includes sort as active filters)
   const activeFilterCount = useMemo(() => {
     let count = 0
+    if (sceneFilter) count++
     if (intExtFilter !== 'all') count++
     if (sortBy !== 'sceneNumber' || sortOrder !== 'asc') count++
     return count
-  }, [intExtFilter, sortBy, sortOrder])
+  }, [sceneFilter, intExtFilter, sortBy, sortOrder])
 
-  // Clear all filters (including sort)
+  // Clear all filters (including sort and search)
   const clearFilters = useCallback(() => {
+    setSceneFilter('')
     setIntExtFilter('all')
     setSortBy('sceneNumber')
     setSortOrder('asc')
@@ -224,6 +226,8 @@ export default function ScriptsPage() {
   const intExtFilterRef = useRef(intExtFilter)
   const sortByRef = useRef(sortBy)
   const sortOrderRef = useRef(sortOrder)
+  const clearFiltersRef = useRef<() => void>(() => {})
+  const activeFilterCountRef = useRef(0)
 
   // Sync refs with state
   useEffect(() => {
@@ -241,6 +245,14 @@ export default function ScriptsPage() {
   useEffect(() => {
     sortOrderRef.current = sortOrder
   }, [sortOrder])
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   // Active script
   const activeScript = scripts[0]
@@ -343,6 +355,12 @@ export default function ScriptsPage() {
         case 's':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+          break
+        case 'x':
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current()
+          }
           break
         case 'escape':
           e.preventDefault()
@@ -1186,14 +1204,14 @@ Warnings: ${allWarnings.length}`
                 <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
                   <div>
                     <span className="text-sm font-medium">Filter & Sort</span>
-                    <span className="text-xs text-cyan-400 ml-2">(1-3 for int/ext, 4-8+Shift for sort, 0 to clear)</span>
+                    <span className="text-xs text-cyan-400 ml-2">(1-3 int/ext, Shift+1-5 sort, 0/X clear)</span>
                   </div>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
-                      className="text-xs text-indigo-400 hover:text-indigo-300"
+                      className="text-xs px-2 py-1 bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 rounded transition-colors"
                     >
-                      Clear all
+                      Clear ({activeFilterCount})
                     </button>
                   )}
                 </div>
@@ -1998,13 +2016,14 @@ Warnings: ${allWarnings.length}`
             
             {/* Filters Open - Filtering & Sorting */}
             <div className="mb-4">
-              <p className="text-xs text-cyan-400 mb-2 uppercase tracking-wider">When Filters Open (1-3: Int/Ext, Shift+1-5: Sort)</p>
+              <p className="text-xs text-cyan-400 mb-2 uppercase tracking-wider">When Filters Open (1-3: Int/Ext, Shift+1-5: Sort, X: Clear)</p>
               <div className="space-y-1 text-sm">
                 {[
                   { key: '1', action: 'Show All', color: 'text-cyan-400' },
                   { key: '2', action: 'Interior (INT)', color: 'text-cyan-400' },
                   { key: '3', action: 'Exterior (EXT)', color: 'text-cyan-400' },
                   { key: '0', action: 'Clear int/ext filter', color: 'text-cyan-400' },
+                  { key: 'X', action: 'Clear all filters', color: 'text-amber-400' },
                   { key: 'Shift+1', action: 'Sort by Scene #', color: 'text-emerald-400' },
                   { key: 'Shift+2', action: 'Sort by Location', color: 'text-emerald-400' },
                   { key: 'Shift+3', action: 'Sort by Time', color: 'text-emerald-400' },
@@ -2031,12 +2050,13 @@ Warnings: ${allWarnings.length}`
                   { key: 'P', action: 'Print script' },
                   { key: 'F', action: 'Toggle filters' },
                   { key: 'S', action: 'Toggle sort order' },
+                  { key: 'X', action: 'Clear all filters', color: 'text-amber-400' },
                   { key: '/', action: 'Focus search' },
                   { key: '?', action: 'Show this help' },
                   { key: 'Esc', action: 'Close modal / Clear filters' },
-                ].map(({ key, action }) => (
+                ].map(({ key, action, color }) => (
                   <div key={key} className="flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
-                    <span className="text-gray-400">{action}</span>
+                    <span className={color || 'text-gray-400'}>{action}</span>
                     <kbd className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">{key}</kbd>
                   </div>
                 ))}

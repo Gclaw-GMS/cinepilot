@@ -472,6 +472,8 @@ ${formatContent(msg.content)}
   // Refs for keyboard shortcuts
   const handlePrintChatRef = useRef(handlePrintChat)
   const messagesLengthRef = useRef(messages.length)
+  const showSearchRef = useRef(showSearch)
+  const inputRef_Chat = useRef(input)
   
   useEffect(() => {
     handlePrintChatRef.current = handlePrintChat
@@ -480,6 +482,14 @@ ${formatContent(msg.content)}
   useEffect(() => {
     messagesLengthRef.current = messages.length
   }, [messages.length])
+
+  useEffect(() => {
+    showSearchRef.current = showSearch
+  }, [showSearch])
+
+  useEffect(() => {
+    inputRef_Chat.current = input
+  }, [input])
 
   const handlePrompt = (prompt: string) => {
     setInput(prompt)
@@ -525,6 +535,42 @@ ${formatContent(msg.content)}
         return
       }
       
+      // Context-aware number keys
+      if (showSearchRef.current) {
+        // When search panel OPEN: Filter messages by number keys 1-5
+        // 1 = All messages, 2 = User messages, 3 = AI responses, 4 = Has context, 5 = Errors
+        const num = parseInt(e.key)
+        if (num >= 1 && num <= 5) {
+          e.preventDefault()
+          if (num === 1) {
+            setSearchQuery('')
+          } else if (num === 2) {
+            setSearchQuery('role:user')
+          } else if (num === 3) {
+            setSearchQuery('role:assistant')
+          } else if (num === 4) {
+            setSearchQuery('context:')
+          } else if (num === 5) {
+            setSearchQuery('error')
+          }
+        }
+        if (e.key === '0') {
+          e.preventDefault()
+          setSearchQuery('')
+        }
+      } else {
+        // When search panel CLOSED: Number keys 1-6 trigger suggested prompts
+        const num = parseInt(e.key)
+        if (num >= 1 && num <= 6) {
+          e.preventDefault()
+          const promptIndex = num - 1
+          if (SUGGESTED_PROMPTS[promptIndex]) {
+            setInput(SUGGESTED_PROMPTS[promptIndex].prompt)
+            inputRef.current?.focus()
+          }
+        }
+      }
+
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
@@ -624,33 +670,38 @@ ${formatContent(msg.content)}
               {/* Search */}
               <div className="relative">
                 {showSearch ? (
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search messages..."
-                        className="w-64 pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                        autoFocus
-                      />
-                      {searchQuery && (
-                        <button
-                          onClick={() => setSearchQuery('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search messages..."
+                          className="w-64 pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                          autoFocus
+                        />
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => { setShowSearch(false); setSearchQuery('') }}
+                        className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4 text-slate-400" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => { setShowSearch(false); setSearchQuery('') }}
-                      className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                    >
-                      <X className="w-4 h-4 text-slate-400" />
-                    </button>
+                    <div className="text-xs text-cyan-400 pl-1">
+                      <span className="text-slate-500">Filter:</span> 1 All · 2 Yours · 3 AI · 4 Context · 5 Errors · <span className="text-slate-500">0 clear</span>
+                    </div>
                   </div>
                 ) : (
                   <button 
@@ -796,7 +847,8 @@ ${formatContent(msg.content)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-lg text-sm text-left transition-all group disabled:opacity-50"
               >
                 <item.icon className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition-colors" />
-                <span className="text-slate-400 group-hover:text-slate-200">{item.label}</span>
+                <span className="text-slate-400 group-hover:text-slate-200 flex-1">{item.label}</span>
+                <kbd className="px-1.5 py-0.5 bg-slate-700/50 group-hover:bg-slate-700 border border-slate-600/50 group-hover:border-slate-500 rounded text-xs font-mono text-slate-500 group-hover:text-slate-300">{idx + 1}</kbd>
               </button>
             ))}
           </div>
@@ -979,42 +1031,110 @@ ${formatContent(msg.content)}
                 </svg>
               </button>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Search messages</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">F</kbd>
+            <div className="space-y-4">
+              {/* When Search Closed - Suggested Prompts */}
+              <div>
+                <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2 px-1">When Search Closed (Prompts)</h3>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">{SUGGESTED_PROMPTS[0]?.label || 'Summarize today\'s shoot'}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">{SUGGESTED_PROMPTS[1]?.label || 'Budget status'}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">{SUGGESTED_PROMPTS[2]?.label || 'Crew availability'}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">{SUGGESTED_PROMPTS[3]?.label || 'Schedule overview'}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">{SUGGESTED_PROMPTS[4]?.label || 'Script summary'}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">5</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">{SUGGESTED_PROMPTS[5]?.label || 'Production risks'}</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">6</kbd>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Refresh context</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">R</kbd>
+
+              {/* When Search Open - Message Filters */}
+              <div>
+                <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2 px-1">When Search Open (Filter)</h3>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">All messages</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Your messages</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">AI responses</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">With context</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Errors</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">5</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Clear filter</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">0</kbd>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Focus input</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">/</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Clear chat</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">C</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Export chat</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">E</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Export Markdown</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">M</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Print chat</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">P</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Show shortcuts</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">?</kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <span className="text-slate-300">Close modal</span>
-                <kbd className="px-2.5 py-1 bg-slate-700 border border-slate-600 rounded text-sm font-mono">Esc</kbd>
+
+              {/* General Shortcuts */}
+              <div>
+                <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2 px-1">General</h3>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Search messages</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">F</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Refresh context</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">R</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Focus input</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">/</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Clear chat</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">C</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Export menu</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">E</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Export Markdown</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">M</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Print chat</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">P</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Show shortcuts</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">?</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-slate-400 text-sm">Close modal</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">Esc</kbd>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="mt-6 pt-4 border-t border-slate-800">

@@ -309,6 +309,10 @@ export default function TasksPage() {
           setShowFilters(!showFilters)
         }
         break
+      case '/':
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        break
       case 's':
       case 'S':
         if (!e.ctrlKey && !e.metaKey) {
@@ -1437,7 +1441,7 @@ export default function TasksPage() {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search tasks... (F)"
+                placeholder="Search tasks... (F for filters, / for search)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500"

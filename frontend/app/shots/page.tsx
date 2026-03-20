@@ -137,7 +137,7 @@ export default function ShotsPage() {
       // When filters panel OPEN: Number keys 1-8 filter by shot size (toggle)
       if (showFiltersRef.current && e.key >= '1' && e.key <= '8' && !e.shiftKey && !e.ctrlKey) { e.preventDefault(); const s = SHOT_SIZES; const i = parseInt(e.key) - 1; setFilterSize(filterSizeRef.current === s[i] ? 'all' : s[i]); return }
       // When filters panel OPEN: Shift+1-3 filter by scene (toggle)
-      if (showFiltersRef.current && e.shiftKey && e.key >= '1' && e.key <= '3') { e.preventDefault(); const scenes = scenes.length >= 3 ? scenes : DEMO_SCENES; const i = parseInt(e.key) - 1; if (scenes[i]) { setFilterScene(filterSceneRef.current === scenes[i].id ? 'all' : scenes[i].id) }; return }
+      if (showFiltersRef.current && e.shiftKey && e.key >= '1' && e.key <= '3') { e.preventDefault(); const sceneList = scenes.length >= 3 ? scenes : DEMO_SCENES; const i = parseInt(e.key) - 1; if (sceneList[i]) { setFilterScene(filterSceneRef.current === sceneList[i].id ? 'all' : sceneList[i].id) }; return }
       // When filters panel OPEN: Shift+4-9 filter by angle (toggle)
       if (showFiltersRef.current && e.shiftKey && e.key >= '4' && e.key <= '9') { e.preventDefault(); const angles = CAMERA_ANGLES; const i = parseInt(e.key) - 4; if (angles[i]) { setFilterAngle(filterAngleRef.current === angles[i] ? 'all' : angles[i]) }; return }
       // When filters panel OPEN: Ctrl+1-9 filter by movement (toggle)

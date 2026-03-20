@@ -166,8 +166,8 @@ export default function TasksPage() {
   // Filter panel ref for click outside
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
-  // Calculate active filter count (includes sort state)
-  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (sortBy ? 1 : 0)
+  // Calculate active filter count (includes search, sort, and filter state)
+  const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0) + (sortBy !== 'dueDate' || sortOrder !== 'asc' ? 1 : 0)
   
   const [showForm, setShowForm] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -220,6 +220,23 @@ export default function TasksPage() {
   }, [viewMode])
   const sortOrderRef = useRef(sortOrder)
   const selectedTasksSizeRef = useRef(selectedTasks.size)
+  const sortByRef = useRef(sortBy)
+
+  // Clear all filters function
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setFilterStatus('all')
+    setFilterPriority('all')
+    setSortBy('dueDate')
+    setSortOrder('asc')
+  }, [])
+
+  // Clear filters ref for keyboard shortcuts
+  const clearFiltersRef = useRef(clearFilters)
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+  useEffect(() => { sortByRef.current = sortBy }, [sortBy])
+  useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
+  useEffect(() => { selectedTasksSizeRef.current = selectedTasks.size }, [selectedTasks])
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
@@ -337,6 +354,13 @@ export default function TasksPage() {
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
           e.preventDefault()
           setViewMode(prev => prev === 'list' ? 'board' : prev === 'board' ? 'calendar' : prev === 'calendar' ? 'conflicts' : 'list')
+        }
+        break
+      case 'x':
+      case 'X':
+        if (!e.ctrlKey && !e.metaKey && showFiltersRef.current) {
+          e.preventDefault()
+          clearFiltersRef.current()
         }
         break
       // Context-aware number keys: behave differently based on filter panel state
@@ -1528,7 +1552,7 @@ export default function TasksPage() {
                     <span className="text-sm font-medium text-slate-300">Filter & Sort:</span>
                   </div>
                   <div className="text-xs text-cyan-400">
-                    <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">1-6</kbd> status · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">⇧8-9</kbd> priority · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">0</kbd> clear
+                    <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">1-6</kbd> status · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">⇧8-9</kbd> priority · <kbd className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400">X</kbd> clear all
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1586,17 +1610,15 @@ export default function TasksPage() {
                     {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
                   </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setFilterStatus('all')
-                    setFilterPriority('all')
-                    setSortBy('dueDate')
-                    setSortOrder('asc')
-                  }}
-                  className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-                >
-                  Clear Filters
-                </button>
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={clearFilters}
+                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear All ({activeFilterCount})
+                  </button>
+                )}
               </div>
             )}
 
@@ -2203,6 +2225,7 @@ export default function TasksPage() {
                     { keys: ['S'], desc: 'Toggle sort order' },
                     { keys: ['/'], desc: 'Focus search' },
                     { keys: ['V'], desc: 'Toggle view mode' },
+                    { keys: ['X'], desc: 'Clear all filters (when open)' },
                     { keys: ['E'], desc: 'Export dropdown' },
                     { keys: ['M'], desc: 'Export Markdown' },
                     { keys: ['P'], desc: 'Print tasks' },

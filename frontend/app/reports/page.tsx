@@ -96,6 +96,14 @@ export default function ReportsPage() {
   const [tabFilter, setTabFilter] = useState<string>('all')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
+  // Clear all filters function (defined before refs that use it)
+  const clearFilters = useCallback(() => {
+    setTabFilter('all')
+    setSearchQuery('')
+    setSortBy('date')
+    setSortOrder('desc')
+  }, [])
+
   // Refs for keyboard shortcuts
   const showFiltersRef = useRef(showFilters)
   const tabFilterRef = useRef(tabFilter)
@@ -103,6 +111,7 @@ export default function ReportsPage() {
   const setTabFilterRef = useRef(setTabFilter)
   const setShowFiltersRef = useRef(setShowFilters)
   const setActiveTabRef = useRef(setActiveTab)
+  const clearFiltersRef = useRef(clearFilters)
   
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'value'>('date')
@@ -110,6 +119,11 @@ export default function ReportsPage() {
   const fetchReportRef = useRef<() => void | Promise<void>>()
   const handlePrintRef = useRef<() => void>()
   const handleExportMarkdownRef = useRef<() => void>(() => {})
+  
+  // Refs for clearFilters function
+  const setSearchQueryRef = useRef(setSearchQuery)
+  const setSortByRef = useRef(setSortBy)
+  const setSortOrderRef = useRef(setSortOrder)
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -168,6 +182,10 @@ export default function ReportsPage() {
   useEffect(() => {
     setActiveTabRef.current = setActiveTab;
   }, [setActiveTab]);
+
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters;
+  }, [clearFilters]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -264,6 +282,12 @@ export default function ReportsPage() {
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
           break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCount > 0) {
+            clearFiltersRef.current()
+          }
+          break
         case 'escape':
           e.preventDefault()
           setShowKeyboardHelp(false)
@@ -280,7 +304,7 @@ export default function ReportsPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [reportData])
+  }, [reportData, activeFilterCount])
 
   // Click outside to close export menu
   useEffect(() => {
@@ -880,15 +904,15 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
               {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
             </button>
             <button
-              onClick={() => { setTabFilter('all'); setSearchQuery(''); setSortBy('date'); setSortOrder('desc') }}
+              onClick={clearFilters}
               className={`px-3 py-1.5 text-sm transition-colors ${
                 activeFilterCount > 0 
-                  ? 'text-red-400 hover:text-red-300' 
+                  ? 'text-amber-400 hover:text-amber-300' 
                   : 'text-slate-500 cursor-not-allowed'
               }`}
               disabled={activeFilterCount === 0}
             >
-              Clear Filters & Sort
+              Clear{activeFilterCount > 0 ? ` All (${activeFilterCount})` : ''}
             </button>
           </div>
         </div>
@@ -1270,6 +1294,10 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle sort order</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">S</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-gray-300">Clear all filters (when open)</span>
+                <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">X</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Toggle export menu</span>

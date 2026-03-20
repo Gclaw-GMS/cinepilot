@@ -207,6 +207,7 @@ export default function AnalyticsPage() {
   const showFilterPanelRef = useRef(showFilterPanel)
   const timePeriodFilterRef = useRef(filters.timePeriod)
   const departmentFilterRef = useRef(filters.department)
+  const viewModeRef = useRef(viewMode)
   
   // Sync refs with state
   useEffect(() => {
@@ -217,6 +218,10 @@ export default function AnalyticsPage() {
     timePeriodFilterRef.current = filters.timePeriod
     departmentFilterRef.current = filters.department
   }, [filters.timePeriod, filters.department])
+
+  useEffect(() => {
+    viewModeRef.current = viewMode
+  }, [viewMode])
 
   // Calculate active filter count
   const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0)
@@ -322,78 +327,84 @@ export default function AnalyticsPage() {
       
       const isFilterPanelOpen = showFilterPanelRef.current
       
-      // When filter panel is open, number keys filter by time period/department
-      if (isFilterPanelOpen) {
-        // Number keys 1-4 for time period (toggle behavior)
-        if (e.key === '1' && !e.shiftKey) {
-          e.preventDefault()
-          const newValue = timePeriodFilterRef.current === 'week' ? 'all' : 'week'
-          setFilters(prev => ({ ...prev, timePeriod: newValue }))
-          return
+      // Context-aware number keys: Different behavior based on filter panel state
+      if (!isFilterPanelOpen) {
+        // When filter panel is CLOSED: Number keys 1-3 switch view modes
+        switch (e.key) {
+          case '1':
+            e.preventDefault()
+            setViewMode('overview')
+            return
+          case '2':
+            e.preventDefault()
+            setViewMode('performance')
+            return
+          case '3':
+            e.preventDefault()
+            setViewMode('forecast')
+            return
         }
-        if (e.key === '2' && !e.shiftKey) {
-          e.preventDefault()
-          const newValue = timePeriodFilterRef.current === 'month' ? 'all' : 'month'
-          setFilters(prev => ({ ...prev, timePeriod: newValue }))
-          return
-        }
-        if (e.key === '3' && !e.shiftKey) {
-          e.preventDefault()
-          const newValue = timePeriodFilterRef.current === 'quarter' ? 'all' : 'quarter'
-          setFilters(prev => ({ ...prev, timePeriod: newValue }))
-          return
-        }
-        if (e.key === '4' && !e.shiftKey) {
-          e.preventDefault()
-          const newValue = timePeriodFilterRef.current === 'year' ? 'all' : 'year'
-          setFilters(prev => ({ ...prev, timePeriod: newValue }))
-          return
-        }
-        if (e.key === '0' && !e.shiftKey) {
-          e.preventDefault()
-          setFilters(prev => ({ ...prev, timePeriod: 'all' }))
-          return
-        }
-        
-        // Shift + number keys 1-5 for department (toggle behavior)
-        if (e.shiftKey && e.key === '1') {
-          e.preventDefault()
-          const newValue = departmentFilterRef.current === 'camera' ? 'all' : 'camera'
-          setFilters(prev => ({ ...prev, department: newValue }))
-          return
-        }
-        if (e.shiftKey && e.key === '2') {
-          e.preventDefault()
-          const newValue = departmentFilterRef.current === 'lighting' ? 'all' : 'lighting'
-          setFilters(prev => ({ ...prev, department: newValue }))
-          return
-        }
-        if (e.shiftKey && e.key === '3') {
-          e.preventDefault()
-          const newValue = departmentFilterRef.current === 'sound' ? 'all' : 'sound'
-          setFilters(prev => ({ ...prev, department: newValue }))
-          return
-        }
-        if (e.shiftKey && e.key === '4') {
-          e.preventDefault()
-          const newValue = departmentFilterRef.current === 'art' ? 'all' : 'art'
-          setFilters(prev => ({ ...prev, department: newValue }))
-          return
-        }
-        if (e.shiftKey && e.key === '5') {
-          e.preventDefault()
-          const newValue = departmentFilterRef.current === 'vfx' ? 'all' : 'vfx'
-          setFilters(prev => ({ ...prev, department: newValue }))
-          return
-        }
-        if (e.shiftKey && e.key === '0') {
-          e.preventDefault()
-          setFilters(prev => ({ ...prev, department: 'all' }))
-          return
+      } else {
+        // When filter panel is OPEN: Number keys 1-4 filter by time period, 5-9 filter by department (toggle behavior)
+        switch (e.key) {
+          case '1':
+            e.preventDefault()
+            const newValue1 = timePeriodFilterRef.current === 'week' ? 'all' : 'week'
+            setFilters(prev => ({ ...prev, timePeriod: newValue1 }))
+            return
+          case '2':
+            e.preventDefault()
+            const newValue2 = timePeriodFilterRef.current === 'month' ? 'all' : 'month'
+            setFilters(prev => ({ ...prev, timePeriod: newValue2 }))
+            return
+          case '3':
+            e.preventDefault()
+            const newValue3 = timePeriodFilterRef.current === 'quarter' ? 'all' : 'quarter'
+            setFilters(prev => ({ ...prev, timePeriod: newValue3 }))
+            return
+          case '4':
+            e.preventDefault()
+            const newValue4 = timePeriodFilterRef.current === 'year' ? 'all' : 'year'
+            setFilters(prev => ({ ...prev, timePeriod: newValue4 }))
+            return
+          case '0':
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, timePeriod: 'all' }))
+            return
+          case '5':
+            e.preventDefault()
+            const newDept1 = departmentFilterRef.current === 'camera' ? 'all' : 'camera'
+            setFilters(prev => ({ ...prev, department: newDept1 }))
+            return
+          case '6':
+            e.preventDefault()
+            const newDept2 = departmentFilterRef.current === 'lighting' ? 'all' : 'lighting'
+            setFilters(prev => ({ ...prev, department: newDept2 }))
+            return
+          case '7':
+            e.preventDefault()
+            const newDept3 = departmentFilterRef.current === 'sound' ? 'all' : 'sound'
+            setFilters(prev => ({ ...prev, department: newDept3 }))
+            return
+          case '8':
+            e.preventDefault()
+            const newDept4 = departmentFilterRef.current === 'art' ? 'all' : 'art'
+            setFilters(prev => ({ ...prev, department: newDept4 }))
+            return
+          case '9':
+            e.preventDefault()
+            const newDept5 = departmentFilterRef.current === 'vfx' ? 'all' : 'vfx'
+            setFilters(prev => ({ ...prev, department: newDept5 }))
+            return
+          case '-':
+          case '_':
+            e.preventDefault()
+            setFilters(prev => ({ ...prev, department: 'all' }))
+            return
         }
       }
       
-      // When filter panel is closed, number keys switch view modes
+      // Other keyboard shortcuts
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
@@ -402,18 +413,6 @@ export default function AnalyticsPage() {
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
-          break
-        case '1':
-          e.preventDefault()
-          setViewMode('overview')
-          break
-        case '2':
-          e.preventDefault()
-          setViewMode('performance')
-          break
-        case '3':
-          e.preventDefault()
-          setViewMode('forecast')
           break
         case '?':
           e.preventDefault()
@@ -1102,7 +1101,7 @@ export default function AnalyticsPage() {
                   
                   {/* Time Period Filter */}
                   <div className="mb-4">
-                    <label className="block text-sm text-slate-400 mb-2">Time Period <span className="text-amber-400">(1-4 to filter, 0 to clear)</span></label>
+                    <label className="block text-sm text-slate-400 mb-2">Time Period <span className="text-cyan-400">(1-4 to filter, 0 to clear when open)</span></label>
                     <select
                       value={filters.timePeriod}
                       onChange={(e) => setFilters(prev => ({ ...prev, timePeriod: e.target.value }))}
@@ -1118,18 +1117,18 @@ export default function AnalyticsPage() {
                   
                   {/* Department Filter */}
                   <div className="mb-4">
-                    <label className="block text-sm text-slate-400 mb-2">Department <span className="text-amber-400">(Shift+1-5 to filter, Shift+0 to clear)</span></label>
+                    <label className="block text-sm text-slate-400 mb-2">Department <span className="text-cyan-400">(5-9 to filter, Shift+0 to clear when open)</span></label>
                     <select
                       value={filters.department}
                       onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       <option value="all">All Departments (Shift+0)</option>
-                      <option value="camera">Camera (Shift+1)</option>
-                      <option value="lighting">Lighting (Shift+2)</option>
-                      <option value="sound">Sound (Shift+3)</option>
-                      <option value="art">Art (Shift+4)</option>
-                      <option value="vfx">VFX (Shift+5)</option>
+                      <option value="camera">Camera (5)</option>
+                      <option value="lighting">Lighting (6)</option>
+                      <option value="sound">Sound (7)</option>
+                      <option value="art">Art (8)</option>
+                      <option value="vfx">VFX (9)</option>
                     </select>
                   </div>
                   
@@ -1688,20 +1687,20 @@ export default function AnalyticsPage() {
             {/* When filter panel CLOSED */}
             <div className="mb-6">
               <h3 className="text-amber-400 text-sm font-medium mb-3 uppercase tracking-wide">
-                When Filters Closed
+                When Filters Closed (1-3 for views)
               </h3>
               <div className="space-y-2">
                 {[
+                  { key: '1', description: 'View: Overview' },
+                  { key: '2', description: 'View: Performance' },
+                  { key: '3', description: 'View: Forecast' },
                   { key: 'R', description: 'Refresh analytics data' },
-                  { key: 'F', description: 'Toggle filter & sort panel' },
+                  { key: 'F', description: 'Open filter & sort panel' },
                   { key: 'S', description: 'Toggle sort order (asc/desc)' },
                   { key: 'E', description: 'Toggle export dropdown' },
                   { key: 'M', description: 'Export as Markdown' },
                   { key: 'P', description: 'Print analytics report' },
                   { key: '/', description: 'Focus search input' },
-                  { key: '1', description: 'Switch to Overview view' },
-                  { key: '2', description: 'Switch to Performance view' },
-                  { key: '3', description: 'Switch to Forecast view' },
                   { key: '?', description: 'Show this help modal' },
                   { key: 'Esc', description: 'Close modal, menus, or clear' },
                 ].map((shortcut) => (
@@ -1721,14 +1720,21 @@ export default function AnalyticsPage() {
             {/* When filter panel OPEN */}
             <div>
               <h3 className="text-cyan-400 text-sm font-medium mb-3 uppercase tracking-wide">
-                When Filters Open
+                When Filters Open (1-9 for filters)
               </h3>
               <div className="space-y-2">
                 {[
-                  { key: '1-4', description: 'Filter by time period (week/month/quarter/year)' },
+                  { key: '1', description: 'Filter: This Week (toggle)' },
+                  { key: '2', description: 'Filter: This Month (toggle)' },
+                  { key: '3', description: 'Filter: This Quarter (toggle)' },
+                  { key: '4', description: 'Filter: This Year (toggle)' },
                   { key: '0', description: 'Clear time period filter' },
-                  { key: 'Shift+1-5', description: 'Filter by department (camera/lighting/sound/art/vfx)' },
-                  { key: 'Shift+0', description: 'Clear department filter' },
+                  { key: '5', description: 'Filter: Camera (toggle)' },
+                  { key: '6', description: 'Filter: Lighting (toggle)' },
+                  { key: '7', description: 'Filter: Sound (toggle)' },
+                  { key: '8', description: 'Filter: Art (toggle)' },
+                  { key: '9', description: 'Filter: VFX (toggle)' },
+                  { key: '-', description: 'Clear department filter' },
                   { key: 'F', description: 'Close filter panel' },
                 ].map((shortcut) => (
                   <div 

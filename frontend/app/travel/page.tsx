@@ -234,6 +234,12 @@ export default function TravelExpensesPage() {
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCount > 0) {
+            clearFiltersRef.current()
+          }
+          break
         case 'p':
           e.preventDefault()
           if (expensesLengthRef.current > 0) {
@@ -762,6 +768,20 @@ export default function TravelExpensesPage() {
     return count
   }, [filterCategory, filterStatus, dateRange, sortBy])
 
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilterCategory('all')
+    setFilterStatus('all')
+    setDateRange({ start: '', end: '' })
+    setSearchQuery('')
+    setSortBy('date')
+    setSortOrder('desc')
+  }, [])
+
+  // Ref for clearFilters
+  const clearFiltersRef = useRef(clearFilters)
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+
   // Conflict detection
   const travelConflicts = useMemo(() => {
     const conflicts: TravelConflict[] = []
@@ -1035,18 +1055,12 @@ export default function TravelExpensesPage() {
                   {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
                 </button>
               </div>
-              {(filterCategory !== 'all' || filterStatus !== 'all' || dateRange.start || dateRange.end || sortBy) && (
+              {activeFilterCount > 0 && (
                 <button
-                  onClick={() => {
-                    setFilterCategory('all')
-                    setFilterStatus('all')
-                    setDateRange({ start: '', end: '' })
-                    setSortBy('date')
-                    setSortOrder('desc')
-                  }}
+                  onClick={clearFilters}
                   className="flex items-center gap-1 px-2 py-1 text-sm text-slate-400 hover:text-white"
                 >
-                  <X className="w-3 h-3" /> Clear Filters
+                  <X className="w-3 h-3" /> Clear All ({activeFilterCount})
                 </button>
               )}
               <div className="ml-auto text-sm text-slate-400">
@@ -1764,6 +1778,10 @@ export default function TravelExpensesPage() {
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Toggle filters</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">F</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-cyan-400">Clear all filters (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">X</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Add new expense</span>

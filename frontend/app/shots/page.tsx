@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, Keyboard, Printer, X } from 'lucide-react'
 
 interface Scene { id: string; sceneNumber: string; headingRaw: string; intExt: string; timeOfDay: string; location: string; _count?: { shots: number } }
 interface Shot { id: string; shotIndex: number; beatIndex: number; shotText: string; characters: string[]; shotSize: string; shotType: string; cameraAngle: string; cameraMovement: string; focalLengthMm: number; lensType: string; keyStyle: string; colorTemp: string; durationEstSec: number; confidenceCamera: number; confidenceLens: number; confidenceLight: number; confidenceDuration: number; isLocked: boolean; userEdited: boolean; notes: string; scene?: Scene }
@@ -47,6 +47,7 @@ export default function ShotsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
 
@@ -114,7 +115,17 @@ export default function ShotsPage() {
     const b = new Blob([content], { type: mimeType }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = filename; a.click(); URL.revokeObjectURL(u); setShowExportMenu(false)
   }, [filteredShots, scenes, stats])
 
+  // Refs for keyboard shortcuts
+  const handleExportMarkdownRef = useRef(() => handleExport('markdown'))
+  const handlePrintRef = useRef(() => window.print())
+  
+  useEffect(() => { handleExportMarkdownRef.current = () => handleExport('markdown') }, [handleExport])
+  useEffect(() => { handlePrintRef.current = () => window.print() }, [])
+
   const toggleNote = (id: string) => setExpandedNotes(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const clearFiltersRef = useRef(clearFilters)
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -122,8 +133,18 @@ export default function ShotsPage() {
       if (showFiltersRef.current && e.key >= '1' && e.key <= '8') { e.preventDefault(); const s = SHOT_SIZES; const i = parseInt(e.key) - 1; setFilterSize(filterSizeRef.current === s[i] ? 'all' : s[i]); return }
       if (!showFiltersRef.current) { if (e.key === '1') { setViewMode('cards'); return } if (e.key === '2') { setViewMode('table'); return } }
       if (showFiltersRef.current && e.key === '0') { e.preventDefault(); setFilterSize('all'); return }
-      if (showFiltersRef.current && e.key.toLowerCase() === 'x') { e.preventDefault(); clearFilters(); return }
-      switch (e.key) { case '/': e.preventDefault(); searchInputRef.current?.focus(); break; case 'f': setShowFilters(p => !p); break; case 's': setSortOrder(p => p === 'asc' ? 'desc' : 'asc'); break; case 'r': fetchShots(); break; case 'e': setShowExportMenu(p => !p); break; case 'Escape': setShowExportMenu(false); setSearchQuery(''); break }
+      switch (e.key) { 
+        case '/': e.preventDefault(); searchInputRef.current?.focus(); break; 
+        case 'f': setShowFilters(p => !p); break; 
+        case 's': setSortOrder(p => p === 'asc' ? 'desc' : 'asc'); break; 
+        case 'r': fetchShots(); break; 
+        case 'e': setShowExportMenu(p => !p); break; 
+        case 'm': e.preventDefault(); handleExportMarkdownRef.current(); break;
+        case 'p': e.preventDefault(); handlePrintRef.current(); break;
+        case 'x': e.preventDefault(); clearFiltersRef.current(); break;
+        case '?': e.preventDefault(); setShowKeyboardHelp(true); break;
+        case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setSearchQuery(''); break 
+      }
     }
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
   }, [fetchShots, clearFilters])
@@ -141,6 +162,7 @@ export default function ShotsPage() {
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowExportMenu(p => !p)} className="p-2 hover:bg-slate-800 rounded-lg" title="Export (E)"><Download className="w-5 h-5 text-slate-400" /></button>
+              <button onClick={() => setShowKeyboardHelp(true)} className="p-2 hover:bg-slate-800 rounded-lg" title="Keyboard Shortcuts (?)"><Keyboard className="w-5 h-5 text-slate-400" /></button>
               <button onClick={fetchShots} className="p-2 hover:bg-slate-800 rounded-lg" title="Refresh (R)"><RefreshCw className="w-5 h-5 text-slate-400" /></button>
             </div>
           </div>
@@ -164,6 +186,32 @@ export default function ShotsPage() {
         </div>
       </header>
       {showExportMenu && <div className="fixed top-20 right-8 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-2 min-w-[160px]"><button onClick={() => handleExport('json')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"><FileJson className="w-4 h-4 text-cyan-400" />JSON</button><button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"><Files className="w-4 h-4 text-emerald-400" />CSV</button><button onClick={() => handleExport('markdown')} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 flex items-center gap-2"><FileText className="w-4 h-4 text-amber-400" />Markdown</button></div>}
+      {showKeyboardHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowKeyboardHelp(false)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="text-lg font-bold flex items-center gap-2"><Keyboard className="w-5 h-5 text-cyan-400" />Keyboard Shortcuts</h2><button onClick={() => setShowKeyboardHelp(false)} className="p-1 hover:bg-slate-700 rounded"><X className="w-5 h-5" /></button></div>
+            <div className="space-y-3 text-sm">
+              <div><span className="text-amber-400 font-mono">/</span> - Focus search</div>
+              <div><span className="text-amber-400 font-mono">?</span> - Toggle this help</div>
+              <div className="border-t border-slate-700 pt-2"><span className="text-emerald-400 font-bold">Actions</span></div>
+              <div><span className="text-amber-400 font-mono">R</span> - Refresh shots</div>
+              <div><span className="text-amber-400 font-mono">F</span> - Toggle filters panel</div>
+              <div><span className="text-amber-400 font-mono">S</span> - Toggle sort order</div>
+              <div><span className="text-amber-400 font-mono">E</span> - Open export menu</div>
+              <div><span className="text-amber-400 font-mono">M</span> - Export to Markdown</div>
+              <div><span className="text-amber-400 font-mono">P</span> - Print shots</div>
+              <div><span className="text-amber-400 font-mono">X</span> - Clear all filters</div>
+              <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Closed</span></div>
+              <div><span className="text-amber-400 font-mono">1</span> - Switch to Cards view</div>
+              <div><span className="text-amber-400 font-mono">2</span> - Switch to Table view</div>
+              <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Open</span></div>
+              <div><span className="text-amber-400 font-mono">1-8</span> - Filter by shot size (EWS→OTS)</div>
+              <div><span className="text-amber-400 font-mono">0</span> - Clear shot size filter</div>
+              <div><span className="text-slate-500">Esc</span> - Close menus / Clear search</div>
+            </div>
+          </div>
+        </div>
+      )}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {filteredShots.length === 0 ? <div className="text-center py-12"><Film className="w-16 h-16 text-slate-600 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-400">No shots found</h3><p className="text-slate-500">Try adjusting your filters</p></div> : viewMode === 'cards' ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredShots.map(shot => <div key={shot.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-cyan-500/50 transition-colors">
           <div className="flex items-start justify-between mb-3"><div className="flex items-center gap-2"><span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-sm font-mono rounded">#{shot.shotIndex}</span><span className="text-xs text-slate-500">{shot.scene?.sceneNumber}</span></div><div className="flex items-center gap-1 text-xs"><Clock className="w-3 h-3 text-slate-500" /><span className="text-slate-400">{shot.durationEstSec}s</span></div></div>

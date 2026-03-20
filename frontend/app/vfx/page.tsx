@@ -233,14 +233,28 @@ export default function VfxPage() {
   useEffect(() => { typeFilterRef.current = typeFilter }, [typeFilter]);
   useEffect(() => { complexityFilterRef.current = complexityFilter }, [complexityFilter]);
 
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setTypeFilter('all')
+    setComplexityFilter('all')
+    setSortBy('scene')
+    setSortOrder('asc')
+  }, [])
+
+  // Ref for clearFilters
+  const clearFiltersRef = useRef(clearFilters)
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (searchQuery) count++;
     if (typeFilter !== 'all') count++;
     if (complexityFilter !== 'all') count++;
     if (sortBy !== 'scene' || sortOrder !== 'asc') count++;
     return count;
-  }, [typeFilter, complexityFilter, sortBy, sortOrder]);
+  }, [searchQuery, typeFilter, complexityFilter, sortBy, sortOrder]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -286,6 +300,12 @@ export default function VfxPage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCount > 0) {
+            clearFiltersRef.current()
+          }
           break
         case 's':
           e.preventDefault()
@@ -374,7 +394,7 @@ export default function VfxPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedScript, showNoteForm, vfxNotes.length, vfxWarnings.length, showFilters])
+  }, [selectedScript, showNoteForm, vfxNotes.length, vfxWarnings.length, showFilters, activeFilterCount])
 
   // Click outside to close export menu and filter panel
   useEffect(() => {
@@ -1495,17 +1515,15 @@ export default function VfxPage() {
                   )}
                 </button>
               </div>
-              <button
-                onClick={() => {
-                  setTypeFilter('all')
-                  setComplexityFilter('all')
-                  setSortBy('scene')
-                  setSortOrder('asc')
-                }}
-                className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-              >
-                Clear Filters
-              </button>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  Clear All ({activeFilterCount})
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -2297,6 +2315,10 @@ export default function VfxPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Toggle filters</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">F</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Clear all filters (when open)</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-amber-400">X</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Toggle sort order</span>

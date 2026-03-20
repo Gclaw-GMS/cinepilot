@@ -57,6 +57,8 @@ export default function ShotsPage() {
   const filterSceneRef = useRef(filterScene)
   const filterAngleRef = useRef(filterAngle)
   const filterMovementRef = useRef(filterMovement)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
 
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -81,6 +83,8 @@ export default function ShotsPage() {
   useEffect(() => { filterSceneRef.current = filterScene }, [filterScene])
   useEffect(() => { filterAngleRef.current = filterAngle }, [filterAngle])
   useEffect(() => { filterMovementRef.current = filterMovement }, [filterMovement])
+  useEffect(() => { sortByRef.current = sortBy }, [sortBy])
+  useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
 
   const fetchShots = useCallback(async () => {
     setLoading(true)
@@ -130,13 +134,24 @@ export default function ShotsPage() {
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
-      if (showFiltersRef.current && e.key >= '1' && e.key <= '8') { e.preventDefault(); const s = SHOT_SIZES; const i = parseInt(e.key) - 1; setFilterSize(filterSizeRef.current === s[i] ? 'all' : s[i]); return }
+      // When filters panel OPEN: Number keys 1-8 filter by shot size (toggle)
+      if (showFiltersRef.current && e.key >= '1' && e.key <= '8' && !e.shiftKey && !e.ctrlKey) { e.preventDefault(); const s = SHOT_SIZES; const i = parseInt(e.key) - 1; setFilterSize(filterSizeRef.current === s[i] ? 'all' : s[i]); return }
+      // When filters panel OPEN: Shift+1-3 filter by scene (toggle)
+      if (showFiltersRef.current && e.shiftKey && e.key >= '1' && e.key <= '3') { e.preventDefault(); const scenes = scenes.length >= 3 ? scenes : DEMO_SCENES; const i = parseInt(e.key) - 1; if (scenes[i]) { setFilterScene(filterSceneRef.current === scenes[i].id ? 'all' : scenes[i].id) }; return }
+      // When filters panel OPEN: Shift+4-9 filter by angle (toggle)
+      if (showFiltersRef.current && e.shiftKey && e.key >= '4' && e.key <= '9') { e.preventDefault(); const angles = CAMERA_ANGLES; const i = parseInt(e.key) - 4; if (angles[i]) { setFilterAngle(filterAngleRef.current === angles[i] ? 'all' : angles[i]) }; return }
+      // When filters panel OPEN: Ctrl+1-9 filter by movement (toggle)
+      if (showFiltersRef.current && e.ctrlKey && e.key >= '1' && e.key <= '9') { e.preventDefault(); const movements = CAMERA_MOVEMENTS; const i = parseInt(e.key) - 1; if (movements[i]) { setFilterMovement(filterMovementRef.current === movements[i] ? 'all' : movements[i]) }; return }
+      // When filters panel CLOSED: Number keys 1-2 switch view mode
       if (!showFiltersRef.current) { if (e.key === '1') { setViewMode('cards'); return } if (e.key === '2') { setViewMode('table'); return } }
-      if (showFiltersRef.current && e.key === '0') { e.preventDefault(); setFilterSize('all'); return }
+      // When filters panel OPEN: Key 0 clears size filter
+      if (showFiltersRef.current && e.key === '0' && !e.shiftKey) { e.preventDefault(); setFilterSize('all'); return }
+      // When filters panel OPEN: Shift+0 clears scene filter
+      if (showFiltersRef.current && e.shiftKey && e.key === '0') { e.preventDefault(); setFilterScene('all'); return }
       switch (e.key) { 
         case '/': e.preventDefault(); searchInputRef.current?.focus(); break; 
         case 'f': setShowFilters(p => !p); break; 
-        case 's': setSortOrder(p => p === 'asc' ? 'desc' : 'asc'); break; 
+        case 's': if (!e.shiftKey) { e.preventDefault(); setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc'); }; break; 
         case 'r': fetchShots(); break; 
         case 'e': setShowExportMenu(p => !p); break; 
         case 'm': e.preventDefault(); handleExportMarkdownRef.current(); break;
@@ -147,7 +162,7 @@ export default function ShotsPage() {
       }
     }
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
-  }, [fetchShots, clearFilters])
+  }, [fetchShots, clearFilters, scenes])
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-slate-400">Loading shots...</p></div></div>
 
@@ -181,7 +196,7 @@ export default function ShotsPage() {
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Movement:</span><select value={filterMovement} onChange={e => setFilterMovement(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Movements</option>{CAMERA_MOVEMENTS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Sort:</span><select value={sortBy} onChange={e => setSortBy(e.target.value as 'index'|'duration'|'focal')} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="index">Shot #</option><option value="duration">Duration</option><option value="focal">Focal Length</option></select><button onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="p-1.5 hover:bg-slate-700 rounded">{sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}</button></div>
             {activeFilterCount > 0 && <button onClick={clearFilters} className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm flex items-center gap-1"><X className="w-3 h-3" />Clear All ({activeFilterCount})</button>}
-            <span className="text-xs text-cyan-400 ml-auto">(1-8 size, X clear all)</span>
+            <span className="text-xs text-cyan-400 ml-auto">(<span className="text-amber-400">1-8</span> size, <span className="text-amber-400">⇧1-3</span> scene, <span className="text-amber-400">⇧4-9</span> angle, <span className="text-amber-400">⌃1-9</span> move, <span className="text-emerald-400">0</span> clear size, <span className="text-emerald-400">X</span> clear all)</span>
           </div>}
         </div>
       </header>
@@ -206,7 +221,11 @@ export default function ShotsPage() {
               <div><span className="text-amber-400 font-mono">2</span> - Switch to Table view</div>
               <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Open</span></div>
               <div><span className="text-amber-400 font-mono">1-8</span> - Filter by shot size (EWS→OTS)</div>
-              <div><span className="text-amber-400 font-mono">0</span> - Clear shot size filter</div>
+              <div><span className="text-amber-400 font-mono">⇧1-3</span> - Filter by scene</div>
+              <div><span className="text-amber-400 font-mono">⇧4-9</span> - Filter by camera angle</div>
+              <div><span className="text-amber-400 font-mono">⌃1-9</span> - Filter by movement</div>
+              <div><span className="text-emerald-400 font-mono">0</span> - Clear shot size filter</div>
+              <div><span className="text-emerald-400 font-mono">⇧0</span> - Clear scene filter</div>
               <div><span className="text-slate-500">Esc</span> - Close menus / Clear search</div>
             </div>
           </div>

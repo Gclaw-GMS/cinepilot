@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Settings,
   Globe,
@@ -171,7 +171,16 @@ export default function SettingsPage() {
   // Refs for context-aware keyboard shortcuts
   const showFilterPanelRef = useRef(showFilterPanel);
   const activeFilterRef = useRef(activeFilter);
+  const activeFilterCountRef = useRef(0);
   
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (activeFilter !== 'all') count++;
+    return count;
+  }, [searchQuery, activeFilter]);
+
   // Sync refs with state for context-aware shortcuts
   useEffect(() => {
     showFilterPanelRef.current = showFilterPanel;
@@ -180,6 +189,20 @@ export default function SettingsPage() {
   useEffect(() => {
     activeFilterRef.current = activeFilter;
   }, [activeFilter]);
+  
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount;
+  }, [activeFilterCount]);
+
+  // Clear filters function
+  const clearFilters = useCallback(() => {
+    setSearchQuery('');
+    setActiveFilter('all');
+  }, []);
+
+  // Ref for clearFilters
+  const clearFiltersRef = useRef(clearFilters);
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -237,6 +260,14 @@ export default function SettingsPage() {
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         setShowFilterPanel(!showFilterPanel);
+      }
+
+      // X: Clear all filters (when filter panel is open)
+      if (e.key === 'x' || e.key === 'X') {
+        e.preventDefault();
+        if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+          clearFiltersRef.current();
+        }
       }
 
       // Context-aware number keys for category filtering
@@ -660,16 +691,17 @@ export default function SettingsPage() {
                   <div className="p-3 border-b border-slate-700">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">Filter Settings</span>
-                      {activeFilter !== 'all' && (
+                      {activeFilterCount > 0 && (
                         <button
-                          onClick={() => setActiveFilter('all')}
-                          className="text-xs text-emerald-400 hover:text-emerald-300"
+                          onClick={clearFilters}
+                          className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
                         >
-                          Clear
+                          <X className="w-3 h-3" />
+                          Clear ({activeFilterCount})
                         </button>
                       )}
                     </div>
-                    <div className="text-xs text-cyan-400 mt-1">(1-6 to filter, 0 to clear)</div>
+                    <div className="text-xs text-cyan-400 mt-1">(1-6 to filter, 0 to clear, X to clear all)</div>
                   </div>
                   <div className="p-2">
                     <button
@@ -1138,6 +1170,7 @@ export default function SettingsPage() {
               <div className="text-xs text-emerald-400 mt-3 mb-1">Actions:</div>
               {[
                 { key: 'F', action: 'Toggle filters' },
+                { key: 'X', action: 'Clear all filters' },
                 { key: 'R', action: 'Refresh settings' },
                 { key: 'S', action: 'Save settings' },
                 { key: 'Ctrl+X', action: 'Reset to defaults' },

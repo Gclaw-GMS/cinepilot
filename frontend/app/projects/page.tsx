@@ -23,7 +23,8 @@ import {
   ChevronDown,
   Filter,
   Printer,
-  FileText
+  FileText,
+  Clock
 } from 'lucide-react'
 
 interface Project {
@@ -125,6 +126,7 @@ export default function ProjectsPage() {
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState({
     status: [] as string[],
@@ -187,6 +189,7 @@ export default function ProjectsPage() {
       setError(null)
     }
     setLoading(false)
+    setLastUpdated(new Date())
   }, [])
 
   useEffect(() => {
@@ -916,6 +919,15 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
               <Folder className="w-5 h-5 text-white" />
             </div>
             Projects
+            {isDemoMode && (
+              <span className="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded">DEMO</span>
+            )}
+            {lastUpdated && (
+              <span className="ml-2 flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3 h-3" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            )}
           </h1>
           <p className="text-slate-500 text-sm mt-1">Manage your film productions</p>
         </div>

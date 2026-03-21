@@ -159,6 +159,8 @@ export default function LocationsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const [filters, setFilters] = useState({
     placeType: 'all',
     intExt: 'all',
@@ -175,6 +177,8 @@ export default function LocationsPage() {
   // Refs for keyboard shortcuts to avoid dependency issues
   const filtersRef = useRef(filters)
   const showFiltersRef = useRef(showFilters)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -184,6 +188,14 @@ export default function LocationsPage() {
   useEffect(() => {
     showFiltersRef.current = showFilters
   }, [showFilters])
+  
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+  
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
 
   // Clear all filters function
   const clearFilters = useCallback(() => {
@@ -243,6 +255,17 @@ export default function LocationsPage() {
     fetchScenes(true)
   }, [fetchScenes])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchScenes(true)
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchScenes])
+
   // Keyboard shortcuts handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -258,6 +281,10 @@ export default function LocationsPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           handleRefresh()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -927,6 +954,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
               <Clock className="w-4 h-4 text-slate-400" />
               <span className="text-slate-400 text-xs">
                 Updated: {lastUpdated.toLocaleTimeString()}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
               </span>
             </div>
           )}
@@ -957,12 +985,41 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={refreshing || autoRefresh}
             className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-all disabled:opacity-50"
             title="Refresh (R)"
           >
             <RefreshCw className={`w-5 h-5 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+
+          {/* Auto-Refresh Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-all ${
+                autoRefresh 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              }`}
+              title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+            >
+              <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+              Auto
+            </button>
+            {/* Interval selector dropdown - only show when auto-refresh is on */}
+            {autoRefresh && (
+              <select
+                value={autoRefreshInterval}
+                onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                className="absolute top-full mt-1 left-0 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-200 cursor-pointer hover:bg-slate-600"
+              >
+                <option value={10}>10s</option>
+                <option value={30}>30s</option>
+                <option value={60}>1m</option>
+                <option value={300}>5m</option>
+              </select>
+            )}
+          </div>
 
           {/* Filter Toggle Button */}
           <button
@@ -1258,6 +1315,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
               </div>
               {[
                 { key: 'R', action: 'Refresh location data' },
+                { key: 'A', action: 'Toggle auto-refresh' },
                 { key: '/', action: 'Focus search input' },
                 { key: 'F', action: 'Toggle filters panel' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },

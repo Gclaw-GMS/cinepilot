@@ -51,6 +51,9 @@ export default function ShotsPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  const [refreshing, setRefreshing] = useState(false)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
   const showFiltersRef = useRef(showFilters)
@@ -91,16 +94,32 @@ export default function ShotsPage() {
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
 
   const fetchShots = useCallback(async () => {
-    setLoading(true)
+    const isInitialLoad = shots.length === 0 && scenes.length === 0
+    if (!isInitialLoad) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
     try {
       const res = await fetch('/api/shots')
       const data = await res.json()
       if (data.shots?.length > 0) { setShots(data.shots); setScenes(data.scenes || []); setStats(data.stats || null); setIsDemoMode(data._demo || false) }
       else { setShots(DEMO_SHOTS); setScenes(DEMO_SCENES); setStats(DEMO_STATS); setIsDemoMode(true) }
     } catch { setShots(DEMO_SHOTS); setScenes(DEMO_SCENES); setStats(DEMO_STATS); setIsDemoMode(true) }
-    finally { setLoading(false); setLastUpdated(new Date()) }
-  }, [])
+    finally { setLoading(false); setRefreshing(false); setLastUpdated(new Date()) }
+  }, [shots.length, scenes.length])
   useEffect(() => { fetchShots() }, [fetchShots])
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchShots()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchShots])
 
   const filteredShots = useMemo(() => {
     let r = [...shots]
@@ -171,6 +190,14 @@ export default function ShotsPage() {
   }, [fetchShots, clearFilters, scenes])
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-slate-400">Loading shots...</p></div></div>
+  
+  // Show refresh indicator inline when refreshing (not initial load)
+  const RefreshIndicator = () => refreshing ? (
+    <div className="flex items-center gap-2 text-sm text-cyan-400">
+      <RefreshCw className="w-4 h-4 animate-spin" />
+      <span>Refreshing...</span>
+    </div>
+  ) : null
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -179,12 +206,33 @@ export default function ShotsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2"><Camera className="w-6 h-6 text-cyan-400" /><h1 className="text-xl font-bold">Shots</h1>{isDemoMode && <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-mono">DEMO</span>}</div>
-              {stats && <div className="flex items-center gap-4 text-sm text-slate-400"><span className="flex items-center gap-1"><Film className="w-4 h-4" />{stats.totalShots} shots</span><span className="flex items-center gap-1"><Clock className="w-4 h-4" />{stats.totalDuration}s</span>{stats.missingFields > 0 && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-4 h-4" />{stats.missingFields} incomplete</span>}{lastUpdated && <span className="flex items-center gap-1 text-slate-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB')}</span>}</div>}
+              {stats && <div className="flex items-center gap-4 text-sm text-slate-400"><span className="flex items-center gap-1"><Film className="w-4 h-4" />{stats.totalShots} shots</span><span className="flex items-center gap-1"><Clock className="w-4 h-4" />{stats.totalDuration}s</span>{stats.missingFields > 0 && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-4 h-4" />{stats.missingFields} incomplete</span>}{refreshing ? <RefreshIndicator /> : lastUpdated && <span className="flex items-center gap-1 text-slate-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB')}</span>}{autoRefresh && <span className="flex items-center gap-1 text-emerald-400 text-xs"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Auto: {autoRefreshInterval}s</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowExportMenu(p => !p)} className="p-2 hover:bg-slate-800 rounded-lg" title="Export (E)"><Download className="w-5 h-5 text-slate-400" /></button>
               <button onClick={() => setShowKeyboardHelp(true)} className="p-2 hover:bg-slate-800 rounded-lg" title="Keyboard Shortcuts (?)"><Keyboard className="w-5 h-5 text-slate-400" /></button>
-              <button onClick={fetchShots} className="p-2 hover:bg-slate-800 rounded-lg" title="Refresh (R)"><RefreshCw className="w-5 h-5 text-slate-400" /></button>
+              <button onClick={fetchShots} className="p-2 hover:bg-slate-800 rounded-lg" title="Refresh (R)"><RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''} text-slate-400`} /></button>
+              <div className="relative">
+                <button onClick={() => setAutoRefresh(!autoRefresh)} className={`p-2 rounded-lg transition-colors ${autoRefresh ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-400'}`} title="Auto-Refresh Toggle">
+                  <RefreshCw className="w-5 h-5" />
+                </button>
+                {autoRefresh && (
+                  <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-2 min-w-[120px]">
+                    <div className="px-3 py-1 text-xs text-slate-500 uppercase font-medium">Interval</div>
+                    {[
+                      { value: 10, label: '10 seconds' },
+                      { value: 30, label: '30 seconds' },
+                      { value: 60, label: '1 minute' },
+                      { value: 300, label: '5 minutes' },
+                    ].map(opt => (
+                      <button key={opt.value} onClick={() => setAutoRefreshInterval(opt.value)} className={`w-full px-3 py-1.5 text-left text-sm hover:bg-slate-700 flex items-center justify-between ${autoRefreshInterval === opt.value ? 'text-cyan-400' : 'text-slate-300'}`}>
+                        {opt.label}
+                        {autoRefreshInterval === opt.value && <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-4">

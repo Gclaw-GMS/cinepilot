@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter, FileText } from 'lucide-react'
+import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter, FileText, Clock } from 'lucide-react'
 
 interface FrameData {
   id: string
@@ -70,6 +70,7 @@ export default function StoryboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [sortBy, setSortBy] = useState<'scene' | 'shot' | 'status' | 'approved'>('scene')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Refs for keyboard shortcuts and data
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -132,6 +133,7 @@ export default function StoryboardPage() {
       console.error('Failed to load frames:', err)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [selectedScript])
 
@@ -862,16 +864,24 @@ ${filteredScenes.map(scene =>
       <div className="max-w-[1600px] mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <Link href="/" className="text-sm text-gray-500 hover:text-gray-300 mb-2 inline-block">
-              &larr; Dashboard
-            </Link>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-              Storyboard
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              AI-generated storyboard frames from your shot list
-            </p>
+          <div className="flex items-center gap-6">
+            <div>
+              <Link href="/" className="text-sm text-gray-500 hover:text-gray-300 mb-2 inline-block">
+                &larr; Dashboard
+              </Link>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                Storyboard
+              </h1>
+              <p className="text-gray-500 text-sm mt-1">
+                AI-generated storyboard frames from your shot list
+              </p>
+            </div>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-4">
             {/* Search Input */}

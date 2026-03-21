@@ -243,6 +243,7 @@ export default function SchedulePage() {
   // Sorting state
   const [sortBy, setSortBy] = useState<'dayNumber' | 'date' | 'location' | 'status' | 'scenes' | 'hours'>('dayNumber')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Sort options
   const sortOptions = [
@@ -337,6 +338,7 @@ export default function SchedulePage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -1182,19 +1184,27 @@ export default function SchedulePage() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <Calendar className="w-6 h-6 text-indigo-400" />
-              Schedule Engine
-            </h1>
-            {isDemoMode && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full border border-amber-500/30">
-                Demo Data
-              </span>
-            )}
+        <div className="flex items-center gap-6">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <Calendar className="w-6 h-6 text-indigo-400" />
+                Schedule Engine
+              </h1>
+              {isDemoMode && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full border border-amber-500/30">
+                  Demo Data
+                </span>
+              )}
+            </div>
+            <p className="text-gray-500 text-sm mt-1">AI-powered shooting schedule with TFPC compliance</p>
           </div>
-          <p className="text-gray-500 text-sm mt-1">AI-powered shooting schedule with TFPC compliance</p>
+          {lastUpdated && (
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <Clock className="w-3.5 h-3.5" />
+              Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {/* Search Input */}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter, Clock } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -101,6 +101,7 @@ export default function ShotHubPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // Filter state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -222,6 +223,7 @@ export default function ShotHubPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -951,17 +953,25 @@ ${locallyFiltered.map(shot => {
     <div className="p-6">
       {/* Top Bar */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg text-gray-400">&#8592;</Link>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Shot Hub</h1>
-            {isDemoMode && (
-              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded">
-                DEMO
-              </span>
-            )}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="p-2 hover:bg-gray-800 rounded-lg text-gray-400">&#8592;</Link>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">Shot Hub</h1>
+              {isDemoMode && (
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded">
+                  DEMO
+                </span>
+              )}
+            </div>
+            <p className="text-gray-500 text-sm mt-0.5">AI-powered shot breakdown engine</p>
           </div>
-          <p className="text-gray-500 text-sm mt-0.5">AI-powered shot breakdown engine</p>
+          {lastUpdated && (
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <Clock className="w-3.5 h-3.5" />
+              Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <select

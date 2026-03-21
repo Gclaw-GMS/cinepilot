@@ -389,6 +389,11 @@ export default function AIToolsPage() {
   const handlePrintRef = useRef<() => void>(() => {})
   const handleExportMarkdownRef = useRef<() => void>(() => {})
   
+  // Refs for filter panel and clear filters (for keyboard shortcuts)
+  const showFilterPanelRef = useRef(showFilterPanel)
+  const activeFilterCountRef = useRef(0)
+  // clearFiltersRef initialized after clearFilters function is defined
+  
   // Refs to store latest values for handlePrint function
   const filteredToolsRef = useRef<typeof tools>([])
   const allCategoriesRef = useRef<string[]>([])
@@ -398,7 +403,7 @@ export default function AIToolsPage() {
   const categoryFilterRef = useRef(categoryFilter)
   const setCategoryFilterRef = useRef(setCategoryFilter)
 
-  // Fetch tools from API on mount
+  // Sync refs with state for keyboard shortcuts (moved after clearFilters definition)
   useEffect(() => {
     async function fetchTools() {
       try {
@@ -429,6 +434,18 @@ export default function AIToolsPage() {
     setShowFilterPanel(false)
     setShowSortPanel(false)
   }, [])
+  
+  // Ref for clear filters (must be after clearFilters is defined)
+  const clearFiltersRef = useRef(clearFilters)
+  
+  // Sync refs with state for keyboard shortcuts
+  useEffect(() => {
+    showFilterPanelRef.current = showFilterPanel
+  }, [showFilterPanel])
+  
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   // Set up fetch tools ref for keyboard shortcut
   const handleRefresh = useCallback(async () => {
@@ -782,8 +799,15 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
         e.preventDefault()
         setShowFilterPanel(!showFilterPanel)
       } else if (e.key === 'x' || e.key === 'X') {
-        e.preventDefault()
-        clearFilters()
+        // Only clear filters when filter panel is open AND filters are active
+        if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+          e.preventDefault()
+          clearFiltersRef.current()
+        } else if (activeFilterCountRef.current > 0) {
+          // Clear even if panel is closed, as long as filters are active
+          e.preventDefault()
+          clearFiltersRef.current()
+        }
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault()
         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -821,7 +845,7 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleRefresh, showFilterPanel, sortOrder, toolCategories, clearFilters])
 
-  // Active filter count (includes sort state)
+  // Active filter count (computed synchronously for keyboard shortcuts)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (categoryFilter !== 'all') count++
@@ -829,6 +853,11 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
     if (sortBy !== 'name' || sortOrder !== 'asc') count++
     return count
   }, [categoryFilter, searchQuery, sortBy, sortOrder])
+
+  // Initialize refs with activeFilterCount after it's defined
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   // Convert tools to renderable format with search, category filtering, and sorting
   const filteredTools = useMemo(() => {
@@ -954,7 +983,7 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                         ? 'bg-indigo-500 text-white' 
                         : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
                     }`}
-                    title="Toggle filters (F)"
+                    title="Toggle filters (F) - X to clear all"
                   >
                     <Search className="w-4 h-4" />
                     <span className="text-sm">Filters</span>

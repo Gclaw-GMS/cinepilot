@@ -477,11 +477,16 @@ ${formatContent(msg.content)}
     setShowPrintMenu(false)
   }, [messages, context])
 
+  // Calculate active filter count (search query when search panel is open)
+  const activeFilterCount = searchQuery.length > 0 ? 1 : 0
+
   // Refs for keyboard shortcuts
   const handlePrintChatRef = useRef(handlePrintChat)
   const messagesLengthRef = useRef(messages.length)
   const showSearchRef = useRef(showSearch)
   const inputRef_Chat = useRef(input)
+  const searchQueryRef = useRef(searchQuery)
+  const activeFilterCountRef = useRef(activeFilterCount)
   
   useEffect(() => {
     handlePrintChatRef.current = handlePrintChat
@@ -498,6 +503,14 @@ ${formatContent(msg.content)}
   useEffect(() => {
     inputRef_Chat.current = input
   }, [input])
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+  }, [searchQuery])
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   const handlePrompt = (prompt: string) => {
     setInput(prompt)
@@ -564,6 +577,11 @@ ${formatContent(msg.content)}
           }
         }
         if (e.key === '0') {
+          e.preventDefault()
+          setSearchQuery('')
+        }
+        // X key: Clear search query when search panel is open and filters are active
+        if (e.key.toLowerCase() === 'x' && activeFilterCountRef.current > 0) {
           e.preventDefault()
           setSearchQuery('')
         }
@@ -709,7 +727,7 @@ ${formatContent(msg.content)}
                       </button>
                     </div>
                     <div className="text-xs text-cyan-400 pl-1">
-                      <span className="text-slate-500">Filter:</span> 1 All · 2 Yours · 3 AI · 4 Context · 5 Errors · <span className="text-slate-500">0 clear</span>
+                      <span className="text-slate-500">Filter:</span> 1 All · 2 Yours · 3 AI · 4 Context · 5 Errors · <span className="text-slate-500">0</span> · <span className="text-amber-400">X clear all</span>
                     </div>
                   </div>
                 ) : (
@@ -1105,6 +1123,10 @@ ${formatContent(msg.content)}
                   <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
                     <span className="text-slate-400 text-sm">Clear filter</span>
                     <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">0</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-amber-400 text-sm">Clear all filters</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-amber-600/50 rounded text-xs font-mono text-amber-400">X</kbd>
                   </div>
                 </div>
               </div>

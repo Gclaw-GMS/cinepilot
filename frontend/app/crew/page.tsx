@@ -24,6 +24,7 @@ import {
   ChevronDown,
   FileText,
   Printer,
+  Clock,
 } from 'lucide-react';
 import {
   BarChart,
@@ -114,6 +115,7 @@ export default function CrewPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Calculate active filter count
   const activeFilterCount = (deptFilter !== 'all' ? 1 : 0) + (search.trim() ? 1 : 0);
@@ -212,6 +214,7 @@ export default function CrewPage() {
       setError(null);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -886,19 +889,27 @@ export default function CrewPage() {
       <header className="bg-slate-900/50 backdrop-blur border-b border-slate-800 sticky top-0 z-10">
         <div className="px-8 py-5">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600">
-                  <Users className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-6">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <h1 className="text-2xl font-semibold tracking-tight">Crew Management</h1>
+                  {isDemoMode && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/15 text-amber-400 rounded font-medium">
+                      DEMO
+                    </span>
+                  )}
                 </div>
-                <h1 className="text-2xl font-semibold tracking-tight">Crew Management</h1>
-                {isDemoMode && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/15 text-amber-400 rounded font-medium">
-                    DEMO
-                  </span>
-                )}
+                <p className="text-slate-500 text-sm mt-1">Manage your production crew and department assignments</p>
               </div>
-              <p className="text-slate-500 text-sm mt-1">Manage your production crew and department assignments</p>
+              {lastUpdated && (
+                <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5" />
+                  Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button 

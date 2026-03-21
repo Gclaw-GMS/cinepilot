@@ -116,6 +116,10 @@ export default function DubbingPage() {
   // Active filter count (includes sort as active filter)
   const activeFilterCount = (languageFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' ? 1 : 0)
   
+  // Ref for active filter count (for keyboard shortcuts)
+  const activeFilterCountRef = useRef(activeFilterCount)
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  
   // Clear all filters
   const clearFilters = useCallback(() => {
     setLanguageFilter('all')
@@ -123,6 +127,10 @@ export default function DubbingPage() {
     setSortOrder('desc')
     setSearchQuery('')
   }, [])
+  
+  // Ref for clearFilters (for keyboard shortcuts)
+  const clearFiltersRef = useRef(clearFilters)
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -211,9 +219,9 @@ export default function DubbingPage() {
           setShowKeyboardHelp(true)
           break
         case 'x':
-          if (activeFilterCount > 0) {
-            e.preventDefault()
-            clearFilters()
+          e.preventDefault()
+          if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
           }
           break
         case 'escape':
@@ -1169,9 +1177,12 @@ export default function DubbingPage() {
                   <span className="text-slate-300">Toggle sort order</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">S</kbd>
                 </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-800">
+                  <span className="text-amber-400 text-xs">When filters open:</span>
+                </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                  <span className="text-slate-300">Clear all filters</span>
-                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">X</kbd>
+                  <span className="text-cyan-400">Clear all filters</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">X</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Export menu</span>

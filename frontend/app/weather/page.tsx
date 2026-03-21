@@ -407,6 +407,7 @@ export default function WeatherPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filters, setFilters] = useState({
     condition: 'all',
     dateRange: 'all',
@@ -581,6 +582,7 @@ export default function WeatherPage() {
       setWeatherData(null);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -1460,6 +1462,14 @@ export default function WeatherPage() {
                 <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
                 Demo Data
               </span>
+            )}
+            {lastUpdated && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-400 text-xs">
+                  Updated: {lastUpdated.toLocaleTimeString()}
+                </span>
+              </div>
             )}
             {selectedLocation && (
               <>

@@ -257,6 +257,10 @@ export default function VfxPage() {
     return count;
   }, [searchQuery, typeFilter, complexityFilter, sortBy, sortOrder]);
 
+  // Ref for active filter count (for keyboard shortcuts)
+  const activeFilterCountRef = useRef(activeFilterCount);
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -304,8 +308,18 @@ export default function VfxPage() {
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current && activeFilterCount > 0) {
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
             clearFiltersRef.current()
+          }
+          break
+        case '0':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            if (activeFilterCountRef.current > 0) {
+              clearFiltersRef.current()
+            } else {
+              setShowFilters(false)
+            }
           }
           break
         case 's':

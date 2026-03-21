@@ -71,6 +71,8 @@ export default function ShotsPage() {
     return count
   }, [searchQuery, filterScene, filterSize, filterAngle, filterMovement])
 
+  const activeFilterCountRef = useRef(activeFilterCount)
+
   const clearFilters = useCallback(() => {
     setSearchQuery('')
     setFilterScene('all')
@@ -86,6 +88,7 @@ export default function ShotsPage() {
   useEffect(() => { filterMovementRef.current = filterMovement }, [filterMovement])
   useEffect(() => { sortByRef.current = sortBy }, [sortBy])
   useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
 
   const fetchShots = useCallback(async () => {
     setLoading(true)
@@ -149,6 +152,8 @@ export default function ShotsPage() {
       if (showFiltersRef.current && e.key === '0' && !e.shiftKey) { e.preventDefault(); setFilterSize('all'); return }
       // When filters panel OPEN: Shift+0 clears scene filter
       if (showFiltersRef.current && e.shiftKey && e.key === '0') { e.preventDefault(); setFilterScene('all'); return }
+      // When filters panel OPEN: 0 (when no filters active or with Ctrl) clears all filters or closes panel
+      if (showFiltersRef.current && e.key === '0' && (e.ctrlKey || activeFilterCountRef.current === 0)) { e.preventDefault(); if (activeFilterCountRef.current > 0) { clearFiltersRef.current() } else { setShowFilters(false) }; return }
       switch (e.key) { 
         case '/': e.preventDefault(); searchInputRef.current?.focus(); break; 
         case 'f': setShowFilters(p => !p); break; 
@@ -197,7 +202,7 @@ export default function ShotsPage() {
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Movement:</span><select value={filterMovement} onChange={e => setFilterMovement(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Movements</option>{CAMERA_MOVEMENTS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Sort:</span><select value={sortBy} onChange={e => setSortBy(e.target.value as 'index'|'duration'|'focal')} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="index">Shot #</option><option value="duration">Duration</option><option value="focal">Focal Length</option></select><button onClick={() => setSortOrder(p => p === 'asc' ? 'desc' : 'asc')} className="p-1.5 hover:bg-slate-700 rounded">{sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}</button></div>
             {activeFilterCount > 0 && <button onClick={clearFilters} className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm flex items-center gap-1"><X className="w-3 h-3" />Clear All ({activeFilterCount})</button>}
-            <span className="text-xs text-cyan-400 ml-auto">(<span className="text-amber-400">1-8</span> size, <span className="text-amber-400">⇧1-3</span> scene, <span className="text-amber-400">⇧4-9</span> angle, <span className="text-amber-400">⌃1-9</span> move, <span className="text-emerald-400">0</span> clear size, <span className="text-emerald-400">X</span> clear all)</span>
+            <span className="text-xs text-cyan-400 ml-auto">(<span className="text-amber-400">1-8</span> size, <span className="text-amber-400">⇧1-3</span> scene, <span className="text-amber-400">⇧4-9</span> angle, <span className="text-amber-400">⌃1-9</span> move, <span className="text-emerald-400">0</span> clear size, <span className="text-emerald-400">⌃0</span> clear all, <span className="text-emerald-400">X</span> clear all)</span>
           </div>}
         </div>
       </header>
@@ -226,6 +231,7 @@ export default function ShotsPage() {
               <div><span className="text-amber-400 font-mono">⇧4-9</span> - Filter by camera angle</div>
               <div><span className="text-amber-400 font-mono">⌃1-9</span> - Filter by movement</div>
               <div><span className="text-emerald-400 font-mono">0</span> - Clear shot size filter</div>
+              <div><span className="text-emerald-400 font-mono">⌃0</span> - Clear all filters (or close panel if none)</div>
               <div><span className="text-emerald-400 font-mono">⇧0</span> - Clear scene filter</div>
               <div><span className="text-slate-500">Esc</span> - Close menus / Clear search</div>
             </div>

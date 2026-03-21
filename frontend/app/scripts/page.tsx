@@ -181,6 +181,7 @@ export default function ScriptsPage() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
   const [analyses, setAnalyses] = useState<AnalysisData[]>([])
   const [loading, setLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const [sceneFilter, setSceneFilter] = useState('')
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
@@ -433,6 +434,7 @@ export default function ScriptsPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
   
@@ -1108,6 +1110,12 @@ Warnings: ${allWarnings.length}`
               ? `${activeScript.title} (v${activeScript.version}) — ${scenes.length} scenes`
               : 'Upload and analyze your screenplay'}
           </p>
+          {lastUpdated && (
+            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
         </div>
         {activeScript && (
           <div className="flex gap-2 items-center">
@@ -1123,7 +1131,7 @@ Warnings: ${allWarnings.length}`
         )}
         <div className="flex gap-2">
           <button
-            onClick={() => fetchData()}
+            onClick={() => { fetchData(); setLastUpdated(new Date()) }}
             className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
             title="Refresh (R)"
           >

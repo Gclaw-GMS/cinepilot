@@ -28,6 +28,7 @@ import {
   Printer,
   AlertTriangle,
   CheckCircle,
+  Clock,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
@@ -134,6 +135,8 @@ export default function TravelExpensesPage() {
   const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
   // Budget limit for conflict detection
   const [budgetLimit, setBudgetLimit] = useState<number>(500000)
+  // Last updated timestamp
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
@@ -156,6 +159,7 @@ export default function TravelExpensesPage() {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [filterCategory, filterStatus, dateRange])
 
@@ -928,6 +932,12 @@ export default function TravelExpensesPage() {
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
+              {lastUpdated && (
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  Updated: {lastUpdated.toLocaleTimeString()}
+                </div>
+              )}
               {/* Filter Toggle Button */}
               <button
                 onClick={() => setShowFilters(!showFilters)}

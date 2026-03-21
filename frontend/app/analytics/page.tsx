@@ -170,6 +170,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
   const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -310,6 +311,7 @@ export default function AnalyticsPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -727,6 +729,7 @@ export default function AnalyticsPage() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     await fetchData()
+    setLastUpdated(new Date())
     setTimeout(() => setRefreshing(false), 500)
   }, [fetchData])
 
@@ -1014,6 +1017,12 @@ export default function AnalyticsPage() {
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <BarChart3 className="w-8 h-8 text-indigo-400" />
             Production Analytics
+            {lastUpdated && (
+              <span className="text-sm font-normal text-slate-400 ml-2 flex items-center gap-1">
+                <Clock className="w-4 h-4" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            )}
           </h1>
           <p className="text-slate-400 mt-1">
             Real-time insights into your film's production metrics

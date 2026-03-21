@@ -18,6 +18,7 @@ import {
   Keyboard,
   Search,
   X,
+  Clock,
   Printer,
   Download,
   Filter,
@@ -127,6 +128,7 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const printMenuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -156,6 +158,7 @@ export default function SettingsPage() {
       setDbConnected(false);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -644,10 +647,18 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-[#0d0d0d] text-slate-100 p-6">
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Settings className="h-6 w-6" />
-            Settings
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-semibold flex items-center gap-2">
+              <Settings className="h-6 w-6" />
+              Settings
+            </h1>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             {/* Search Input */}
             <div className="relative">

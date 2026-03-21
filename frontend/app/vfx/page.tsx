@@ -148,6 +148,7 @@ export default function VfxPage() {
   const [success, setSuccess] = useState('');
   const [isUsingDemo, setIsUsingDemo] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'scenes' | 'cost' | 'conflicts'>('overview');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Form states for add/edit
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -795,6 +796,7 @@ export default function VfxPage() {
       setIsUsingDemo(true);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, [calculateSummaryCost]);
 
@@ -1278,33 +1280,41 @@ export default function VfxPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-purple-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">VFX Breakdown</h1>
-                {isUsingDemo && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full border border-amber-500/30">
-                    <AlertCircle className="w-3 h-3" />
-                    Demo Data
-                  </span>
-                )}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-purple-400" />
               </div>
-              <p className="text-sm text-slate-400">
-                Scene-by-scene visual effects requirements and complexity analysis
-              </p>
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold">VFX Breakdown</h1>
+                  {isUsingDemo && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full border border-amber-500/30">
+                      <AlertCircle className="w-3 h-3" />
+                      Demo Data
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-400">
+                  Scene-by-scene visual effects requirements and complexity analysis
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => setShowKeyboardHelp(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
-              title="Keyboard shortcuts (?)"
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span className="text-xs">?</span>
-            </button>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
+          <button
+            onClick={() => setShowKeyboardHelp(true)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
+            title="Keyboard shortcuts (?)"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span className="text-xs">?</span>
+          </button>
         </div>
 
         {/* Controls */}

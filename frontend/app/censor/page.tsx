@@ -26,7 +26,8 @@ import {
   FileJson,
   FileSpreadsheet,
   PieChart,
-  BarChart3
+  BarChart3,
+  Clock
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell, PieChart as RePieChart, Pie
@@ -176,6 +177,7 @@ export default function CensorPage() {
   
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
@@ -432,6 +434,7 @@ export default function CensorPage() {
     } finally {
       setLoading(false)
       setIsRefreshing(false)
+      setLastUpdated(new Date())
     }
   }, [selectedProject])
 
@@ -866,6 +869,12 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
               {isDemoMode && (
                 <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">
                   Demo
+                </span>
+              )}
+              {lastUpdated && (
+                <span className="flex items-center gap-1 text-xs text-gray-500">
+                  <Clock className="w-3 h-3" />
+                  Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
               )}
             </div>

@@ -163,6 +163,7 @@ export default function MissionControl() {
   const [sortBy, setSortBy] = useState<'name' | 'health' | 'members' | 'dailyRate' | 'level' | 'daysLeft' | 'scenes' | 'progress' | 'title'>('health')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [sortCategory, setSortCategory] = useState<'departments' | 'risks' | 'locations'>('departments')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
@@ -200,6 +201,7 @@ export default function MissionControl() {
     } finally {
       setLoading(false)
       setRefreshing(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -1034,6 +1036,12 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
                 )}
               </div>
               <p className="text-xs text-slate-400 font-mono">CINE PILOT PRODUCTION HUD</p>
+              {lastUpdated && (
+                <p className="text-xs text-slate-500 font-mono flex items-center gap-1 mt-1">
+                  <Clock className="w-3 h-3" />
+                  Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
             </div>
           </div>
           

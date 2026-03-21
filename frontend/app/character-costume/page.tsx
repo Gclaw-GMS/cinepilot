@@ -7,7 +7,7 @@ import {
   Image, MessageSquare, TrendingUp, Save, X, Copy,
   Palette as PaletteIcon, Crown, Heart, Zap, Shield, Star,
   DollarSign, RefreshCw, HelpCircle, Printer, AlertCircle, CheckCircle,
-  List, AlertTriangle, BarChart3
+  List, AlertTriangle, BarChart3, Clock
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -135,6 +135,7 @@ export default function CharacterCostumePage() {
   
   // Budget tracking state
   const [budgetLimit, setBudgetLimit] = useState<number>(500000)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
   // Budget calculations
   const totalEstimatedBudget = summary?.totalBudget || 0
@@ -272,6 +273,8 @@ export default function CharacterCostumePage() {
   const filterStatusRef = useRef(filterStatus)
   const uniqueRolesRef = useRef(['protagonist', 'antagonist', 'supporting', 'comic', 'romantic', 'mentor', 'tragic'])
   const uniqueStatusesRef = useRef(['planning', 'in_progress', 'completed'])
+  
+
 
   const fetchCharacters = useCallback(async () => {
     setLoading(true)
@@ -287,6 +290,7 @@ export default function CharacterCostumePage() {
       setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -422,6 +426,13 @@ export default function CharacterCostumePage() {
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
+          break
+        case 'x':
+        case 'X':
+          e.preventDefault()
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
+          }
           break
         case 'p':
           if (!e.ctrlKey && !e.metaKey) {
@@ -955,12 +966,25 @@ export default function CharacterCostumePage() {
   }, [filteredCharacters])
 
   // Clear all filters and sort
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilterRole('all')
     setFilterStatus('all')
     setSortBy('name')
     setSortOrder('asc')
-  }
+  }, [])
+
+  // Clear filters refs (after clearFilters is defined)
+  const activeFilterCountRef = useRef(activeFilterCount)
+  const clearFiltersRef = useRef(clearFilters)
+
+  // Keep refs in sync with state for keyboard shortcuts
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+  
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   const roleData = summary ? Object.entries(summary.byRole).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -1034,6 +1058,12 @@ export default function CharacterCostumePage() {
               {isDemoMode && (
                 <span className="ml-2 px-2 py-1 text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded">
                   Demo Mode
+                </span>
+              )}
+              {lastUpdated && (
+                <span className="ml-2 flex items-center gap-1 text-xs text-slate-500">
+                  <Clock className="w-3 h-3" />
+                  Updated: {lastUpdated.toLocaleTimeString('en-GB')}
                 </span>
               )}
             </h1>
@@ -1184,7 +1214,7 @@ export default function CharacterCostumePage() {
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
                     <div>
                       <span className="text-sm font-medium">Filter & Sort</span>
-                      <span className="text-xs text-cyan-400 ml-2">(1-7 for role, ⇧1-3 for status, 0 to clear)</span>
+                      <span className="text-xs text-cyan-400 ml-2">(1-7 for role, ⇧1-3 for status, 0 to clear, X to clear all)</span>
                     </div>
                     {activeFilterCount > 0 && (
                       <button
@@ -2229,6 +2259,10 @@ export default function CharacterCostumePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Clear status filter</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">⇧0 / ⇧4</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-amber-400">Clear all filters</span>
+                  <kbd className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-sm">X</kbd>
                 </div>
                 <div className="border-t border-slate-700 my-3"></div>
                 <div className="text-xs text-purple-400 uppercase tracking-wider mb-2">When Filters Closed</div>

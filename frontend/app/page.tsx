@@ -9,7 +9,7 @@ import {
 import {
   FileText, Video, ImageIcon, Calendar, MapPin, DollarSign, Shield,
   ArrowUpRight, ArrowRight, RefreshCw, AlertCircle, Loader2, ListChecks,
-  Search, HelpCircle, X, Download, Printer, ChevronDown
+  Search, HelpCircle, X, Download, Printer, ChevronDown, Clock
 } from 'lucide-react'
 
 const PALETTE = {
@@ -153,6 +153,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -368,6 +369,7 @@ export default function Dashboard() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [checkDbStatus])
 
@@ -567,6 +569,13 @@ Generated: ${new Date().toLocaleString()}
               {loading || refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />}
               Refresh
             </button>
+            {/* Last Updated Timestamp */}
+            {lastUpdated && (
+              <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
             {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

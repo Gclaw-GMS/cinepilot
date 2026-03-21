@@ -116,6 +116,8 @@ export default function CrewPage() {
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
   
   // Calculate active filter count
   const activeFilterCount = (deptFilter !== 'all' ? 1 : 0) + (search.trim() ? 1 : 0);
@@ -230,6 +232,18 @@ export default function CrewPage() {
       setIsRefreshing(false)
     }
   }, [fetchCrew])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      setIsRefreshing(true)
+      fetchCrew().finally(() => setIsRefreshing(false))
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchCrew])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -921,6 +935,36 @@ export default function CrewPage() {
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
+              {/* Auto-Refresh Toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    autoRefresh ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+                  }`}
+                  title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                >
+                  <div className="relative">
+                    <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                    {autoRefresh && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                    )}
+                  </div>
+                  <span className="hidden sm:inline">Auto</span>
+                </button>
+                {autoRefresh && (
+                  <select
+                    value={autoRefreshInterval}
+                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                    className="bg-slate-800 text-slate-300 text-xs px-2 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value={10}>10s</option>
+                    <option value={30}>30s</option>
+                    <option value={60}>1m</option>
+                    <option value={300}>5m</option>
+                  </select>
+                )}
+              </div>
               <div className="relative" ref={exportMenuRef}>
                 <button 
                   onClick={() => setShowExportMenu(prev => !prev)}

@@ -224,6 +224,7 @@ export default function NotificationsPage() {
   const filterTabRef = useRef(filterTab)
   const showFiltersRef = useRef(showFilters)
   const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Sync refs with state for keyboard shortcuts
   useEffect(() => {
@@ -277,6 +278,7 @@ export default function NotificationsPage() {
       setNotifications(DEMO_NOTIFICATIONS);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -1008,16 +1010,24 @@ export default function NotificationsPage() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500">
-                <Bell className="h-5 w-5 text-white" />
-              </div>
-              Notifications
-            </h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Send and manage production notifications across all channels
-            </p>
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-2xl font-semibold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500">
+                  <Bell className="h-5 w-5 text-white" />
+                </div>
+                Notifications
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Send and manage production notifications across all channels
+              </p>
+            </div>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button

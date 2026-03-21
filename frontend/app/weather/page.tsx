@@ -408,6 +408,8 @@ export default function WeatherPage() {
   const [printing, setPrinting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
   const [filters, setFilters] = useState({
     condition: 'all',
     dateRange: 'all',
@@ -626,6 +628,20 @@ export default function WeatherPage() {
     refreshWeatherRef.current = refreshWeather;
   }, [refreshWeather]);
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const intervalId = setInterval(() => {
+      setRefreshing(true);
+      if (selectedLocation) {
+        fetchWeather(selectedLocation);
+      }
+    }, autoRefreshInterval * 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [autoRefresh, autoRefreshInterval, selectedLocation, fetchWeather]);
+
   // Keep filter refs in sync with state
   useEffect(() => {
     filtersRef.current = filters;
@@ -663,6 +679,10 @@ export default function WeatherPage() {
         case 'r':
           e.preventDefault()
           refreshWeatherRef.current()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -1400,6 +1420,7 @@ export default function WeatherPage() {
               </div>
               <div className="space-y-3">
                 <ShortcutRow keys={['R']} description="Refresh weather data" />
+                <ShortcutRow keys={['A']} description="Toggle auto-refresh" />
                 <ShortcutRow keys={['/']} description="Search locations" />
                 <div className="pt-2 pb-1 border-t border-white/10">
                   <span className="text-xs text-amber-400 font-medium">When Filters Closed</span>
@@ -1549,6 +1570,36 @@ export default function WeatherPage() {
                   )}
                   Refresh
                 </button>
+                {/* Auto-refresh toggle */}
+                <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+                  <button
+                    onClick={() => setAutoRefresh(!autoRefresh)}
+                    className={`flex items-center gap-2 text-sm transition-colors ${
+                      autoRefresh ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                    title="Toggle auto-refresh"
+                  >
+                    <div className={`w-8 h-4 rounded-full transition-colors relative ${
+                      autoRefresh ? 'bg-emerald-500' : 'bg-slate-600'
+                    }`}>
+                      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                        autoRefresh ? 'left-4.5 translate-x-0' : 'left-0.5'
+                      }`} style={{ left: autoRefresh ? '18px' : '2px' }} />
+                    </div>
+                  </button>
+                  {autoRefresh && (
+                    <select
+                      value={autoRefreshInterval}
+                      onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                      className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white"
+                    >
+                      <option value={10}>10s</option>
+                      <option value={30}>30s</option>
+                      <option value={60}>1m</option>
+                      <option value={300}>5m</option>
+                    </select>
+                  )}
+                </div>
                 {/* Filter Toggle Button */}
                 <button
                   onClick={() => setShowFilters(!showFilters)}

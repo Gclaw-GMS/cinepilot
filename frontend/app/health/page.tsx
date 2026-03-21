@@ -655,7 +655,15 @@ export default function HealthPage() {
               }`} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">System Health</h1>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                System Health
+                {lastRefresh && (
+                  <span className="text-sm font-normal text-slate-400 ml-2 flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    Updated: {lastRefresh.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                )}
+              </h1>
               <p className="text-slate-400">Monitor database, disk, memory, and environment</p>
             </div>
             {healthData?.isDemo && (

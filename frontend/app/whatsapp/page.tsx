@@ -117,14 +117,27 @@ export default function WhatsAppPage() {
   const activeFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (roleFilter !== 'all' ? 1 : 0) + (sortBy !== 'date' || sortOrder !== 'desc' ? 1 : 0)
   
   // Clear all filters
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setCategoryFilter('all')
     setStatusFilter('all')
     setRoleFilter('all')
     setSearchQuery('')
     setSortBy('date')
     setSortOrder('desc')
-  }
+  }, [])
+
+  // Refs for keyboard shortcuts
+  const clearFiltersRef = useRef(clearFilters)
+  const activeFilterCountRef = useRef(activeFilterCount)
+
+  // Sync refs with state
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
   
   // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -280,6 +293,13 @@ export default function WhatsAppPage() {
             if (activeTabRef.current === 'templates') setCategoryFilter('all')
             else if (activeTabRef.current === 'history') setStatusFilter('all')
             else if (activeTabRef.current === 'contacts') setRoleFilter('all')
+          }
+          break
+        case 'x':
+        case 'X':
+          if (!e.ctrlKey && !e.metaKey && showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current()
           }
           break
         case '1':
@@ -804,7 +824,7 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
-                    <span className="text-xs text-cyan-400">Number keys to filter • 0 to clear</span>
+                    <span className="text-xs text-cyan-400">Number keys to filter • 0 to clear • X for all</span>
                   </div>
                   <button 
                     onClick={() => { clearFilters() }}
@@ -1387,6 +1407,7 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
               <div className="text-xs text-cyan-400 uppercase tracking-wider mb-1 mt-3">When Filters Open (Number Keys)</div>
               {[
                 { key: '0', description: 'Clear filter (show all)' },
+                { key: 'X', description: 'Clear all filters' },
                 { key: '1-3', description: 'Templates: Schedule, Reminder, Call Sheet' },
                 { key: '1-5', description: 'History: Pending, Sent, Delivered, Read, Failed' },
                 { key: '1-8', description: 'Contacts: Roles (Lead Actor → Writer)' },

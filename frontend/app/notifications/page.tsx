@@ -253,6 +253,20 @@ export default function NotificationsPage() {
     setSortBy('date');
     setSortOrder('desc');
   }, []);
+
+  // Refs for keyboard shortcuts
+  const clearFiltersRef = useRef(clearFilters)
+  const activeFilterCountRef = useRef(activeFilterCount)
+
+  // Sync refs with state
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+
   const [form, setForm] = useState({
     channel: 'app' as 'app' | 'email' | 'whatsapp' | 'sms',
     recipient: '',
@@ -697,6 +711,13 @@ export default function NotificationsPage() {
           if (showFiltersRef.current) {
             // When filters panel OPEN: Clear tab filter
             setFilterTab('all')
+          }
+          break
+        case 'x':
+        case 'X':
+          if (!e.ctrlKey && !e.metaKey && showFiltersRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current()
           }
           break
         case 'c':
@@ -1560,7 +1581,7 @@ export default function NotificationsPage() {
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-indigo-400" />
                   <span className="text-sm font-medium text-slate-300">Filters:</span>
-                  <span className="text-xs text-cyan-400 ml-1">(1-4 to filter, 0 to clear)</span>
+                  <span className="text-xs text-cyan-400 ml-1">(1-4 to filter, 0 to clear, X for all)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-slate-400">Channel:</label>
@@ -1839,6 +1860,10 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-cyan-400">Clear tab filter</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-cyan-400">0</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-cyan-400">Clear all filters</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-cyan-400">X</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Go to Inbox</span>

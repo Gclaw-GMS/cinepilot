@@ -93,6 +93,7 @@ export default function CollaborationPage() {
     department: 'all',
     status: 'all',
   })
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'department' | 'status' | 'dailyRate'>('name')
@@ -165,6 +166,7 @@ export default function CollaborationPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -756,14 +758,22 @@ export default function CollaborationPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center">
-              <Users className="w-5 h-5" />
-            </div>
-            Team Collaboration
-          </h1>
-          <p className="text-slate-400 mt-1">Manage your production team and communications</p>
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5" />
+              </div>
+              Team Collaboration
+            </h1>
+            <p className="text-slate-400 mt-1">Manage your production team and communications</p>
+          </div>
+          {lastUpdated && (
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <Clock className="w-3.5 h-3.5" />
+              Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">

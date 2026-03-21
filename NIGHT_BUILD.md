@@ -1,5 +1,49 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (5:29 AM) - Censor Page Last Updated Timestamp IMPLEMENTED
+
+### 5:29 AM - Censor Page - Last Updated Timestamp (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Censor Page - Last Updated Timestamp**: Added timestamp display showing when data was last refreshed
+
+### Feature Details
+- **Clock Icon**: Added Clock icon import from lucide-react
+- **lastUpdated State**: Tracks Date when data was last loaded
+- **Timestamp Display**: Shows "Updated: HH:MM:SS" format in header next to DEMO badge
+- **Two Update Points**: Timestamp updates on initial data load and on refresh button click
+- **Consistent with Other Pages**: Matches pattern from Timeline, Analytics, Budget, DOOD, Equipment, Dubbing, Catering, Reports, Locations, Character Costume, AI Tools, Exports, Shots, Call Sheets, and Collaboration pages
+
+### Technical Implementation
+- Added Clock to lucide-react imports
+- Added lastUpdated useState<Date | null>(null) state declaration
+- Added setLastUpdated(new Date()) in fetchAnalysis finally block when data loads
+- Added conditional display: {lastUpdated && (...)} with Clock icon and formatted time (en-GB locale)
+- Displayed in header next to DEMO badge
+
+### Build Verification
+- **Build:** Clean build with 84 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### Censor Page Last Updated Timestamp Feature Checklist
+- [x] Clock icon imported from lucide-react ✅
+- [x] lastUpdated state tracks Date when data was loaded ✅
+- [x] Timestamp updates on initial mount ✅
+- [x] Timestamp updates on refresh button click ✅
+- [x] Header displays timestamp with Clock icon ✅
+- [x] Format shows "Updated: HH:MM:SS" ✅
+- [x] Consistent with other pages (timeline, analytics, budget, dood, equipment, dubbing, catering, reports, locations, character-costume, ai-tools, exports, shots, call-sheets, collaboration) ✅
+- [x] Build passes ✅
+- [x] Tests pass (803) ✅
+- [x] Lint passes ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (5:08 AM) - Timeline Page Last Updated Timestamp IMPLEMENTED
 
 ### 5:08 AM - Timeline Page - Last Updated Timestamp (IMPLEMENTED)

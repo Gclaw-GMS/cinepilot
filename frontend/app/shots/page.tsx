@@ -50,6 +50,7 @@ export default function ShotsPage() {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
   const showFiltersRef = useRef(showFilters)
@@ -94,7 +95,7 @@ export default function ShotsPage() {
       if (data.shots?.length > 0) { setShots(data.shots); setScenes(data.scenes || []); setStats(data.stats || null); setIsDemoMode(data._demo || false) }
       else { setShots(DEMO_SHOTS); setScenes(DEMO_SCENES); setStats(DEMO_STATS); setIsDemoMode(true) }
     } catch { setShots(DEMO_SHOTS); setScenes(DEMO_SCENES); setStats(DEMO_STATS); setIsDemoMode(true) }
-    finally { setLoading(false) }
+    finally { setLoading(false); setLastUpdated(new Date()) }
   }, [])
   useEffect(() => { fetchShots() }, [fetchShots])
 
@@ -173,7 +174,7 @@ export default function ShotsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2"><Camera className="w-6 h-6 text-cyan-400" /><h1 className="text-xl font-bold">Shots</h1>{isDemoMode && <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-mono">DEMO</span>}</div>
-              {stats && <div className="flex items-center gap-4 text-sm text-slate-400"><span className="flex items-center gap-1"><Film className="w-4 h-4" />{stats.totalShots} shots</span><span className="flex items-center gap-1"><Clock className="w-4 h-4" />{stats.totalDuration}s</span>{stats.missingFields > 0 && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-4 h-4" />{stats.missingFields} incomplete</span>}</div>}
+              {stats && <div className="flex items-center gap-4 text-sm text-slate-400"><span className="flex items-center gap-1"><Film className="w-4 h-4" />{stats.totalShots} shots</span><span className="flex items-center gap-1"><Clock className="w-4 h-4" />{stats.totalDuration}s</span>{stats.missingFields > 0 && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-4 h-4" />{stats.missingFields} incomplete</span>}{lastUpdated && <span className="flex items-center gap-1 text-slate-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB')}</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowExportMenu(p => !p)} className="p-2 hover:bg-slate-800 rounded-lg" title="Export (E)"><Download className="w-5 h-5 text-slate-400" /></button>

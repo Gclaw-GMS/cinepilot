@@ -182,6 +182,9 @@ export default function ScriptsPage() {
   const [analyses, setAnalyses] = useState<AnalysisData[]>([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
 
   const [sceneFilter, setSceneFilter] = useState('')
   const [intExtFilter, setIntExtFilter] = useState<string>('all')
@@ -229,6 +232,8 @@ export default function ScriptsPage() {
   const sortOrderRef = useRef(sortOrder)
   const clearFiltersRef = useRef<() => void>(() => {})
   const activeFilterCountRef = useRef(0)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   // Sync refs with state
   useEffect(() => {
@@ -254,6 +259,14 @@ export default function ScriptsPage() {
   useEffect(() => {
     clearFiltersRef.current = clearFilters
   }, [clearFilters])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
 
   // Active script
   const activeScript = scripts[0]
@@ -328,6 +341,10 @@ export default function ScriptsPage() {
         case 'r':
           e.preventDefault()
           fetchDataRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case 'e':
           e.preventDefault()
@@ -407,6 +424,9 @@ export default function ScriptsPage() {
   }, [showFilters])
 
   const fetchData = useCallback(async () => {
+    if (!loading) {
+      setRefreshing(true)
+    }
     try {
       const res = await fetch('/api/scripts')
       const data = await res.json()
@@ -434,6 +454,7 @@ export default function ScriptsPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setRefreshing(false)
       setLastUpdated(new Date())
     }
   }, [])
@@ -442,6 +463,18 @@ export default function ScriptsPage() {
   fetchDataRef.current = fetchData
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const intervalId = setInterval(() => {
+      setRefreshing(true)
+      fetchData()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(intervalId)
+  }, [autoRefresh, autoRefreshInterval, fetchData])
 
   // Export functions
   const exportToCSV = () => {
@@ -1114,6 +1147,7 @@ Warnings: ${allWarnings.length}`
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               Updated: {lastUpdated.toLocaleTimeString()}
+              {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
             </p>
           )}
         </div>
@@ -1132,11 +1166,41 @@ Warnings: ${allWarnings.length}`
         <div className="flex gap-2">
           <button
             onClick={() => { fetchData(); setLastUpdated(new Date()) }}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm"
+            className={`px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
+              refreshing || autoRefresh 
+                ? 'bg-gray-700 text-gray-300' 
+                : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+            }`}
             title="Refresh (R)"
+            disabled={refreshing || autoRefresh}
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+          {/* Auto-refresh toggle */}
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
+              autoRefresh 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
+                : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-transparent'
+            }`}
+            title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+          >
+            <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+            <span>Auto</span>
+          </button>
+          {autoRefresh && (
+            <select
+              value={autoRefreshInterval}
+              onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+              className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-2 py-2 focus:outline-none focus:border-emerald-500"
+            >
+              <option value={10}>10s</option>
+              <option value={30}>30s</option>
+              <option value={60}>1m</option>
+              <option value={300}>5m</option>
+            </select>
+          )}
           {activeScript && (
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -2053,6 +2117,7 @@ Warnings: ${allWarnings.length}`
               <div className="space-y-1 text-sm">
                 {[
                   { key: 'R', action: 'Refresh scripts' },
+                  { key: 'A', action: 'Toggle auto-refresh', color: 'text-emerald-400' },
                   { key: 'E', action: 'Export menu' },
                   { key: 'M', action: 'Export Markdown' },
                   { key: 'P', action: 'Print script' },

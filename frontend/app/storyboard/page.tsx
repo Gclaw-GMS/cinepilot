@@ -86,6 +86,8 @@ export default function StoryboardPage() {
   const showFiltersRef = useRef(showFilters)
   const statusFilterRef = useRef(statusFilter)
   const selectedStyleRef = useRef(selectedStyle)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     selectedScriptRef.current = selectedScript
@@ -656,12 +658,8 @@ ${filteredScenes.map(scene =>
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current) {
-            setStatusFilter('all')
-            setSceneFilter('all')
-            setSearchQuery('')
-            setSortBy('scene')
-            setSortOrder('asc')
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
           }
           break
         case 'e':
@@ -785,6 +783,15 @@ ${filteredScenes.map(scene =>
     setSortBy('scene')
     setSortOrder('asc')
   }, [])
+  
+  // Sync refs with state
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+  
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
   
   // Toggle sort order
   const toggleSortOrder = () => {
@@ -941,7 +948,7 @@ ${filteredScenes.map(scene =>
                     ? 'bg-violet-600 border-violet-500 text-white'
                     : 'bg-[#1a1a1a] border-gray-700 hover:bg-[#222] text-gray-400'
                 }`}
-                title="Filter & Sort (F)"
+                title={`Filter & Sort (F)${activeFilterCount > 0 ? ' - X to clear all' : ''}`}
               >
                 <Filter className="w-5 h-5" />
                 {activeFilterCount > 0 && (

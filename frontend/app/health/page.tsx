@@ -67,6 +67,8 @@ export default function HealthPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'healthy' | 'degraded' | 'unhealthy'>('all')
   const [sortBy, setSortBy] = useState<'component' | 'status' | 'latency'>('component')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -452,6 +454,18 @@ export default function HealthPage() {
     }
   }, [])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const intervalId = setInterval(() => {
+      setRefreshing(true)
+      fetchHealth()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(intervalId)
+  }, [autoRefresh, autoRefreshInterval, fetchHealth])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -834,6 +848,36 @@ export default function HealthPage() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+            {/* Auto-refresh toggle */}
+            <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 text-sm transition-colors ${
+                  autoRefresh ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'
+                }`}
+                title="Toggle auto-refresh"
+              >
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${
+                  autoRefresh ? 'bg-emerald-500' : 'bg-slate-600'
+                }`}>
+                  <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                    autoRefresh ? 'left-4.5 translate-x-0' : 'left-0.5'
+                  }`} style={{ left: autoRefresh ? '18px' : '2px' }} />
+                </div>
+              </button>
+              {autoRefresh && (
+                <select
+                  value={autoRefreshInterval}
+                  onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                  className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              )}
+            </div>
             <button
               onClick={() => setShowKeyboardHelp(true)}
               className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"

@@ -95,6 +95,10 @@ export default function CallSheetsPage() {
   const [loadingShootingDays, setLoadingShootingDays] = useState(false)
   const [showScheduleImport, setShowScheduleImport] = useState(false)
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
@@ -102,6 +106,8 @@ export default function CallSheetsPage() {
   const filterLocationRef = useRef(filterLocation)
   const filterMonthRef = useRef(filterMonth)
   const showFiltersRef = useRef(showFilters)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -115,6 +121,14 @@ export default function CallSheetsPage() {
   useEffect(() => {
     showFiltersRef.current = showFilters
   }, [showFilters])
+  
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+  
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
   
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -194,6 +208,18 @@ export default function CallSheetsPage() {
     fetchCrew()
   }, [fetchCallSheets, fetchCrew])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      setRefreshing(true)
+      fetchCallSheets()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchCallSheets])
+
   // Toggle sort order
   const toggleSortOrder = useCallback(() => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -212,6 +238,12 @@ export default function CallSheetsPage() {
           e.preventDefault()
           setRefreshing(true)
           fetchCallSheets()
+          break
+        case 'a':
+          e.preventDefault()
+          if (!creating && !isEditing) {
+            setAutoRefresh(!autoRefresh)
+          }
           break
         case '/':
           e.preventDefault()
@@ -1051,6 +1083,12 @@ export default function CallSheetsPage() {
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 Updated: {lastUpdated.toLocaleTimeString()}
+                {autoRefresh && (
+                  <span className="flex items-center gap-1 text-emerald-400 ml-2">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                    Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval/60}m`}
+                  </span>
+                )}
               </p>
             )}
           </div>
@@ -1061,12 +1099,52 @@ export default function CallSheetsPage() {
               setRefreshing(true)
               fetchCallSheets()
             }}
-            disabled={refreshing}
+            disabled={refreshing || autoRefresh}
             className="p-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-400 hover:text-white rounded-lg transition-colors"
             title="Refresh (R)"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+          {/* Auto-Refresh Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
+                autoRefresh 
+                  ? 'bg-emerald-500/20 text-emerald-400' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+              }`}
+              title="Auto-Refresh Toggle (A)"
+            >
+              <span className="relative flex h-2 w-2">
+                {autoRefresh && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${autoRefresh ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
+              </span>
+            </button>
+            {autoRefresh && (
+              <div className="absolute right-0 mt-2 w-32 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-700">
+                  <span className="text-xs text-emerald-400 font-medium">Auto-Refresh</span>
+                </div>
+                <div className="py-1">
+                  {[10, 30, 60, 300].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setAutoRefreshInterval(opt)}
+                      className={`w-full px-3 py-1.5 text-left text-sm hover:bg-slate-700 flex items-center justify-between ${
+                        autoRefreshInterval === opt ? 'text-cyan-400' : 'text-slate-300'
+                      }`}
+                    >
+                      <span>{opt < 60 ? `${opt}s` : `${opt/60}m`}</span>
+                      {autoRefreshInterval === opt && <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
@@ -1861,6 +1939,7 @@ export default function CallSheetsPage() {
             <div className="space-y-3">
               {[
                 { key: 'R', description: 'Refresh call sheets' },
+                { key: 'A', description: 'Toggle auto-refresh', color: 'emerald' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters' },
                 { key: 'S', description: 'Toggle sort order (ASC/DESC)' },
@@ -1879,7 +1958,7 @@ export default function CallSheetsPage() {
                   className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
                 >
                   <span className="text-slate-300">{shortcut.description}</span>
-                  <kbd className="px-3 py-1 bg-slate-700 border border-slate-600 rounded text-cyan-400 font-mono text-sm font-medium">
+                  <kbd className={`px-3 py-1 bg-slate-700 border border-slate-600 rounded ${shortcut.color === 'emerald' ? 'text-emerald-400' : 'text-cyan-400'} font-mono text-sm font-medium`}>
                     {shortcut.key}
                   </kbd>
                 </div>

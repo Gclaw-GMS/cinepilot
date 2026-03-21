@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, Keyboard, Printer, X } from 'lucide-react'
+import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, Keyboard, Printer, X, Plus, Edit2, Trash2, Lock, Unlock, Save, Loader2 } from 'lucide-react'
 
 interface Scene { id: string; sceneNumber: string; headingRaw: string; intExt: string; timeOfDay: string; location: string; _count?: { shots: number } }
 interface Shot { id: string; shotIndex: number; beatIndex: number; shotText: string; characters: string[]; shotSize: string; shotType: string; cameraAngle: string; cameraMovement: string; focalLengthMm: number; lensType: string; keyStyle: string; colorTemp: string; durationEstSec: number; confidenceCamera: number; confidenceLens: number; confidenceLight: number; confidenceDuration: number; isLocked: boolean; userEdited: boolean; notes: string; scene?: Scene }
@@ -54,6 +54,30 @@ export default function ShotsPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const [refreshing, setRefreshing] = useState(false)
+  
+  // CRUD state
+  const [showForm, setShowForm] = useState(false)
+  const [editingShot, setEditingShot] = useState<Shot | null>(null)
+  const [formLoading, setFormLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  
+  // Form data
+  const [formData, setFormData] = useState({
+    shotText: '',
+    sceneId: '',
+    shotSize: 'MS',
+    cameraAngle: 'eye',
+    cameraMovement: 'static',
+    focalLengthMm: 50,
+    lensType: 'prime',
+    keyStyle: 'motivated',
+    colorTemp: '5600K',
+    durationEstSec: 5,
+    characters: '',
+    notes: '',
+  })
 
   const searchInputRef = useRef<HTMLInputElement>(null)
   const showFiltersRef = useRef(showFilters)
@@ -183,11 +207,118 @@ export default function ShotsPage() {
         case 'p': e.preventDefault(); handlePrintRef.current(); break;
         case 'x': e.preventDefault(); clearFiltersRef.current(); break;
         case '?': e.preventDefault(); setShowKeyboardHelp(true); break;
-        case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setSearchQuery(''); break 
+        case 'n': if (!e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); openAddForm(); }; break;
+        case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setShowForm(false); setSearchQuery(''); setDeleteConfirm(null); break 
       }
     }
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
   }, [fetchShots, clearFilters, scenes])
+
+  // CRUD Functions
+  const openAddForm = useCallback(() => {
+    setEditingShot(null)
+    setFormData({
+      shotText: '',
+      sceneId: scenes[0]?.id || '',
+      shotSize: 'MS',
+      cameraAngle: 'eye',
+      cameraMovement: 'static',
+      focalLengthMm: 50,
+      lensType: 'prime',
+      keyStyle: 'motivated',
+      colorTemp: '5600K',
+      durationEstSec: 5,
+      characters: '',
+      notes: '',
+    })
+    setFormError(null)
+    setShowForm(true)
+  }, [scenes])
+
+  const openEditForm = useCallback((shot: Shot) => {
+    setEditingShot(shot)
+    setFormData({
+      shotText: shot.shotText,
+      sceneId: shot.scene?.id || '',
+      shotSize: shot.shotSize,
+      cameraAngle: shot.cameraAngle,
+      cameraMovement: shot.cameraMovement,
+      focalLengthMm: shot.focalLengthMm,
+      lensType: shot.lensType,
+      keyStyle: shot.keyStyle,
+      colorTemp: shot.colorTemp,
+      durationEstSec: shot.durationEstSec,
+      characters: shot.characters?.join(', ') || '',
+      notes: shot.notes || '',
+    })
+    setFormError(null)
+    setShowForm(true)
+  }, [])
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormLoading(true)
+    setFormError(null)
+
+    const payload = {
+      ...formData,
+      characters: formData.characters.split(',').map(c => c.trim()).filter(Boolean),
+    }
+
+    try {
+      const url = editingShot ? `/api/shots/${editingShot.id}` : '/api/shots'
+      const method = editingShot ? 'PATCH' : 'POST'
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to save shot' }))
+        throw new Error(err.error || 'Failed to save shot')
+      }
+
+      setShowForm(false)
+      fetchShots()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to save shot')
+    } finally {
+      setFormLoading(false)
+    }
+  }, [editingShot, formData, fetchShots])
+
+  const handleDelete = useCallback(async (shotId: string) => {
+    setDeleteLoading(true)
+    try {
+      const res = await fetch(`/api/shots/${shotId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to delete shot' }))
+        throw new Error(err.error || 'Failed to delete shot')
+      }
+      setDeleteConfirm(null)
+      fetchShots()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to delete shot')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }, [fetchShots])
+
+  const handleLockToggle = useCallback(async (shot: Shot) => {
+    try {
+      const res = await fetch(`/api/shots/${shot.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isLocked: !shot.isLocked }),
+      })
+      if (!res.ok) throw new Error('Failed to update lock status')
+      fetchShots()
+    } catch (err) {
+      console.error('Failed to toggle lock:', err)
+    }
+  }, [fetchShots])
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-slate-400">Loading shots...</p></div></div>
   
@@ -209,6 +340,7 @@ export default function ShotsPage() {
               {stats && <div className="flex items-center gap-4 text-sm text-slate-400"><span className="flex items-center gap-1"><Film className="w-4 h-4" />{stats.totalShots} shots</span><span className="flex items-center gap-1"><Clock className="w-4 h-4" />{stats.totalDuration}s</span>{stats.missingFields > 0 && <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-4 h-4" />{stats.missingFields} incomplete</span>}{refreshing ? <RefreshIndicator /> : lastUpdated && <span className="flex items-center gap-1 text-slate-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB')}</span>}{autoRefresh && <span className="flex items-center gap-1 text-emerald-400 text-xs"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Auto: {autoRefreshInterval}s</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={openAddForm} className="flex items-center gap-2 px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors" title="Add Shot (N)"><Plus className="w-4 h-4" />Add Shot</button>
               <button onClick={() => setShowExportMenu(p => !p)} className="p-2 hover:bg-slate-800 rounded-lg" title="Export (E)"><Download className="w-5 h-5 text-slate-400" /></button>
               <button onClick={() => setShowKeyboardHelp(true)} className="p-2 hover:bg-slate-800 rounded-lg" title="Keyboard Shortcuts (?)"><Keyboard className="w-5 h-5 text-slate-400" /></button>
               <button onClick={fetchShots} className="p-2 hover:bg-slate-800 rounded-lg" title="Refresh (R)"><RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''} text-slate-400`} /></button>
@@ -263,6 +395,7 @@ export default function ShotsPage() {
               <div><span className="text-amber-400 font-mono">/</span> - Focus search</div>
               <div><span className="text-amber-400 font-mono">?</span> - Toggle this help</div>
               <div className="border-t border-slate-700 pt-2"><span className="text-emerald-400 font-bold">Actions</span></div>
+              <div><span className="text-amber-400 font-mono">N</span> - Add new shot</div>
               <div><span className="text-amber-400 font-mono">R</span> - Refresh shots</div>
               <div><span className="text-amber-400 font-mono">F</span> - Toggle filters panel</div>
               <div><span className="text-amber-400 font-mono">S</span> - Toggle sort order</div>
@@ -287,16 +420,254 @@ export default function ShotsPage() {
         </div>
       )}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {filteredShots.length === 0 ? <div className="text-center py-12"><Film className="w-16 h-16 text-slate-600 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-400">No shots found</h3><p className="text-slate-500">Try adjusting your filters</p></div> : viewMode === 'cards' ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredShots.map(shot => <div key={shot.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-cyan-500/50 transition-colors">
-          <div className="flex items-start justify-between mb-3"><div className="flex items-center gap-2"><span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-sm font-mono rounded">#{shot.shotIndex}</span><span className="text-xs text-slate-500">{shot.scene?.sceneNumber}</span></div><div className="flex items-center gap-1 text-xs"><Clock className="w-3 h-3 text-slate-500" /><span className="text-slate-400">{shot.durationEstSec}s</span></div></div>
+        {filteredShots.length === 0 ? <div className="text-center py-12"><Film className="w-16 h-16 text-slate-600 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-400">No shots found</h3><p className="text-slate-500">Try adjusting your filters</p></div> : viewMode === 'cards' ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredShots.map(shot => <div key={shot.id} className={`bg-slate-900 border rounded-xl p-4 hover:border-cyan-500/50 transition-colors ${shot.isLocked ? 'border-amber-500/50' : 'border-slate-800'}`}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 text-sm font-mono rounded ${shot.isLocked ? 'bg-amber-500/20 text-amber-400' : 'bg-cyan-500/20 text-cyan-400'}`}>#{shot.shotIndex}</span>
+              <span className="text-xs text-slate-500">{shot.scene?.sceneNumber}</span>
+              {shot.isLocked && <Lock className="w-3 h-3 text-amber-400" />}
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => handleLockToggle(shot)} className="p-1 hover:bg-slate-800 rounded" title={shot.isLocked ? 'Unlock shot' : 'Lock shot'}>{shot.isLocked ? <Lock className="w-3 h-3 text-amber-400" /> : <Unlock className="w-3 h-3 text-slate-500" />}</button>
+              <button onClick={() => openEditForm(shot)} className="p-1 hover:bg-slate-800 rounded" title="Edit shot"><Edit2 className="w-3 h-3 text-slate-400" /></button>
+              <button onClick={() => setDeleteConfirm(shot.id)} className="p-1 hover:bg-slate-800 rounded" title="Delete shot"><Trash2 className="w-3 h-3 text-slate-400 hover:text-red-400" /></button>
+              <div className="flex items-center gap-1 text-xs ml-2"><Clock className="w-3 h-3 text-slate-500" /><span className="text-slate-400">{shot.durationEstSec}s</span></div>
+            </div>
+          </div>
           <p className="text-sm text-slate-300 mb-3 line-clamp-2">{shot.shotText}</p>
           <div className="flex flex-wrap gap-1 mb-3"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded">{shot.shotSize}</span><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded">{shot.cameraAngle}</span><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded">{shot.cameraMovement}</span><span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded">{shot.focalLengthMm}mm</span></div>
           <div className="flex items-center gap-3 text-xs mb-3"><span className={getConfColor(shot.confidenceCamera)}>Cam: {(shot.confidenceCamera*100).toFixed(0)}%</span><span className={getConfColor(shot.confidenceLens)}>Lens: {(shot.confidenceLens*100).toFixed(0)}%</span><span className={getConfColor(shot.confidenceLight)}>Light: {(shot.confidenceLight*100).toFixed(0)}%</span></div>
           {shot.characters?.length > 0 && <div className="flex flex-wrap gap-1 mb-3">{shot.characters.map(c => <span key={c} className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">{c}</span>)}</div>}
           {shot.notes && <button onClick={() => toggleNote(shot.id)} className="text-xs text-slate-500 hover:text-cyan-400 flex items-center gap-1">{expandedNotes.has(shot.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}{expandedNotes.has(shot.id) ? 'Hide' : 'Show'} notes</button>}
           {expandedNotes.has(shot.id) && shot.notes && <p className="mt-2 text-xs text-slate-400 italic border-t border-slate-800 pt-2">{shot.notes}</p>}
-        </div>)}</div> : <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">#</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Scene</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Shot</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Size</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Angle</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Movement</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Focal</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Duration</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Confidence</th></tr></thead><tbody>{filteredShots.map((shot, i) => <tr key={shot.id} className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/30'}><td className="px-4 py-3 text-sm font-mono text-cyan-400">#{shot.shotIndex}</td><td className="px-4 py-3 text-sm text-slate-400">{shot.scene?.sceneNumber}</td><td className="px-4 py-3 text-sm text-slate-300 max-w-[200px] truncate">{shot.shotText}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.shotSize}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraAngle}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraMovement}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.focalLengthMm}mm</td><td className="px-4 py-3 text-sm text-slate-300">{shot.durationEstSec}s</td><td className="px-4 py-3 text-xs"><span className={getConfColor(shot.confidenceCamera)}>{(shot.confidenceCamera*100).toFixed(0)}%</span></td></tr>)}</tbody></table></div>}
+        </div>)}</div> : <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">#</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Scene</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Shot</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Size</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Angle</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Movement</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Focal</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Duration</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th></tr></thead><tbody>{filteredShots.map((shot, i) => <tr key={shot.id} className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/30'}><td className="px-4 py-3 text-sm font-mono text-cyan-400">#{shot.shotIndex}</td><td className="px-4 py-3 text-sm text-slate-400">{shot.scene?.sceneNumber}</td><td className="px-4 py-3 text-sm text-slate-300 max-w-[200px] truncate">{shot.shotText}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.shotSize}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraAngle}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraMovement}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.focalLengthMm}mm</td><td className="px-4 py-3 text-xs"><div className="flex items-center gap-1"><button onClick={() => handleLockToggle(shot)} className="p-1 hover:bg-slate-700 rounded">{shot.isLocked ? <Lock className="w-3 h-3 text-amber-400" /> : <Unlock className="w-3 h-3 text-slate-500" />}</button><button onClick={() => openEditForm(shot)} className="p-1 hover:bg-slate-700 rounded"><Edit2 className="w-3 h-3 text-slate-400" /></button><button onClick={() => setDeleteConfirm(shot.id)} className="p-1 hover:bg-slate-700 rounded"><Trash2 className="w-3 h-3 text-slate-400 hover:text-red-400" /></button></div></td></tr>)}</tbody></table></div>}
       </main>
+
+      {/* Add/Edit Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Camera className="w-5 h-5 text-cyan-400" />
+                {editingShot ? 'Edit Shot' : 'Add New Shot'}
+              </h2>
+              <button onClick={() => setShowForm(false)} className="p-1 hover:bg-slate-700 rounded"><X className="w-5 h-5" /></button>
+            </div>
+            
+            {formError && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {formError}
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Shot Description</label>
+                <textarea
+                  value={formData.shotText}
+                  onChange={e => setFormData(p => ({ ...p, shotText: e.target.value }))}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  rows={2}
+                  required
+                  placeholder="Describe the shot..."
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Scene</label>
+                  <select
+                    value={formData.sceneId}
+                    onChange={e => setFormData(p => ({ ...p, sceneId: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                    required
+                  >
+                    {scenes.map(s => <option key={s.id} value={s.id}>{s.sceneNumber} - {s.location}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Duration (seconds)</label>
+                  <input
+                    type="number"
+                    value={formData.durationEstSec}
+                    onChange={e => setFormData(p => ({ ...p, durationEstSec: parseInt(e.target.value) || 0 }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                    min="1"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Shot Size</label>
+                  <select
+                    value={formData.shotSize}
+                    onChange={e => setFormData(p => ({ ...p, shotSize: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  >
+                    {SHOT_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Camera Angle</label>
+                  <select
+                    value={formData.cameraAngle}
+                    onChange={e => setFormData(p => ({ ...p, cameraAngle: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  >
+                    {CAMERA_ANGLES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Movement</label>
+                  <select
+                    value={formData.cameraMovement}
+                    onChange={e => setFormData(p => ({ ...p, cameraMovement: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  >
+                    {CAMERA_MOVEMENTS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Focal Length (mm)</label>
+                  <input
+                    type="number"
+                    value={formData.focalLengthMm}
+                    onChange={e => setFormData(p => ({ ...p, focalLengthMm: parseInt(e.target.value) || 50 }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                    min="8"
+                    max="800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Lens Type</label>
+                  <select
+                    value={formData.lensType}
+                    onChange={e => setFormData(p => ({ ...p, lensType: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="prime">Prime</option>
+                    <option value="zoom">Zoom</option>
+                    <option value="wide">Wide</option>
+                    <option value="macro">Macro</option>
+                    <option value="action">Action</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Color Temp</label>
+                  <select
+                    value={formData.colorTemp}
+                    onChange={e => setFormData(p => ({ ...p, colorTemp: e.target.value }))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="3200K">3200K (Tungsten)</option>
+                    <option value="4300K">4300K (Mixed)</option>
+                    <option value="5600K">5600K (Daylight)</option>
+                    <option value="6500K">6500K (Cloudy)</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Key Style</label>
+                <select
+                  value={formData.keyStyle}
+                  onChange={e => setFormData(p => ({ ...p, keyStyle: e.target.value }))}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="motivated">Motivated</option>
+                  <option value="natural">Natural</option>
+                  <option value="noir">Noir</option>
+                  <option value="kinetic">Kinetic</option>
+                  <option value="emotional">Emotional</option>
+                  <option value="artistic">Artistic</option>
+                  <option value="establishing">Establishing</option>
+                  <option value="detail">Detail</option>
+                  <option value="conversational">Conversational</option>
+                  <option value="symbolic">Symbolic</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Characters (comma-separated)</label>
+                <input
+                  type="text"
+                  value={formData.characters}
+                  onChange={e => setFormData(p => ({ ...p, characters: e.target.value }))}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  placeholder="RAM, PRIYA, ..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                  rows={3}
+                  placeholder="Additional notes for this shot..."
+                />
+              </div>
+              
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-500/50 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {editingShot ? 'Update Shot' : 'Create Shot'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">Delete Shot?</h3>
+                <p className="text-sm text-slate-400">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm)}
+                disabled={deleteLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-500/50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete Shot
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

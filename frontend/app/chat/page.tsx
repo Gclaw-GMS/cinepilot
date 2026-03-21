@@ -71,6 +71,7 @@ export default function ChatPage() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -91,6 +92,13 @@ export default function ChatPage() {
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  // Set lastUpdated timestamp on initial load
+  useEffect(() => {
+    if (messages.length > 0 && !lastUpdated) {
+      setLastUpdated(new Date())
+    }
+  }, [messages.length, lastUpdated])
 
   // Add welcome message on first load
   useEffect(() => {
@@ -518,6 +526,7 @@ ${formatContent(msg.content)}
       console.error('Failed to fetch context:', err)
     } finally {
       setIsRefreshing(false)
+      setLastUpdated(new Date())
     }
   }
 
@@ -723,6 +732,12 @@ ${formatContent(msg.content)}
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
+              {lastUpdated && (
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  Updated: {lastUpdated.toLocaleTimeString()}
+                </div>
+              )}
               <div className="relative" ref={exportMenuRef}>
                 <button 
                   onClick={() => setShowExportMenu(prev => !prev)}

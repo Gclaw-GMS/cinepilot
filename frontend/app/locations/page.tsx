@@ -5,7 +5,7 @@ import {
   MapPin, Search, Filter, RefreshCw, Loader2, 
   Star, ExternalLink, TrendingUp, AlertTriangle,
   Building2, Trees, Warehouse, Waves, Users,
-  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer, FileText
+  ChevronRight, Info, Target, Award, X, Keyboard, Download, Printer, FileText, Clock
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -158,6 +158,7 @@ export default function LocationsPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [filters, setFilters] = useState({
     placeType: 'all',
     intExt: 'all',
@@ -232,6 +233,7 @@ export default function LocationsPage() {
       setScenes(DEMO_SCENES)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
       if (isRefresh) setRefreshing(false)
     }
   }, [])
@@ -920,6 +922,14 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
             <h1 className="text-2xl font-semibold">Location Scouter</h1>
             <p className="text-slate-400 text-sm mt-0.5">AI-powered script-aware location discovery</p>
           </div>
+          {lastUpdated && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-400 text-xs">
+                Updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-3">

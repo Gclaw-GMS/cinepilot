@@ -356,6 +356,12 @@ export default function ShotHubPage() {
             clearFiltersRef.current()
           }
           break
+        case 'x':
+          if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
+            e.preventDefault()
+            clearFiltersRef.current()
+          }
+          break
       }
     }
     
@@ -1074,7 +1080,10 @@ ${locallyFiltered.map(shot => {
             {showFilterPanel && (
               <div className="absolute right-0 mt-1 w-72 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-white">Filter & Sort</h3>
+                    <span className="text-xs text-cyan-400">(1-8 for size, 0 to clear, X for all)</span>
+                  </div>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
@@ -1490,6 +1499,10 @@ ${locallyFiltered.map(shot => {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-cyan-300">Clear all filters (when F open)</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-cyan-300">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-amber-300">Clear all filters (when F open)</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-amber-300">X</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Toggle sort order</span>

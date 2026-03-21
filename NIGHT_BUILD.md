@@ -1,5 +1,51 @@
 # CinePilot Night Build Verification
 
+## Build Status: ✅ PASSING (8:34 AM) - Shots Page Ctrl+0 Keyboard Shortcut IMPLEMENTED
+
+### 8:34 AM - Shots Page - Ctrl+0 for Clear Filters & Close Panel (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Shots Page - Ctrl+0 Keyboard Shortcut**: Added Ctrl+0 key to clear all filters when filter panel is open, or close the panel if no filters active
+
+### Feature Details
+- **Ctrl+0 Shortcut**: When filter panel is open:
+  - If filters are active: clears all filters
+  - If no filters active: closes the filter panel
+- **Active Filter Count**: Uses activeFilterCountRef to check if filters are active
+- **Keyboard Help Modal**: Updated with Ctrl+0 shortcut in "When Filters Open" section
+- **Filter Panel Hint**: Updated to show Ctrl+0 shortcut
+- **Consistent with Other Pages**: Follows pattern from Projects, Notes, Analytics, Budget, VFX, Tasks, Schedule pages
+
+### Technical Implementation
+- Added activeFilterCountRef useRef(activeFilterCount) after activeFilterCount useMemo
+- Added useEffect to sync activeFilterCountRef with activeFilterCount state
+- Added Ctrl+0 key handler in keyboard shortcuts (checks if filter panel is open)
+- Updated keyboard help modal with Ctrl+0 shortcut
+- Updated filter panel hint with Ctrl+0 shortcut
+- Maintains existing 0 key (clears size filter) and Shift+0 (clears scene filter)
+
+### Build Verification
+- **Build:** Clean build with 84 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### Shots Page Ctrl+0 Keyboard Shortcut Feature Checklist
+- [x] Ctrl+0 clears all filters (when filter panel open and filters active) ✅
+- [x] Ctrl+0 closes filter panel (when filter panel open but no filters active) ✅
+- [x] activeFilterCountRef tracks filter state ✅
+- [x] Keyboard help modal updated with Ctrl+0 shortcut ✅
+- [x] Filter panel hint updated with Ctrl+0 shortcut ✅
+- [x] Consistent with other pages (projects, notes, analytics, budget, vfx, tasks, schedule) ✅
+- [x] Build passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (7:49 AM) - Projects Page X & 0 Keyboard Shortcuts IMPLEMENTED
 
 ### 7:49 AM - Projects Page - X & 0 Keyboard Shortcuts for Clear Filters (IMPLEMENTED)

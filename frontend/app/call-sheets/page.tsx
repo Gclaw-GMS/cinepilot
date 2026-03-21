@@ -321,8 +321,13 @@ export default function CallSheetsPage() {
           }
           break
         case 'x':
+        case 'X':
           e.preventDefault()
-          if (selected && !isEditing) {
+          // When filter panel OPEN and filters active: clear all filters
+          // Otherwise: toggle export menu (when call sheet selected)
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current?.()
+          } else if (selected && !isEditing) {
             setShowExportMenu(prev => !prev)
           }
           break
@@ -482,13 +487,25 @@ export default function CallSheetsPage() {
     return count
   }, [filterLocation, filterMonth, sortBy, sortOrder])
 
+  // Ref for active filter count (for keyboard shortcut)
+  const activeFilterCountRef = useRef(activeFilterCount)
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+
   // Clear all filters and sort
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilterLocation('all')
     setFilterMonth('all')
     setSortBy('date')
     setSortOrder('desc')
-  }
+  }, [])
+
+  // Ref for clearFilters (for keyboard shortcut)
+  const clearFiltersRef = useRef(clearFilters)
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
 
   // Create call sheet from a shooting day
   const createFromShootingDay = async (day: ShootingDayOption) => {
@@ -1074,7 +1091,10 @@ export default function CallSheetsPage() {
             {showFilters && (
               <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                  <span className="text-sm font-medium">Filter & Sort</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Filter & Sort</span>
+                    <span className="text-xs text-cyan-400">(X for all)</span>
+                  </div>
                   {activeFilterCount > 0 && (
                     <button
                       onClick={clearFilters}
@@ -1843,7 +1863,7 @@ export default function CallSheetsPage() {
                 { key: 'N', description: 'New call sheet' },
                 { key: 'I', description: 'Import from schedule' },
                 { key: 'E', description: 'Edit selected sheet' },
-                { key: 'X', description: 'Export dropdown menu' },
+                { key: 'X', description: 'Clear filters (when open) / Export menu' },
                 { key: 'M', description: 'Export as Markdown' },
                 { key: 'D', description: 'Delete selected sheet' },
                 { key: 'P', description: 'Print selected sheet' },
@@ -1863,10 +1883,11 @@ export default function CallSheetsPage() {
               
               {/* Number key shortcuts section */}
               <div className="mt-4 pt-4 border-t border-slate-700">
-                <h4 className="text-xs text-slate-500 uppercase tracking-wider mb-3">When Filters Open</h4>
+                <h4 className="text-xs text-amber-400 uppercase tracking-wider mb-3">When Filters Open</h4>
                 {[
                   { key: '1-9', description: 'Filter by location' },
                   { key: '0', description: 'Clear location filter' },
+                  { key: 'X', description: 'Clear all filters', color: 'cyan' },
                   { key: 'Shift+1-9', description: 'Filter by month' },
                   { key: 'Shift+0', description: 'Clear month filter' },
                 ].map((shortcut) => (
@@ -1875,7 +1896,7 @@ export default function CallSheetsPage() {
                     className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
                   >
                     <span className="text-slate-400 text-sm">{shortcut.description}</span>
-                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-cyan-400 font-mono text-xs">
+                    <kbd className={`px-2 py-0.5 bg-slate-700 border border-slate-600 rounded ${shortcut.color === 'cyan' ? 'text-cyan-400' : 'text-amber-400'} font-mono text-xs`}>
                       {shortcut.key}
                     </kbd>
                   </div>

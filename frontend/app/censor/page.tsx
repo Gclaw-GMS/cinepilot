@@ -1480,7 +1480,7 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
                     contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
                     labelStyle={{ color: '#fff' }}
                   />
-                  <Bar dataKey="count" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1530,7 +1530,7 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
                     innerRadius={60}
                     outerRadius={100}
                     paddingAngle={5}
-                    dataKey="count"
+                    dataKey="value"
                     nameKey="name"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     labelLine={true}

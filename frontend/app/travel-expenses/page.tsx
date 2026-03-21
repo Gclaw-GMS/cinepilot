@@ -85,6 +85,7 @@ export default function TravelExpensesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<'list' | 'dashboard' | 'conflicts'>('dashboard')
   const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default ₹5L budget
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // Calculate active filter count using useMemo for efficiency
   const activeFilterCount = useMemo(() => {
@@ -162,6 +163,7 @@ export default function TravelExpensesPage() {
       console.error(err)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -169,6 +171,7 @@ export default function TravelExpensesPage() {
     setRefreshing(true)
     await loadExpenses()
     setRefreshing(false)
+    setLastUpdated(new Date())
   }, [loadExpenses])
 
   // Store handleRefresh in ref for keyboard shortcuts
@@ -868,7 +871,15 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <div className="p-3 bg-amber-500/20 rounded-xl"><Plane className="w-6 h-6 text-amber-500" /></div>
               <div>
                 <h1 className="text-2xl font-bold">Travel Expenses</h1>
-                <p className="text-slate-400 text-sm">Track cast & crew travel costs</p>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-400">Track cast & crew travel costs</span>
+                  {lastUpdated && (
+                    <span className="flex items-center gap-1 text-xs text-slate-500">
+                      <Clock className="w-3.5 h-3.5" />
+                      Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">

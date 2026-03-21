@@ -116,12 +116,16 @@ export default function TravelExpensesPage() {
   const showFiltersRef = useRef(showFilters)
   const categoryFilterRef = useRef(categoryFilter)
   const statusFilterRef = useRef(statusFilter)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef<(() => void) | null>(null)
 
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
   useEffect(() => { categoryFilterRef.current = categoryFilter }, [categoryFilter])
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
 
   const [formData, setFormData] = useState({
     category: 'flight',
@@ -735,6 +739,8 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === '?' || (e.shiftKey && e.key === '/')) { setShowHelp(true) }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
       if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
+      if (e.key === 'x' && !e.metaKey && !e.ctrlKey && !e.altKey && showFiltersRef.current && activeFilterCountRef.current > 0) { e.preventDefault(); clearFiltersRef.current?.() }
+      if (e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && expenses.length > 0) { e.preventDefault(); setShowPrintMenu(prev => !prev) }
       // Context-aware number key shortcuts
       // When filters panel OPEN: filter by category (1-9) or status (Shift+1-4)
       // When filters panel CLOSED: switch view modes (1-3)
@@ -1128,7 +1134,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
             <div className="flex items-center gap-2 mb-4">
               <Filter className="w-4 h-4 text-amber-500" />
               <span className="text-sm font-medium text-slate-300">Filters:</span>
-              <span className="text-xs text-cyan-400">(Press 1-9 to filter by category, Shift+1-4 for status, 0 to clear)</span>
+              <span className="text-xs text-cyan-400">(Press 1-9 for category, Shift+1-4 for status, 0 to clear, X for all)</span>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
@@ -1427,6 +1433,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Per Diem</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">8</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Daily Allowance</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">9</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Clear category filter</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">0</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-cyan-400">Clear all filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm text-cyan-400">X</kbd></div>
               <div className="border-t border-slate-700 my-2"></div>
               <div className="text-sm font-medium text-cyan-400 mb-2">Status Filters (Shift+Number)</div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Filter by Pending</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Shift+1</kbd></div>
@@ -1440,6 +1447,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Refresh data</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">R</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Export Markdown</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">M</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-slate-300">Print report</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">P</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Add new expense</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+N</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Export menu</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Ctrl+E</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Close modal / Clear</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">Esc</kbd></div>

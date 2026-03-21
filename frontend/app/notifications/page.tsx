@@ -212,6 +212,8 @@ export default function NotificationsPage() {
   
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
@@ -312,6 +314,28 @@ export default function NotificationsPage() {
   useEffect(() => {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
+
+  // Auto-refresh functionality
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+  
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+  
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+  
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchNotifications()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchNotifications])
 
   // Export functions
   const handleExportCSV = () => {
@@ -641,6 +665,10 @@ export default function NotificationsPage() {
         case 'r':
           e.preventDefault()
           handleRefreshRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -1045,6 +1073,12 @@ export default function NotificationsPage() {
             </div>
             {lastUpdated && (
               <span className="flex items-center gap-1 text-xs text-slate-500">
+                {autoRefresh && (
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Auto
+                  </span>
+                )}
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
               </span>
@@ -1059,6 +1093,44 @@ export default function NotificationsPage() {
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+
+            {/* Auto-Refresh Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  autoRefresh 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600'
+                }`}
+                title={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'} (A)`}
+              >
+                <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-300 animate-pulse' : 'bg-slate-500'}`} />
+                <span>Auto</span>
+              </button>
+              {/* Auto-refresh interval dropdown */}
+              {autoRefresh && (
+                <div className="absolute right-0 mt-2 w-36 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="px-3 py-2 text-xs text-slate-400 border-b border-slate-700">
+                    Refresh Interval
+                  </div>
+                  {[10, 30, 60, 300].map((interval) => (
+                    <button
+                      key={interval}
+                      onClick={() => setAutoRefreshInterval(interval)}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-700 transition-colors flex items-center justify-between ${
+                        autoRefreshInterval === interval ? 'text-emerald-400' : 'text-slate-300'
+                      }`}
+                    >
+                      <span>{interval < 60 ? `${interval}s` : `${interval / 60}m`}</span>
+                      {autoRefreshInterval === interval && (
+                        <span className="text-emerald-400">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Analytics Toggle Button */}
             <button
@@ -1818,6 +1890,10 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Refresh notifications</span>
                 <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-slate-300">R</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
+                <span className="text-emerald-400">Toggle auto-refresh</span>
+                <kbd className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-emerald-400">A</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-slate-300">Toggle export menu</span>

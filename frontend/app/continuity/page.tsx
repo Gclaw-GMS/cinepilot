@@ -98,6 +98,7 @@ export default function ContinuityPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'scene' | 'severity' | 'type' | 'description'>('severity');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -282,6 +283,7 @@ export default function ContinuityPage() {
       }
     } finally {
       setLoading(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -826,6 +828,12 @@ export default function ContinuityPage() {
                 Detect character inconsistencies and plot holes across scenes
               </p>
             </div>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {/* Health Score Badge */}

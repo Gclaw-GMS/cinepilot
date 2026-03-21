@@ -48,6 +48,7 @@ export default function WhatsAppPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   // Filter panel state (using showFilterPanel)
   
   // Filter panel state
@@ -158,6 +159,7 @@ export default function WhatsAppPage() {
       setTemplates(DEMO_TEMPLATES); setMessages(DEMO_MESSAGES); setIsDemoMode(true)
     }
     setLoading(false)
+    setLastUpdated(new Date())
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -166,6 +168,7 @@ export default function WhatsAppPage() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     await fetchData()
+    setLastUpdated(new Date())
     setTimeout(() => setIsRefreshing(false), 500)
   }, [fetchData])
 
@@ -754,7 +757,7 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg"><MessageCircle className="w-6 h-6 text-white" /></div>
-          <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
+          <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}{lastUpdated && <span className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
         </div>
         
         <div className="flex items-center gap-3 relative">

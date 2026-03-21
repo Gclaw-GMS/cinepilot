@@ -138,6 +138,10 @@ export default function NotesPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  
   // Calculate active filter count (including sort state and search) - MUST be before refs that use it
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -254,6 +258,17 @@ export default function NotesPage() {
     fetchNotes()
   }, [fetchNotes])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      fetchNotes()
+    }, autoRefreshInterval * 1000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchNotes])
+
   // Refs for keyboard shortcuts
   const selectedNoteRef = useRef<Note | null>(null)
   const handleTogglePinRef = useRef<((note: Note) => Promise<void>) | null>(null)
@@ -322,6 +337,10 @@ export default function NotesPage() {
         case 'r':
           e.preventDefault()
           handleRefreshRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -1031,6 +1050,7 @@ export default function NotesPage() {
             {lastUpdated && (
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3.5 h-3.5" />
+                {autoRefresh && <span className="text-emerald-400 font-medium">Auto</span>}
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
@@ -1044,6 +1064,38 @@ export default function NotesPage() {
               <RefreshCw className={`w-4 h-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+            {/* Auto-Refresh Toggle */}
+            <div className="relative flex items-center">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-colors ${
+                  autoRefresh 
+                    ? 'bg-emerald-600 border-emerald-500 text-white' 
+                    : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-400'
+                }`}
+                title="Auto-Refresh (A)"
+              >
+                <div className="relative flex items-center">
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                  {autoRefresh && (
+                    <span className="absolute -top-1 -right-1.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  )}
+                </div>
+                <span>Auto</span>
+              </button>
+              {autoRefresh && (
+                <select
+                  value={autoRefreshInterval}
+                  onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                  className="ml-2 px-2 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              )}
+            </div>
             {/* Filter Toggle Button */}
             <div className="relative" ref={filterPanelRef}>
               <button
@@ -1920,6 +1972,7 @@ export default function NotesPage() {
               </div>
               {[
                 { key: 'R', action: 'Refresh notes' },
+                { key: 'A', action: 'Toggle auto-refresh' },
                 { key: '/', action: 'Focus search' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order' },

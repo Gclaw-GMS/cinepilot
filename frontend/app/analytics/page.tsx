@@ -209,6 +209,9 @@ export default function AnalyticsPage() {
   const timePeriodFilterRef = useRef(filters.timePeriod)
   const departmentFilterRef = useRef(filters.department)
   const viewModeRef = useRef(viewMode)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef<(() => void) | null>(null)
+  const searchQueryRef = useRef(searchQuery)
   
   // Sync refs with state
   useEffect(() => {
@@ -224,8 +227,17 @@ export default function AnalyticsPage() {
     viewModeRef.current = viewMode
   }, [viewMode])
 
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+  }, [searchQuery])
+
   // Calculate active filter count
   const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0) + (searchQuery ? 1 : 0)
+
+  // Sync activeFilterCount with ref after it's computed
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   // Sorted data using useMemo
   const sortedBudgetData = useMemo(() => {
@@ -287,6 +299,11 @@ export default function AnalyticsPage() {
     setSortBy('category')
     setSortOrder('asc')
   }
+
+  // Sync clearFiltersRef with handleClearFilters function
+  useEffect(() => {
+    clearFiltersRef.current = handleClearFilters
+  })
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -425,9 +442,9 @@ export default function AnalyticsPage() {
           setShowFilterPanel(prev => !prev)
           break
         case 'x':
-          if (showFilterPanelRef.current && activeFilterCount > 0) {
+          if (showFilterPanelRef.current && activeFilterCountRef.current > 0) {
             e.preventDefault()
-            handleClearFilters()
+            clearFiltersRef.current?.()
           }
           break
         case 's':
@@ -1073,7 +1090,7 @@ export default function AnalyticsPage() {
             <button
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-              title="Filter & Sort (F)"
+              title="Filter & Sort (F) - X to clear all"
             >
               <Filter className="w-4 h-4" />
               Filter & Sort

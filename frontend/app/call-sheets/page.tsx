@@ -63,6 +63,7 @@ export default function CallSheetsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -133,6 +134,7 @@ export default function CallSheetsPage() {
     } finally {
       setLoading(false)
       setRefreshing(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -908,6 +910,12 @@ export default function CallSheetsPage() {
             <p className="text-slate-400 text-sm mt-0.5">
               Generate and manage daily call sheets
             </p>
+            {lastUpdated && (
+              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Updated: {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -138,6 +138,10 @@ export default function ReportsPage() {
     return count
   }, [tabFilter, searchQuery, sortBy, sortOrder])
 
+  // Active filter count ref for keyboard shortcuts
+  const activeFilterCountRef = useRef(activeFilterCount)
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+
   const fetchReport = useCallback(async () => {
     try {
       const res = await fetch('/api/reports')
@@ -301,7 +305,7 @@ export default function ReportsPage() {
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current && activeFilterCount > 0) {
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
             clearFiltersRef.current()
           }
           break
@@ -798,7 +802,7 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
                 ? 'bg-indigo-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
-            title="Toggle Filter & Sort (F)"
+            title={`Toggle Filter & Sort (F)${activeFilterCount > 0 ? ' - X to clear all' : ''}`}
           >
             <Filter className="w-4 h-4" />
             Filter & Sort

@@ -74,9 +74,15 @@ export default function DubbingPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [languageFilter, setLanguageFilter] = useState('all')
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30)
+  
   // Refs for keyboard shortcuts (to avoid dependency issues)
   const languageFilterRef = useRef(languageFilter)
   const showFilterPanelRef = useRef(showFilterPanel)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Sort state
   const [sortBy, setSortBy] = useState<'title' | 'language' | 'date'>('date')
@@ -141,6 +147,25 @@ export default function DubbingPage() {
     showFilterPanelRef.current = showFilterPanel
   }, [showFilterPanel])
   
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+  
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+  
+  // Auto-refresh interval
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchDataRef.current?.()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
+  
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
   const fetchDataRef = useRef<() => void | Promise<void>>()
@@ -159,6 +184,10 @@ export default function DubbingPage() {
         case 'r':
           e.preventDefault()
           fetchDataRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -714,6 +743,7 @@ export default function DubbingPage() {
                 <Clock className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-400 text-xs">
                   Updated: {lastUpdated.toLocaleTimeString()}
+                  {autoRefresh && <span className="ml-2 text-green-400">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
                 </span>
               </div>
             )}
@@ -787,6 +817,44 @@ export default function DubbingPage() {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+            {/* Auto-Refresh Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  autoRefresh 
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+                }`}
+                title="Auto-refresh (A)"
+              >
+                <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                <span className="text-xs">Auto</span>
+                {autoRefresh && (
+                  <span className="ml-1 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                )}
+              </button>
+              {autoRefresh && (
+                <div className="absolute left-0 mt-2 w-32 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-slate-700">
+                    <span className="text-xs text-slate-400">Refresh Interval</span>
+                  </div>
+                  {[10, 30, 60, 300].map((interval) => (
+                    <button
+                      key={interval}
+                      onClick={() => setAutoRefreshInterval(interval)}
+                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                        autoRefreshInterval === interval 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {interval < 60 ? `${interval}s` : `${interval / 60}m`}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -1136,6 +1204,10 @@ export default function DubbingPage() {
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Refresh data</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                  <span className="text-slate-300">Toggle auto-refresh</span>
+                  <kbd className="px-2 py-1 bg-green-500/20 rounded text-sm text-green-400">A</kbd>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-800">
                   <span className="text-slate-300">Focus search</span>

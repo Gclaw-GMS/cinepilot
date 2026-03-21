@@ -226,7 +226,7 @@ export default function CallSheetsPage() {
         case 'i':
           e.preventDefault()
           if (!creating && !isEditing) {
-            fetchShootingDays()
+            fetchShootingDaysRef.current?.()
             setShowScheduleImport(true)
           }
           break
@@ -503,9 +503,13 @@ export default function CallSheetsPage() {
 
   // Ref for clearFilters (for keyboard shortcut)
   const clearFiltersRef = useRef(clearFilters)
+  const fetchShootingDaysRef = useRef<() => Promise<void>>()
   useEffect(() => {
     clearFiltersRef.current = clearFilters
   }, [clearFilters])
+  useEffect(() => {
+    fetchShootingDaysRef.current = fetchShootingDays
+  }, [fetchShootingDays])
 
   // Create call sheet from a shooting day
   const createFromShootingDay = async (day: ShootingDayOption) => {

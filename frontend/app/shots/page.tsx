@@ -166,12 +166,35 @@ export default function ShotsPage() {
     const b = new Blob([content], { type: mimeType }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = filename; a.click(); URL.revokeObjectURL(u); setShowExportMenu(false)
   }, [filteredShots, scenes, stats])
 
+  // CRUD Functions (defined early for use in refs)
+  const openAddForm = useCallback(() => {
+    setEditingShot(null)
+    setFormData({
+      shotText: '',
+      sceneId: scenes[0]?.id || '',
+      shotSize: 'MS',
+      cameraAngle: 'eye',
+      cameraMovement: 'static',
+      focalLengthMm: 50,
+      lensType: 'prime',
+      keyStyle: 'motivated',
+      colorTemp: '5600K',
+      durationEstSec: 5,
+      characters: '',
+      notes: '',
+    })
+    setFormError(null)
+    setShowForm(true)
+  }, [scenes])
+
   // Refs for keyboard shortcuts
   const handleExportMarkdownRef = useRef(() => handleExport('markdown'))
   const handlePrintRef = useRef(() => window.print())
+  const openAddFormRef = useRef<() => void>(() => {})
   
   useEffect(() => { handleExportMarkdownRef.current = () => handleExport('markdown') }, [handleExport])
   useEffect(() => { handlePrintRef.current = () => window.print() }, [])
+  useEffect(() => { openAddFormRef.current = openAddForm }, [openAddForm])
 
   const toggleNote = (id: string) => setExpandedNotes(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -207,33 +230,12 @@ export default function ShotsPage() {
         case 'p': e.preventDefault(); handlePrintRef.current(); break;
         case 'x': e.preventDefault(); clearFiltersRef.current(); break;
         case '?': e.preventDefault(); setShowKeyboardHelp(true); break;
-        case 'n': if (!e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); openAddForm(); }; break;
+        case 'n': if (!e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); openAddFormRef.current(); }; break;
         case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setShowForm(false); setSearchQuery(''); setDeleteConfirm(null); break 
       }
     }
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
   }, [fetchShots, clearFilters, scenes])
-
-  // CRUD Functions
-  const openAddForm = useCallback(() => {
-    setEditingShot(null)
-    setFormData({
-      shotText: '',
-      sceneId: scenes[0]?.id || '',
-      shotSize: 'MS',
-      cameraAngle: 'eye',
-      cameraMovement: 'static',
-      focalLengthMm: 50,
-      lensType: 'prime',
-      keyStyle: 'motivated',
-      colorTemp: '5600K',
-      durationEstSec: 5,
-      characters: '',
-      notes: '',
-    })
-    setFormError(null)
-    setShowForm(true)
-  }, [scenes])
 
   const openEditForm = useCallback((shot: Shot) => {
     setEditingShot(shot)

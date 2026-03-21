@@ -118,6 +118,7 @@ export default function TravelExpensesPage() {
   const statusFilterRef = useRef(statusFilter)
   const activeFilterCountRef = useRef(0)
   const clearFiltersRef = useRef<(() => void) | null>(null)
+  const expensesLengthRef = useRef(expenses.length)
 
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
@@ -126,6 +127,7 @@ export default function TravelExpensesPage() {
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
   useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+  useEffect(() => { expensesLengthRef.current = expenses.length }, [expenses.length])
 
   const [formData, setFormData] = useState({
     category: 'flight',
@@ -740,7 +742,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setShowFilters(!showFilters) }
       if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
       if (e.key === 'x' && !e.metaKey && !e.ctrlKey && !e.altKey && showFiltersRef.current && activeFilterCountRef.current > 0) { e.preventDefault(); clearFiltersRef.current?.() }
-      if (e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && expenses.length > 0) { e.preventDefault(); setShowPrintMenu(prev => !prev) }
+      if (e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && expensesLengthRef.current > 0) { e.preventDefault(); setShowPrintMenu(prev => !prev) }
       // Context-aware number key shortcuts
       // When filters panel OPEN: filter by category (1-9) or status (Shift+1-4)
       // When filters panel CLOSED: switch view modes (1-3)

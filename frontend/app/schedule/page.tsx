@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { 
   Calendar, RefreshCw, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer, AlertCircle
+  MapPin, Sun, Moon, Film, Zap, TrendingUp, LayoutGrid, Search, Keyboard, Copy, Check, Download, Filter, Printer, AlertCircle, CloudRain, Wind, Droplets, Cloud
 } from 'lucide-react'
 
 interface DaySceneData {
@@ -221,6 +221,30 @@ interface SchedulePageProps {
   }
 }
 
+// Weather data types
+interface DayWeather {
+  date: string
+  dayNumber: number
+  condition: string
+  tempHigh: number
+  tempLow: number
+  humidity: number
+  windSpeed: number
+  precipitation: number
+  icon: string
+  recommendation: string
+}
+
+// Demo weather data
+const DEMO_WEATHER: DayWeather[] = [
+  { date: '2026-03-15', dayNumber: 1, condition: 'Sunny', tempHigh: 34, tempLow: 26, humidity: 65, windSpeed: 12, precipitation: 0, icon: 'sun', recommendation: 'Great for outdoor shoots' },
+  { date: '2026-03-16', dayNumber: 2, condition: 'Partly Cloudy', tempHigh: 32, tempLow: 25, humidity: 70, windSpeed: 15, precipitation: 10, icon: 'cloud-sun', recommendation: 'Good for outdoor, have backup' },
+  { date: '2026-03-17', dayNumber: 3, condition: 'Clear Night', tempHigh: 28, tempLow: 22, humidity: 75, windSpeed: 8, precipitation: 0, icon: 'moon', recommendation: 'Ideal for night shoots' },
+  { date: '2026-03-18', dayNumber: 4, condition: 'Thunderstorms', tempHigh: 29, tempLow: 24, humidity: 85, windSpeed: 25, precipitation: 80, icon: 'cloud-rain', recommendation: 'RESCHEDULE recommended - move indoors' },
+  { date: '2026-03-19', dayNumber: 5, condition: 'Sunny', tempHigh: 33, tempLow: 25, humidity: 60, windSpeed: 10, precipitation: 0, icon: 'sun', recommendation: 'Perfect for outdoor shoots' },
+  { date: '2026-03-20', dayNumber: 6, condition: 'Clear Night', tempHigh: 27, tempLow: 21, humidity: 70, windSpeed: 6, precipitation: 0, icon: 'moon', recommendation: 'Good for night shoots' },
+]
+
 export default function SchedulePage() {
   const [shootingDays, setShootingDays] = useState<ShootingDayData[]>([])
   const [versions, setVersions] = useState<VersionData[]>([])
@@ -232,6 +256,9 @@ export default function SchedulePage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
+  const [weatherData, setWeatherData] = useState<DayWeather[]>([])
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [showWeatherPanel, setShowWeatherPanel] = useState(true)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -309,6 +336,54 @@ export default function SchedulePage() {
     return d.toISOString().split('T')[0]
   })
 
+  // Fetch weather data for scheduled days
+  const fetchWeather = useCallback(async () => {
+    setWeatherLoading(true)
+    try {
+      // Get scheduled dates from shooting days
+      const scheduledDays = shootingDays.filter(d => d.scheduledDate)
+      if (scheduledDays.length === 0) {
+        setWeatherData(DEMO_WEATHER)
+        setWeatherLoading(false)
+        return
+      }
+      
+      // Try to fetch real weather data
+      const res = await fetch('/api/weather?action=forecast')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.forecast && data.forecast.length > 0) {
+          // Map weather data to shooting days
+          const weatherMap: DayWeather[] = scheduledDays.map((day, idx) => {
+            const forecast = data.forecast[idx] || data.forecast[0]
+            return {
+              date: day.scheduledDate || '',
+              dayNumber: day.dayNumber,
+              condition: forecast?.condition || 'Unknown',
+              tempHigh: forecast?.tempHigh || 30,
+              tempLow: forecast?.tempLow || 25,
+              humidity: forecast?.humidity || 60,
+              windSpeed: forecast?.windSpeed || 10,
+              precipitation: forecast?.precipitation || 0,
+              icon: forecast?.icon || 'sun',
+              recommendation: forecast?.recommendation || 'Check weather',
+            }
+          })
+          setWeatherData(weatherMap)
+        } else {
+          setWeatherData(DEMO_WEATHER)
+        }
+      } else {
+        setWeatherData(DEMO_WEATHER)
+      }
+    } catch (e) {
+      console.error('Weather fetch error:', e)
+      setWeatherData(DEMO_WEATHER)
+    } finally {
+      setWeatherLoading(false)
+    }
+  }, [shootingDays])
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
@@ -345,6 +420,13 @@ export default function SchedulePage() {
   useEffect(() => { 
     fetchData() 
   }, [fetchData])
+
+  // Fetch weather when shooting days are loaded
+  useEffect(() => {
+    if (shootingDays.length > 0) {
+      fetchWeather()
+    }
+  }, [shootingDays.length, fetchWeather])
 
   // Update refs when functions change
   useEffect(() => {
@@ -1568,6 +1650,72 @@ export default function SchedulePage() {
           <div className="text-2xl font-bold text-purple-400">{computedStats.nightShootDays}</div>
         </div>
       </div>
+
+      {/* Weather Panel */}
+      {showWeatherPanel && weatherData.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border border-blue-700/30 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sun className="w-5 h-5 text-amber-400" />
+              <h3 className="text-lg font-semibold text-white">Weather Forecast for Shoot Days</h3>
+              {weatherLoading && <div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />}
+            </div>
+            <button 
+              onClick={fetchWeather}
+              disabled={weatherLoading}
+              className="px-3 py-1.5 bg-blue-700/50 hover:bg-blue-600/50 disabled:opacity-50 rounded-lg text-sm text-blue-300 flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${weatherLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {weatherData.map((day) => {
+              const isRainy = day.condition.toLowerCase().includes('rain') || day.condition.toLowerCase().includes('storm')
+              const isNight = day.icon === 'moon'
+              const isHot = day.tempHigh > 32
+              
+              return (
+                <div 
+                  key={day.dayNumber}
+                  className={`bg-gray-800/60 border rounded-lg p-3 ${
+                    isRainy 
+                      ? 'border-amber-500/50' 
+                      : isHot 
+                        ? 'border-red-500/30'
+                        : 'border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400">Day {day.dayNumber}</span>
+                    {isRainy && <CloudRain className="w-4 h-4 text-amber-400" />}
+                    {isNight && !isRainy && <Moon className="w-4 h-4 text-purple-400" />}
+                    {!isNight && !isRainy && <Sun className="w-4 h-4 text-amber-400" />}
+                  </div>
+                  <div className="text-sm font-medium text-white">{day.condition}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-lg font-bold text-white">{day.tempHigh}°</span>
+                    <span className="text-xs text-gray-400">/{day.tempLow}°</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                    <Droplets className="w-3 h-3" />
+                    <span>{day.humidity}%</span>
+                    <Wind className="w-3 h-3 ml-2" />
+                    <span>{day.windSpeed}km/h</span>
+                  </div>
+                  {day.precipitation > 0 && (
+                    <div className="mt-2 text-xs text-amber-400 flex items-center gap-1">
+                      <CloudRain className="w-3 h-3" />
+                      {day.precipitation}% rain
+                    </div>
+                  )}
+                  <div className="mt-2 text-xs text-cyan-400 line-clamp-2">{day.recommendation}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Chart View */}
       {viewMode === 'chart' && filteredShootingDays.length > 0 && (

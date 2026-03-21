@@ -171,6 +171,8 @@ export default function AnalyticsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -212,6 +214,8 @@ export default function AnalyticsPage() {
   const activeFilterCountRef = useRef(0)
   const clearFiltersRef = useRef<(() => void) | null>(null)
   const searchQueryRef = useRef(searchQuery)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Sync refs with state
   useEffect(() => {
@@ -230,6 +234,14 @@ export default function AnalyticsPage() {
   useEffect(() => {
     searchQueryRef.current = searchQuery
   }, [searchQuery])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
 
   // Calculate active filter count
   const activeFilterCount = (filters.timePeriod !== 'all' ? 1 : 0) + (filters.department !== 'all' ? 1 : 0) + (sortBy !== 'category' || sortOrder !== 'asc' ? 1 : 0) + (searchQuery ? 1 : 0)
@@ -336,6 +348,18 @@ export default function AnalyticsPage() {
     fetchData()
   }, [fetchData])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const intervalId = setInterval(() => {
+      setRefreshing(true)
+      fetchData()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(intervalId)
+  }, [autoRefresh, autoRefreshInterval, fetchData])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -428,6 +452,10 @@ export default function AnalyticsPage() {
         case 'r':
           e.preventDefault()
           handleRefreshRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -1046,6 +1074,7 @@ export default function AnalyticsPage() {
               <span className="text-sm font-normal text-slate-400 ml-2 flex items-center gap-1">
                 <Clock className="w-4 h-4" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
               </span>
             )}
           </h1>
@@ -1079,12 +1108,38 @@ export default function AnalyticsPage() {
           
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={refreshing || autoRefresh}
             className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          
+          {/* Auto-refresh toggle */}
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-2 text-sm transition-colors ${
+                autoRefresh ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'
+              }`}
+              title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+            >
+              <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+              Auto
+            </button>
+            {autoRefresh && (
+              <select
+                value={autoRefreshInterval}
+                onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white"
+              >
+                <option value={10}>10s</option>
+                <option value={30}>30s</option>
+                <option value={60}>1m</option>
+                <option value={300}>5m</option>
+              </select>
+            )}
+          </div>
           
           <div className="relative" ref={filterPanelRef}>
             <button
@@ -1757,6 +1812,7 @@ export default function AnalyticsPage() {
                   { key: '2', description: 'View: Performance' },
                   { key: '3', description: 'View: Forecast' },
                   { key: 'R', description: 'Refresh analytics data' },
+                  { key: 'A', description: 'Toggle auto-refresh', color: 'emerald' },
                   { key: 'F', description: 'Open filter & sort panel' },
                   { key: 'S', description: 'Toggle sort order (asc/desc)' },
                   { key: 'E', description: 'Toggle export dropdown' },
@@ -1771,7 +1827,11 @@ export default function AnalyticsPage() {
                     className="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
                   >
                     <span className="text-slate-300 text-sm">{shortcut.description}</span>
-                    <kbd className="px-2 py-1 bg-slate-600 text-white text-xs font-mono rounded border border-slate-500">
+                    <kbd className={`px-2 py-1 text-xs font-mono rounded border ${
+                      shortcut.color === 'emerald' 
+                        ? 'bg-emerald-600 text-white border-emerald-500' 
+                        : 'bg-slate-600 text-white border-slate-500'
+                    }`}>
                       {shortcut.key}
                     </kbd>
                   </div>

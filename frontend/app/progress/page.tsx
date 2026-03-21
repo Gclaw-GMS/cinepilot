@@ -104,6 +104,7 @@ export default function ProgressPage() {
   // Sorting state
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'priority' | 'progress' | 'date' | 'tasks'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -201,7 +202,8 @@ export default function ProgressPage() {
       };
       setProgress(demoProgress);
     } finally {
-      setLoading(false)
+      setLoading(false);
+      setLastUpdated(new Date());
     }
   }, [])
 
@@ -939,14 +941,22 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
     <div className="p-6 min-h-screen bg-slate-950 text-white">
       {/* Header */}
       <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Target className="w-6 h-6 text-cyan-400" />
-            Production Progress
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Track your film's production milestones and tasks
-          </p>
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Target className="w-6 h-6 text-cyan-400" />
+              Production Progress
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              Track your film's production milestones and tasks
+            </p>
+          </div>
+          {lastUpdated && (
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <Clock className="w-3.5 h-3.5" />
+              Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {/* Search Input */}

@@ -170,6 +170,10 @@ export default function TasksPage() {
   // Calculate active filter count (includes search, sort, and filter state)
   const activeFilterCount = (filterStatus !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0) + (sortBy !== 'dueDate' || sortOrder !== 'asc' ? 1 : 0)
   
+  // Active filter count ref for keyboard shortcuts
+  const activeFilterCountRef = useRef(activeFilterCount)
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  
   const [showForm, setShowForm] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -360,7 +364,7 @@ export default function TasksPage() {
         break
       case 'x':
       case 'X':
-        if (!e.ctrlKey && !e.metaKey && showFiltersRef.current) {
+        if (!e.ctrlKey && !e.metaKey && showFiltersRef.current && activeFilterCountRef.current > 0) {
           e.preventDefault()
           clearFiltersRef.current()
         }
@@ -1542,7 +1546,7 @@ export default function TasksPage() {
                   ? 'bg-purple-600 text-white' 
                   : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600'
               }`}
-              title="Toggle filters (F)"
+              title={`Toggle filters (F)${activeFilterCount > 0 ? ' - X to clear all' : ''}`}
             >
               <Filter className="w-4 h-4" />
               <span>Filters</span>
@@ -2235,7 +2239,7 @@ export default function TasksPage() {
                     { keys: ['S'], desc: 'Toggle sort order' },
                     { keys: ['/'], desc: 'Focus search' },
                     { keys: ['V'], desc: 'Toggle view mode' },
-                    { keys: ['X'], desc: 'Clear all filters (when open)' },
+                    { keys: ['X'], desc: 'Clear all filters (when filters active)' },
                     { keys: ['E'], desc: 'Export dropdown' },
                     { keys: ['M'], desc: 'Export Markdown' },
                     { keys: ['P'], desc: 'Print tasks' },

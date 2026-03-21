@@ -150,6 +150,10 @@ export default function BudgetPage() {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [subcategoryFilter, setSubcategoryFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
@@ -164,6 +168,8 @@ export default function BudgetPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const handleRefreshRef = useRef<() => Promise<void>>()
   const handleExportMarkdownRef = useRef<() => void>(() => {})
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Refs for keyboard shortcuts (to avoid dependency issues in useEffect)
   const categoryFilterRef = useRef(categoryFilter)
@@ -203,6 +209,23 @@ export default function BudgetPage() {
   useEffect(() => {
     searchQueryRef.current = searchQuery
   }, [searchQuery])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    const interval = setInterval(() => {
+      handleRefreshRef.current?.()
+    }, autoRefreshInterval * 1000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
 
   // Get unique categories from items
   const categories = [...new Set(items.map(item => item.category))].sort()
@@ -796,6 +819,10 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
           e.preventDefault()
           setShowFilters(prev => !prev)
           break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
+          break
         case 's':
           e.preventDefault()
           setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -1066,6 +1093,12 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
             <div className="flex items-center gap-1.5 text-xs text-gray-500 ml-2">
               <Clock className="w-3.5 h-3.5" />
               <span>Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+              {autoRefresh && (
+                <span className="ml-2 flex items-center gap-1 text-green-400">
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                  Auto: {autoRefreshInterval}s
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -1103,12 +1136,37 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
           <span className="text-sm text-gray-500">{filteredItems.length} of {items.length}</span>
           <button 
             onClick={handleRefresh} 
-            disabled={refreshing}
+            disabled={refreshing || autoRefresh}
             className="p-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded text-sm flex items-center gap-2"
             title="Refresh (R)"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+          {/* Auto-Refresh Toggle */}
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`px-3 py-2 rounded text-sm flex items-center gap-2 transition-colors ${
+              autoRefresh 
+                ? 'bg-green-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title={autoRefresh ? `Auto-refresh ON (${autoRefreshInterval}s)` : 'Auto-refresh OFF'}
+          >
+            <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+            Auto
+          </button>
+          {autoRefresh && (
+            <select 
+              value={autoRefreshInterval} 
+              onChange={e => setAutoRefreshInterval(Number(e.target.value))}
+              className="px-2 py-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300"
+            >
+              <option value={10}>10s</option>
+              <option value={30}>30s</option>
+              <option value={60}>1m</option>
+              <option value={300}>5m</option>
+            </select>
+          )}
           <select value={region} onChange={e => setRegion(e.target.value)} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
             {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -1953,6 +2011,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
             <div className="space-y-2">
               {[
                 { key: 'R', action: 'Refresh budget data' },
+                { key: 'A', action: 'Toggle auto-refresh' },
                 { key: '/', action: 'Search budget items' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order (ASC/DESC)' },

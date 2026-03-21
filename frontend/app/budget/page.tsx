@@ -8,7 +8,7 @@ import {
 import { 
   DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
   RefreshCw, Loader2, Download, Filter, Plus, X, Keyboard, Search,
-  FileText, FileJson, Printer
+  FileText, FileJson, Printer, Clock
 } from 'lucide-react'
 
 interface BudgetItemData {
@@ -134,6 +134,7 @@ export default function BudgetPage() {
   const [expenses, setExpenses] = useState<ExpenseData[]>([])
   const [forecast, setForecast] = useState<ForecastData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [generating, setGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [error, setError] = useState<string | null>(null)
@@ -748,6 +749,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
       setForecast(DEMO_FORECAST)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -912,6 +914,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
       console.error('Refresh failed:', e)
     } finally {
       setRefreshing(false)
+      setLastUpdated(new Date())
     }
   }, [fetchData])
 
@@ -1054,9 +1057,17 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Budget Engine</h1>
-          <p className="text-gray-500 text-sm mt-0.5">AI-powered production budgeting</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Budget Engine</h1>
+            <p className="text-gray-500 text-sm mt-0.5">AI-powered production budgeting</p>
+          </div>
+          {lastUpdated && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 ml-2">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {/* Search Input */}

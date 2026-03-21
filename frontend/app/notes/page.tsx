@@ -136,6 +136,7 @@ export default function NotesPage() {
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Calculate active filter count (including sort state and search) - MUST be before refs that use it
   const activeFilterCount = useMemo(() => {
@@ -245,6 +246,7 @@ export default function NotesPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -1009,21 +1011,29 @@ export default function NotesPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-              <StickyNote className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white">Production Notes</h1>
-                {isDemoMode && (
-                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
-                    Demo Data
-                  </span>
-                )}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                <StickyNote className="w-5 h-5 text-amber-400" />
               </div>
-              <p className="text-sm text-slate-400">Keep track of important production details</p>
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold text-white">Production Notes</h1>
+                  {isDemoMode && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                      Demo Data
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-400">Keep track of important production details</p>
+              </div>
             </div>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button

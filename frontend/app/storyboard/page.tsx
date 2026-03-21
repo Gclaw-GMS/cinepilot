@@ -654,6 +654,16 @@ ${filteredScenes.map(scene =>
             setStatusFilter('all')
           }
           break
+        case 'x':
+          e.preventDefault()
+          if (showFiltersRef.current) {
+            setStatusFilter('all')
+            setSceneFilter('all')
+            setSearchQuery('')
+            setSortBy('scene')
+            setSortOrder('asc')
+          }
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -768,13 +778,13 @@ ${filteredScenes.map(scene =>
   const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (sceneFilter !== 'all' ? 1 : 0) + (sortBy !== 'scene' || sortOrder !== 'asc' ? 1 : 0)
   
   // Clear all filters and sort
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setStatusFilter('all')
     setSceneFilter('all')
     setSearchQuery('')
     setSortBy('scene')
     setSortOrder('asc')
-  }
+  }, [])
   
   // Toggle sort order
   const toggleSortOrder = () => {
@@ -945,7 +955,7 @@ ${filteredScenes.map(scene =>
                   <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Filter & Sort</span>
-                      <span className="text-xs text-cyan-400">(1-4 for status, 0 to clear)</span>
+                      <span className="text-xs text-cyan-400">(1-4 for status, 0 to clear, X for all)</span>
                     </div>
                     {activeFilterCount > 0 && (
                       <button
@@ -1410,10 +1420,11 @@ ${filteredScenes.map(scene =>
                   { key: '3', action: 'Filter by Pending (toggle)' },
                   { key: '4', action: 'Filter by Failed (toggle)' },
                   { key: '0', action: 'Clear status filter' },
+                  { key: 'X', action: 'Clear all filters', color: 'amber' },
                 ].map(shortcut => (
                   <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
                     <span className="text-gray-400 text-sm">{shortcut.action}</span>
-                    <kbd className="px-2 py-1 bg-gray-800 text-cyan-400 text-xs rounded font-mono">
+                    <kbd className={`px-2 py-1 bg-gray-800 text-xs rounded font-mono ${shortcut.color === 'amber' ? 'text-amber-400' : 'text-cyan-400'}`}>
                       {shortcut.key}
                     </kbd>
                   </div>

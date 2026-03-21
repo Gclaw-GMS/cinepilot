@@ -404,11 +404,11 @@ export async function POST(req: NextRequest) {
     const newDemoSheet = {
       id: `demo-${demoNextId++}`,
       projectId: 'default-project',
-      shootingDayId: null,
       title: title ?? 'New Call Sheet',
       date: date ?? new Date().toISOString(),
       notes: notes ?? null,
       createdAt: new Date().toISOString(),
+      shootingDayId: shootingDayId ?? null,
       shootingDay: null,
       content: content ?? {
         callTime: '06:00',

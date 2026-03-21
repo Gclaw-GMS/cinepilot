@@ -5,7 +5,7 @@ import {
   FileText, Plus, Trash2, Calendar, Save, X, Edit2, 
   Clock, MapPin, CloudSun, Users, Film, ChevronDown, ChevronUp,
   Printer, Download, RefreshCw, AlertCircle, BarChart3, TrendingUp, Building2,
-  Keyboard, Search, Filter
+  Keyboard, Search, Filter, ArrowRight
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -56,6 +56,19 @@ const DEPARTMENTS = [
   'Direction', 'Production', 'VFX', 'Stunts', 'Catering', 'Transport'
 ]
 
+// Type for shooting days from schedule
+interface ShootingDayOption {
+  id: string
+  dayNumber: number
+  scheduledDate: string | null
+  callTime: string | null
+  location: { name: string } | null
+  dayScenes: Array<{
+    scene: { sceneNumber: string; headingRaw: string | null; location: string | null }
+    estimatedMinutes: number | null
+  }>
+}
+
 export default function CallSheetsPage() {
   const [callSheets, setCallSheets] = useState<CallSheet[]>([])
   const [crew, setCrew] = useState<CrewMember[]>([])
@@ -76,6 +89,12 @@ export default function CallSheetsPage() {
   const [filterMonth, setFilterMonth] = useState('all')
   const [sortBy, setSortBy] = useState<'date' | 'title' | 'location'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  
+  // Shooting days for creating call sheets from schedule
+  const [shootingDays, setShootingDays] = useState<ShootingDayOption[]>([])
+  const [loadingShootingDays, setLoadingShootingDays] = useState(false)
+  const [showScheduleImport, setShowScheduleImport] = useState(false)
+  
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
@@ -150,6 +169,26 @@ export default function CallSheetsPage() {
     }
   }, [])
 
+  const fetchShootingDays = useCallback(async () => {
+    try {
+      setLoadingShootingDays(true)
+      const res = await fetch('/api/schedule')
+      if (res.ok) {
+        const data = await res.json()
+        // Handle different response formats
+        const days = data.shootingDays || data.data?.shootingDays || data.days || []
+        // Filter to only future/scheduled days that don't have call sheets yet
+        const existingDates = new Set(callSheets.map(cs => cs.shootingDayId).filter(Boolean))
+        const filteredDays = days.filter((d: ShootingDayOption) => !existingDates.has(d.id))
+        setShootingDays(filteredDays.slice(0, 10)) // Limit to 10 most recent
+      }
+    } catch (e) {
+      console.error('Failed to fetch shooting days:', e)
+    } finally {
+      setLoadingShootingDays(false)
+    }
+  }, [callSheets])
+
   useEffect(() => {
     fetchCallSheets()
     fetchCrew()
@@ -182,6 +221,13 @@ export default function CallSheetsPage() {
           e.preventDefault()
           if (!creating && !isEditing) {
             createNew()
+          }
+          break
+        case 'i':
+          e.preventDefault()
+          if (!creating && !isEditing) {
+            fetchShootingDays()
+            setShowScheduleImport(true)
           }
           break
         case 'e':
@@ -442,6 +488,76 @@ export default function CallSheetsPage() {
     setFilterMonth('all')
     setSortBy('date')
     setSortOrder('desc')
+  }
+
+  // Create call sheet from a shooting day
+  const createFromShootingDay = async (day: ShootingDayOption) => {
+    try {
+      setCreating(true)
+      setShowScheduleImport(false)
+      
+      // Extract scene numbers from the shooting day
+      const sceneNumbers = day.dayScenes?.map(ds => ds.scene.sceneNumber).filter(Boolean) || []
+      
+      // Build the call sheet content from the shooting day data
+      const content = {
+        callTime: day.callTime || '06:00',
+        wrapTime: calculateWrapTime(day.callTime, day.dayScenes),
+        location: day.location?.name || '',
+        locationAddress: '',
+        scenes: sceneNumbers,
+        crewCalls: [],
+        weather: '',
+      }
+      
+      const res = await fetch('/api/call-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: day.scheduledDate || new Date().toISOString().split('T')[0],
+          title: `Day ${day.dayNumber} - ${day.location?.name || 'Call Sheet'}`,
+          shootingDayId: day.id,
+          content,
+        }),
+      })
+      
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Failed to create call sheet')
+      }
+      
+      const created = await res.json()
+      setCallSheets((prev) => [created, ...prev])
+      setSelected(created)
+      setEditForm(created.content || content)
+      setEditNotes(created.notes || '')
+      setEditTitle(created.title || '')
+      setEditDate(created.date ? created.date.split('T')[0] : '')
+      setIsEditing(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create from shooting day')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  // Helper to calculate wrap time based on call time and estimated scene duration
+  const calculateWrapTime = (callTime: string | null, dayScenes: ShootingDayOption['dayScenes']): string => {
+    if (!callTime || !dayScenes?.length) return '19:00'
+    
+    // Calculate total estimated minutes
+    const totalMinutes = dayScenes.reduce((sum, ds) => sum + (ds.estimatedMinutes || 60), 0)
+    
+    // Parse call time
+    const [hours, mins] = callTime.split(':').map(Number)
+    if (isNaN(hours)) return '19:00'
+    
+    // Add 1 hour buffer for setup/wrap
+    const totalCalc = hours * 60 + totalMinutes + 60
+    const wrapHours = Math.floor(totalCalc / 60) % 24
+    const wrapMins = totalCalc % 60
+    
+    return `${String(wrapHours).padStart(2, '0')}:${String(wrapMins).padStart(2, '0')}`
   }
 
   const createNew = async () => {
@@ -1043,6 +1159,18 @@ export default function CallSheetsPage() {
               <Plus className="w-4 h-4" />
             )}
             New Call Sheet
+          </button>
+          <button
+            onClick={() => {
+              fetchShootingDays()
+              setShowScheduleImport(true)
+            }}
+            disabled={creating}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 rounded-lg font-medium transition-colors border border-slate-600"
+            title="Import from Schedule (I)"
+          >
+            <Calendar className="w-4 h-4" />
+            Import from Schedule
           </button>
         </div>
       </div>
@@ -1713,6 +1841,7 @@ export default function CallSheetsPage() {
                 { key: 'F', description: 'Toggle filters' },
                 { key: 'S', description: 'Toggle sort order (ASC/DESC)' },
                 { key: 'N', description: 'New call sheet' },
+                { key: 'I', description: 'Import from schedule' },
                 { key: 'E', description: 'Edit selected sheet' },
                 { key: 'X', description: 'Export dropdown menu' },
                 { key: 'M', description: 'Export as Markdown' },
@@ -1757,6 +1886,85 @@ export default function CallSheetsPage() {
             <div className="mt-6 pt-4 border-t border-slate-700">
               <p className="text-xs text-slate-500 text-center">
                 Press <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400">?</kbd> anytime to show this help
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Import Modal */}
+      {showScheduleImport && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setShowScheduleImport(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Import from Schedule</h2>
+                  <p className="text-sm text-slate-400">Create call sheet from shooting day</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowScheduleImport(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {loadingShootingDays ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="w-6 h-6 text-cyan-400 animate-spin" />
+                <span className="ml-3 text-slate-400">Loading shooting days...</span>
+              </div>
+            ) : shootingDays.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400">No shooting days found</p>
+                <p className="text-sm text-slate-500 mt-1">Create shooting days in the Schedule first</p>
+              </div>
+            ) : (
+              <div className="space-y-3 overflow-y-auto flex-1">
+                {shootingDays.map((day) => (
+                  <button
+                    key={day.id}
+                    onClick={() => createFromShootingDay(day)}
+                    disabled={creating}
+                    className="w-full text-left p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-violet-500/50 rounded-xl transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-white">
+                          Day {day.dayNumber} — {day.location?.name || 'Unknown Location'}
+                        </div>
+                        <div className="text-sm text-slate-400 mt-1">
+                          {day.scheduledDate ? new Date(day.scheduledDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Date not set'}
+                          {day.callTime && ` • Call: ${day.callTime}`}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          {day.dayScenes?.length || 0} scenes scheduled
+                        </div>
+                      </div>
+                      <div className="text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowRight className="w-5 h-5" />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-6 pt-4 border-t border-slate-700">
+              <p className="text-xs text-slate-500 text-center">
+                Press <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400">Esc</kbd> to close
               </p>
             </div>
           </div>

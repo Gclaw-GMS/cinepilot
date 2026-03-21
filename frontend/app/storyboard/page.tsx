@@ -71,6 +71,8 @@ export default function StoryboardPage() {
   const [sortBy, setSortBy] = useState<'scene' | 'shot' | 'status' | 'approved'>('scene')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
   
   // Refs for keyboard shortcuts and data
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -86,6 +88,12 @@ export default function StoryboardPage() {
   const showFiltersRef = useRef(showFilters)
   const statusFilterRef = useRef(statusFilter)
   const selectedStyleRef = useRef(selectedStyle)
+  const activeFilterCountRef = useRef(0)
+  const clearFiltersRef = useRef<() => void>(() => {})
+  
+  // Refs for auto-refresh
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   useEffect(() => {
     selectedScriptRef.current = selectedScript
@@ -106,6 +114,14 @@ export default function StoryboardPage() {
   useEffect(() => {
     selectedStyleRef.current = selectedStyle
   }, [selectedStyle])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
 
   useEffect(() => {
     fetch('/api/scripts')
@@ -148,6 +164,15 @@ export default function StoryboardPage() {
   useEffect(() => {
     handleRefreshRef.current = handleRefresh
   }, [handleRefresh])
+
+  // Auto-refresh interval
+  useEffect(() => {
+    if (!autoRefresh) return
+    const interval = setInterval(() => {
+      handleRefreshRef.current?.()
+    }, autoRefreshInterval * 1000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchFrames])
 
   // Export functions using filtered/sorted data
   const handleExportCSV = () => {
@@ -586,6 +611,10 @@ ${filteredScenes.map(scene =>
           e.preventDefault()
           handleRefreshRef.current?.()
           break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
+          break
         case 'f':
           e.preventDefault()
           setShowFilters(prev => !prev)
@@ -656,12 +685,8 @@ ${filteredScenes.map(scene =>
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current) {
-            setStatusFilter('all')
-            setSceneFilter('all')
-            setSearchQuery('')
-            setSortBy('scene')
-            setSortOrder('asc')
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
           }
           break
         case 'e':
@@ -786,6 +811,15 @@ ${filteredScenes.map(scene =>
     setSortOrder('asc')
   }, [])
   
+  // Sync refs with state
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+  
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+  
   // Toggle sort order
   const toggleSortOrder = () => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -890,6 +924,7 @@ ${filteredScenes.map(scene =>
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
               </span>
             )}
           </div>
@@ -926,12 +961,38 @@ ${filteredScenes.map(scene =>
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
-              disabled={isRefreshing}
+              disabled={isRefreshing || autoRefresh}
               className="p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg hover:bg-[#222] transition-colors disabled:opacity-50"
               title="Refresh (R)"
             >
               <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
+            {/* Auto-Refresh Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`p-2 border rounded-lg transition-colors flex items-center gap-1 ${
+                  autoRefresh
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : 'bg-[#1a1a1a] border-gray-700 hover:bg-[#222] text-gray-400'
+                }`}
+                title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+              >
+                <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+              </button>
+              {autoRefresh && (
+                <select
+                  value={autoRefreshInterval}
+                  onChange={e => setAutoRefreshInterval(Number(e.target.value))}
+                  className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 w-16"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              )}
+            </div>
             {/* Filter Toggle Button */}
             <div className="relative filter-menu">
               <button
@@ -941,7 +1002,7 @@ ${filteredScenes.map(scene =>
                     ? 'bg-violet-600 border-violet-500 text-white'
                     : 'bg-[#1a1a1a] border-gray-700 hover:bg-[#222] text-gray-400'
                 }`}
-                title="Filter & Sort (F)"
+                title={`Filter & Sort (F)${activeFilterCount > 0 ? ' - X to clear all' : ''}`}
               >
                 <Filter className="w-5 h-5" />
                 {activeFilterCount > 0 && (
@@ -1424,7 +1485,7 @@ ${filteredScenes.map(scene =>
                 ].map(shortcut => (
                   <div key={shortcut.key} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
                     <span className="text-gray-400 text-sm">{shortcut.action}</span>
-                    <kbd className={`px-2 py-1 bg-gray-800 text-xs rounded font-mono ${shortcut.color === 'amber' ? 'text-amber-400' : 'text-cyan-400'}`}>
+                    <kbd className={`px-2 py-1 bg-gray-800 text-xs rounded font-mono ${shortcut.color === 'amber' ? 'text-amber-400' : shortcut.color === 'emerald' ? 'text-emerald-400' : 'text-cyan-400'}`}>
                       {shortcut.key}
                     </kbd>
                   </div>
@@ -1434,6 +1495,7 @@ ${filteredScenes.map(scene =>
                 <div className="text-xs text-emerald-400 uppercase tracking-wider mt-4 mb-2">General</div>
                 {[
                   { key: 'R', action: 'Refresh storyboard data' },
+                  { key: 'A', action: 'Toggle auto-refresh', color: 'emerald' },
                   { key: 'F', action: 'Toggle filters & sort' },
                   { key: 'S', action: 'Toggle sort order (asc/desc)' },
                   { key: 'P', action: 'Print storyboard report' },

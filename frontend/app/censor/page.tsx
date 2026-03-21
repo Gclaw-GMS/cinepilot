@@ -204,6 +204,7 @@ export default function CensorPage() {
   const filterSeverityRef = useRef(filterSeverity)
   const searchQueryRef = useRef(searchQuery)
   const clearFiltersRef = useRef<() => void>(() => {})
+  const activeFilterCountRef = useRef(0)
   
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
@@ -237,6 +238,11 @@ export default function CensorPage() {
   useEffect(() => {
     clearFiltersRef.current = clearFilters
   }, [clearFilters])
+
+  // Update activeFilterCount ref
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -323,7 +329,7 @@ export default function CensorPage() {
           break
         case 'x':
           e.preventDefault()
-          if (showFiltersRef.current && activeFilterCount > 0) {
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
             clearFiltersRef.current()
           }
           break
@@ -910,6 +916,7 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
           <div className="relative" ref={filterPanelRef}>
             <button
               onClick={() => setShowFilters(!showFilters)}
+              title={`Filter & Sort (F)${activeFilterCount > 0 ? ' - X to clear all' : ''}`}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                 showFilters || activeFilterCount > 0
                   ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'

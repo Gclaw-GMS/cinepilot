@@ -117,6 +117,7 @@ export default function AudienceSentimentPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'analyzing' | 'failed'>('all')
   const [regionalFilter, setRegionalFilter] = useState<string>('all')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
   // Sorting state
   const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'sentiment' | 'comments' | 'positive' | 'negative' | 'neutral'>('createdAt')
@@ -243,6 +244,7 @@ export default function AudienceSentimentPage() {
     } finally {
       setLoading(false)
       setRefreshing(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -885,6 +887,14 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
                   <span className="text-xs font-medium">{activeFilterCount}</span>
                 )}
               </button>
+              {lastUpdated && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <span className="text-slate-400 text-xs">
+                    Updated: {lastUpdated.toLocaleTimeString()}
+                  </span>
+                </div>
+              )}
               <button
                 onClick={() => setShowKeyboardHelp(true)}
                 className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"

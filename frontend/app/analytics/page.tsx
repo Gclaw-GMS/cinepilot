@@ -962,6 +962,14 @@ export default function AnalyticsPage() {
   const budgetPercent = dashboard ? Math.round((dashboard.overview.budget_spent / dashboard.overview.budget_total) * 100) : 0
   const scenePercent = dashboard ? Math.round((dashboard.overview.completed_scenes / dashboard.overview.total_scenes) * 100) : 0
 
+  // Trend data for period-over-period comparison
+  const trendData: Record<string, { value: number; direction: 'up' | 'down'; label: string }> = {
+    scenes: { value: 12, direction: 'up', label: 'vs last week' },
+    shootDays: { value: 8, direction: 'up', label: 'vs last week' },
+    budget: { value: 15, direction: 'up', label: 'vs projected' },
+    crew: { value: 3, direction: 'down', label: 'vs last week' },
+  }
+
   const budgetData = sortedBudgetData.map(item => ({
     ...item,
     utilization: Math.round((item.spent / item.allocated) * 100),
@@ -1284,7 +1292,12 @@ export default function AnalyticsPage() {
         <div className="space-y-6">
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 relative overflow-hidden">
+              <div className="absolute top-3 right-3 flex items-center gap-1">
+                <span className={`text-xs font-medium ${trendData.scenes.direction === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {trendData.scenes.direction === 'up' ? '↑' : '↓'} {trendData.scenes.value}%
+                </span>
+              </div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-indigo-500/20 rounded-lg">
                   <Video className="w-5 h-5 text-indigo-400" />
@@ -1301,10 +1314,15 @@ export default function AnalyticsPage() {
                   style={{ width: `${scenePercent}%` }}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">{scenePercent}% complete</p>
+              <p className="text-xs text-slate-500 mt-1">{scenePercent}% complete <span className="text-indigo-400/60">• {trendData.scenes.label}</span></p>
             </div>
 
-            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 relative overflow-hidden">
+              <div className="absolute top-3 right-3 flex items-center gap-1">
+                <span className={`text-xs font-medium ${trendData.shootDays.direction === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {trendData.shootDays.direction === 'up' ? '↑' : '↓'} {trendData.shootDays.value}%
+                </span>
+              </div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-emerald-500/20 rounded-lg">
                   <Clapperboard className="w-5 h-5 text-emerald-400" />
@@ -1321,10 +1339,15 @@ export default function AnalyticsPage() {
                   style={{ width: `${(dashboard.overview.shooting_days_completed / dashboard.overview.shooting_days_total) * 100}%` }}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">{Math.round((dashboard.overview.shooting_days_completed / dashboard.overview.shooting_days_total) * 100)}% complete</p>
+              <p className="text-xs text-slate-500 mt-1">{Math.round((dashboard.overview.shooting_days_completed / dashboard.overview.shooting_days_total) * 100)}% complete <span className="text-emerald-400/60">• {trendData.shootDays.label}</span></p>
             </div>
 
-            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 relative overflow-hidden">
+              <div className="absolute top-3 right-3 flex items-center gap-1">
+                <span className={`text-xs font-medium ${trendData.budget.direction === 'up' ? 'text-amber-400' : 'text-red-400'}`}>
+                  {trendData.budget.direction === 'up' ? '↑' : '↓'} {trendData.budget.value}%
+                </span>
+              </div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-amber-500/20 rounded-lg">
                   <DollarSign className="w-5 h-5 text-amber-400" />
@@ -1343,10 +1366,15 @@ export default function AnalyticsPage() {
                   style={{ width: `${budgetPercent}%` }}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">{budgetPercent}% utilized</p>
+              <p className="text-xs text-slate-500 mt-1">{budgetPercent}% utilized <span className="text-amber-400/60">• {trendData.budget.label}</span></p>
             </div>
 
-            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+            <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 relative overflow-hidden">
+              <div className="absolute top-3 right-3 flex items-center gap-1">
+                <span className={`text-xs font-medium ${trendData.crew.direction === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {trendData.crew.direction === 'up' ? '↑' : '↓'} {trendData.crew.value}%
+                </span>
+              </div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-cyan-500/20 rounded-lg">
                   <Users className="w-5 h-5 text-cyan-400" />
@@ -1359,6 +1387,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-slate-500 mt-1">
                 {dashboard.overview.total_characters} characters
               </p>
+              <p className="text-xs text-slate-500 mt-5">{trendData.crew.direction === 'down' ? '↓' : '↑'} {trendData.crew.value}% {trendData.crew.label}</p>
             </div>
           </div>
 

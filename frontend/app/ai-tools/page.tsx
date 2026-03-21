@@ -7,7 +7,7 @@ import {
   Play, ArrowRight, TrendingUp, Target, Zap, Loader2,
   BarChart3, PieChart, Activity, Gauge, AlertOctagon,
   CheckCircle, XCircle, Info, RefreshCw, Keyboard, Search, X,
-  Download, Printer
+  Download, Printer, Clock
 } from 'lucide-react'
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
@@ -378,6 +378,7 @@ export default function AIToolsPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [showSortPanel, setShowSortPanel] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const sortPanelRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
@@ -413,6 +414,7 @@ export default function AIToolsPage() {
         console.warn('Failed to fetch AI tools from API, using defaults:', e)
       } finally {
         setLoadingTools(false)
+        setLastUpdated(new Date())
       }
     }
     fetchTools()
@@ -444,6 +446,7 @@ export default function AIToolsPage() {
       console.warn('Failed to refresh AI tools:', e)
     } finally {
       setRefreshing(false)
+      setLastUpdated(new Date())
     }
   }, [])
 
@@ -929,6 +932,16 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600">(/)</span>
               </div>
+              
+              {/* Last Updated Timestamp */}
+              {lastUpdated && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <span className="text-slate-400 text-xs">
+                    Updated: {lastUpdated.toLocaleTimeString()}
+                  </span>
+                </div>
+              )}
               
               {/* Filter & Sort Toggle Buttons */}
               <div className="flex items-center gap-2">

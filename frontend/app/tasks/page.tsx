@@ -162,6 +162,7 @@ export default function TasksPage() {
   // Sorting state
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'status' | 'title' | 'assignee' | 'createdAt'>('dueDate')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Filter panel ref for click outside
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -267,6 +268,7 @@ export default function TasksPage() {
       setIsDemoMode(true)
     } finally {
       setLoading(false)
+      setLastUpdated(new Date())
       console.log('[Tasks] Loading complete')
     }
   }, [])
@@ -1293,16 +1295,24 @@ export default function TasksPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">Task Manager</h1>
-              {isDemoMode && (
-                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
-                  Demo Mode
-                </span>
-              )}
+          <div className="flex items-center gap-6">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white">Task Manager</h1>
+                {isDemoMode && (
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full font-medium">
+                    Demo Mode
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-400 text-sm mt-1">Track production tasks and deadlines</p>
             </div>
-            <p className="text-slate-400 text-sm mt-1">Track production tasks and deadlines</p>
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           
           <div className="flex items-center gap-3">

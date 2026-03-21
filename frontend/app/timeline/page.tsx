@@ -47,6 +47,7 @@ export default function TimelinePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
   // Calculate active filter count (includes sort state)
   const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)
@@ -199,6 +200,7 @@ export default function TimelinePage() {
       setIsDemoMode(true);
     } finally {
       if (isInitial) setLoading(false);
+      setLastUpdated(new Date());
     }
   }, [selectedProject, DEMO_STATS]);
 
@@ -842,6 +844,12 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                 {isDemoMode && (
                   <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/15 text-amber-400 rounded font-medium">
                     DEMO
+                  </span>
+                )}
+                {lastUpdated && (
+                  <span className="text-xs text-slate-600 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Updated: {lastUpdated.toLocaleTimeString('en-GB')}
                   </span>
                 )}
               </div>

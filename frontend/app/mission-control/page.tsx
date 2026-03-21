@@ -164,6 +164,10 @@ export default function MissionControl() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [sortCategory, setSortCategory] = useState<'departments' | 'risks' | 'locations'>('departments')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  
+  // Auto-refresh states
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
 
   // Ref for keyboard shortcut access
   const fetchDataRef = useRef<() => void>(() => {})
@@ -174,6 +178,8 @@ export default function MissionControl() {
   const showFilterPanelRef = useRef(showFilterPanel)
   const clearFiltersRef = useRef<() => void>(() => {})
   const activeFilterCountRef = useRef<number>(0)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Unique filter values (computed from data) - wrapped in useMemo to avoid re-computation
   const uniqueDepartments = useMemo(() => data?.departments.map(d => d.name) ?? [], [data])
@@ -207,11 +213,22 @@ export default function MissionControl() {
 
   useEffect(() => {
     fetchData()
-    
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchData, 60000)
-    return () => clearInterval(interval)
   }, [fetchData])
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchData()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchData])
+
+  // Keep refs in sync
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
@@ -774,6 +791,10 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
           e.preventDefault()
           setShowKeyboardHelp(true)
           break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
+          break
         case 'f':
           e.preventDefault()
           setShowFilterPanel(prev => !prev)
@@ -1042,6 +1063,12 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
                   Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               )}
+              {autoRefresh && (
+                <p className="text-xs text-emerald-400 font-mono flex items-center gap-1 mt-1">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                  Auto: {autoRefreshInterval}s
+                </p>
+              )}
             </div>
           </div>
           
@@ -1259,6 +1286,45 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
               >
                 <RefreshCw className={`w-5 h-5 text-cyan-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`p-3 rounded-xl border transition-all ${
+                    autoRefresh 
+                      ? 'bg-emerald-500/20 border-emerald-500/50' 
+                      : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title="Auto-Refresh Toggle"
+                >
+                  <RefreshCw className={`w-5 h-5 ${autoRefresh ? 'text-emerald-400' : 'text-cyan-400'}`} />
+                </button>
+                {autoRefresh && (
+                  <div className="absolute right-0 mt-2 w-36 bg-slate-800 border border-white/20 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-3 py-2 text-xs text-slate-500 uppercase font-medium border-b border-white/10">
+                      Interval
+                    </div>
+                    {[
+                      { value: 10, label: '10 seconds' },
+                      { value: 30, label: '30 seconds' },
+                      { value: 60, label: '1 minute' },
+                      { value: 300, label: '5 minutes' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setAutoRefreshInterval(opt.value)}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-white/10 transition-colors flex items-center justify-between ${
+                          autoRefreshInterval === opt.value ? 'text-cyan-400' : 'text-slate-300'
+                        }`}
+                      >
+                        {opt.label}
+                        {autoRefreshInterval === opt.value && (
+                          <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button 
                 onClick={() => setShowKeyboardHelp(true)}
                 className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all"
@@ -1363,6 +1429,7 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
             </div>
             <div className="space-y-3">
               <ShortcutRow keys={['R']} description="Refresh mission data" />
+              <ShortcutRow keys={['A']} description="Toggle auto-refresh" />
               <ShortcutRow keys={['/']} description="Focus search input" />
               <ShortcutRow keys={['F']} description="Toggle filters panel" />
               <ShortcutRow keys={['S']} description="Toggle sort order (asc/desc)" />

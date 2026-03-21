@@ -151,6 +151,18 @@ export default function ProgressPage() {
     setSortOrder('asc')
   }, [])
 
+  // Refs for keyboard shortcuts - defined after state/hooks they reference
+  const activeFilterCountRef = useRef(activeFilterCount)
+  const clearFiltersRef = useRef(clearFilters)
+
+  // Keep new refs in sync
+  useEffect(() => {
+    activeFilterCountRef.current = activeFilterCount
+  }, [activeFilterCount])
+  useEffect(() => {
+    clearFiltersRef.current = clearFilters
+  }, [clearFilters])
+
   const fetchProgress = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -704,6 +716,13 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           setFilterStatus('all')
           setFilterPriority('all')
           break
+        case 'x':
+          e.preventDefault()
+          // X to clear all filters (only when filter panel is open and filters are active)
+          if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+            clearFiltersRef.current()
+          }
+          break
         case 'e':
           e.preventDefault()
           setShowExportMenu(prev => !prev)
@@ -1095,13 +1114,13 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
             <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
               <Filter className="w-4 h-4 text-cyan-400" />
               Filter & Sort
-              <span className="text-xs text-cyan-400 ml-2">(1-5 status, 6-9 priority, 0 clear)</span>
+              <span className="text-xs text-cyan-400 ml-2">(1-5 status, 6-9 priority, 0 X clear)</span>
             </h3>
             <button
               onClick={clearFilters}
-              className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+              className={`text-xs transition-colors ${activeFilterCount > 0 ? 'text-amber-400 hover:text-amber-300' : 'text-cyan-400 hover:text-cyan-300'}`}
             >
-              Clear All
+              {activeFilterCount > 0 ? `Clear All (${activeFilterCount})` : 'Clear All'}
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1233,6 +1252,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
                 { key: '8', action: 'Filter: medium (toggle)' },
                 { key: '9', action: 'Filter: low (toggle)' },
                 { key: '0', action: 'Clear all filters' },
+                { key: 'X', action: 'Clear all filters (when active)' },
                 { key: 'F', action: 'Close filters panel' },
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg">

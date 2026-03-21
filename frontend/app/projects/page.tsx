@@ -144,12 +144,17 @@ export default function ProjectsPage() {
   const filterStatusRef = useRef(filters.status)
   const filterLanguageRef = useRef(filters.language)
   const filterGenreRef = useRef(filters.genre)
+  const sortByRef = useRef(sortBy)
+  const sortOrderRef = useRef(sortOrder)
+  const activeFilterCountRef = useRef(0)
   
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
   useEffect(() => { filterStatusRef.current = filters.status }, [filters.status])
   useEffect(() => { filterLanguageRef.current = filters.language }, [filters.language])
   useEffect(() => { filterGenreRef.current = filters.genre }, [filters.genre])
+  useEffect(() => { sortByRef.current = sortBy }, [sortBy])
+  useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -371,6 +376,28 @@ export default function ProjectsPage() {
         }))
       }
     }
+    // X: Clear all filters (when filters panel is open and filters are active)
+    else if (e.key.toLowerCase() === 'x') {
+      e.preventDefault()
+      if (showFiltersRef.current && activeFilterCountRef.current > 0) {
+        setFilters({ status: [], language: [], genre: [] })
+        setSortBy('createdAt')
+        setSortOrder('desc')
+      }
+    }
+    // 0: Clear all filters (when filters panel is open)
+    else if (e.key === '0') {
+      e.preventDefault()
+      if (showFiltersRef.current) {
+        if (activeFilterCountRef.current > 0) {
+          setFilters({ status: [], language: [], genre: [] })
+          setSortBy('createdAt')
+          setSortOrder('desc')
+        } else {
+          setShowFilters(false)
+        }
+      }
+    }
     // Escape: Close modal / Clear search / Close export / Close filters
     else if (e.key === 'Escape') {
       if (showKeyboardHelp) {
@@ -385,7 +412,7 @@ export default function ProjectsPage() {
         setSearch('')
       }
     }
-  }, [loadProjects, search, showKeyboardHelp, showExportDropdown, showFilters, showPrintMenu])
+  }, [loadProjects, search, showKeyboardHelp, showExportDropdown, showFilters, showPrintMenu, setFilters, setSortBy, setSortOrder])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -812,6 +839,9 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
     return count
   }, [filters, sortBy, sortOrder])
 
+  // Sync activeFilterCount ref after it's computed
+  useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+
   // Filter and sort projects
   const filtered = useMemo(() => {
     let result = projects.filter(p => {
@@ -885,9 +915,9 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
     })
   }
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({ status: [], language: [], genre: [] })
-  }
+  }, [])
 
   const getStatusStyle = (status: string) => {
     const option = STATUS_OPTIONS.find(o => o.value === status)
@@ -1560,7 +1590,8 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
                   { key: '3', description: 'Filter: Production (toggle)' },
                   { key: '4', description: 'Filter: Post Production (toggle)' },
                   { key: '5', description: 'Filter: Completed (toggle)' },
-                  { key: '0', description: 'Clear all filters' },
+                  { key: 'X', description: 'Clear all filters' },
+                  { key: '0', description: 'Clear filters or close panel' },
                 ].map(({ key, description }) => (
                   <div 
                     key={key}

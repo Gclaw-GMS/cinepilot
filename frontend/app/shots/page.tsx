@@ -57,6 +57,7 @@ export default function ShotsPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const [refreshing, setRefreshing] = useState(false)
+  const [selectedRowIndex, setSelectedRowIndex] = useState(-1)
   
   // CRUD state
   const [showForm, setShowForm] = useState(false)
@@ -160,6 +161,15 @@ export default function ShotsPage() {
     r.sort((a, b) => { let c = 0; if (sortBy === 'index') c = a.shotIndex - b.shotIndex; else if (sortBy === 'duration') c = a.durationEstSec - b.durationEstSec; else if (sortBy === 'focal') c = a.focalLengthMm - b.focalLengthMm; return sortOrder === 'asc' ? c : -c })
     return r
   }, [shots, searchQuery, filterScene, filterSize, filterAngle, filterMovement, sortBy, sortOrder])
+
+  // Refs for keyboard navigation
+  const filteredShotsRef = useRef(filteredShots)
+  const selectedRowIndexRef = useRef(selectedRowIndex)
+  const viewModeRef = useRef(viewMode)
+
+  useEffect(() => { filteredShotsRef.current = filteredShots }, [filteredShots])
+  useEffect(() => { selectedRowIndexRef.current = selectedRowIndex }, [selectedRowIndex])
+  useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
 
   // Chart data computation
   const shotSizeData = useMemo(() => {
@@ -275,7 +285,26 @@ export default function ShotsPage() {
         case '?': e.preventDefault(); setShowKeyboardHelp(true); break;
         case 'n': if (!e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); openAddFormRef.current(); }; break;
         case 'g': e.preventDefault(); setShowFilters(true); break;
-        case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setShowForm(false); setSearchQuery(''); setDeleteConfirm(null); break 
+        // Arrow key navigation for shots
+        case 'ArrowUp': 
+          e.preventDefault()
+          if (filteredShotsRef.current.length > 0) {
+            setSelectedRowIndex(prev => prev <= 0 ? filteredShotsRef.current.length - 1 : prev - 1)
+          }
+          break
+        case 'ArrowDown': 
+          e.preventDefault()
+          if (filteredShotsRef.current.length > 0) {
+            setSelectedRowIndex(prev => prev >= filteredShotsRef.current.length - 1 ? 0 : prev + 1)
+          }
+          break
+        case 'Enter': 
+          e.preventDefault()
+          if (selectedRowIndexRef.current >= 0 && selectedRowIndexRef.current < filteredShotsRef.current.length) {
+            openEditForm(filteredShotsRef.current[selectedRowIndexRef.current])
+          }
+          break
+        case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setShowForm(false); setSearchQuery(''); setDeleteConfirm(null); setSelectedRowIndex(-1); break 
       }
     }
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
@@ -465,7 +494,11 @@ export default function ShotsPage() {
               <div><span className="text-emerald-400 font-mono">0</span> - Clear shot size filter</div>
               <div><span className="text-emerald-400 font-mono">⌃0</span> - Clear all filters (or close panel if none)</div>
               <div><span className="text-emerald-400 font-mono">⇧0</span> - Clear scene filter</div>
-              <div><span className="text-slate-500">Esc</span> - Close menus / Clear search</div>
+              <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">Navigation</span></div>
+              <div><span className="text-amber-400 font-mono">↑</span> - Select previous shot</div>
+              <div><span className="text-amber-400 font-mono">↓</span> - Select next shot</div>
+              <div><span className="text-amber-400 font-mono">Enter</span> - Edit selected shot</div>
+              <div><span className="text-slate-500">Esc</span> - Close menus / Clear search / Clear selection</div>
             </div>
           </div>
         </div>
@@ -528,7 +561,7 @@ export default function ShotsPage() {
             </div>
           </div>
         )}
-        {filteredShots.length === 0 ? <div className="text-center py-12"><Film className="w-16 h-16 text-slate-600 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-400">No shots found</h3><p className="text-slate-500">Try adjusting your filters</p></div> : viewMode === 'cards' ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredShots.map(shot => <div key={shot.id} className={`bg-slate-900 border rounded-xl p-4 hover:border-cyan-500/50 transition-colors ${shot.isLocked ? 'border-amber-500/50' : 'border-slate-800'}`}>
+        {filteredShots.length === 0 ? <div className="text-center py-12"><Film className="w-16 h-16 text-slate-600 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-400">No shots found</h3><p className="text-slate-500">Try adjusting your filters</p></div> : viewMode === 'cards' ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredShots.map((shot, idx) => <div key={shot.id} className={`bg-slate-900 border rounded-xl p-4 hover:border-cyan-500/50 transition-colors cursor-pointer ${selectedRowIndex === idx ? 'ring-2 ring-cyan-500 bg-cyan-900/20' : ''} ${shot.isLocked ? 'border-amber-500/50' : 'border-slate-800'}`} onClick={() => setSelectedRowIndex(idx)}>
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className={`px-2 py-0.5 text-sm font-mono rounded ${shot.isLocked ? 'bg-amber-500/20 text-amber-400' : 'bg-cyan-500/20 text-cyan-400'}`}>#{shot.shotIndex}</span>
@@ -548,7 +581,7 @@ export default function ShotsPage() {
           {shot.characters?.length > 0 && <div className="flex flex-wrap gap-1 mb-3">{shot.characters.map(c => <span key={c} className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">{c}</span>)}</div>}
           {shot.notes && <button onClick={() => toggleNote(shot.id)} className="text-xs text-slate-500 hover:text-cyan-400 flex items-center gap-1">{expandedNotes.has(shot.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}{expandedNotes.has(shot.id) ? 'Hide' : 'Show'} notes</button>}
           {expandedNotes.has(shot.id) && shot.notes && <p className="mt-2 text-xs text-slate-400 italic border-t border-slate-800 pt-2">{shot.notes}</p>}
-        </div>)}</div> : <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">#</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Scene</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Shot</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Size</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Angle</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Movement</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Focal</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Duration</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th></tr></thead><tbody>{filteredShots.map((shot, i) => <tr key={shot.id} className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/30'}><td className="px-4 py-3 text-sm font-mono text-cyan-400">#{shot.shotIndex}</td><td className="px-4 py-3 text-sm text-slate-400">{shot.scene?.sceneNumber}</td><td className="px-4 py-3 text-sm text-slate-300 max-w-[200px] truncate">{shot.shotText}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.shotSize}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraAngle}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraMovement}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.focalLengthMm}mm</td><td className="px-4 py-3 text-xs"><div className="flex items-center gap-1"><button onClick={() => handleLockToggle(shot)} className="p-1 hover:bg-slate-700 rounded">{shot.isLocked ? <Lock className="w-3 h-3 text-amber-400" /> : <Unlock className="w-3 h-3 text-slate-500" />}</button><button onClick={() => openEditForm(shot)} className="p-1 hover:bg-slate-700 rounded"><Edit2 className="w-3 h-3 text-slate-400" /></button><button onClick={() => setDeleteConfirm(shot.id)} className="p-1 hover:bg-slate-700 rounded"><Trash2 className="w-3 h-3 text-slate-400 hover:text-red-400" /></button></div></td></tr>)}</tbody></table></div>}
+        </div>)}</div> : <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden"><table className="w-full"><thead className="bg-slate-800/50"><tr><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">#</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Scene</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Shot</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Size</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Angle</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Movement</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Focal</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Duration</th><th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th></tr></thead><tbody>{filteredShots.map((shot, i) => <tr key={shot.id} className={`${i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/30'} ${selectedRowIndex === i ? 'ring-2 ring-cyan-500 bg-cyan-900/20' : ''} cursor-pointer`} onClick={() => setSelectedRowIndex(i)}><td className="px-4 py-3 text-sm font-mono text-cyan-400">#{shot.shotIndex}</td><td className="px-4 py-3 text-sm text-slate-400">{shot.scene?.sceneNumber}</td><td className="px-4 py-3 text-sm text-slate-300 max-w-[200px] truncate">{shot.shotText}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.shotSize}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraAngle}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.cameraMovement}</td><td className="px-4 py-3 text-sm text-slate-300">{shot.focalLengthMm}mm</td><td className="px-4 py-3 text-xs"><div className="flex items-center gap-1"><button onClick={() => handleLockToggle(shot)} className="p-1 hover:bg-slate-700 rounded">{shot.isLocked ? <Lock className="w-3 h-3 text-amber-400" /> : <Unlock className="w-3 h-3 text-slate-500" />}</button><button onClick={() => openEditForm(shot)} className="p-1 hover:bg-slate-700 rounded"><Edit2 className="w-3 h-3 text-slate-400" /></button><button onClick={() => setDeleteConfirm(shot.id)} className="p-1 hover:bg-slate-700 rounded"><Trash2 className="w-3 h-3 text-slate-400 hover:text-red-400" /></button></div></td></tr>)}</tbody></table></div>}
       </main>
 
       {/* Add/Edit Form Modal */}

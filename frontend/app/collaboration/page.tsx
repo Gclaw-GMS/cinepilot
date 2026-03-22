@@ -85,6 +85,8 @@ export default function CollaborationPage() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -111,10 +113,16 @@ export default function CollaborationPage() {
   // Refs for clear filters
   const clearFiltersRef = useRef<() => void>(() => {})
   const activeFilterCountRef = useRef(0)
+  
+  // Refs for auto-refresh
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   // Keep refs in sync
   useEffect(() => { filterStatusRef.current = filters.status }, [filters.status])
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   // Calculate active filter count (including sort)
   const hasActiveSort = sortBy !== 'name' || sortOrder !== 'asc'
@@ -174,6 +182,17 @@ export default function CollaborationPage() {
     fetchData()
   }, [fetchData])
 
+  // Auto-refresh interval
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchDataRef.current?.()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -185,8 +204,14 @@ export default function CollaborationPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          setRefreshing(true)
-          fetchDataRef.current?.().finally(() => setRefreshing(false))
+          if (!autoRefreshRef.current) {
+            setRefreshing(true)
+            fetchDataRef.current?.().finally(() => setRefreshing(false))
+          }
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -772,6 +797,9 @@ export default function CollaborationPage() {
             <span className="flex items-center gap-1 text-xs text-slate-500">
               <Clock className="w-3.5 h-3.5" />
               Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              {autoRefresh && (
+                <span className="ml-1 text-emerald-400">• Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>
+              )}
             </span>
           )}
         </div>
@@ -789,11 +817,48 @@ export default function CollaborationPage() {
           </div>
           <button
             onClick={() => { setRefreshing(true); fetchData().finally(() => setRefreshing(false)) }}
-            disabled={refreshing}
+            disabled={refreshing || autoRefresh}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
+            title={autoRefresh ? "Auto-refresh is on" : "Refresh (R)"}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
+          
+          {/* Auto-Refresh Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                autoRefresh 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+              title="Auto-refresh (A)"
+            >
+              {autoRefresh && (
+                <span className="w-2 h-2 bg-emerald-300 rounded-full animate-pulse" />
+              )}
+              Auto
+            </button>
+            {autoRefresh && (
+              <div className="absolute top-full right-0 mt-2 w-36 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="px-3 py-2 text-xs text-slate-400 border-b border-slate-700">Interval</div>
+                {[10, 30, 60, 300].map((interval) => (
+                  <button
+                    key={interval}
+                    onClick={() => setAutoRefreshInterval(interval)}
+                    className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                      autoRefreshInterval === interval
+                        ? 'bg-emerald-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {interval < 60 ? `${interval}s` : `${interval / 60}m`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           
           {/* Export Dropdown */}
           <div className="relative" ref={exportMenuRef}>
@@ -1400,6 +1465,10 @@ export default function CollaborationPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Refresh data</span>
                 <kbd className="px-3 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-slate-300">R</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-emerald-400">Toggle auto-refresh</span>
+                <kbd className="px-3 py-1 bg-emerald-900/50 border border-emerald-700 rounded text-sm text-emerald-400">A</kbd>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-300">Focus search</span>

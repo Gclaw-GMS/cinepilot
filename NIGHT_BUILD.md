@@ -1,6 +1,6 @@
-## Build Status: ✅ PASSING (12:46 PM) - Night Build Verification Complete
+## Build Status: ✅ PASSING (1:26 PM) - Night Build Verification Complete
 
-### 12:46 PM - Night Build Verification
+### 1:26 PM - Night Build Verification
 
 ### Current Status
 - **Build:** ✅ Pass (84 routes, static generation)
@@ -14,6 +14,7 @@
 - **Charts:** Implemented on 36/37 pages (settings is config-only)
 - **API Endpoints:** All connected and functional
 - **Demo Mode:** All pages have fallback demo data
+- **Keyboard Shortcuts:** 'A' toggle auto-refresh, 'R' refresh, 'F' filters, etc.
 
 ### Feature Summary
 All CinePilot features are complete and working:

@@ -1076,7 +1076,7 @@ export default function NotificationsPage() {
                 {autoRefresh && (
                   <span className="flex items-center gap-1 text-emerald-400">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Auto
+                    Auto: {autoRefreshInterval}s
                   </span>
                 )}
                 <Clock className="w-3.5 h-3.5" />
@@ -1087,9 +1087,9 @@ export default function NotificationsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-              title="Refresh (R)"
+              disabled={isRefreshing || autoRefresh}
+              className={`p-2 rounded-lg transition-colors ${autoRefresh ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700'}`}
+              title={`Refresh (R)${autoRefresh ? ' - Disabled during auto-refresh' : ''}`}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>

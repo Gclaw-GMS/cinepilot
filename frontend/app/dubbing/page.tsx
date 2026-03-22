@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Languages, FileText, ArrowRight, RefreshCw, Globe, Sparkles, CheckCircle, HelpCircle, X, Search, Download, Printer, Filter, ChevronDown, Clock } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 
 type ScriptOption = {
   id: string
@@ -715,6 +715,43 @@ export default function DubbingPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [dubbedVersions, filteredVersions, languageFilter])
 
+  // Compute activity by month for chart
+  const activityByMonth = useMemo(() => {
+    const months: Record<string, number> = {}
+    const versionsToUse = languageFilter !== 'all' ? filteredVersions : dubbedVersions
+    versionsToUse.forEach(dub => {
+      const date = new Date(dub.createdAt)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      months[monthKey] = (months[monthKey] || 0) + 1
+    })
+    return Object.entries(months)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([name, value]) => ({ name, value }))
+  }, [dubbedVersions, filteredVersions, languageFilter])
+
+  // Compute preview notes status for chart
+  const notesStatusData = useMemo(() => {
+    const hasNotes = preview.filter(p => p.notes && p.notes.length > 0).length
+    const noNotes = preview.length - hasNotes
+    return [
+      { name: 'With Notes', value: hasNotes, fill: '#10b981' },
+      { name: 'Without Notes', value: noNotes, fill: '#64748b' },
+    ]
+  }, [preview])
+
+  // Compute versions by language count
+  const versionsByLanguageData = useMemo(() => {
+    const versionsToUse = languageFilter !== 'all' ? filteredVersions : dubbedVersions
+    const counts: Record<string, number> = {}
+    versionsToUse.forEach(dub => {
+      counts[dub.language] = (counts[dub.language] || 0) + 1
+    })
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
+      .sort((a, b) => b.value - a.value)
+  }, [dubbedVersions, filteredVersions, languageFilter])
+
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -1011,6 +1048,96 @@ export default function DubbingPage() {
                   />
                   <Legend />
                 </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Activity by Month Chart */}
+        {activityByMonth.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Globe className="w-5 h-5 text-cyan-400" />
+              Dubbing Activity (Last 6 Months)
+              {activeFilterCount > 0 && (
+                <span className="text-xs text-slate-400">(Filtered)</span>
+              )}
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={activityByMonth}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                  <YAxis stroke="#94a3b8" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value} versions`, '']}
+                  />
+                  <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Notes Status Chart */}
+        {preview.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-emerald-400" />
+              Scene Translation Notes
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={notesStatusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {notesStatusData.map((entry, index) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value} scenes`, '']}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Versions Count by Language */}
+        {versionsByLanguageData.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Languages className="w-5 h-5 text-amber-400" />
+              Versions by Language
+              {activeFilterCount > 0 && (
+                <span className="text-xs text-slate-400">(Filtered)</span>
+              )}
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={versionsByLanguageData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" stroke="#94a3b8" fontSize={12} />
+                  <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} width={80} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    formatter={(value: number) => [`${value} versions`, '']}
+                  />
+                  <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>

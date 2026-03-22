@@ -116,6 +116,8 @@ export default function ReportsPage() {
   const setShowFiltersRef = useRef(setShowFilters)
   const setActiveTabRef = useRef(setActiveTab)
   const clearFiltersRef = useRef(clearFilters)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'value'>('date')
@@ -141,6 +143,10 @@ export default function ReportsPage() {
   // Active filter count ref for keyboard shortcuts
   const activeFilterCountRef = useRef(activeFilterCount)
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+
+  // Sync auto-refresh refs with state
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   const fetchReport = useCallback(async () => {
     try {
@@ -290,6 +296,10 @@ export default function ReportsPage() {
         case 'm':
           e.preventDefault()
           if (reportData) handleExportMarkdownRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case 'g':
           e.preventDefault()
@@ -759,9 +769,9 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
                   <Clock className="w-3 h-3" />
                   Updated: {lastUpdated.toLocaleTimeString()}
                   {autoRefresh && (
-                    <span className="ml-2 flex items-center gap-1 text-emerald-400">
+                    <span className="ml-1 flex items-center gap-1 text-emerald-400">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Auto
+                      Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                     </span>
                   )}
                 </span>
@@ -1353,6 +1363,10 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Refresh data</span>
                 <kbd className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded text-sm font-mono">R</kbd>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-emerald-400 font-medium">Toggle auto-refresh</span>
+                <kbd className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded text-sm font-mono text-emerald-400">A</kbd>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
                 <span className="text-gray-300">Focus search</span>

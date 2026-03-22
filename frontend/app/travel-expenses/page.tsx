@@ -86,6 +86,8 @@ export default function TravelExpensesPage() {
   const [viewMode, setViewMode] = useState<'list' | 'dashboard' | 'conflicts'>('dashboard')
   const [budgetLimit, setBudgetLimit] = useState<number>(500000) // Default ₹5L budget
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30)
 
   // Calculate active filter count using useMemo for efficiency
   const activeFilterCount = useMemo(() => {
@@ -119,9 +121,13 @@ export default function TravelExpensesPage() {
   const activeFilterCountRef = useRef(0)
   const clearFiltersRef = useRef<(() => void) | null>(null)
   const expensesLengthRef = useRef(expenses.length)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
   useEffect(() => { categoryFilterRef.current = categoryFilter }, [categoryFilter])
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
@@ -192,6 +198,17 @@ export default function TravelExpensesPage() {
   useEffect(() => {
     viewModeRef.current = viewMode
   }, [viewMode])
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      loadExpenses()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, loadExpenses])
 
   // Click outside handlers for dropdowns and filter panel
   useEffect(() => {
@@ -743,6 +760,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
       if (e.key === 's' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
       if (e.key === 'x' && !e.metaKey && !e.ctrlKey && !e.altKey && showFiltersRef.current && activeFilterCountRef.current > 0) { e.preventDefault(); clearFiltersRef.current?.() }
       if (e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && expensesLengthRef.current > 0) { e.preventDefault(); setShowPrintMenu(prev => !prev) }
+      if (e.key === 'a' && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setAutoRefresh(prev => !prev) }
       // Context-aware number key shortcuts
       // When filters panel OPEN: filter by category (1-9) or status (Shift+1-4)
       // When filters panel CLOSED: switch view modes (1-3)
@@ -885,6 +903,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
                     <span className="flex items-center gap-1 text-xs text-slate-500">
                       <Clock className="w-3.5 h-3.5" />
                       Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                      {autoRefresh && <span className="text-emerald-400 ml-1">• Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
                     </span>
                   )}
                 </div>
@@ -894,12 +913,49 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               {/* Refresh Button */}
               <button 
                 onClick={handleRefresh} 
-                disabled={refreshing}
+                disabled={refreshing || autoRefresh}
                 className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition disabled:opacity-50"
                 title="Refresh (R)"
               >
                 <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+
+              {/* Auto-Refresh Toggle */}
+              <div className="relative">
+                <button 
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                    autoRefresh 
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-400'
+                  }`}
+                  title="Auto-Refresh (A)"
+                >
+                  <div className="relative">
+                    <RefreshCw className="w-4 h-4" />
+                    {autoRefresh && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium">Auto</span>
+                </button>
+                {/* Auto-Refresh Interval Dropdown */}
+                {autoRefresh && (
+                  <div className="absolute right-0 mt-2 w-32 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                    {[10, 30, 60, 300].map(interval => (
+                      <button
+                        key={interval}
+                        onClick={() => setAutoRefreshInterval(interval)}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-700 transition ${
+                          autoRefreshInterval === interval ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
+                        }`}
+                      >
+                        {interval < 60 ? `${interval}s` : `${interval / 60}m`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Export Dropdown */}
               <div className="relative" ref={exportMenuRef}>
@@ -1446,6 +1502,7 @@ ${filteredExpenses.map((e, i) => `<tr><td>${i + 1}</td><td><span class="category
               <div className="border-t border-slate-700 my-2"></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle filters</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">F</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Toggle sort order</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">S</kbd></div>
+              <div className="flex items-center justify-between"><span className="text-emerald-400">Toggle auto-refresh</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm text-emerald-400">A</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Focus search</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">/</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Refresh data</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">R</kbd></div>
               <div className="flex items-center justify-between"><span className="text-slate-300">Export Markdown</span><kbd className="px-2 py-1 bg-slate-700 rounded text-sm">M</kbd></div>

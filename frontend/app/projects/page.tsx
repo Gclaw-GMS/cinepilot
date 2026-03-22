@@ -127,6 +127,8 @@ export default function ProjectsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState({
     status: [] as string[],
@@ -148,6 +150,10 @@ export default function ProjectsPage() {
   const sortOrderRef = useRef(sortOrder)
   const activeFilterCountRef = useRef(0)
   
+  // Auto-refresh refs
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+  
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
   useEffect(() => { filterStatusRef.current = filters.status }, [filters.status])
@@ -155,6 +161,10 @@ export default function ProjectsPage() {
   useEffect(() => { filterGenreRef.current = filters.genre }, [filters.genre])
   useEffect(() => { sortByRef.current = sortBy }, [sortBy])
   useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
+  
+  // Sync auto-refresh refs with state
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -201,6 +211,17 @@ export default function ProjectsPage() {
     loadProjects()
   }, [loadProjects])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefreshRef.current) return
+    
+    const interval = setInterval(() => {
+      loadProjects()
+    }, autoRefreshIntervalRef.current * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, loadProjects])
+
   // Keyboard shortcuts handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Ignore if typing in input
@@ -208,10 +229,17 @@ export default function ProjectsPage() {
       return
     }
 
-    // R: Refresh projects
+    // R: Refresh projects (disabled when auto-refresh is on)
     if (e.key.toLowerCase() === 'r') {
       e.preventDefault()
-      loadProjects()
+      if (!autoRefreshRef.current) {
+        loadProjects()
+      }
+    }
+    // A: Toggle auto-refresh
+    else if (e.key.toLowerCase() === 'a') {
+      e.preventDefault()
+      setAutoRefresh(prev => !prev)
     }
     // /: Focus search
     else if (e.key === '/') {
@@ -956,6 +984,7 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
               <span className="ml-2 flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3 h-3" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {autoRefresh && <span className="text-emerald-500"> · Auto: {autoRefreshInterval}s</span>}
               </span>
             )}
           </h1>
@@ -963,8 +992,37 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
         </div>
         <div className="flex items-center gap-2">
           <button 
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              autoRefresh 
+                ? 'bg-emerald-600 text-white' 
+                : 'bg-slate-800 hover:bg-slate-700'
+            }`}
+            title="Toggle auto-refresh (A)"
+          >
+            <span className="relative flex h-3 w-3">
+              {autoRefresh && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              )}
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${autoRefresh ? 'bg-emerald-400' : 'bg-slate-400'}`}></span>
+            </span>
+            Auto
+          </button>
+          {autoRefresh && (
+            <select
+              value={autoRefreshInterval}
+              onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+              className="px-2 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white"
+            >
+              <option value={10}>10s</option>
+              <option value={30}>30s</option>
+              <option value={60}>1m</option>
+              <option value={300}>5m</option>
+            </select>
+          )}
+          <button 
             onClick={loadProjects}
-            disabled={loading}
+            disabled={loading || autoRefresh}
             className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             title="Refresh (R)"
           >
@@ -1540,6 +1598,7 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
 
             <div className="space-y-3">
               {[
+                { key: 'A', description: 'Toggle auto-refresh', color: 'emerald' },
                 { key: 'R', description: 'Refresh projects' },
                 { key: '/', description: 'Focus search input' },
                 { key: 'F', description: 'Toggle filters' },
@@ -1550,13 +1609,13 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
                 { key: 'M', description: 'Export Markdown' },
                 { key: '?', description: 'Show this help' },
                 { key: 'Esc', description: 'Close modal / Clear search / Close filters / Close print menu' },
-              ].map(({ key, description }) => (
+              ].map(({ key, description, color }) => (
                 <div 
                   key={key}
                   className="flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors"
                 >
                   <span className="text-slate-400 text-sm">{description}</span>
-                  <kbd className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs font-mono text-slate-300">
+                  <kbd className={`px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs font-mono ${color === 'emerald' ? 'text-emerald-400' : color === 'amber' ? 'text-amber-400' : color === 'cyan' ? 'text-cyan-400' : 'text-slate-300'}`}>
                     {key}
                   </kbd>
                 </div>

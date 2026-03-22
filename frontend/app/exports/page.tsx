@@ -125,6 +125,29 @@ export default function ExportsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+  
+  // Sync refs with state
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
+  
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      if (autoRefreshRef.current) {
+        handleRefreshRef.current?.()
+      }
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
+  
   // Filter state
   const [showFilters, setShowFilters] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -184,8 +207,14 @@ export default function ExportsPage() {
       
       switch (e.key.toLowerCase()) {
         case 'r':
+          if (!autoRefreshRef.current) {
+            e.preventDefault()
+            handleRefreshRef.current?.()
+          }
+          break
+        case 'a':
           e.preventDefault()
-          handleRefreshRef.current?.()
+          setAutoRefresh(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -657,6 +686,7 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
                 <span className="ml-2 text-xs text-slate-500 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   Updated: {lastUpdated.toLocaleTimeString('en-GB')}
+                  {autoRefresh && <span className="ml-1 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
                 </span>
               )}
             </h1>
@@ -701,12 +731,53 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
-              title="Refresh (R)"
+              disabled={refreshing || autoRefresh}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={autoRefresh ? 'Auto-refresh active (disable with A)' : 'Refresh (R)'}
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            
+            {/* Auto-Refresh Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                  autoRefresh 
+                    ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' 
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
+                }`}
+                title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+              >
+                <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+                <span className="hidden sm:inline">Auto</span>
+              </button>
+              
+              {/* Interval Dropdown */}
+              {autoRefresh && (
+                <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden min-w-[120px]">
+                  <div className="px-3 py-2 text-xs text-slate-500 border-b border-slate-700">
+                    Auto-refresh interval
+                  </div>
+                  {[
+                    { value: 10, label: '10 seconds' },
+                    { value: 30, label: '30 seconds' },
+                    { value: 60, label: '1 minute' },
+                    { value: 300, label: '5 minutes' },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setAutoRefreshInterval(option.value)}
+                      className={`w-full px-3 py-2 text-sm text-left hover:bg-slate-700 transition-colors ${
+                        autoRefreshInterval === option.value ? 'text-emerald-400 bg-emerald-600/10' : 'text-slate-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             
             {/* Keyboard Help Button */}
             <button
@@ -1082,6 +1153,10 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Refresh data</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
+                <span className="text-emerald-400">Toggle auto-refresh</span>
+                <kbd className="px-2 py-1 bg-emerald-600/20 border border-emerald-500/30 rounded text-sm text-emerald-400">A</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800 hover:bg-slate-800/50 px-2 rounded">
                 <span className="text-slate-300">Focus search</span>

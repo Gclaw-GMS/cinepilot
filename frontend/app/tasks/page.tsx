@@ -1699,31 +1699,35 @@ export default function TasksPage() {
             <div className="flex bg-slate-800 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                title="List View"
+                className={`p-2 rounded-md transition-colors relative ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="List View (1)"
               >
                 <ListChecks className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(1)</span>
               </button>
               <button
                 onClick={() => setViewMode('board')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                title="Board View"
+                className={`p-2 rounded-md transition-colors relative ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Board View (2)"
               >
                 <LayoutGrid className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(2)</span>
               </button>
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                title="Calendar View"
+                className={`p-2 rounded-md transition-colors relative ${viewMode === 'calendar' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Calendar View (3)"
               >
                 <CalendarDays className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(3)</span>
               </button>
               <button
                 onClick={() => setViewMode('conflicts')}
                 className={`p-2 rounded-md transition-colors relative ${viewMode === 'conflicts' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                title="Conflicts View"
+                title="Conflicts View (4)"
               >
                 <AlertTriangle className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(4)</span>
                 {conflictStats.highCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold">
                     {conflictStats.highCount}

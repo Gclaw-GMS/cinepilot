@@ -129,6 +129,8 @@ export default function SettingsPage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
   const printMenuRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -166,6 +168,18 @@ export default function SettingsPage() {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const intervalId = setInterval(() => {
+      setRefreshing(true);
+      fetchSettings();
+    }, autoRefreshInterval * 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [autoRefresh, autoRefreshInterval, fetchSettings]);
+
   // Refs for keyboard shortcuts
   const saveRef = useRef<() => void>(() => {});
   const handlePrintRef = useRef<() => void>(() => {});
@@ -175,6 +189,10 @@ export default function SettingsPage() {
   const showFilterPanelRef = useRef(showFilterPanel);
   const activeFilterRef = useRef(activeFilter);
   const activeFilterCountRef = useRef(0);
+  
+  // Refs for auto-refresh
+  const autoRefreshRef = useRef(autoRefresh);
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval);
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -196,6 +214,15 @@ export default function SettingsPage() {
   useEffect(() => {
     activeFilterCountRef.current = activeFilterCount;
   }, [activeFilterCount]);
+
+  // Sync auto-refresh refs with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh;
+  }, [autoRefresh]);
+  
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval;
+  }, [autoRefreshInterval]);
 
   // Clear filters function
   const clearFilters = useCallback(() => {
@@ -227,6 +254,12 @@ export default function SettingsPage() {
         e.preventDefault();
         setRefreshing(true);
         fetchSettings().finally(() => setRefreshing(false));
+      }
+
+      // A: Toggle auto-refresh
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setAutoRefresh(prev => !prev);
       }
 
       // S: Save settings
@@ -656,6 +689,9 @@ export default function SettingsPage() {
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                {autoRefresh && (
+                  <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval}s</span>
+                )}
               </span>
             )}
           </div>
@@ -778,12 +814,44 @@ export default function SettingsPage() {
                 setRefreshing(true);
                 fetchSettings().finally(() => setRefreshing(false));
               }}
-              disabled={refreshing}
+              disabled={refreshing || autoRefresh}
               className="p-2 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh settings (R)"
             >
               <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            {/* Auto-Refresh Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                  autoRefresh ? 'bg-emerald-500 text-white' : 'bg-slate-800 border border-slate-700 hover:bg-slate-700'
+                }`}
+                title="Toggle auto-refresh (A)"
+              >
+                <div className="relative">
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                  {autoRefresh && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  )}
+                </div>
+                <span className="text-sm">Auto</span>
+              </button>
+              {autoRefresh && (
+                <div className="absolute right-0 mt-2 w-32 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <select
+                    value={autoRefreshInterval}
+                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                    className="w-full bg-slate-800 text-slate-300 px-3 py-2 text-sm focus:outline-none"
+                  >
+                    <option value={10}>10 seconds</option>
+                    <option value={30}>30 seconds</option>
+                    <option value={60}>1 minute</option>
+                    <option value={300}>5 minutes</option>
+                  </select>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowShortcuts(true)}
               className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
@@ -1183,6 +1251,7 @@ export default function SettingsPage() {
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'X', action: 'Clear all filters' },
                 { key: 'R', action: 'Refresh settings' },
+                { key: 'A', action: 'Toggle auto-refresh' },
                 { key: 'S', action: 'Save settings' },
                 { key: 'Ctrl+X', action: 'Reset to defaults' },
                 { key: 'E', action: 'Export menu' },
@@ -1191,7 +1260,9 @@ export default function SettingsPage() {
               ].map((shortcut) => (
                 <div key={shortcut.key} className="flex items-center justify-between py-1">
                   <span className="text-slate-400 text-sm">{shortcut.action}</span>
-                  <kbd className="px-2 py-1 bg-slate-800 rounded text-xs font-mono text-slate-300 border border-slate-700">
+                  <kbd className={`px-2 py-1 bg-slate-800 rounded text-xs font-mono border border-slate-700 ${
+                    shortcut.key === 'A' ? 'text-emerald-400' : 'text-slate-300'
+                  }`}>
                     {shortcut.key}
                   </kbd>
                 </div>

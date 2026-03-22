@@ -650,14 +650,13 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           searchInputRef.current?.focus()
           break
         // Context-aware number key shortcuts
-        // When filters panel CLOSED: Opens filter panel and applies filter
-        // When filters panel OPEN: Toggles filter (press again to clear)
+        // When filters panel CLOSED: 1-3 switch view modes, 4-9 open filters
+        // When filters panel OPEN: 1-9 apply/toggle filters
         case '1':
           e.preventDefault()
           if (!showFiltersRef.current) {
-            // Filters closed: Open filter panel and apply status filter
-            setShowFilters(true)
-            setFilterStatus('completed')
+            // Filters closed: Switch to Timeline view
+            setViewMode('timeline')
           } else {
             // Filters open: Toggle filter
             setFilterStatus(prev => prev === 'completed' ? 'all' : 'completed')
@@ -666,18 +665,20 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
         case '2':
           e.preventDefault()
           if (!showFiltersRef.current) {
-            setShowFilters(true)
-            setFilterStatus('in_progress')
+            // Filters closed: Switch to Kanban view
+            setViewMode('kanban')
           } else {
+            // Filters open: Toggle filter
             setFilterStatus(prev => prev === 'in_progress' ? 'all' : 'in_progress')
           }
           break
         case '3':
           e.preventDefault()
           if (!showFiltersRef.current) {
-            setShowFilters(true)
-            setFilterStatus('pending')
+            // Filters closed: Switch to Tasks view
+            setViewMode('tasks')
           } else {
+            // Filters open: Toggle filter
             setFilterStatus(prev => prev === 'pending' ? 'all' : 'pending')
           }
           break
@@ -1029,7 +1030,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           </div>
           {/* View Toggle */}
           <div className="flex bg-slate-800 rounded-lg p-1">
-            {(['timeline', 'tasks', 'kanban'] as const).map((mode, idx) => (
+            {(['timeline', 'kanban', 'tasks'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -1039,7 +1040,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {idx + 1} {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {mode.charAt(0).toUpperCase() + mode.slice(1)} <span className="text-xs opacity-60 ml-1">({mode === 'timeline' ? '1' : mode === 'kanban' ? '2' : '3'})</span>
               </button>
             ))}
           </div>

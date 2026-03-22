@@ -427,6 +427,10 @@ export default function ContinuityPage() {
           e.preventDefault();
           setShowFilters(!showFilters);
           break;
+        case 'v':
+          e.preventDefault();
+          setViewMode(prev => prev === 'list' ? 'grid' : 'list');
+          break;
         case 'x':
           if (showFilters && activeFilterCountRef.current > 0) {
             e.preventDefault();
@@ -1207,16 +1211,18 @@ export default function ContinuityPage() {
               <button
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded-md transition-colors relative ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="List View (V)"
               >
                 <List className="w-4 h-4" />
-                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(1)</span>
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(V)</span>
               </button>
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-md transition-colors relative ${viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Grid View (V)"
               >
                 <LayoutGrid className="w-4 h-4" />
-                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(2)</span>
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(V)</span>
               </button>
             </div>
 

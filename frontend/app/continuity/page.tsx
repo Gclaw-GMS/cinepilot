@@ -1132,9 +1132,9 @@ export default function ContinuityPage() {
         {/* Tabs */}
         <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
           {[
-            { key: 'overview', label: 'Overview', icon: BarChart3 },
-            { key: 'breakdown', label: 'Scene Breakdown', icon: LayoutGrid },
-            { key: 'trends', label: 'Trends', icon: TrendingUp },
+            { key: 'overview', label: 'Overview', icon: BarChart3, shortcut: '1' },
+            { key: 'breakdown', label: 'Scene Breakdown', icon: LayoutGrid, shortcut: '2' },
+            { key: 'trends', label: 'Trends', icon: TrendingUp, shortcut: '3' },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -1147,6 +1147,7 @@ export default function ContinuityPage() {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
+              <span className="text-xs opacity-60">({tab.shortcut})</span>
             </button>
           ))}
         </div>

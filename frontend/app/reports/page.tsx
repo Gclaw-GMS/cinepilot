@@ -728,12 +728,12 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
   const productionPercentage = reportData ? Math.round((reportData.production.spent / reportData.production.budget) * 100) : 0
   const schedulePercentage = reportData ? Math.round((reportData.schedule.completedDays / reportData.schedule.totalDays) * 100) : 0
 
-  const tabs: { key: ReportTab; label: string; icon: typeof FileText }[] = [
-    { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'production', label: 'Production', icon: Film },
-    { key: 'schedule', label: 'Schedule', icon: Calendar },
-    { key: 'crew', label: 'Crew', icon: Users },
-    { key: 'censor', label: 'Censor', icon: Shield },
+  const tabs: { key: ReportTab; label: string; icon: typeof FileText; shortcut: string }[] = [
+    { key: 'overview', label: 'Overview', icon: FileText, shortcut: '1' },
+    { key: 'production', label: 'Production', icon: Film, shortcut: '2' },
+    { key: 'schedule', label: 'Schedule', icon: Calendar, shortcut: '3' },
+    { key: 'crew', label: 'Crew', icon: Users, shortcut: '4' },
+    { key: 'censor', label: 'Censor', icon: Shield, shortcut: '5' },
   ]
 
   if (loading) {
@@ -1012,6 +1012,7 @@ ${reportData.locations.byType.map(t => `| ${t.type} | ${t.count} |`).join('\n')}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
+            <span className="text-xs opacity-60">({tab.shortcut})</span>
           </button>
         ))}
       </div>

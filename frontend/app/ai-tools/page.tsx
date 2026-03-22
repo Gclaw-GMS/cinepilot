@@ -379,6 +379,11 @@ export default function AIToolsPage() {
   const [showSortPanel, setShowSortPanel] = useState(false)
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  
+  // Auto-refresh states
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  
   const printMenuRef = useRef<HTMLDivElement>(null)
   const sortPanelRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
@@ -392,6 +397,10 @@ export default function AIToolsPage() {
   // Refs for filter panel and clear filters (for keyboard shortcuts)
   const showFilterPanelRef = useRef(showFilterPanel)
   const activeFilterCountRef = useRef(0)
+  
+  // Refs for auto-refresh
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   // clearFiltersRef initialized after clearFilters function is defined
   
   // Refs to store latest values for handlePrint function
@@ -447,6 +456,15 @@ export default function AIToolsPage() {
     clearFiltersRef.current = clearFilters
   }, [clearFilters])
 
+  // Sync auto-refresh refs with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+  
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
   // Set up fetch tools ref for keyboard shortcut
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -466,6 +484,19 @@ export default function AIToolsPage() {
       setLastUpdated(new Date())
     }
   }, [])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      if (autoRefreshRef.current) {
+        handleRefresh()
+      }
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, handleRefresh])
 
   // Export functions
   const handleExportCSV = () => {
@@ -813,7 +844,12 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
-        handleRefresh()
+        if (!autoRefreshRef.current) {
+          handleRefresh()
+        }
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault()
+        setAutoRefresh(!autoRefreshRef.current)
       } else if (e.key === '/') {
         e.preventDefault()
         searchInputRef.current?.focus()
@@ -843,7 +879,7 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleRefresh, showFilterPanel, sortOrder, toolCategories, clearFilters])
+  }, [handleRefresh, showFilterPanel, sortOrder, toolCategories, clearFilters, autoRefresh])
 
   // Active filter count (computed synchronously for keyboard shortcuts)
   const activeFilterCount = useMemo(() => {
@@ -967,8 +1003,16 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
                   <Clock className="w-4 h-4 text-slate-400" />
                   <span className="text-slate-400 text-xs">
-                    Updated: {lastUpdated.toLocaleTimeString()}
+                    Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    {autoRefresh && (
+                      <span className="text-emerald-400 ml-1">
+                        Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
+                      </span>
+                    )}
                   </span>
+                  {autoRefresh && (
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse ml-1" />
+                  )}
                 </div>
               )}
               
@@ -1101,12 +1145,52 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
               {/* Refresh Button */}
               <button
                 onClick={handleRefresh}
-                disabled={refreshing}
+                disabled={refreshing || autoRefresh}
                 className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
-                title="Refresh (R)"
+                title={autoRefresh ? "Auto-refresh is on" : "Refresh (R)"}
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+              
+              {/* Auto-refresh toggle */}
+              <div className="relative">
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`p-2.5 rounded-lg transition-colors ${
+                    autoRefresh 
+                      ? 'bg-emerald-600/20 border border-emerald-500/50' 
+                      : 'bg-slate-800 hover:bg-slate-700 border border-slate-700'
+                  }`}
+                  title={autoRefresh ? `Auto-refresh: On (${autoRefreshInterval}s) - Press A to toggle` : 'Auto-refresh: Off - Press A to toggle'}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'text-emerald-400 animate-spin' : 'text-slate-400'}`} />
+                    {autoRefresh && (
+                      <span className="text-xs text-emerald-400 font-medium">
+                        {autoRefreshInterval}s
+                      </span>
+                    )}
+                  </div>
+                </button>
+                {autoRefresh && (
+                  <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[100px]">
+                    {[10, 30, 60, 300].map((interval) => (
+                      <button
+                        key={interval}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAutoRefreshInterval(interval);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-sm hover:bg-slate-700 transition-colors ${
+                          autoRefreshInterval === interval ? 'text-emerald-400' : 'text-slate-300'
+                        }`}
+                      >
+                        {interval < 60 ? `${interval}s` : `${interval / 60}m`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               
               {/* Keyboard Help Button */}
               <button
@@ -1516,6 +1600,10 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Refresh tools</span>
                   <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono">R</kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                  <span className="text-emerald-400">Toggle auto-refresh</span>
+                  <kbd className="px-2 py-1 bg-slate-800 rounded text-sm font-mono text-emerald-400">A</kbd>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-800">
                   <span className="text-slate-400">Focus search</span>

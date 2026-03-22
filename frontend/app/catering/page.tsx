@@ -84,6 +84,8 @@ export default function CateringPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [viewMode, setViewMode] = useState<'calendar' | 'analytics' | 'conflicts'>('calendar')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30)
   
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -98,6 +100,8 @@ export default function CateringPage() {
   const showFiltersRef = useRef(showFilters)
   const activeFilterCountRef = useRef(0)
   const clearFiltersRef = useRef<() => void>(() => {})
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   const [dayFormData, setDayFormData] = useState({
     date: '', totalCrew: 50, totalCast: 10
@@ -151,8 +155,26 @@ export default function CateringPage() {
     showFiltersRef.current = showFilters
   }, [showFilters])
 
+  // Sync auto-refresh refs with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefresh, autoRefreshInterval])
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefreshRef.current) return
+    
+    const interval = setInterval(() => {
+      fetchDataRef.current()
+    }, autoRefreshIntervalRef.current * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
+
   // Handle refresh
   const handleRefresh = useCallback(async () => {
+    if (autoRefreshRef.current) return // Don't allow manual refresh when auto-refresh is on
     setRefreshing(true)
     await fetchData()
     setTimeout(() => setRefreshing(false), 500)
@@ -459,7 +481,11 @@ export default function CateringPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          if (!autoRefreshRef.current) handleRefresh()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
           break
         case '/':
           e.preventDefault()
@@ -953,7 +979,8 @@ export default function CateringPage() {
               </button>
             </div>
             <div className="space-y-3">
-              <ShortcutRow keys={['R']} description="Refresh catering data" />
+              <ShortcutRow keys={['R']} description="Refresh (disabled when auto-refresh on)" />
+              <ShortcutRow keys={['A']} description="Toggle auto-refresh" color="emerald" />
               <ShortcutRow keys={['/']} description="Search shoot days or meals" />
               <ShortcutRow keys={['F']} description="Toggle filters" />
               <ShortcutRow keys={['S']} description="Toggle sort order" />
@@ -1020,18 +1047,55 @@ export default function CateringPage() {
               {/* Refresh Button */}
               <button
                 onClick={handleRefresh}
-                disabled={refreshing}
+                disabled={refreshing || autoRefresh}
                 className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
                 title="Refresh (R)"
               >
                 <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
 
+              {/* Auto-Refresh Toggle */}
+              <div className="relative">
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors text-sm ${
+                    autoRefresh 
+                      ? 'bg-emerald-600 border-emerald-500 text-white' 
+                      : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+                  }`}
+                  title="Toggle auto-refresh (A)"
+                >
+                  <div className="flex items-center gap-1.5">
+                    {autoRefresh && (
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                      </span>
+                    )}
+                    Auto
+                  </div>
+                </button>
+                {/* Interval Selector Dropdown */}
+                {autoRefresh && (
+                  <select
+                    value={autoRefreshInterval}
+                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                    className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white cursor-pointer hover:bg-slate-700"
+                  >
+                    <option value={10}>10s</option>
+                    <option value={30}>30s</option>
+                    <option value={60}>1m</option>
+                    <option value={300}>5m</option>
+                  </select>
+                )}
+              </div>
+
               {/* Last Updated Timestamp */}
               {lastUpdated && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <Clock className="w-3.5 h-3.5" />
                   Updated: {lastUpdated.toLocaleTimeString()}
+                  {autoRefresh && <span className="text-emerald-500"> · Auto: {autoRefreshInterval}s</span>}
                 </div>
               )}
 
@@ -1681,13 +1745,14 @@ export default function CateringPage() {
   )
 }
 
-function ShortcutRow({ keys, description }: { keys: string[], description: string }) {
+function ShortcutRow({ keys, description, color }: { keys: string[], description: string, color?: string }) {
+  const colorClass = color === 'amber' ? 'text-amber-400' : color === 'emerald' ? 'text-emerald-400' : color === 'cyan' ? 'text-cyan-400' : 'text-cyan-400'
   return (
     <div className="flex items-center justify-between py-2 px-3 hover:bg-white/5 rounded-lg transition-colors">
       <span className="text-slate-300">{description}</span>
       <div className="flex gap-1">
         {keys.map((key, i) => (
-          <kbd key={i} className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono text-cyan-400">
+          <kbd key={i} className={`px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-md text-sm font-mono ${colorClass}`}>
             {key}
           </kbd>
         ))}

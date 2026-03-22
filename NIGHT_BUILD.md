@@ -619,3 +619,26 @@
 - [x] Lint passes ✅
 - [x] Tests pass (803) ✅
 - [x] Pushed to origin/master ✅
+
+---
+## Sunday, March 22nd, 2026 - 7:06 AM
+
+### Exports Page - Auto-Refresh Feature ✅
+
+**Feature Perfect:** Auto-refresh for Exports page
+
+**Changes:**
+- Added autoRefresh state and autoRefreshInterval state (default 30s)
+- Added refs for keyboard shortcut access
+- Added useEffect for auto-refresh interval
+- Added toggle button UI with dropdown for interval selection
+- Intervals: 10s, 30s, 1 minute, 5 minutes
+- Keyboard shortcut 'A' toggles auto-refresh
+- Added pulsing green indicator when active
+- Updated header to show auto-refresh status
+- Updated keyboard help modal with new shortcut
+- Refresh button disabled during auto-refresh
+
+**Build Status:** ✅ Pass (build, lint, tests all passing)
+
+**Commit:** dbabb36

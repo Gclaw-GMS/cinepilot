@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, Keyboard, Printer, X, Plus, Edit2, Trash2, Lock, Unlock, Save, Loader2 } from 'lucide-react'
+import { Camera, Film, Clock, AlertTriangle, Download, FileText, Filter, Search, RefreshCw, SortAsc, SortDesc, FileJson, Files, ChevronDown, ChevronUp, Keyboard, Printer, X, Plus, Edit2, Trash2, Lock, Unlock, Save, Loader2, BarChart3, PieChart as RePieChart } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 interface Scene { id: string; sceneNumber: string; headingRaw: string; intExt: string; timeOfDay: string; location: string; _count?: { shots: number } }
 interface Shot { id: string; shotIndex: number; beatIndex: number; shotText: string; characters: string[]; shotSize: string; shotType: string; cameraAngle: string; cameraMovement: string; focalLengthMm: number; lensType: string; keyStyle: string; colorTemp: string; durationEstSec: number; confidenceCamera: number; confidenceLens: number; confidenceLight: number; confidenceDuration: number; isLocked: boolean; userEdited: boolean; notes: string; scene?: Scene }
@@ -10,6 +11,8 @@ interface Stats { totalShots: number; totalDuration: number; missingFields: numb
 const SHOT_SIZES = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU', 'OTS']
 const CAMERA_ANGLES = ['eye', 'high', 'low', 'bird', 'worm', 'dutch']
 const CAMERA_MOVEMENTS = ['static', 'pan', 'tilt', 'dolly', 'crane', 'steadicam', 'handheld', 'drone', 'tracking']
+
+const CHART_COLORS = ['#06b6d4', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6', '#14b8a6']
 
 const DEMO_SHOTS: Shot[] = [
   { id: 'shot-1', shotIndex: 1, beatIndex: 1, shotText: 'Wide shot of the office', characters: ['RAM'], shotSize: 'WS', shotType: 'wide', cameraAngle: 'eye', cameraMovement: 'static', focalLengthMm: 35, lensType: 'zoom', keyStyle: 'motivated', colorTemp: '5600K', durationEstSec: 8, confidenceCamera: 0.9, confidenceLens: 0.85, confidenceLight: 0.8, confidenceDuration: 0.7, isLocked: false, userEdited: false, notes: 'Establish the office environment with natural light from windows', scene: { id: 'scene-1', sceneNumber: '1', headingRaw: 'INT. OFFICE - DAY', intExt: 'INT', timeOfDay: 'DAY', location: 'Office' } },
@@ -155,6 +158,31 @@ export default function ShotsPage() {
     r.sort((a, b) => { let c = 0; if (sortBy === 'index') c = a.shotIndex - b.shotIndex; else if (sortBy === 'duration') c = a.durationEstSec - b.durationEstSec; else if (sortBy === 'focal') c = a.focalLengthMm - b.focalLengthMm; return sortOrder === 'asc' ? c : -c })
     return r
   }, [shots, searchQuery, filterScene, filterSize, filterAngle, filterMovement, sortBy, sortOrder])
+
+  // Chart data computation
+  const shotSizeData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    filteredShots.forEach(s => { counts[s.shotSize] = (counts[s.shotSize] || 0) + 1 })
+    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+  }, [filteredShots])
+
+  const cameraAngleData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    filteredShots.forEach(s => { counts[s.cameraAngle] = (counts[s.cameraAngle] || 0) + 1 })
+    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+  }, [filteredShots])
+
+  const cameraMovementData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    filteredShots.forEach(s => { counts[s.cameraMovement] = (counts[s.cameraMovement] || 0) + 1 })
+    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+  }, [filteredShots])
+
+  const sceneDurationData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    filteredShots.forEach(s => { if (s.scene?.location) { counts[s.scene.location] = (counts[s.scene.location] || 0) + s.durationEstSec } })
+    return Object.entries(counts).map(([name, value]) => ({ name, duration: value })).sort((a, b) => b.duration - a.duration)
+  }, [filteredShots])
 
   const getConfColor = (v: number) => v >= 0.85 ? 'text-emerald-400' : v >= 0.7 ? 'text-amber-400' : 'text-red-400'
 
@@ -422,6 +450,63 @@ export default function ShotsPage() {
         </div>
       )}
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Charts Section */}
+        {filteredShots.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Shot Size Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3"><PieChart className="w-4 h-4 text-cyan-400" /><span className="text-sm font-medium text-slate-300">Shot Sizes</span></div>
+              <ResponsiveContainer width="100%" height={120}>
+                <PieChart>
+                  <Pie data={shotSizeData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={40} label={({ name, value }) => `${name}: ${value}`}>
+                    {shotSizeData.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Camera Angle Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3"><Camera className="w-4 h-4 text-purple-400" /><span className="text-sm font-medium text-slate-300">Camera Angles</span></div>
+              <ResponsiveContainer width="100%" height={120}>
+                <PieChart>
+                  <Pie data={cameraAngleData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={40} label={({ name, value }) => `${name}: ${value}`}>
+                    {cameraAngleData.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Camera Movement Distribution */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3"><Film className="w-4 h-4 text-emerald-400" /><span className="text-sm font-medium text-slate-300">Movements</span></div>
+              <ResponsiveContainer width="100%" height={120}>
+                <PieChart>
+                  <Pie data={cameraMovementData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={40} label={({ name, value }) => `${name}: ${value}`}>
+                    {cameraMovementData.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Duration by Scene */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3"><BarChart3 className="w-4 h-4 text-amber-400" /><span className="text-sm font-medium text-slate-300">Duration by Scene</span></div>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={sceneDurationData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                  <Bar dataKey="duration" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
         {filteredShots.length === 0 ? <div className="text-center py-12"><Film className="w-16 h-16 text-slate-600 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-400">No shots found</h3><p className="text-slate-500">Try adjusting your filters</p></div> : viewMode === 'cards' ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredShots.map(shot => <div key={shot.id} className={`bg-slate-900 border rounded-xl p-4 hover:border-cyan-500/50 transition-colors ${shot.isLocked ? 'border-amber-500/50' : 'border-slate-800'}`}>
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">

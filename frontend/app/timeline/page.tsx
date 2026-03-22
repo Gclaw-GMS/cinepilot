@@ -1179,7 +1179,7 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                   }`}
                 >
                   <Layers className="w-4 h-4 inline mr-1" />
-                  Timeline
+                  Timeline <span className="text-xs opacity-60 ml-1">(1)</span>
                 </button>
                 <button
                   onClick={() => setViewMode('gantt')}
@@ -1188,7 +1188,7 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                   }`}
                 >
                   <Grid3X3 className="w-4 h-4 inline mr-1" />
-                  Gantt
+                  Gantt <span className="text-xs opacity-60 ml-1">(2)</span>
                 </button>
                 <button
                   onClick={() => setViewMode('calendar')}
@@ -1197,7 +1197,7 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                   }`}
                 >
                   <Calendar className="w-4 h-4 inline mr-1" />
-                  Calendar
+                  Calendar <span className="text-xs opacity-60 ml-1">(3)</span>
                 </button>
               </div>
 

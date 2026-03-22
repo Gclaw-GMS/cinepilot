@@ -417,8 +417,8 @@ export default function ShotsPage() {
             <div className="flex-1 relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><input ref={searchInputRef} type="text" placeholder="Search shots... (press /)" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-cyan-500" /></div>
             <button onClick={() => setShowFilters(!showFilters)} className={`px-4 py-2 rounded-lg text-sm font-medium ${showFilters ? 'bg-cyan-500 text-white' : 'bg-slate-800 hover:bg-slate-700'}`}><Filter className="w-4 h-4 inline mr-2" />Filters {showFilters ? 'ON' : 'OFF'}</button>
             <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
-              <button onClick={() => setViewMode('cards')} className={`px-3 py-1 rounded text-sm ${viewMode === 'cards' ? 'bg-cyan-500 text-white' : 'text-slate-400'}`}>Cards</button>
-              <button onClick={() => setViewMode('table')} className={`px-3 py-1 rounded text-sm ${viewMode === 'table' ? 'bg-cyan-500 text-white' : 'text-slate-400'}`}>Table</button>
+              <button onClick={() => setViewMode('cards')} className={`px-3 py-1 rounded text-sm ${viewMode === 'cards' ? 'bg-cyan-500 text-white' : 'text-slate-400'}`}>Cards <span className="text-xs opacity-60 ml-1">(C/1)</span></button>
+              <button onClick={() => setViewMode('table')} className={`px-3 py-1 rounded text-sm ${viewMode === 'table' ? 'bg-cyan-500 text-white' : 'text-slate-400'}`}>Table <span className="text-xs opacity-60 ml-1">(T/2)</span></button>
             </div>
           </div>
           {showFilters && <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700 flex flex-wrap items-center gap-4">

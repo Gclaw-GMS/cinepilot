@@ -1880,8 +1880,9 @@ export default function VfxPage() {
                     ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
+                title="Overview (1)"
               >
-                Overview
+                Overview<span className="text-xs opacity-60 ml-1">(1)</span>
               </button>
               <button
                 onClick={() => setActiveTab('scenes')}
@@ -1890,8 +1891,9 @@ export default function VfxPage() {
                     ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
+                title="Scenes (2)"
               >
-                Scenes
+                Scenes<span className="text-xs opacity-60 ml-1">(2)</span>
               </button>
               <button
                 onClick={() => setActiveTab('cost')}
@@ -1900,8 +1902,9 @@ export default function VfxPage() {
                     ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
+                title="Cost Analysis (3)"
               >
-                Cost Analysis
+                Cost Analysis<span className="text-xs opacity-60 ml-1">(3)</span>
               </button>
               <button
                 onClick={() => setActiveTab('conflicts')}
@@ -1910,8 +1913,9 @@ export default function VfxPage() {
                     ? 'bg-purple-600/20 text-purple-400 border border-b-0 border-purple-500/30'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
+                title="Conflicts (4)"
               >
-                Conflicts
+                Conflicts<span className="text-xs opacity-60 ml-1">(4)</span>
                 {conflictStats.high > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold">
                     {conflictStats.high}

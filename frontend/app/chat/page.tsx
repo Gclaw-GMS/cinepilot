@@ -72,6 +72,12 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -487,6 +493,7 @@ ${formatContent(msg.content)}
   const inputRef_Chat = useRef(input)
   const searchQueryRef = useRef(searchQuery)
   const activeFilterCountRef = useRef(activeFilterCount)
+  const showFiltersRef = useRef(false) // For chat, we don't have filters but keep for consistency
   
   useEffect(() => {
     handlePrintChatRef.current = handlePrintChat
@@ -511,6 +518,42 @@ ${formatContent(msg.content)}
   useEffect(() => {
     activeFilterCountRef.current = activeFilterCount
   }, [activeFilterCount])
+
+  // Sync auto-refresh refs with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    const timer = autoRefreshTimerRef.current
+    return () => {
+      if (timer) {
+        clearInterval(timer)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (autoRefresh) {
+      autoRefreshTimerRef.current = setInterval(() => {
+        if (autoRefreshRef.current) {
+          fetchContext()
+        }
+      }, autoRefreshIntervalRef.current * 1000)
+    }
+
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current)
+        autoRefreshTimerRef.current = null
+      }
+    }
+  }, [autoRefresh, autoRefreshInterval])
 
   const handlePrompt = (prompt: string) => {
     setInput(prompt)
@@ -599,6 +642,10 @@ ${formatContent(msg.content)}
       }
 
       switch (e.key.toLowerCase()) {
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
+          break
         case 'r':
           e.preventDefault()
           fetchContext()
@@ -742,8 +789,37 @@ ${formatContent(msg.content)}
                 )}
               </div>
               <button 
+                onClick={() => setAutoRefresh(prev => !prev)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+                  autoRefresh 
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                    : 'bg-slate-800 hover:bg-slate-700'
+                }`}
+                title="Toggle auto-refresh (A)"
+              >
+                <div className="relative">
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                  {autoRefresh && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                  )}
+                </div>
+                Auto
+              </button>
+              {autoRefresh && (
+                <select
+                  value={autoRefreshInterval}
+                  onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                  className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              )}
+              <button 
                 onClick={fetchContext}
-                disabled={isRefreshing}
+                disabled={isRefreshing || autoRefresh}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
                 title="Refresh context (R)"
               >
@@ -753,7 +829,8 @@ ${formatContent(msg.content)}
               {lastUpdated && (
                 <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
                   <Clock className="w-3.5 h-3.5" />
-                  Updated: {lastUpdated.toLocaleTimeString()}
+                  {autoRefresh && <span className="text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+                  {!autoRefresh && <span>Updated: {lastUpdated.toLocaleTimeString()}</span>}
                 </div>
               )}
               <div className="relative" ref={exportMenuRef}>
@@ -1138,6 +1215,10 @@ ${formatContent(msg.content)}
                   <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
                     <span className="text-slate-400 text-sm">Search messages</span>
                     <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-xs font-mono">F</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
+                    <span className="text-emerald-400 text-sm">Toggle auto-refresh</span>
+                    <kbd className="px-2 py-0.5 bg-slate-700 border border-emerald-600/50 rounded text-xs font-mono text-emerald-400">A</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 px-3 bg-slate-800/30 rounded-lg">
                     <span className="text-slate-400 text-sm">Refresh context</span>

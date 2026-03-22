@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown, Filter, AlertTriangle } from 'lucide-react'
+import { MessageCircle, Send, FileText, Clock, Users, Plus, X, Loader2, Search, Download, RefreshCw, Phone, Trash2, Edit2, Keyboard, Printer, ChevronDown, Filter, AlertTriangle, BarChart3, PieChart as RePieChart } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 interface WhatsAppTemplate { id: string; name: string; category: string; content: string; variables: string[]; createdAt: string }
 interface SentMessage { id: string; recipient: string; recipientName?: string; message: string; status: string; timestamp: string }
@@ -25,6 +26,8 @@ const DEMO_MESSAGES: SentMessage[] = [
   { id: 'wa-1', recipient: '+919876543210', recipientName: 'Ajith Kumar', message: '📅 Schedule Update\n\nDate: 15-03-2026\nTime: 6:00 AM\nLocation: Studio A', status: 'delivered', timestamp: new Date(Date.now() - 3600000).toISOString() },
   { id: 'wa-2', recipient: '+919876543213', recipientName: 'Ravi K. Chandran', message: '⏰ Call Reminder\n\nDon\'t forget: 15-03-2026 at 5:00 AM', status: 'read', timestamp: new Date(Date.now() - 7200000).toISOString() },
 ]
+
+const CHART_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#10b981']
 
 export default function WhatsAppPage() {
   const [activeTab, setActiveTab] = useState<'compose' | 'templates' | 'history' | 'contacts'>('compose')
@@ -639,6 +642,53 @@ export default function WhatsAppPage() {
 
 
 
+  // Chart data computation
+  const statusChartData = useMemo(() => {
+    const statusCounts = messages.reduce((acc, m) => {
+      acc[m.status] = (acc[m.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count,
+    }))
+  }, [messages])
+
+  const roleChartData = useMemo(() => {
+    const roleCounts = contacts.reduce((acc, c) => {
+      const role = c.role || 'Other'
+      acc[role] = (acc[role] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    return Object.entries(roleCounts).map(([role, count]) => ({
+      name: role,
+      value: count,
+    }))
+  }, [contacts])
+
+  const categoryChartData = useMemo(() => {
+    const categoryCounts = templates.reduce((acc, t) => {
+      const cat = t.category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+      acc[cat] = (acc[cat] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    return Object.entries(categoryCounts).map(([category, count]) => ({
+      name: category,
+      value: count,
+    }))
+  }, [templates])
+
+  const messageActivityData = useMemo(() => {
+    // Group messages by day of week
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const dayCounts = dayNames.map(name => ({ day: name, messages: 0 }))
+    messages.forEach(m => {
+      const dayIndex = new Date(m.timestamp).getDay()
+      dayCounts[dayIndex].messages++
+    })
+    return dayCounts
+  }, [messages])
+
   const filteredMessages = useMemo(() => {
     let result = messages.filter(m => {
       const matchSearch = !searchQuery || m.recipient.includes(searchQuery) || m.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()) || m.message.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1212,6 +1262,121 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
                 <option value="Music Director">Music Director</option>
               </select>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Charts Section - Always visible for data overview */}
+      {messages.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Message Status Distribution */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <RePieChart className="w-4 h-4 text-green-400" />
+              <h3 className="text-sm font-semibold text-white">Message Status</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={statusChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {statusChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Contact Roles Distribution */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-blue-400" />
+              <h3 className="text-sm font-semibold text-white">Contact Roles</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={roleChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {roleChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Template Categories */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-semibold text-white">Template Categories</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={categoryChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {categoryChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Message Activity by Day */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-semibold text-white">Activity by Day</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={messageActivityData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Bar dataKey="messages" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}

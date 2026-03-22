@@ -148,6 +148,8 @@ export default function EquipmentPage() {
   const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
   const [budgetLimit, setBudgetLimit] = useState<number>(50000) // Daily budget limit for rentals
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -178,6 +180,8 @@ export default function EquipmentPage() {
   const selectAllEquipmentRef = useRef<() => void>(() => {})
   const filteredLengthRef = useRef<number>(0)
   const activeFilterCountRef = useRef<number>(0)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   // Keep refs in sync with state for keyboard shortcuts
   useEffect(() => {
@@ -191,6 +195,25 @@ export default function EquipmentPage() {
   useEffect(() => {
     activeFilterCountRef.current = activeFilterCount
   }, [activeFilterCount])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchDataRef.current?.()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
 
   // Calculate category breakdown for chart
   const categoryData = useMemo(() => {
@@ -603,7 +626,15 @@ export default function EquipmentPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          fetchDataRef.current?.()
+          if (!autoRefreshRef.current) {
+            fetchDataRef.current?.()
+          }
+          break
+        case 'a':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            setAutoRefresh(prev => !prev)
+          }
           break
         case 's':
           e.preventDefault()
@@ -1128,14 +1159,47 @@ export default function EquipmentPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
+                <Clock className="w-3.5 h-3.5" />
+                Updated: {lastUpdated.toLocaleTimeString()}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+              </div>
+            )}
             <button
               onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+              disabled={refreshing || autoRefresh}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors disabled:opacity-50"
               title="Refresh (R)"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-colors ${
+                  autoRefresh ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
+                }`}
+                title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+              >
+                <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+                Auto
+              </button>
+              {autoRefresh && (
+                <div className="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg p-2 z-10">
+                  <select
+                    value={autoRefreshInterval}
+                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                    className="bg-slate-700 text-slate-200 text-sm rounded px-2 py-1 border border-slate-600 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value={10}>10 seconds</option>
+                    <option value={30}>30 seconds</option>
+                    <option value={60}>1 minute</option>
+                    <option value={300}>5 minutes</option>
+                  </select>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowKeyboardHelp(true)}
               className="flex items-center gap-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-400 transition-colors"
@@ -1144,12 +1208,6 @@ export default function EquipmentPage() {
               <HelpCircle className="w-4 h-4" />
               <span className="text-xs">?</span>
             </button>
-            {lastUpdated && (
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
-                <Clock className="w-3.5 h-3.5" />
-                Updated: {lastUpdated.toLocaleTimeString()}
-              </div>
-            )}
             {/* Filter Toggle Button */}
             <div className="relative filter-menu">
               <button
@@ -2134,6 +2192,10 @@ export default function EquipmentPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Refresh equipment data</span>
                   <kbd className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-sm">R</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Toggle auto-refresh</span>
+                  <kbd className="px-2 py-1 bg-slate-700 text-emerald-400 rounded text-sm">A</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-300">Toggle sort order</span>

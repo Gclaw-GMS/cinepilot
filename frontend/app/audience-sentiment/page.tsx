@@ -119,12 +119,18 @@ export default function AudienceSentimentPage() {
   const [regionalFilter, setRegionalFilter] = useState<string>('all')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  
   // Sorting state
   const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'sentiment' | 'comments' | 'positive' | 'negative' | 'neutral'>('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Calculate active filter count using useMemo for stable reference
   const activeFilterCount = useMemo(() => {
@@ -185,6 +191,27 @@ export default function AudienceSentimentPage() {
   useEffect(() => {
     activeFilterCountRef.current = activeFilterCount
   }, [activeFilterCount])
+
+  // Sync autoRefresh ref with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  // Sync autoRefreshInterval ref with state
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      fetchDataRef.current?.()
+    }, autoRefreshInterval * 1000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
 
   // Filter and sort analyses by platform, status, search query, regional cinema, and sort options
   const filteredAnalyses = useMemo(() => {
@@ -336,8 +363,14 @@ export default function AudienceSentimentPage() {
       
       switch (e.key.toLowerCase()) {
         case 'r':
+          if (!autoRefreshRef.current) {
+            e.preventDefault()
+            fetchDataRef.current?.()
+          }
+          break
+        case 'a':
           e.preventDefault()
-          fetchDataRef.current?.()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -866,12 +899,37 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
               </div>
               <button
                 onClick={() => fetchDataRef.current?.()}
-                disabled={refreshing}
-                className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors"
-                title="Refresh data (R)"
+                disabled={refreshing || autoRefresh}
+                className="p-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={autoRefresh ? 'Auto-refresh is on - Press A to disable' : 'Refresh data (R)'}
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
+              {/* Auto-Refresh Toggle */}
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`p-2 border rounded-lg transition-colors flex items-center gap-1.5 ${
+                  autoRefresh
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                    : 'bg-slate-800/50 hover:bg-slate-700/50 border-slate-700/50 text-slate-400 hover:text-white'
+                }`}
+                title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+              >
+                <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`} />
+              </button>
+              {autoRefresh && (
+                <select
+                  value={autoRefreshInterval}
+                  onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              )}
               {/* Filter Toggle Button */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -892,6 +950,7 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
                   <Clock className="w-4 h-4 text-slate-400" />
                   <span className="text-slate-400 text-xs">
                     Updated: {lastUpdated.toLocaleTimeString()}
+                    {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
                   </span>
                 </div>
               )}
@@ -1597,6 +1656,10 @@ ${a.regionalCinema ? `| Regional Cinema | ${a.regionalCinema} |\n` : ''}${a.vide
             </div>
             <div className="space-y-2">
               {/* General Shortcuts */}
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-emerald-400">Toggle auto-refresh</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">A</kbd>
+              </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-emerald-400">Refresh data</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>

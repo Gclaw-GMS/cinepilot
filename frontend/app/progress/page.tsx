@@ -105,6 +105,8 @@ export default function ProgressPage() {
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'priority' | 'progress' | 'date' | 'tasks'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
   
   const searchInputRef = useRef<HTMLInputElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -115,6 +117,8 @@ export default function ProgressPage() {
   const filterStatusRef = useRef(filterStatus)
   const filterPriorityRef = useRef(filterPriority)
   const viewModeRef = useRef(viewMode)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   // Update progress ref when progress changes
   useEffect(() => {
@@ -134,6 +138,12 @@ export default function ProgressPage() {
   useEffect(() => {
     viewModeRef.current = viewMode
   }, [viewMode])
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
 
   // Calculate active filter count (includes sort state)
   const activeFilterCount = useMemo(() => {
@@ -602,6 +612,18 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
     fetchProgress()
   }, [fetchProgress, refreshKey])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const intervalId = setInterval(() => {
+      setIsRefreshing(true)
+      setRefreshKey(k => k + 1)
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(intervalId)
+  }, [autoRefresh, autoRefreshInterval])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -612,10 +634,16 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
       
       switch (e.key.toLowerCase()) {
         case 'r':
+          if (!autoRefreshRef.current) {
+            e.preventDefault()
+            setIsRefreshing(true)
+            setRefreshKey(k => k + 1)
+            setTimeout(() => setIsRefreshing(false), 1000)
+          }
+          break
+        case 'a':
           e.preventDefault()
-          setIsRefreshing(true)
-          setRefreshKey(k => k + 1)
-          setTimeout(() => setIsRefreshing(false), 1000)
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -974,6 +1002,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
             <span className="flex items-center gap-1 text-xs text-slate-500">
               <Clock className="w-3.5 h-3.5" />
               Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              {autoRefresh && <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval}s</span>}
             </span>
           )}
         </div>
@@ -1021,6 +1050,34 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
           >
             <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
+          {/* Auto-Refresh Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${
+                autoRefresh ? 'bg-emerald-500 text-black' : 'bg-slate-800 hover:bg-slate-700'
+              }`}
+              title="Auto-Refresh (A)"
+            >
+              <RefreshCw className={`w-5 h-5 ${autoRefresh ? 'animate-spin' : ''}`} />
+              {autoRefresh && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              )}
+            </button>
+            {autoRefresh && (
+              <select
+                value={autoRefreshInterval}
+                onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                className="absolute right-0 mt-2 w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white appearance-none cursor-pointer"
+                style={{ top: '100%' }}
+              >
+                <option value={10}>10s</option>
+                <option value={30}>30s</option>
+                <option value={60}>1m</option>
+                <option value={300}>5m</option>
+              </select>
+            )}
+          </div>
           {/* Filter Toggle Button */}
           <div className="relative filter-btn">
             <button
@@ -1221,6 +1278,7 @@ ${progress.upcoming_deadlines.map(d => `| ${d.task} | ${d.date} | ${d.days_left}
               <div className="text-xs text-amber-400 font-medium mb-2">When filters panel CLOSED:</div>
               {[
                 { key: 'R', action: 'Refresh data' },
+                { key: 'A', action: 'Toggle auto-refresh' },
                 { key: '/', action: 'Focus search' },
                 { key: 'F', action: 'Toggle filters' },
                 { key: 'S', action: 'Toggle sort order' },

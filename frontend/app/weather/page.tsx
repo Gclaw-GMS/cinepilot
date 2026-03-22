@@ -439,6 +439,8 @@ export default function WeatherPage() {
   // Refs for keyboard shortcuts (to avoid dependency issues)
   const clearFiltersRef = useRef(() => {})
   const activeFilterCountRef = useRef(0)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
 
   // Keep refs in sync with state for keyboard shortcuts
   useEffect(() => {
@@ -448,6 +450,14 @@ export default function WeatherPage() {
   useEffect(() => {
     clearFiltersRef.current = clearFilters
   }, [clearFilters])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
 
   // Filtered and sorted weather forecast
   const filteredForecast = useMemo(() => {
@@ -1488,6 +1498,7 @@ export default function WeatherPage() {
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
                 <Clock className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-400 text-xs">
+                  {autoRefresh && <span className="flex items-center gap-1 text-emerald-400 mr-2"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Auto: {autoRefreshInterval}s</span>}
                   Updated: {lastUpdated.toLocaleTimeString()}
                 </span>
               </div>
@@ -1559,7 +1570,7 @@ export default function WeatherPage() {
                 </div>
                 <button
                   onClick={refreshWeather}
-                  disabled={loading || refreshing}
+                  disabled={loading || refreshing || autoRefresh}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-50 transition-colors"
                   title="Refresh (R)"
                 >

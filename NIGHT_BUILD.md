@@ -1,4 +1,66 @@
 
+## Build Status: ✅ PASSING (11:26 AM) - Crew & Health Pages 'A' Key Shortcut IMPLEMENTED
+
+### 11:26 AM - Crew & Health Pages - 'A' Key Auto-Refresh Toggle (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Crew Page - 'A' Key Shortcut**: Added keyboard shortcut 'A' to toggle auto-refresh on/off
+- **Health Page - 'A' Key Shortcut**: Added keyboard shortcut 'A' to toggle auto-refresh on/off
+
+### Feature Details
+- **Keyboard Shortcut 'A'**: Press 'A' to toggle auto-refresh (matches other pages)
+- **Visual Indicator**: Pulsing green dot when auto-refresh is active (already existed)
+- **Auto-Refresh Interval**: Shows "Auto: Xs" in header when active
+- **Consistent Pattern**: Now matches reports, equipment, travel-expenses, crew, shots, and other pages
+
+### Technical Implementation
+- Added autoRefreshRef and autoRefreshIntervalRef to crew page
+- Added sync useEffects for refs in both pages
+- Added case 'a' handler to keyboard handleKeyDown function
+- Added 'A' shortcut to keyboard help modal (emerald colored to highlight)
+- Updated header timestamp to show interval: "Auto: 30s" format
+- Disabled refresh button when auto-refresh is active
+
+### UI Components
+- Toggle button with green highlight when active (already existed)
+- Pulsing green dot indicator when active (already existed)
+- Interval selector dropdown (already existed)
+- Header now shows: "Auto: 30s" when active
+- Refresh button disabled during auto-refresh
+
+### Keyboard Shortcuts Updated
+- **A** - Toggle auto-refresh (NEW for crew & health)
+- **R** - Refresh data (disabled when auto-refresh is on)
+- **F** - Toggle filters panel
+- **S** - Toggle sort order
+
+### Build Verification
+- **Build:** Clean build with 84 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings ✅
+- **Tests:** 803 passing, 0 failing ✅
+- **Pushed:** origin/master ✅
+
+### Crew & Health Pages 'A' Key Shortcut Feature Checklist
+- [x] Feature works 100% ('A' key toggles auto-refresh) ✅
+- [x] autoRefreshRef added to crew page ✅
+- [x] autoRefreshIntervalRef added to crew page ✅
+- [x] Sync useEffects added to both pages ✅
+- [x] case 'a' handler added to keyboard handler ✅
+- [x] Keyboard help modal updated (emerald-colored A shortcut) ✅
+- [x] Header shows auto-refresh interval ("Auto: Xs") ✅
+- [x] Refresh button disabled during auto-refresh ✅
+- [x] Consistent with other pages (reports, equipment, travel-expenses, shots, etc.) ✅
+- [x] Error handling complete ✅
+- [x] Build passes ✅
+- [x] TypeScript passes ✅
+- [x] Lint passes ✅
+- [x] Tests pass (803) ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (11:06 AM) - Reports Page Keyboard Shortcut IMPLEMENTED
 
 ### 11:06 AM - Reports Page - 'A' Key Auto-Refresh Toggle (IMPLEMENTED)

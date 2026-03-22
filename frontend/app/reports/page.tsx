@@ -116,6 +116,8 @@ export default function ReportsPage() {
   const setShowFiltersRef = useRef(setShowFilters)
   const setActiveTabRef = useRef(setActiveTab)
   const clearFiltersRef = useRef(clearFilters)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'value'>('date')
@@ -141,6 +143,10 @@ export default function ReportsPage() {
   // Active filter count ref for keyboard shortcuts
   const activeFilterCountRef = useRef(activeFilterCount)
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+
+  // Sync auto-refresh refs with state
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   const fetchReport = useCallback(async () => {
     try {

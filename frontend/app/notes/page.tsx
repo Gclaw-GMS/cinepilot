@@ -170,6 +170,8 @@ export default function NotesPage() {
   const searchRef = useRef(search)
   const clearFiltersRef = useRef(clearFilters)
   const activeFilterCountRef = useRef(activeFilterCount)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Keep refs in sync with state for keyboard shortcuts
   useEffect(() => {
@@ -191,6 +193,14 @@ export default function NotesPage() {
   useEffect(() => {
     activeFilterCountRef.current = activeFilterCount
   }, [activeFilterCount])
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
   
   // Tab state for view switching
   const [activeTab, setActiveTab] = useState<'all' | 'pinned' | 'recent' | 'analytics'>('all')
@@ -1050,7 +1060,7 @@ export default function NotesPage() {
             {lastUpdated && (
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3.5 h-3.5" />
-                {autoRefresh && <span className="text-emerald-400 font-medium">Auto</span>}
+                {autoRefresh && <span className="flex items-center gap-1 text-emerald-400"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Auto: {autoRefreshInterval}s</span>}
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
@@ -1058,7 +1068,7 @@ export default function NotesPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleRefresh}
-              disabled={loading || refreshing}
+              disabled={loading || refreshing || autoRefresh}
               className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg text-sm text-slate-300 transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${loading || refreshing ? 'animate-spin' : ''}`} />

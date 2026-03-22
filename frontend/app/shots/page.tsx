@@ -245,6 +245,15 @@ export default function ShotsPage() {
       // When filters panel OPEN: Ctrl+1-9 filter by movement (toggle)
       if (showFiltersRef.current && e.ctrlKey && e.key >= '1' && e.key <= '9') { e.preventDefault(); const movements = CAMERA_MOVEMENTS; const i = parseInt(e.key) - 1; if (movements[i]) { setFilterMovement(filterMovementRef.current === movements[i] ? 'all' : movements[i]) }; return }
       // When filters panel CLOSED: Number keys 1-2 switch view mode
+      // Scene quick-select shortcuts (0-8) - works regardless of filter panel state
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // 0 = show all scenes
+        if (e.key === '0') { e.preventDefault(); setFilterScene('all'); return }
+        // 1-8 = quick filter by scene (if available)
+        const sceneIndex = parseInt(e.key) - 1
+        if (sceneIndex >= 1 && sceneIndex <= 8 && scenes[sceneIndex]) { e.preventDefault(); setFilterScene(scenes[sceneIndex].id); return }
+      }
+      // View mode shortcuts (only when filters panel is closed)
       if (!showFiltersRef.current) { if (e.key === '1') { setViewMode('cards'); return } if (e.key === '2') { setViewMode('table'); return } }
       // When filters panel OPEN: Key 0 clears size filter
       if (showFiltersRef.current && e.key === '0' && !e.shiftKey) { e.preventDefault(); setFilterSize('all'); return }
@@ -264,6 +273,7 @@ export default function ShotsPage() {
         case 'x': e.preventDefault(); clearFiltersRef.current(); break;
         case '?': e.preventDefault(); setShowKeyboardHelp(true); break;
         case 'n': if (!e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); openAddFormRef.current(); }; break;
+        case 'g': e.preventDefault(); setShowFilters(true); break;
         case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setShowForm(false); setSearchQuery(''); setDeleteConfirm(null); break 
       }
     }
@@ -411,7 +421,7 @@ export default function ShotsPage() {
             </div>
           </div>
           {showFilters && <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Scene:</span><select value={filterScene} onChange={e => setFilterScene(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Scenes</option>{scenes.map(s => <option key={s.id} value={s.id}>{s.sceneNumber} - {s.location}</option>)}</select></div>
+            <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Scene:</span><select value={filterScene} onChange={e => setFilterScene(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Scenes (0)</option>{scenes.map((s, i) => <option key={s.id} value={s.id}>{s.sceneNumber} - {s.location} ({i + 1})</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Size:</span><select value={filterSize} onChange={e => setFilterSize(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Sizes (1-8)</option>{SHOT_SIZES.map((s,i) => <option key={s} value={s}>{s} ({i+1})</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Angle:</span><select value={filterAngle} onChange={e => setFilterAngle(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Angles</option>{CAMERA_ANGLES.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
             <div className="flex items-center gap-2"><span className="text-sm text-slate-400">Movement:</span><select value={filterMovement} onChange={e => setFilterMovement(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">All Movements</option>{CAMERA_MOVEMENTS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
@@ -439,9 +449,13 @@ export default function ShotsPage() {
               <div><span className="text-amber-400 font-mono">M</span> - Export to Markdown</div>
               <div><span className="text-amber-400 font-mono">P</span> - Print shots</div>
               <div><span className="text-amber-400 font-mono">X</span> - Clear all filters</div>
+              <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">Scene Quick-Select</span></div>
+              <div><span className="text-emerald-400 font-mono">0</span> - Show all scenes</div>
+              <div><span className="text-amber-400 font-mono">1-8</span> - Quick filter by scene</div>
               <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Closed</span></div>
               <div><span className="text-amber-400 font-mono">1</span> - Switch to Cards view</div>
               <div><span className="text-amber-400 font-mono">2</span> - Switch to Table view</div>
+              <div><span className="text-amber-400 font-mono">G</span> - Open filters (go to scene)</div>
               <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Open</span></div>
               <div><span className="text-amber-400 font-mono">1-8</span> - Filter by shot size (EWS→OTS)</div>
               <div><span className="text-amber-400 font-mono">⇧1-3</span> - Filter by scene</div>

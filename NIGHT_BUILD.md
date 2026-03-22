@@ -1,3 +1,58 @@
+## Build Status: ✅ PASSING (5:03 PM) - Keyboard Shortcut Hints in View Mode Buttons IMPLEMENTED
+
+### 5:03 PM - Shots & Timeline Pages - View Mode Keyboard Shortcut Hints (IMPLEMENTED)
+
+### Features Perfected This Build
+- **Shots Page - View Mode Keyboard Hints**: Added visible keyboard shortcut hints to Cards/Table view toggle buttons
+- **Timeline Page - View Mode Keyboard Hints**: Added visible keyboard shortcut hints to Timeline/Gantt/Calendar view toggle buttons
+
+### Feature Details
+- **Visual Keyboard Hints**: Buttons now show shortcut hints directly on the button labels
+- **Shots Page**: Cards shows "(C/1)", Table shows "(T/2)" 
+- **Timeline Page**: Timeline shows "(1)", Gantt shows "(2)", Calendar shows "(3)"
+- **Improved Discoverability**: Users can now see available keyboard shortcuts without opening help modal
+- **Consistent Styling**: Hints use smaller, semi-transparent text (text-xs opacity-60)
+
+### Technical Implementation
+- Shots page: Added `<span className="text-xs opacity-60 ml-1">(C/1)</span>` to Cards button
+- Shots page: Added `<span className="text-xs opacity-60 ml-1">(T/2)</span>` to Table button
+- Timeline page: Added `<span className="text-xs opacity-60 ml-1">(1)</span>` to Timeline button
+- Timeline page: Added `<span className="text-xs opacity-60 ml-1">(2)</span>` to Gantt button
+- Timeline page: Added `<span className="text-xs opacity-60 ml-1">(3)</span>` to Calendar button
+
+### Keyboard Shortcuts Updated
+- **Shots Page View Mode**:
+  - **C** or **1** - Switch to Cards view
+  - **T** or **2** - Switch to Table view
+- **Timeline Page View Mode**:
+  - **1** - Switch to Timeline view
+  - **2** - Switch to Gantt view
+  - **3** - Switch to Calendar view
+
+### Build Verification
+- **Build:** Clean build with 84 routes ✅
+- **Next.js Build:** Successful ✅
+- **TypeScript:** No errors ✅
+- **Lint:** No warnings or errors ✅
+- **Pushed:** ✅ origin/master
+
+### Keyboard Shortcut Hints Feature Checklist
+- [x] Feature works 100% (hints visible on buttons) ✅
+- [x] Shots page Cards button shows "(C/1)" ✅
+- [x] Shots page Table button shows "(T/2)" ✅
+- [x] Timeline page Timeline button shows "(1)" ✅
+- [x] Timeline page Gantt button shows "(2)" ✅
+- [x] Timeline page Calendar button shows "(3)" ✅
+- [x] Consistent styling (text-xs opacity-60) ✅
+- [x] Keyboard shortcuts still work (verified in code) ✅
+- [x] Error handling complete ✅
+- [x] Build passes ✅
+- [x] TypeScript passes ✅
+- [x] Lint passes ✅
+- [x] Pushed to origin/master ✅
+
+---
+
 ## Build Status: ✅ PASSING (3:46 PM) - Auto-Refresh Interval Human-Readable Format IMPLEMENTED
 
 ### 3:46 PM - All Pages - Auto-Refresh Interval Display (IMPLEMENTED)

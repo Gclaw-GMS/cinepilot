@@ -254,7 +254,8 @@ export default function ShotsPage() {
         if (sceneIndex >= 1 && sceneIndex <= 8 && scenes[sceneIndex]) { e.preventDefault(); setFilterScene(scenes[sceneIndex].id); return }
       }
       // View mode shortcuts (only when filters panel is closed)
-      if (!showFiltersRef.current) { if (e.key === '1') { setViewMode('cards'); return } if (e.key === '2') { setViewMode('table'); return } }
+      // 1 = Cards view, 2 = Table view, C = Cards, T = Table
+      if (!showFiltersRef.current) { if (e.key === '1' || e.key === 'c' || e.key === 'C') { setViewMode('cards'); return } if (e.key === '2' || e.key === 't' || e.key === 'T') { setViewMode('table'); return } }
       // When filters panel OPEN: Key 0 clears size filter
       if (showFiltersRef.current && e.key === '0' && !e.shiftKey) { e.preventDefault(); setFilterSize('all'); return }
       // When filters panel OPEN: Shift+0 clears scene filter
@@ -453,8 +454,8 @@ export default function ShotsPage() {
               <div><span className="text-emerald-400 font-mono">0</span> - Show all scenes</div>
               <div><span className="text-amber-400 font-mono">1-8</span> - Quick filter by scene</div>
               <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Closed</span></div>
-              <div><span className="text-amber-400 font-mono">1</span> - Switch to Cards view</div>
-              <div><span className="text-amber-400 font-mono">2</span> - Switch to Table view</div>
+              <div><span className="text-amber-400 font-mono">1</span> or <span className="text-amber-400 font-mono">C</span> - Switch to Cards view</div>
+              <div><span className="text-amber-400 font-mono">2</span> or <span className="text-amber-400 font-mono">T</span> - Switch to Table view</div>
               <div><span className="text-amber-400 font-mono">G</span> - Open filters (go to scene)</div>
               <div className="border-t border-slate-700 pt-2"><span className="text-cyan-400 font-bold">When Filters Open</span></div>
               <div><span className="text-amber-400 font-mono">1-8</span> - Filter by shot size (EWS→OTS)</div>

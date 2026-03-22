@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter, FileText, Clock } from 'lucide-react'
+import { Search, RefreshCw, HelpCircle, X, Download, Printer, ChevronDown, Keyboard, Filter, FileText, Clock, BarChart3, PieChart as RePieChart } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 interface FrameData {
   id: string
@@ -46,6 +47,8 @@ const STYLES = [
   { key: 'markerLine', label: 'Marker & Ink', icon: '✒' },
   { key: 'blueprint', label: 'Blueprint', icon: '▦' },
 ]
+
+const CHART_COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6', '#14b8a6']
 
 export default function StoryboardPage() {
   const [scripts, setScripts] = useState<ScriptOption[]>([])
@@ -722,6 +725,49 @@ ${filteredScenes.map(scene =>
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Chart data computation
+  const allFrames = useMemo(() => scenes.flatMap(s => s.frames), [scenes])
+  
+  const statusChartData = useMemo(() => {
+    const statusCounts = allFrames.reduce((acc, f) => {
+      const status = f.status || 'unknown'
+      acc[status] = (acc[status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count,
+    }))
+  }, [allFrames])
+
+  const styleChartData = useMemo(() => {
+    const styleCounts = allFrames.reduce((acc, f) => {
+      const style = f.style || 'unknown'
+      acc[style] = (acc[style] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    return Object.entries(styleCounts).map(([style, count]) => ({
+      name: style.replace(/([A-Z])/g, ' $1').trim(),
+      value: count,
+    }))
+  }, [allFrames])
+
+  const sceneChartData = useMemo(() => {
+    return scenes.slice(0, 10).map(scene => ({
+      name: `Scene ${scene.sceneNumber}`,
+      frames: scene.frames.length,
+    }))
+  }, [scenes])
+
+  const approvalChartData = useMemo(() => {
+    const approved = allFrames.filter(f => f.isApproved).length
+    const pending = allFrames.length - approved
+    return [
+      { name: 'Approved', value: approved },
+      { name: 'Pending', value: pending },
+    ]
+  }, [allFrames])
+
   // Filter and sort scenes based on search query and filters
   const filteredScenes = useMemo(() => {
     let result = scenes
@@ -1207,6 +1253,121 @@ ${filteredScenes.map(scene =>
             </div>
           )}
         </div>
+
+        {/* Charts Section */}
+        {allFrames.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Frame Status Distribution */}
+            <div className="bg-[#141414] border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <RePieChart className="w-4 h-4 text-violet-400" />
+                <h3 className="text-sm font-semibold text-white">Frame Status</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={statusChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {statusChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Style Distribution */}
+            <div className="bg-[#141414] border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PieChart className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-sm font-semibold text-white">Art Style</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={styleChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {styleChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Frames per Scene */}
+            <div className="bg-[#141414] border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-semibold text-white">Frames per Scene</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={sceneChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9ca3af' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Bar dataKey="frames" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Approval Status */}
+            <div className="bg-[#141414] border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PieChart className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-semibold text-white">Approval Status</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={approvalChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {approvalChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#f59e0b'} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="flex items-center gap-4 mb-8 bg-[#141414] border border-gray-800 rounded-xl p-4">

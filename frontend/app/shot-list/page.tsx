@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter, Clock } from 'lucide-react'
+import { Lock, Unlock, Loader2, Save, Download, HelpCircle, X, ChevronDown, Printer, BarChart3, PieChart as PieChartIcon, TrendingUp, Camera, Timer, Filter, Clock, RefreshCw } from 'lucide-react'
 import { Skeleton, StatsCardSkeleton, ShotRowSkeleton, SceneListSkeleton } from '@/components/ui/Skeleton'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -116,6 +116,7 @@ export default function ShotHubPage() {
     cameraMovement: 'all',
   })
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const autoRefreshDropdownRef = useRef<HTMLDivElement>(null)
 
   // Sorting state
   const [sortBy, setSortBy] = useState<'shotIndex' | 'scene' | 'shotSize' | 'cameraAngle' | 'cameraMovement' | 'duration' | 'confidence'>('shotIndex')
@@ -190,6 +191,15 @@ export default function ShotHubPage() {
     activeFilterCountRef.current = activeFilterCount
   }, [activeFilterCount])
 
+  // Keep auto-refresh refs in sync with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
   const fetchScriptId = useCallback(async () => {
     try {
       const res = await fetch('/api/scripts')
@@ -235,6 +245,19 @@ export default function ShotHubPage() {
     }
   }, [])
 
+  // Auto-refresh interval effect
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      if (scriptId) {
+        fetchShots(scriptId)
+      }
+    }, autoRefreshInterval * 1000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, scriptId, fetchShots])
+
   useEffect(() => {
     (async () => {
       const id = await fetchScriptId()
@@ -272,7 +295,13 @@ export default function ShotHubPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          fetchDataRef.current?.()
+          if (!autoRefreshRef.current) {
+            fetchDataRef.current?.()
+          }
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(a => !a)
           break
         case '/':
           e.preventDefault()
@@ -389,14 +418,19 @@ export default function ShotHubPage() {
       if (showFilterPanel && filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
         setShowFilterPanel(false)
       }
+      // Close auto-refresh dropdown when clicking outside (but don't toggle autoRefresh off)
+      if (autoRefresh && autoRefreshDropdownRef.current && !autoRefreshDropdownRef.current.contains(e.target as Node)) {
+        // Just let it be - the dropdown is conditionally rendered based on autoRefresh state
+        // User can turn off auto-refresh by clicking the button again
+      }
     }
-    if (showExportMenu || showPrintMenu || showFilterPanel) {
+    if (showExportMenu || showPrintMenu || showFilterPanel || autoRefresh) {
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showExportMenu, showPrintMenu, showFilterPanel])
+  }, [showExportMenu, showPrintMenu, showFilterPanel, autoRefresh])
 
   const handleGenerateAll = useCallback(async () => {
     if (!scriptId) return
@@ -984,6 +1018,12 @@ ${locallyFiltered.map(shot => {
             <span className="flex items-center gap-1 text-xs text-slate-500">
               <Clock className="w-3.5 h-3.5" />
               Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              {autoRefresh && (
+                <span className="flex items-center gap-1 text-emerald-400 ml-2">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                  Auto: {autoRefreshInterval}s
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -1192,6 +1232,42 @@ ${locallyFiltered.map(shot => {
                     ))}
                   </select>
                 </div>
+              </div>
+            )}
+          </div>
+          {/* Auto-Refresh Toggle */}
+          <div className="relative" ref={autoRefreshDropdownRef}>
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`p-2 rounded-lg transition-colors ${
+                autoRefresh 
+                  ? 'bg-emerald-500/20 text-emerald-400' 
+                  : 'bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-white'
+              }`}
+              title="Auto-Refresh Toggle (A)"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            {autoRefresh && (
+              <div className="absolute top-full right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 py-2 min-w-[140px]">
+                <div className="px-3 py-1 text-xs text-gray-500 uppercase font-medium">Interval</div>
+                {[
+                  { value: 10, label: '10 seconds' },
+                  { value: 30, label: '30 seconds' },
+                  { value: 60, label: '1 minute' },
+                  { value: 300, label: '5 minutes' },
+                ].map(opt => (
+                  <button 
+                    key={opt.value} 
+                    onClick={() => setAutoRefreshInterval(opt.value)}
+                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-700 flex items-center justify-between ${
+                      autoRefreshInterval === opt.value ? 'text-cyan-400' : 'text-gray-300'
+                    }`}
+                  >
+                    {opt.label}
+                    {autoRefreshInterval === opt.value && <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -1490,6 +1566,10 @@ ${locallyFiltered.map(shot => {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Refresh data</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-emerald-300">Toggle auto-refresh</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-300">A</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Search scenes</span>

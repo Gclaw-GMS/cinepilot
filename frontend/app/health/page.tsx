@@ -69,6 +69,8 @@ export default function HealthPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -454,6 +456,10 @@ export default function HealthPage() {
     }
   }, [])
 
+  // Sync refs with state for keyboard shortcut access
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
+
   // Auto-refresh effect
   useEffect(() => {
     if (!autoRefresh) return
@@ -477,7 +483,13 @@ export default function HealthPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefreshRef.current?.()
+          if (!autoRefreshRef.current) {
+            handleRefreshRef.current?.()
+          }
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -675,6 +687,7 @@ export default function HealthPage() {
                   <span className="text-sm font-normal text-slate-400 ml-2 flex items-center gap-1">
                     <Clock className="w-4 h-4" />
                     Updated: {lastRefresh.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    {autoRefresh && <span className="text-emerald-400">• Auto: {autoRefreshInterval}s</span>}
                   </span>
                 )}
               </h1>
@@ -855,7 +868,7 @@ export default function HealthPage() {
                 className={`flex items-center gap-2 text-sm transition-colors ${
                   autoRefresh ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-300'
                 }`}
-                title="Toggle auto-refresh"
+                title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
               >
                 <div className={`w-8 h-4 rounded-full transition-colors relative ${
                   autoRefresh ? 'bg-emerald-500' : 'bg-slate-600'
@@ -1212,6 +1225,14 @@ export default function HealthPage() {
             </div>
             
             <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-slate-300">Refresh health data</span>
+                <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">R</kbd>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                <span className="text-emerald-400">Toggle auto-refresh</span>
+                <kbd className="px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded text-sm font-mono text-emerald-400">A</kbd>
+              </div>
               <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                 <span className="text-slate-300">Search components</span>
                 <kbd className="px-2 py-1 bg-slate-700 rounded text-sm font-mono">/</kbd>

@@ -1342,7 +1342,7 @@ export default function SchedulePage() {
               }`}
             >
               <LayoutGrid className="w-4 h-4 inline-block mr-1.5" />
-              Timeline
+              Timeline <span className="text-xs opacity-60 ml-1">(1)</span>
             </button>
             <button
               onClick={() => setViewMode('chart')}
@@ -1353,7 +1353,7 @@ export default function SchedulePage() {
               }`}
             >
               <TrendingUp className="w-4 h-4 inline-block mr-1.5" />
-              Analytics
+              Analytics <span className="text-xs opacity-60 ml-1">(2)</span>
             </button>
             <button
               onClick={() => setViewMode('conflicts')}
@@ -1364,7 +1364,7 @@ export default function SchedulePage() {
               }`}
             >
               <AlertCircle className="w-4 h-4 inline-block mr-1.5" />
-              Conflicts
+              Conflicts <span className="text-xs opacity-60 ml-1">(3)</span>
               {conflictStats.high > 0 && (
                 <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
                   {conflictStats.high}

@@ -164,6 +164,10 @@ export default function TasksPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  
   // Filter panel ref for click outside
   const filterPanelRef = useRef<HTMLDivElement>(null)
   
@@ -226,6 +230,14 @@ export default function TasksPage() {
   const sortOrderRef = useRef(sortOrder)
   const selectedTasksSizeRef = useRef(selectedTasks.size)
   const sortByRef = useRef(sortBy)
+  
+  // Auto-refresh refs
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+
+  // Keep auto-refresh refs in sync
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   // Clear all filters function
   const clearFilters = useCallback(() => {
@@ -280,6 +292,17 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks()
   }, [fetchTasks])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchTasks()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchTasks])
 
   // Keyboard shortcuts handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -491,6 +514,10 @@ export default function TasksPage() {
           const allIds = new Set(filteredTasksRef.current.map(t => t.id))
           setSelectedTasks(allIds)
           setShowBulkActions(allIds.size > 0)
+        } else {
+          // Toggle auto-refresh (when not in input)
+          e.preventDefault()
+          setAutoRefresh(prev => !prev)
         }
         break
       case 'Escape':
@@ -1315,6 +1342,9 @@ export default function TasksPage() {
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                {autoRefresh && (
+                  <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval}s</span>
+                )}
               </span>
             )}
           </div>
@@ -1330,12 +1360,41 @@ export default function TasksPage() {
             </button>
             <button
               onClick={() => fetchTasks()}
-              disabled={refreshing}
+              disabled={refreshing || autoRefresh}
               className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 transition-colors disabled:opacity-50"
               title="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            {/* Auto-refresh toggle */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`flex items-center gap-2 px-2 py-2 rounded-lg transition-colors ${
+                  autoRefresh ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400 hover:text-slate-300'
+                }`}
+                title={autoRefresh ? 'Auto-refresh ON - Click to disable (A)' : 'Auto-refresh OFF - Click to enable (A)'}
+              >
+                <div className="relative">
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                  {autoRefresh && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                  )}
+                </div>
+              </button>
+              {autoRefresh && (
+                <select
+                  value={autoRefreshInterval}
+                  onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                  className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              )}
+            </div>
             {stats.completed > 0 && (
               <button
                 onClick={handleClearCompleted}
@@ -2243,6 +2302,7 @@ export default function TasksPage() {
                     { keys: ['E'], desc: 'Export dropdown' },
                     { keys: ['M'], desc: 'Export Markdown' },
                     { keys: ['P'], desc: 'Print tasks' },
+                    { keys: ['A'], desc: 'Toggle auto-refresh' },
                     { keys: ['Ctrl', 'A'], desc: 'Select all tasks' },
                     { keys: ['Ctrl', 'D'], desc: 'Delete selected' },
                     { keys: ['Esc'], desc: 'Clear selection' },

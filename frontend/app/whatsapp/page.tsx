@@ -36,7 +36,7 @@ export default function WhatsAppPage() {
   const [contacts] = useState<Contact[]>(DEMO_CONTACTS)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [isDemoMode, setIsDemoMode] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplate | null>(null)
   const [recipient, setRecipient] = useState('')
   const [recipientName, setRecipientName] = useState('')

@@ -137,6 +137,32 @@ export default function TravelExpensesPage() {
   const [budgetLimit, setBudgetLimit] = useState<number>(500000)
   // Last updated timestamp
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+
+  // Sync refs with state
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh
+  }, [autoRefresh])
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = autoRefreshInterval
+  }, [autoRefreshInterval])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchDataRef.current?.()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval])
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true)
@@ -261,7 +287,11 @@ export default function TravelExpensesPage() {
           break
         case 'a':
           e.preventDefault()
-          setViewMode('analytics')
+          if (showFiltersRef.current) {
+            setViewMode('analytics')
+          } else {
+            setAutoRefresh(!autoRefreshRef.current)
+          }
           break
         case 'c':
           e.preventDefault()
@@ -926,16 +956,52 @@ export default function TravelExpensesPage() {
               {/* Refresh Button */}
               <button
                 onClick={fetchExpenses}
-                disabled={loading}
+                disabled={loading || autoRefresh}
                 className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition-colors disabled:opacity-50"
                 title="Refresh (R)"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
+              {/* Auto-Refresh Toggle */}
+              <div className="relative">
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`p-2 rounded-lg transition-colors ${autoRefresh ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-400'}`}
+                  title="Auto-Refresh Toggle (A)"
+                >
+                  <div className="relative">
+                    <RefreshCw className="w-4 h-4" />
+                    {autoRefresh && <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>}
+                  </div>
+                </button>
+                {autoRefresh && (
+                  <div className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 min-w-[120px] z-20">
+                    <div className="px-3 py-1 text-xs text-slate-500 uppercase font-medium">Interval</div>
+                    {[
+                      { value: 10, label: '10s' },
+                      { value: 30, label: '30s' },
+                      { value: 60, label: '1m' },
+                      { value: 300, label: '5m' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setAutoRefreshInterval(opt.value)}
+                        className={`w-full px-3 py-1.5 text-left text-sm hover:bg-slate-700 flex items-center justify-between ${
+                          autoRefreshInterval === opt.value ? 'text-cyan-400' : 'text-slate-300'
+                        }`}
+                      >
+                        {opt.label}
+                        {autoRefreshInterval === opt.value && <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {lastUpdated && (
                 <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
                   <Clock className="w-3.5 h-3.5" />
                   Updated: {lastUpdated.toLocaleTimeString()}
+                  {autoRefresh && <span className="flex items-center gap-1 text-emerald-400 ml-1">Auto: {autoRefreshInterval}s</span>}
                 </div>
               )}
               {/* Filter Toggle Button */}
@@ -1787,6 +1853,10 @@ export default function TravelExpensesPage() {
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">R</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                <span className="text-emerald-400">Toggle auto-refresh (when filters closed)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-emerald-400">A</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Focus search</span>
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">/</kbd>
               </div>
@@ -1827,8 +1897,8 @@ export default function TravelExpensesPage() {
                 <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">1</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                <span className="text-slate-300">Switch to Analytics view</span>
-                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300">2</kbd>
+                <span className="text-cyan-400">Switch to Analytics view (when filters open)</span>
+                <kbd className="px-2 py-1 bg-slate-800 rounded text-sm text-cyan-400">A or 2</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-800">
                 <span className="text-slate-300">Switch to Conflicts view</span>

@@ -177,6 +177,8 @@ export default function ShotHubPage() {
   const activeFilterCountRef = useRef(activeFilterCount)
   const setFiltersRef = useRef(setFilters)
   const clearFiltersRef = useRef(clearFilters)
+  const scenesRef = useRef(scenes)
+  const selectedSceneIdRef = useRef(selectedSceneId)
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -190,6 +192,14 @@ export default function ShotHubPage() {
   useEffect(() => {
     activeFilterCountRef.current = activeFilterCount
   }, [activeFilterCount])
+
+  useEffect(() => {
+    scenesRef.current = scenes
+  }, [scenes])
+
+  useEffect(() => {
+    selectedSceneIdRef.current = selectedSceneId
+  }, [selectedSceneId])
 
   // Keep auto-refresh refs in sync with state
   useEffect(() => {
@@ -361,6 +371,32 @@ export default function ShotHubPage() {
           e.preventDefault()
           if (shots.length > 0 && !printingRef.current) {
             handlePrintRef.current?.()
+          }
+          break
+        // Scene quick-select shortcuts (0-8) - works regardless of filter panel state
+        case '0':
+          if (!e.ctrlKey && !e.metaKey && !e.altKey && !showFilterPanelRef.current) {
+            e.preventDefault()
+            setSelectedSceneId(null) // Show all scenes
+            return
+          }
+          break
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+          if (!e.ctrlKey && !e.metaKey && !e.altKey && !showFilterPanelRef.current) {
+            e.preventDefault()
+            const sceneIndex = parseInt(e.key) - 1
+            const sceneList = scenesRef.current
+            if (sceneList[sceneIndex]) {
+              setSelectedSceneId(sceneList[sceneIndex].id)
+            }
+            return
           }
           break
         // Number key shortcuts for filtering (when filter panel is open)
@@ -1179,10 +1215,10 @@ ${locallyFiltered.map(shot => {
                     onChange={e => setFilters(prev => ({ ...prev, sceneId: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm text-white"
                   >
-                    <option value="all">All Scenes</option>
-                    {scenes.map(scene => (
+                    <option value="all">All Scenes (0)</option>
+                    {scenes.map((scene, i) => (
                       <option key={scene.id} value={scene.id}>
-                        {scene.sceneNumber}: {scene.headingRaw?.substring(0, 30) || 'Untitled'}
+                        {scene.sceneNumber}: {scene.headingRaw?.substring(0, 30) || 'Untitled'} ({i + 1})
                       </option>
                     ))}
                   </select>
@@ -1574,6 +1610,15 @@ ${locallyFiltered.map(shot => {
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Search scenes</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">/</kbd>
+              </div>
+              {/* Scene quick-select shortcuts - shown only when filter panel is closed */}
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-orange-300">Show all scenes</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-orange-300">0</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-orange-300">Quick filter by scene (1-8)</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-orange-300">1-8</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Toggle filters</span>

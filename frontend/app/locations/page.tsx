@@ -286,6 +286,23 @@ export default function LocationsPage() {
           e.preventDefault()
           setAutoRefresh(prev => !prev)
           break
+        // View mode shortcuts: C/T or 1/2 for Cards/Chart
+        case 'c':
+        case 'C':
+        case '1':
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setViewMode('cards')
+          }
+          break
+        case 't':
+        case 'T':
+        case '2':
+          e.preventDefault()
+          if (!showFiltersRef.current) {
+            setViewMode('chart')
+          }
+          break
         case '/':
           e.preventDefault()
           searchInputRef.current?.focus()
@@ -1314,6 +1331,8 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">General:</span>
               </div>
               {[
+                { key: 'C or 1', action: 'Switch to Cards view' },
+                { key: 'T or 2', action: 'Switch to Chart view' },
                 { key: 'R', action: 'Refresh location data' },
                 { key: 'A', action: 'Toggle auto-refresh' },
                 { key: '/', action: 'Focus search input' },

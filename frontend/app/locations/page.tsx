@@ -250,6 +250,11 @@ export default function LocationsPage() {
     }
   }, [])
 
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchScenes()
+  }, [fetchScenes])
+
   // Handle refresh
   const handleRefresh = useCallback(() => {
     fetchScenes(true)

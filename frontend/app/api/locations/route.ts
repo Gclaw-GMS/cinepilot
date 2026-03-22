@@ -102,8 +102,8 @@ export async function GET(req: NextRequest) {
       orderBy: { sceneIndex: 'asc' },
     });
 
-    // If no scenes with location intents, return demo data
-    if (scenes.length === 0) {
+    // If no scenes with location intents, return demo data with intents
+    if (scenes.length === 0 || scenes.every(s => s.locationIntents.length === 0)) {
       if (statsOnly) {
         return NextResponse.json({
           scenes: DEMO_SCENES.map(s => ({

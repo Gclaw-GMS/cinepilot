@@ -1283,9 +1283,10 @@ export default function NotesPage() {
                 setFormData({ title: '', content: '', category: 'general', tags: '', isPinned: false })
               }}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              title="New Note (N)"
             >
               <Plus className="w-4 h-4" />
-              New Note
+              New Note<span className="text-xs opacity-60 ml-1">(N)</span>
             </button>
           </div>
         </div>

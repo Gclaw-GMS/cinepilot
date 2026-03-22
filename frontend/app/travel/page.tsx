@@ -1031,9 +1031,10 @@ export default function TravelExpensesPage() {
               <button
                 onClick={() => setShowForm(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+                title="Add Expense (N)"
               >
                 <Plus className="w-4 h-4" />
-                Add Expense
+                Add Expense<span className="text-xs opacity-60 ml-1">(N)</span>
               </button>
             </div>
           </div>

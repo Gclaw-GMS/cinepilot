@@ -1060,9 +1060,9 @@ export default function CrewPage() {
                   );
                 })}
               </div>
-              <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium transition-colors">
+              <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium transition-colors" title="Add Crew Member (N)">
                 <Plus className="w-4 h-4" />
-                Add Crew
+                Add Crew<span className="text-xs opacity-60 ml-1">(N)</span>
               </button>
               <button 
                 onClick={() => setShowKeyboardHelp(true)} 

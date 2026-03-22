@@ -100,6 +100,10 @@ export default function ContinuityPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
+  
   // Refs for keyboard shortcuts
   const searchInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -118,6 +122,10 @@ export default function ContinuityPage() {
   const sortOrderRef = useRef(sortOrder);
   const clearFiltersRef = useRef<() => void>();
   const activeFilterCountRef = useRef<number>(0);
+  
+  // Auto-refresh refs
+  const autoRefreshRef = useRef(autoRefresh);
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval);
 
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters; }, [showFilters]);
@@ -128,6 +136,8 @@ export default function ContinuityPage() {
   useEffect(() => { severityFilterRef.current = severityFilter; }, [severityFilter]);
   useEffect(() => { typeFilterRef.current = typeFilter; }, [typeFilter]);
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { autoRefreshRef.current = autoRefresh; }, [autoRefresh]);
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval; }, [autoRefreshInterval]);
 
   // Active filter count
   const activeFilterCount = useMemo(() => {
@@ -299,6 +309,19 @@ export default function ContinuityPage() {
     }
   };
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const interval = setInterval(() => {
+      if (selectedScript && autoRefreshRef.current) {
+        fetchWarnings(selectedScript);
+      }
+    }, autoRefreshInterval * 1000);
+    
+    return () => clearInterval(interval);
+  }, [autoRefresh, autoRefreshInterval, selectedScript, fetchWarnings]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -372,7 +395,13 @@ export default function ContinuityPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault();
-          fetchDataRef.current?.();
+          if (!autoRefreshRef.current) {
+            fetchDataRef.current?.();
+          }
+          break;
+        case 'a':
+          e.preventDefault();
+          setAutoRefresh(!autoRefreshRef.current);
           break;
         case '/':
           e.preventDefault();
@@ -406,7 +435,7 @@ export default function ContinuityPage() {
           break;
         case 's':
           e.preventDefault();
-          setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+          setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc');
           break;
         case '?':
           e.preventDefault();
@@ -832,6 +861,11 @@ export default function ContinuityPage() {
               <span className="flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                {autoRefresh && (
+                  <span className="text-emerald-400 ml-1">
+                    Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -1034,9 +1068,48 @@ export default function ContinuityPage() {
                 </div>
               )}
             </div>
+            {/* Auto-refresh toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`p-2.5 rounded-lg transition-colors ${
+                  autoRefresh 
+                    ? 'bg-emerald-600/20 border border-emerald-500/50' 
+                    : 'bg-slate-800 hover:bg-slate-700'
+                }`}
+                title={autoRefresh ? `Auto-refresh: On (${autoRefreshInterval}s) - Press A to toggle` : 'Auto-refresh: Off - Press A to toggle'}
+              >
+                <div className="flex items-center gap-1.5">
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'text-emerald-400 animate-spin' : 'text-slate-400'}`} />
+                  {autoRefresh && (
+                    <span className="text-xs text-emerald-400 font-medium">
+                      {autoRefreshInterval}s
+                    </span>
+                  )}
+                </div>
+              </button>
+              {autoRefresh && (
+                <div className="absolute top-full mt-1 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[100px]">
+                  {[10, 30, 60, 300].map((interval) => (
+                    <button
+                      key={interval}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAutoRefreshInterval(interval);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-sm hover:bg-slate-700 transition-colors ${
+                        autoRefreshInterval === interval ? 'text-emerald-400' : 'text-slate-300'
+                      }`}
+                    >
+                      {interval < 60 ? `${interval}s` : `${interval / 60}m`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleRefresh}
-              disabled={refreshing}
+              disabled={refreshing || autoRefresh}
               className="p-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg transition-colors"
               title="Refresh (R)"
             >
@@ -1598,6 +1671,7 @@ export default function ContinuityPage() {
               <div className="space-y-2">
                 {[
                   { key: 'R', description: 'Refresh continuity data' },
+                  { key: 'A', description: 'Toggle auto-refresh', color: 'emerald' },
                   { key: '/', description: 'Focus search input' },
                   { key: 'F', description: 'Toggle filters panel' },
                   { key: 'S', description: 'Toggle sort order (asc/desc)' },
@@ -1613,7 +1687,10 @@ export default function ContinuityPage() {
                     className="flex items-center justify-between p-2 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
                   >
                     <span className="text-slate-300 text-sm">{shortcut.description}</span>
-                    <kbd className="px-2 py-0.5 bg-slate-700 border border-slate-600 rounded text-amber-400 font-mono text-xs font-medium">
+                    <kbd className={`px-2 py-0.5 bg-slate-700 border border-slate-600 rounded font-mono text-xs font-medium ${
+                      shortcut.color === 'emerald' ? 'text-emerald-400' : 
+                      shortcut.color === 'cyan' ? 'text-cyan-400' : 'text-amber-400'
+                    }`}>
                       {shortcut.key}
                     </kbd>
                   </div>

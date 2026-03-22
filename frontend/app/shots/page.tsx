@@ -119,6 +119,8 @@ export default function ShotsPage() {
   useEffect(() => { sortByRef.current = sortBy }, [sortBy])
   useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   const fetchShots = useCallback(async () => {
     const isInitialLoad = shots.length === 0 && scenes.length === 0
@@ -227,6 +229,8 @@ export default function ShotsPage() {
   const toggleNote = (id: string) => setExpandedNotes(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const clearFiltersRef = useRef(clearFilters)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
 
   useEffect(() => {
@@ -252,6 +256,7 @@ export default function ShotsPage() {
         case '/': e.preventDefault(); searchInputRef.current?.focus(); break; 
         case 'f': setShowFilters(p => !p); break; 
         case 's': if (!e.shiftKey) { e.preventDefault(); setSortOrder(sortOrderRef.current === 'asc' ? 'desc' : 'asc'); }; break; 
+        case 'a': if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); setAutoRefresh(prev => !prev) }; break;
         case 'r': fetchShots(); break; 
         case 'e': setShowExportMenu(p => !p); break; 
         case 'm': e.preventDefault(); handleExportMarkdownRef.current(); break;
@@ -427,6 +432,7 @@ export default function ShotsPage() {
               <div className="border-t border-slate-700 pt-2"><span className="text-emerald-400 font-bold">Actions</span></div>
               <div><span className="text-amber-400 font-mono">N</span> - Add new shot</div>
               <div><span className="text-amber-400 font-mono">R</span> - Refresh shots</div>
+              <div><span className="text-amber-400 font-mono">A</span> - Toggle auto-refresh</div>
               <div><span className="text-amber-400 font-mono">F</span> - Toggle filters panel</div>
               <div><span className="text-amber-400 font-mono">S</span> - Toggle sort order</div>
               <div><span className="text-amber-400 font-mono">E</span> - Open export menu</div>

@@ -102,6 +102,10 @@ export default function ShotHubPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
 
   // Filter state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -161,6 +165,10 @@ export default function ShotHubPage() {
   const handlePrintRef = useRef<() => void>()
   const handleExportMarkdownRef = useRef<() => void>()
   const printingRef = useRef(printing)
+  
+  // Auto-refresh refs
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Refs for keyboard shortcuts to avoid dependency issues
   const showFilterPanelRef = useRef(showFilterPanel)

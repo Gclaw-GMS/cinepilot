@@ -272,6 +272,10 @@ export default function SchedulePage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
+  
   // Sort options
   const sortOptions = [
     { value: 'dayNumber', label: 'Day Number' },
@@ -320,6 +324,10 @@ export default function SchedulePage() {
   const activeFilterCountRef = useRef(0)
   const clearFiltersRef = useRef(clearFilters)
   
+  // Refs for auto-refresh
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+  
   // Keep refs in sync with state
   useEffect(() => { filterStatusRef.current = filterStatus }, [filterStatus])
   useEffect(() => { filterLocationRef.current = filterLocation }, [filterLocation])
@@ -328,6 +336,8 @@ export default function SchedulePage() {
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
   useEffect(() => { clearFiltersRef.current = clearFilters }, [clearFilters])
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
 
   const [mode, setMode] = useState('balanced')
   const [startDate, setStartDate] = useState(() => {
@@ -433,6 +443,17 @@ export default function SchedulePage() {
     fetchDataRef.current = fetchData
   }, [fetchData])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const interval = setInterval(() => {
+      fetchDataRef.current?.()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, autoRefreshInterval, fetchData])
+
   // Update data refs when they change
   useEffect(() => {
     shootingDaysRef.current = shootingDays
@@ -456,6 +477,10 @@ export default function SchedulePage() {
         case 'r':
           e.preventDefault()
           fetchDataRef.current?.()
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -1285,6 +1310,12 @@ export default function SchedulePage() {
             <span className="flex items-center gap-1 text-xs text-slate-500">
               <Clock className="w-3.5 h-3.5" />
               Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              {autoRefresh && (
+                <span className="flex items-center gap-1 text-emerald-400 ml-2">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                  Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval/60}m`}
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -1595,6 +1626,42 @@ export default function SchedulePage() {
               </>
             )}
           </button>
+          {/* Auto-Refresh Toggle */}
+          <div className="relative">
+            <button 
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                autoRefresh 
+                  ? 'bg-emerald-500/20 text-emerald-400' 
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+              }`}
+              title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+            >
+              <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+              Auto
+              {autoRefresh && (
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+              )}
+            </button>
+            {autoRefresh && (
+              <div className="absolute top-full right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 py-1 min-w-[120px]">
+                {[10, 30, 60, 300].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setAutoRefreshInterval(opt)}
+                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-slate-700 flex items-center justify-between ${
+                      autoRefreshInterval === opt ? 'text-cyan-400' : 'text-slate-300'
+                    }`}
+                  >
+                    {opt < 60 ? `${opt}s` : `${opt/60}m`}
+                    {autoRefreshInterval === opt && (
+                      <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button 
             onClick={fetchData}
             className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-gray-300 flex items-center gap-2 transition-colors"
@@ -2164,6 +2231,7 @@ export default function SchedulePage() {
             <div className="space-y-3">
               {[
                 { key: 'R', desc: 'Refresh schedule data' },
+                { key: 'A', desc: 'Toggle auto-refresh', highlight: 'emerald' },
                 { key: '/', desc: 'Focus search input' },
                 { key: 'F', desc: 'Toggle filters & sort panel' },
                 { key: 'S', desc: 'Toggle sort order (asc/desc)' },
@@ -2186,6 +2254,7 @@ export default function SchedulePage() {
                   <span className={`text-sm font-mono bg-gray-900 px-3 py-1.5 rounded border border-gray-700 ${
                     highlight === 'cyan' ? 'text-cyan-400' : 
                     highlight === 'amber' ? 'text-amber-400' : 
+                    highlight === 'emerald' ? 'text-emerald-400' :
                     'text-indigo-400'
                   }`}>{key}</span>
                 </div>

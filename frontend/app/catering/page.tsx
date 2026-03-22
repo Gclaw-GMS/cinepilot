@@ -1108,7 +1108,7 @@ export default function CateringPage() {
                   }`}
                   title="Calendar view (1)"
                 >
-                  Calendar
+                  Calendar<span className="text-xs opacity-60 ml-1">(1)</span>
                 </button>
                 <button
                   onClick={() => setViewMode('analytics')}
@@ -1117,7 +1117,7 @@ export default function CateringPage() {
                   }`}
                   title="Analytics view (2)"
                 >
-                  Analytics
+                  Analytics<span className="text-xs opacity-60 ml-1">(2)</span>
                 </button>
                 <button
                   onClick={() => setViewMode('conflicts')}
@@ -1126,7 +1126,7 @@ export default function CateringPage() {
                   }`}
                   title="Conflicts view (3)"
                 >
-                  Conflicts
+                  Conflicts<span className="text-xs opacity-60 ml-1">(3)</span>
                   {conflictStats.total > 0 && (
                     <span className={`px-1.5 py-0.5 text-xs font-bold rounded-full ${
                       conflictStats.high > 0 ? 'bg-red-500 text-white' : 

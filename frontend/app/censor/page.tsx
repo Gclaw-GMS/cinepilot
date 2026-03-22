@@ -183,6 +183,8 @@ export default function CensorPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
   
   // Refs for keyboard shortcuts and click outside
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -205,6 +207,8 @@ export default function CensorPage() {
   const searchQueryRef = useRef(searchQuery)
   const clearFiltersRef = useRef<() => void>(() => {})
   const activeFilterCountRef = useRef(0)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
   
   // Sync refs with state
   useEffect(() => { showFiltersRef.current = showFilters }, [showFilters])
@@ -214,6 +218,8 @@ export default function CensorPage() {
   useEffect(() => { filterCategoryRef.current = filterCategory }, [filterCategory])
   useEffect(() => { filterSeverityRef.current = filterSeverity }, [filterSeverity])
   useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
   
   // Active filter count (includes searchQuery)
   const activeFilterCount = useMemo(() => {
@@ -313,7 +319,13 @@ export default function CensorPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          fetchDataRef.current?.()
+          if (!autoRefreshRef.current) {
+            fetchDataRef.current?.()
+          }
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case '/':
           e.preventDefault()
@@ -450,6 +462,18 @@ export default function CensorPage() {
   useEffect(() => {
     fetchAnalysis()
   }, [fetchAnalysis])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const intervalId = setInterval(() => {
+      setIsRefreshing(true)
+      fetchAnalysis()
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(intervalId)
+  }, [autoRefresh, autoRefreshInterval, fetchAnalysis])
 
   const handleAnalyze = async () => {
     setAnalyzing(true)
@@ -881,6 +905,12 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
                 <span className="flex items-center gap-1 text-xs text-gray-500">
                   <Clock className="w-3 h-3" />
                   Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  {autoRefresh && (
+                    <span className="ml-2 flex items-center gap-1 text-emerald-400">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                      Auto: {autoRefreshInterval}s
+                    </span>
+                  )}
                 </span>
               )}
             </div>
@@ -1115,12 +1145,43 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
           {/* Refresh Button */}
           <button
             onClick={() => { setIsRefreshing(true); fetchDataRef.current?.() }}
-            disabled={isRefreshing || loading}
+            disabled={isRefreshing || loading || autoRefresh}
             className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh (R)"
           >
             <RefreshCw className={`w-4 h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
+          
+          {/* Auto-refresh toggle */}
+          <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-2 text-sm transition-colors ${
+                autoRefresh ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'
+              }`}
+              title="Toggle auto-refresh"
+            >
+              <div className={`w-8 h-4 rounded-full transition-colors relative ${
+                autoRefresh ? 'bg-emerald-500' : 'bg-gray-600'
+              }`}>
+                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                  autoRefresh ? 'left-4.5 translate-x-0' : 'left-0.5'
+                }`} style={{ left: autoRefresh ? '18px' : '2px' }} />
+              </div>
+            </button>
+            {autoRefresh && (
+              <select
+                value={autoRefreshInterval}
+                onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              >
+                <option value={10}>10s</option>
+                <option value={30}>30s</option>
+                <option value={60}>1m</option>
+                <option value={300}>5m</option>
+              </select>
+            )}
+          </div>
           
           <button
             onClick={() => setShowKeyboardHelp(true)}
@@ -1664,6 +1725,10 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Refresh analysis</span>
                 <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-gray-300">R</kbd>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800">
+                <span className="text-gray-300">Toggle auto-refresh</span>
+                <kbd className="px-2 py-1 bg-gray-800 rounded text-sm text-emerald-400">A</kbd>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-300">Focus search</span>

@@ -1113,7 +1113,7 @@ export default function CharacterCostumePage() {
               }`}
             >
               <List className="w-4 h-4" />
-              List
+              List <span className="text-xs opacity-60 ml-1">(1)</span>
             </button>
             <button
               onClick={() => setViewMode('analytics')}
@@ -1124,7 +1124,7 @@ export default function CharacterCostumePage() {
               }`}
             >
               <BarChart3 className="w-4 h-4" />
-              Analytics
+              Analytics <span className="text-xs opacity-60 ml-1">(2)</span>
             </button>
             <button
               onClick={() => setViewMode('conflicts')}
@@ -1135,7 +1135,7 @@ export default function CharacterCostumePage() {
               }`}
             >
               <AlertTriangle className="w-4 h-4" />
-              Conflicts
+              Conflicts <span className="text-xs opacity-60 ml-1">(3)</span>
               {conflicts.length > 0 && (
                 <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-medium ${
                   highSeverityConflicts.length > 0 

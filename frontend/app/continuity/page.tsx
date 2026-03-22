@@ -1206,15 +1206,17 @@ export default function ContinuityPage() {
             <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`p-2 rounded-md transition-colors relative ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
               >
                 <List className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(1)</span>
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`p-2 rounded-md transition-colors relative ${viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
               >
                 <LayoutGrid className="w-4 h-4" />
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] opacity-60">(2)</span>
               </button>
             </div>
 

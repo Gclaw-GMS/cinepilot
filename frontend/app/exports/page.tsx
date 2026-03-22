@@ -7,9 +7,16 @@ import {
   CheckSquare, Square, File, Archive, Film, Clapperboard,
   DollarSign, Users, MapPin, User, Camera, FileCheck,
   Folder, Image, ClipboardList, BarChart3, TrendingUp,
-  UsersRound, Briefcase, Search, HelpCircle, Filter, ChevronDown
+  UsersRound, Briefcase, Search, HelpCircle, Filter, ChevronDown,
+  PieChart as PieChartIcon
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
 import type { LucideIcon } from 'lucide-react'
+
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
 
 interface ExportType {
   id: string
@@ -183,6 +190,52 @@ export default function ExportsPage() {
   
   // Sync activeFilterCountRef
   useEffect(() => { activeFilterCountRef.current = activeFilterCount }, [activeFilterCount])
+  
+  // Chart data computation
+  const chartData = useMemo(() => {
+    // Category distribution
+    const categoryData = EXPORT_CATEGORIES.map(cat => ({
+      name: cat.label,
+      value: cat.exports.length,
+    }))
+    
+    // Format distribution
+    const formatCounts: Record<string, number> = {}
+    EXPORT_CATEGORIES.forEach(cat => {
+      cat.exports.forEach(exp => {
+        formatCounts[exp.format] = (formatCounts[exp.format] || 0) + 1
+      })
+    })
+    const formatData = Object.entries(formatCounts).map(([name, value]) => ({
+      name,
+      value,
+    }))
+    
+    // Recent exports by day (last 7 days)
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      return d.toISOString().split('T')[0]
+    })
+    const activityByDay = last7Days.map(date => {
+      const dayName = dayNames[new Date(date).getDay()]
+      const count = recentExports.filter(e => 
+        e.timestamp.split('T')[0] === date
+      ).length
+      return { day: dayName, exports: count }
+    })
+    
+    // Success rate
+    const successCount = recentExports.filter(e => e.status === 'success').length
+    const failureCount = recentExports.filter(e => e.status === 'failed').length
+    const successRateData = [
+      { name: 'Success', value: successCount || 1 },
+      { name: 'Failed', value: failureCount || 0 },
+    ]
+    
+    return { categoryData, formatData, activityByDay, successRateData }
+  }, [recentExports])
   
   // Export menu state
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -963,6 +1016,130 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
             </div>
           </div>
         )}
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* Exports by Category */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <PieChartIcon className="w-4 h-4 text-indigo-400" />
+              Exports by Category
+            </h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={chartData.categoryData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {chartData.categoryData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  formatter={(value: number) => [`${value} exports`, 'Count']}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Exports by Format */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-emerald-400" />
+              Exports by Format
+            </h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={chartData.formatData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {chartData.formatData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  formatter={(value: number) => [`${value} formats`, 'Count']}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Recent Export Activity */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-amber-400" />
+              Export Activity (7 Days)
+            </h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData.activityByDay}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="day" stroke="#64748b" fontSize={10} />
+                <YAxis stroke="#64748b" fontSize={10} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  formatter={(value: number) => [`${value} exports`, 'Activity']}
+                />
+                <Bar dataKey="exports" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Export Success Rate */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-cyan-400" />
+              Success Rate
+            </h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={chartData.successRateData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  <Cell fill="#10b981" />
+                  <Cell fill="#ef4444" />
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  formatter={(value: number, name: string) => [name === 'Success' ? `${value} successful` : `${value} failed`, name]}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Export Categories */}

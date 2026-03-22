@@ -242,7 +242,7 @@ export default function CallSheetsPage() {
         case 'a':
           e.preventDefault()
           if (!creating && !isEditing) {
-            setAutoRefresh(!autoRefresh)
+            setAutoRefresh(prev => !prev)
           }
           break
         case '/':

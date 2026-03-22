@@ -181,6 +181,13 @@ export default function ScriptsPage() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
   const [analyses, setAnalyses] = useState<AnalysisData[]>([])
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(loading)
+  
+  // Keep loadingRef in sync
+  useEffect(() => {
+    loadingRef.current = loading
+  }, [loading])
+  
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
@@ -424,7 +431,7 @@ export default function ScriptsPage() {
   }, [showFilters])
 
   const fetchData = useCallback(async () => {
-    if (!loading) {
+    if (!loadingRef.current) {
       setRefreshing(true)
     }
     try {

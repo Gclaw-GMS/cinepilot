@@ -1163,7 +1163,7 @@ export default function EquipmentPage() {
               <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/50 rounded-lg text-xs text-slate-400">
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString()}
-                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
               </div>
             )}
             <button

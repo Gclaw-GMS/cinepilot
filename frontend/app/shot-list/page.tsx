@@ -1057,7 +1057,7 @@ ${locallyFiltered.map(shot => {
               {autoRefresh && (
                 <span className="flex items-center gap-1 text-emerald-400 ml-2">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                  Auto: {autoRefreshInterval}s
+                  Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                 </span>
               )}
             </span>

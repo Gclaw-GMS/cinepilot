@@ -1076,7 +1076,7 @@ export default function NotificationsPage() {
                 {autoRefresh && (
                   <span className="flex items-center gap-1 text-emerald-400">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Auto: {autoRefreshInterval}s
+                    Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                   </span>
                 )}
                 <Clock className="w-3.5 h-3.5" />

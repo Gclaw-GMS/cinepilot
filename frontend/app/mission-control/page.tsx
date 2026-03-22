@@ -1066,7 +1066,7 @@ ${currentData.weekly.map(w => `| ${w.day} | ${formatCurr(w.budget)} | ${w.scenes
               {autoRefresh && (
                 <p className="text-xs text-emerald-400 font-mono flex items-center gap-1 mt-1">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                  Auto: {autoRefreshInterval}s
+                  Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                 </p>
               )}
             </div>

@@ -1095,7 +1095,7 @@ export default function CharacterCostumePage() {
                 <span className="ml-2 flex items-center gap-1 text-xs text-slate-500">
                   <Clock className="w-3 h-3" />
                   Updated: {lastUpdated.toLocaleTimeString('en-GB')}
-                  {autoRefresh && <span className="text-emerald-400"> • Auto: {autoRefreshInterval}s</span>}
+                  {autoRefresh && <span className="text-emerald-400"> • Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
                 </span>
               )}
             </h1>

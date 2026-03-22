@@ -1074,7 +1074,7 @@ export default function AnalyticsPage() {
               <span className="text-sm font-normal text-slate-400 ml-2 flex items-center gap-1">
                 <Clock className="w-4 h-4" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
               </span>
             )}
           </h1>

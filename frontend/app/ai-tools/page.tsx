@@ -1161,13 +1161,13 @@ ${currentFilteredTools.filter(t => t.category === category).map(t => `| ${t.name
                       ? 'bg-emerald-600/20 border border-emerald-500/50' 
                       : 'bg-slate-800 hover:bg-slate-700 border border-slate-700'
                   }`}
-                  title={autoRefresh ? `Auto-refresh: On (${autoRefreshInterval}s) - Press A to toggle` : 'Auto-refresh: Off - Press A to toggle'}
+                  title={autoRefresh ? `Auto-refresh: On (${autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}) - Press A to toggle` : 'Auto-refresh: Off - Press A to toggle'}
                 >
                   <div className="flex items-center gap-1.5">
                     <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'text-emerald-400 animate-spin' : 'text-slate-400'}`} />
                     {autoRefresh && (
                       <span className="text-xs text-emerald-400 font-medium">
-                        {autoRefreshInterval}s
+                        {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                       </span>
                     )}
                   </div>

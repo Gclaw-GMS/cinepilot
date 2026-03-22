@@ -1498,7 +1498,7 @@ export default function WeatherPage() {
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
                 <Clock className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-400 text-xs">
-                  {autoRefresh && <span className="flex items-center gap-1 text-emerald-400 mr-2"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Auto: {autoRefreshInterval}s</span>}
+                  {autoRefresh && <span className="flex items-center gap-1 text-emerald-400 mr-2"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
                   Updated: {lastUpdated.toLocaleTimeString()}
                 </span>
               </div>

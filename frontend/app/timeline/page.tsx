@@ -876,7 +876,7 @@ ${shootingDays.map((day: any) => `| ${day.dayNumber || '-'} | ${day.scheduledDat
                     <Clock className="w-3 h-3" />
                     Updated: {lastUpdated.toLocaleTimeString('en-GB')}
                     {autoRefresh && (
-                      <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval}s</span>
+                      <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>
                     )}
                   </span>
                 )}

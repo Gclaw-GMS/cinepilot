@@ -1096,7 +1096,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
               {autoRefresh && (
                 <span className="ml-2 flex items-center gap-1 text-green-400">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                  Auto: {autoRefreshInterval}s
+                  Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                 </span>
               )}
             </div>
@@ -1150,7 +1150,7 @@ ${forecast.categories.map(cat => `| ${cat.category} | ₹${cat.planned.toLocaleS
                 ? 'bg-green-600 text-white' 
                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
             }`}
-            title={autoRefresh ? `Auto-refresh ON (${autoRefreshInterval}s)` : 'Auto-refresh OFF'}
+            title={autoRefresh ? `Auto-refresh ON (${autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`})` : 'Auto-refresh OFF'}
           >
             <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
             Auto

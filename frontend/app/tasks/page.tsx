@@ -1343,7 +1343,7 @@ export default function TasksPage() {
                 <Clock className="w-3.5 h-3.5" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                 {autoRefresh && (
-                  <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval}s</span>
+                  <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>
                 )}
               </span>
             )}

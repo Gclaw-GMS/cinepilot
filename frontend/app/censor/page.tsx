@@ -908,7 +908,7 @@ ${(analysis.uncertainties || []).map(u => `- ${u}`).join('\n')}
                   {autoRefresh && (
                     <span className="ml-2 flex items-center gap-1 text-emerald-400">
                       <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                      Auto: {autoRefreshInterval}s
+                      Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}
                     </span>
                   )}
                 </span>

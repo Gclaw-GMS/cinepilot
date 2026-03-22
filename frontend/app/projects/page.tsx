@@ -1044,7 +1044,7 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
               <span className="ml-2 flex items-center gap-1 text-xs text-slate-500">
                 <Clock className="w-3 h-3" />
                 Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                {autoRefresh && <span className="text-emerald-500"> · Auto: {autoRefreshInterval}s</span>}
+                {autoRefresh && <span className="text-emerald-500"> · Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
               </span>
             )}
           </h1>

@@ -954,7 +954,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
               <Clock className="w-4 h-4 text-slate-400" />
               <span className="text-slate-400 text-xs">
                 Updated: {lastUpdated.toLocaleTimeString()}
-                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+                {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
               </span>
             </div>
           )}

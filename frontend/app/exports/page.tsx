@@ -739,7 +739,7 @@ ${recentExports.slice(0, 5).map(exp => `| ${exp.name} | ${exp.type} | ${new Date
                 <span className="ml-2 text-xs text-slate-500 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   Updated: {lastUpdated.toLocaleTimeString('en-GB')}
-                  {autoRefresh && <span className="ml-1 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+                  {autoRefresh && <span className="ml-1 text-emerald-400">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
                 </span>
               )}
             </h1>

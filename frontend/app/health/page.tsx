@@ -687,7 +687,7 @@ export default function HealthPage() {
                   <span className="text-sm font-normal text-slate-400 ml-2 flex items-center gap-1">
                     <Clock className="w-4 h-4" />
                     Updated: {lastRefresh.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    {autoRefresh && <span className="text-emerald-400">• Auto: {autoRefreshInterval}s</span>}
+                    {autoRefresh && <span className="text-emerald-400">• Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
                   </span>
                 )}
               </h1>

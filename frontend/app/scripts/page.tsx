@@ -1154,7 +1154,7 @@ Warnings: ${allWarnings.length}`
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               Updated: {lastUpdated.toLocaleTimeString()}
-              {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval}s</span>}
+              {autoRefresh && <span className="ml-2 text-emerald-400">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}
             </p>
           )}
         </div>

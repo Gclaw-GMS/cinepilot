@@ -49,6 +49,9 @@ export default function WhatsAppPage() {
   const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30) // seconds
+  
   // Filter panel state (using showFilterPanel)
   
   // Filter panel state
@@ -150,6 +153,9 @@ export default function WhatsAppPage() {
   const statusFilterRef = useRef(statusFilter)
   const roleFilterRef = useRef(roleFilter)
   const activeTabRef = useRef(activeTab)
+  const autoRefreshRef = useRef(autoRefresh)
+  const autoRefreshIntervalRef = useRef(autoRefreshInterval)
+  const isRefreshingRef = useRef(isRefreshing)
   
   // Update refs when state changes
   useEffect(() => { showFilterPanelRef.current = showFilterPanel }, [showFilterPanel])
@@ -157,6 +163,9 @@ export default function WhatsAppPage() {
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
   useEffect(() => { roleFilterRef.current = roleFilter }, [roleFilter])
   useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+  useEffect(() => { autoRefreshRef.current = autoRefresh }, [autoRefresh])
+  useEffect(() => { autoRefreshIntervalRef.current = autoRefreshInterval }, [autoRefreshInterval])
+  useEffect(() => { isRefreshingRef.current = isRefreshing }, [isRefreshing])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -185,6 +194,20 @@ export default function WhatsAppPage() {
     setTimeout(() => setIsRefreshing(false), 500)
   }, [fetchData])
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return
+    
+    const intervalId = setInterval(() => {
+      if (!isRefreshingRef.current) {
+        setIsRefreshing(true)
+        fetchData()
+      }
+    }, autoRefreshInterval * 1000)
+    
+    return () => clearInterval(intervalId)
+  }, [autoRefresh, autoRefreshInterval, fetchData])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -196,7 +219,13 @@ export default function WhatsAppPage() {
       switch (e.key.toLowerCase()) {
         case 'r':
           e.preventDefault()
-          handleRefresh()
+          if (!autoRefreshRef.current) {
+            handleRefresh()
+          }
+          break
+        case 'a':
+          e.preventDefault()
+          setAutoRefresh(!autoRefreshRef.current)
           break
         case 'f':
           e.preventDefault()
@@ -777,7 +806,7 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg"><MessageCircle className="w-6 h-6 text-white" /></div>
-          <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}{lastUpdated && <span className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
+          <div><div className="flex items-center gap-3"><h1 className="text-2xl font-bold text-white">WhatsApp Broadcast</h1>{isDemoMode && <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full font-medium">Demo Mode</span>}{lastUpdated && <span className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" />Updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}{autoRefresh && <span className="text-emerald-400 ml-1">Auto: {autoRefreshInterval < 60 ? `${autoRefreshInterval}s` : `${autoRefreshInterval / 60}m`}</span>}</span>}</div><p className="text-gray-500 text-sm mt-1">Send messages to cast & crew</p></div>
         </div>
         
         <div className="flex items-center gap-3 relative">
@@ -974,11 +1003,39 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
           {/* Refresh Button */}
           <button 
             onClick={handleRefresh} 
-            disabled={isRefreshing}
+            disabled={isRefreshing || autoRefresh}
             className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
           >
             <RefreshCw className={`w-5 h-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
+          
+          {/* Auto-Refresh Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`p-2 rounded-lg transition-colors ${autoRefresh ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'}`}
+              title="Auto-Refresh Toggle (A)"
+            >
+              <div className="flex items-center gap-1">
+                <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                <span className="text-xs font-medium">Auto</span>
+              </div>
+            </button>
+            {autoRefresh && (
+              <div className="absolute top-full mt-1 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[120px] z-20">
+                {[10, 30, 60, 300].map((val) => (
+                  <button
+                    key={val}
+                    onClick={() => setAutoRefreshInterval(val)}
+                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-700 flex items-center justify-between ${autoRefreshInterval === val ? 'text-cyan-400' : 'text-gray-300'}`}
+                  >
+                    {val < 60 ? `${val}s` : `${val / 60}m`}
+                    {autoRefreshInterval === val && <span className="w-2 h-2 bg-cyan-400 rounded-full"></span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           
           {/* Keyboard Help Button */}
           <button 
@@ -1350,6 +1407,7 @@ ${contacts.map(c => `| ${c.name} | ${c.phone} | ${c.role || '-'} |`).join('\n')}
               {/* Main shortcuts */}
               <div className="text-xs text-cyan-400 uppercase tracking-wider mb-1">General</div>
               {[
+                { key: 'A', description: 'Toggle auto-refresh' },
                 { key: 'R', description: 'Refresh data' },
                 { key: 'S', description: 'Toggle sort order (asc/desc)' },
                 { key: 'F', description: 'Toggle filter panel' },

@@ -1051,10 +1051,11 @@ export default function CrewPage() {
                           ? 'bg-emerald-600 text-white' 
                           : 'text-slate-400 hover:text-white hover:bg-slate-700'
                       }`}
-                      title={`${option.label} (${option.key === 'list' ? '1' : '2'})`}
+                      title={`${option.label} (V)`}
                     >
                       <Icon className="w-4 h-4" />
                       <span className="hidden md:inline">{option.label}</span>
+                      <span className="text-xs opacity-60 ml-1">(V)</span>
                     </button>
                   );
                 })}

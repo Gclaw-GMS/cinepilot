@@ -1514,7 +1514,7 @@ export default function WeatherPage() {
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Forecast
+                    Forecast<span className="text-xs opacity-60 ml-1">(1)</span>
                   </button>
                   <button
                     onClick={() => setViewMode('hourly')}
@@ -1524,7 +1524,7 @@ export default function WeatherPage() {
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Hourly
+                    Hourly<span className="text-xs opacity-60 ml-1">(2)</span>
                   </button>
                   <button
                     onClick={() => setViewMode('analytics')}
@@ -1534,7 +1534,7 @@ export default function WeatherPage() {
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Analytics
+                    Analytics<span className="text-xs opacity-60 ml-1">(3)</span>
                   </button>
                   <button
                     onClick={() => setViewMode('schedule')}
@@ -1545,7 +1545,7 @@ export default function WeatherPage() {
                     }`}
                   >
                     <Calendar className="w-3.5 h-3.5" />
-                    Schedule
+                    Schedule<span className="text-xs opacity-60">(4)</span>
                   </button>
                   <button
                     onClick={() => setViewMode('alerts')}
@@ -1556,7 +1556,7 @@ export default function WeatherPage() {
                     }`}
                   >
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    Alerts
+                    Alerts<span className="text-xs opacity-60">(5)</span>
                     {weatherData && (() => {
                       const alerts = generateWeatherAlerts(weatherData.forecast, scheduleData?.shootingDays || scheduleData?.days);
                       const criticalCount = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;

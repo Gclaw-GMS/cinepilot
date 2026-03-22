@@ -1423,7 +1423,7 @@ export default function EquipmentPage() {
             }`}
           >
             <Package className="w-4 h-4 inline-block mr-2" />
-            List
+            List<span className="text-xs opacity-60 ml-1">(1)</span>
           </button>
           <button
             onClick={() => setViewMode('analytics')}
@@ -1434,7 +1434,7 @@ export default function EquipmentPage() {
             }`}
           >
             <DollarSign className="w-4 h-4 inline-block mr-2" />
-            Analytics
+            Analytics<span className="text-xs opacity-60 ml-1">(2)</span>
           </button>
           <button
             onClick={() => setViewMode('conflicts')}
@@ -1445,14 +1445,13 @@ export default function EquipmentPage() {
             }`}
           >
             <AlertTriangle className="w-4 h-4 inline-block" />
-            Conflicts
+            Conflicts<span className="text-xs opacity-60 ml-1">(3)</span>
             {conflictStats.high > 0 && (
               <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                 {conflictStats.high}
               </span>
             )}
           </button>
-          <span className="text-xs text-slate-500 ml-2">Press 1, 2, 3 to switch views</span>
         </div>
 
         {/* List/Analytics View */}

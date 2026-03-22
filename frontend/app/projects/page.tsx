@@ -24,8 +24,25 @@ import {
   Filter,
   Printer,
   FileText,
-  Clock
+  Clock,
+  BarChart3,
+  PieChart as PieChartIcon
 } from 'lucide-react'
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts'
+
+const CHART_COLORS = ['#06b6d4', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6', '#14b8a6']
 
 interface Project {
   id: string
@@ -918,6 +935,49 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
     return result
   }, [projects, search, filters, sortBy, sortOrder])
 
+  // Chart data for visualizations
+  const statusData = useMemo(() => {
+    const counts = filtered.reduce((acc: Record<string, number>, p) => {
+      acc[p.status] = (acc[p.status] || 0) + 1
+      return acc
+    }, {})
+    return Object.entries(counts).map(([name, value]) => ({ name: name.replace('_', ' '), value }))
+  }, [filtered])
+
+  const languageData = useMemo(() => {
+    const counts = filtered.reduce((acc: Record<string, number>, p) => {
+      if (p.language) {
+        acc[p.language] = (acc[p.language] || 0) + 1
+      }
+      return acc
+    }, {})
+    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  }, [filtered])
+
+  const genreData = useMemo(() => {
+    const counts = filtered.reduce((acc: Record<string, number>, p) => {
+      if (p.genre) {
+        const primaryGenre = p.genre.split('/')[0].trim()
+        acc[primaryGenre] = (acc[primaryGenre] || 0) + 1
+      }
+      return acc
+    }, {})
+    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  }, [filtered])
+
+  const budgetData = useMemo(() => {
+    const statusBudgets = filtered.reduce((acc: Record<string, number>, p) => {
+      const budget = parseInt(p.budget || '0') || 0
+      const status = p.status.replace('_', ' ')
+      acc[status] = (acc[status] || 0) + budget
+      return acc
+    }, {})
+    return Object.entries(statusBudgets).map(([name, value]) => ({
+      name,
+      budget: Math.round(value / 100000) // Convert to lakhs
+    }))
+  }, [filtered])
+
   // Refs for keyboard shortcut accessibility
   const filteredRef = useRef(filtered)
   const handleExportMarkdownRef = useRef(handleExportMarkdown)
@@ -1280,6 +1340,146 @@ ${p.description ? `- **Description:** ${p.description}` : ''}
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-600 bg-slate-900 px-1.5 py-0.5 rounded">/</span>
         </div>
       </div>
+
+      {/* Charts Section */}
+      {filtered.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Projects by Status */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <PieChartIcon className="w-4 h-4 text-cyan-400" />
+              <span className="text-sm font-medium text-slate-300">By Status</span>
+            </div>
+            <ResponsiveContainer width="100%" height={120}>
+              <PieChart>
+                <Pie
+                  data={statusData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={30}
+                  outerRadius={45}
+                  paddingAngle={2}
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {statusData.map((entry, index) => (
+                <span key={entry.name} className="text-xs text-slate-500">
+                  {entry.name}: {entry.value}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Projects by Language */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <PieChartIcon className="w-4 h-4 text-violet-400" />
+              <span className="text-sm font-medium text-slate-300">By Language</span>
+            </div>
+            <ResponsiveContainer width="100%" height={120}>
+              <PieChart>
+                <Pie
+                  data={languageData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={30}
+                  outerRadius={45}
+                  paddingAngle={2}
+                >
+                  {languageData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {languageData.map((entry, index) => (
+                <span key={entry.name} className="text-xs text-slate-500">
+                  {entry.name}: {entry.value}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Projects by Genre */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <PieChartIcon className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm font-medium text-slate-300">By Genre</span>
+            </div>
+            <ResponsiveContainer width="100%" height={120}>
+              <PieChart>
+                <Pie
+                  data={genreData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={30}
+                  outerRadius={45}
+                  paddingAngle={2}
+                >
+                  {genreData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {genreData.slice(0, 3).map((entry, index) => (
+                <span key={entry.name} className="text-xs text-slate-500">
+                  {entry.name}: {entry.value}
+                </span>
+              ))}
+              {genreData.length > 3 && (
+                <span className="text-xs text-slate-500">+{genreData.length - 3} more</span>
+              )}
+            </div>
+          </div>
+
+          {/* Budget by Status */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-medium text-slate-300">Budget (Lakhs)</span>
+            </div>
+            <ResponsiveContainer width="100%" height={120}>
+              <BarChart data={budgetData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="name" tick={{ fontSize: 8 }} stroke="#64748b" />
+                <YAxis tick={{ fontSize: 8 }} stroke="#64748b" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                  formatter={(value: number) => [`₹${value}L`, 'Budget']}
+                />
+                <Bar dataKey="budget" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Projects Grid */}
       {loading ? (

@@ -1131,7 +1131,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 viewMode === 'cards' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Cards
+              Cards <span className="text-xs opacity-60 ml-1">(C/1)</span>
             </button>
             <button
               onClick={() => setViewMode('chart')}
@@ -1139,7 +1139,7 @@ ${selectedScene ? `## Scene: ${selectedScene.sceneNumber}
                 viewMode === 'chart' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Analysis
+              Analysis <span className="text-xs opacity-60 ml-1">(T/2)</span>
             </button>
           </div>
         </div>

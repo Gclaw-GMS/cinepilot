@@ -145,7 +145,7 @@ export default function EquipmentPage() {
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'analytics' | 'conflicts' | 'timeline'>('list')
   const [budgetLimit, setBudgetLimit] = useState<number>(50000) // Daily budget limit for rentals
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
@@ -676,6 +676,8 @@ export default function EquipmentPage() {
           if (isFiltersOpen) {
             // Filter by maintenance status (toggle)
             setFilterStatus(prev => prev === 'maintenance' ? 'all' : 'maintenance')
+          } else {
+            setViewMode('timeline')
           }
           break
         case '5':
@@ -1453,6 +1455,17 @@ export default function EquipmentPage() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setViewMode('timeline')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'timeline'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+            }`}
+          >
+            <Clock className="w-4 h-4 inline-block mr-2" />
+            Timeline<span className="text-xs opacity-60 ml-1">(4)</span>
+          </button>
         </div>
 
         {/* List/Analytics View */}
@@ -1649,6 +1662,130 @@ export default function EquipmentPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Timeline View */}
+        {viewMode === 'timeline' && (
+          <div className="space-y-6">
+            {/* Timeline Header */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Equipment Rental Timeline</h3>
+                  <p className="text-sm text-slate-400">Visual overview of equipment availability over time</p>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-emerald-500"></span>
+                    Available
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-amber-500"></span>
+                    In Use
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-red-500"></span>
+                    Maintenance
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-slate-500"></span>
+                    Returned
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Timeline Chart */}
+            {equipment.length > 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 overflow-x-auto">
+                <div className="min-w-[800px]">
+                  {/* Timeline Header - Days */}
+                  <div className="flex border-b border-slate-700 pb-2 mb-4">
+                    <div className="w-40 shrink-0 text-sm text-slate-400 font-medium">Equipment</div>
+                    <div className="flex-1 flex">
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map(day => (
+                        <div key={day} className="flex-1 text-center text-xs text-slate-500">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Timeline Rows */}
+                  {filtered.map(eq => {
+                    const startDay = parseInt(eq.dateStart.split('-')[2]) || 1
+                    const endDay = parseInt(eq.dateEnd.split('-')[2]) || 30
+                    const statusColors: Record<string, string> = {
+                      'available': 'bg-emerald-500',
+                      'in-use': 'bg-amber-500',
+                      'maintenance': 'bg-red-500',
+                      'returned': 'bg-slate-500'
+                    }
+                    const barColor = statusColors[eq.status] || 'bg-slate-500'
+                    
+                    return (
+                      <div key={eq.id} className="flex items-center py-2 border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+                        <div className="w-40 shrink-0">
+                          <p className="text-sm font-medium text-white truncate">{eq.name}</p>
+                          <p className="text-xs text-slate-500">{eq.category}</p>
+                        </div>
+                        <div className="flex-1 flex h-8 items-center relative">
+                          {/* Background grid lines */}
+                          {Array.from({ length: 30 }, (_, i) => (
+                            <div key={i} className="flex-1 border-l border-slate-800 h-full"></div>
+                          ))}
+                          {/* Rental bar */}
+                          <div 
+                            className={`absolute h-6 rounded ${barColor} opacity-80`}
+                            style={{
+                              left: `${((startDay - 1) / 30) * 100}%`,
+                              width: `${Math.max(((endDay - startDay + 1) / 30) * 100, 2)}%`
+                            }}
+                            title={`${eq.dateStart} to ${eq.dateEnd}`}
+                          ></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+                <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400">No equipment to display</p>
+                <button 
+                  onClick={() => setModalOpen(true)}
+                  className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium"
+                >
+                  Add Equipment
+                </button>
+              </div>
+            )}
+
+            {/* Timeline Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Active Rentals</p>
+                <p className="text-2xl font-bold mt-1">{equipment.filter(e => e.status === 'in-use').length}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Total Rental Days</p>
+                <p className="text-2xl font-bold mt-1">{equipment.reduce((acc, e) => {
+                  const start = parseInt(e.dateStart.split('-')[2]) || 0
+                  const end = parseInt(e.dateEnd.split('-')[2]) || 30
+                  return acc + (end - start + 1)
+                }, 0)}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Available Now</p>
+                <p className="text-2xl font-bold mt-1 text-emerald-400">{equipment.filter(e => e.status === 'available').length}</p>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Need Attention</p>
+                <p className="text-2xl font-bold mt-1 text-red-400">{equipment.filter(e => e.status === 'maintenance').length}</p>
+              </div>
+            </div>
           </div>
         )}
 

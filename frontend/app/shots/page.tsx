@@ -301,7 +301,7 @@ export default function ShotsPage() {
         case 'Enter': 
           e.preventDefault()
           if (selectedRowIndexRef.current >= 0 && selectedRowIndexRef.current < filteredShotsRef.current.length) {
-            openEditForm(filteredShotsRef.current[selectedRowIndexRef.current])
+            openEditFormRef.current(filteredShotsRef.current[selectedRowIndexRef.current])
           }
           break
         case 'Escape': setShowExportMenu(false); setShowKeyboardHelp(false); setShowForm(false); setSearchQuery(''); setDeleteConfirm(null); setSelectedRowIndex(-1); break 
@@ -310,6 +310,9 @@ export default function ShotsPage() {
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
   }, [fetchShots, clearFilters, scenes])
 
+  // Forward reference for openEditForm to use in keyboard handler
+  const openEditFormRef = useRef<(shot: Shot) => void>(() => {})
+  
   const openEditForm = useCallback((shot: Shot) => {
     setEditingShot(shot)
     setFormData({
@@ -329,6 +332,9 @@ export default function ShotsPage() {
     setFormError(null)
     setShowForm(true)
   }, [])
+  
+  // Update ref after openEditForm is defined
+  useEffect(() => { openEditFormRef.current = openEditForm }, [openEditForm])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
